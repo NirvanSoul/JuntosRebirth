@@ -1,0 +1,308 @@
+import { fireEvent, render, within } from '@testing-library/react-native';
+import { Dimensions, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { CategoryDetailModal } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal';
+import type { Category } from '@/features/categories/types';
+import type { SessionTransaction } from '@/features/transactions/types';
+import { categoryColors } from '@/theme/categoryColors';
+import { colors } from '@/theme/colors';
+import { iconSize, layout } from '@/theme/layout';
+import { shadows } from '@/theme/shadows';
+import { spacing } from '@/theme/spacing';
+
+const category: Category = {
+  id: 'food',
+  spaceId: 'personal',
+  name: 'Comida',
+  icon: 'fork-knife',
+  colorToken: 'orange',
+  isDefault: false,
+  isArchived: false,
+};
+
+const transaction: SessionTransaction = {
+  id: 'lunch',
+  spaceId: 'personal',
+  type: 'expense',
+  amountMinor: 1890,
+  currency: 'EUR',
+  title: 'Almuerzo',
+  categoryId: 'food',
+  occurredOn: '2026-07-30',
+  recurrence: 'once',
+  updatedAt: '2026-07-30T12:00:00.000Z',
+};
+
+describe('CategoryDetailModal', () => {
+  it('expone presupuesto, compartir, edición y eliminación desde el detalle', async () => {
+    const onSaveBudget = jest.fn();
+    const onShare = jest.fn(() => true);
+    const onEdit = jest.fn();
+    const onDelete = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <CategoryDetailModal
+          category={category}
+          onAddTransaction={jest.fn()}
+          onClose={jest.fn()}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          onSaveBudget={onSaveBudget}
+          onShare={onShare}
+          shareTargets={[{ id: 'couple', name: 'Pareja' }]}
+          transactions={[transaction]}
+          visible
+        />
+      </SafeAreaProvider>,
+    );
+    const detail = screen.getByTestId('category-detail-modal');
+    const modalContent = screen.getByTestId('category-detail-modal-content');
+    const scrollView = screen.getByTestId('category-detail-scroll-view');
+
+    expect(StyleSheet.flatten(detail.props.style).height).toBeCloseTo(
+      (Dimensions.get('window').height - 47) * 0.94,
+    );
+    expect(StyleSheet.flatten(modalContent.props.style).paddingBottom).toBe(0);
+    expect(
+      StyleSheet.flatten(scrollView.props.contentContainerStyle).paddingBottom,
+    ).toBe(34 + layout.modalBottomInset.regular + spacing.md);
+    expect(
+      StyleSheet.flatten(scrollView.props.contentContainerStyle).paddingTop,
+    ).toBe(spacing.xl + layout.minTouchTarget);
+    expect(StyleSheet.flatten(scrollView.props.style).flex).toBe(1);
+    expect(scrollView.props.nestedScrollEnabled).toBeUndefined();
+
+    expect(
+      within(detail).getByTestId('category-detail-context').props.children,
+    ).toBe('Categoría');
+    expect(
+      within(detail).getByTestId('category-detail-title').props.children,
+    ).toBe('Comida');
+    expect(within(detail).queryByText('1 movimiento')).toBeNull();
+    expect(within(detail).getByText('Almuerzo')).toBeTruthy();
+    expect(within(detail).getByTestId('category-expense-metric')).toBeTruthy();
+    expect(within(detail).queryByTestId('category-income-metric')).toBeNull();
+    expect(within(detail).queryByTestId('category-budget-summary')).toBeNull();
+    const topBar = screen.getByTestId('category-detail-top-bar');
+    expect(StyleSheet.flatten(topBar.props.style).paddingTop).toBe(spacing.xl);
+    expect(StyleSheet.flatten(topBar.props.style).position).toBe('absolute');
+    expect(
+      within(topBar).getAllByRole('button')[0]?.props.accessibilityLabel,
+    ).toBe('Eliminar categoría');
+    expect(
+      within(topBar).getAllByRole('button')[1]?.props.accessibilityLabel,
+    ).toBe('Editar categoría');
+    expect(
+      within(topBar).getAllByRole('button')[2]?.props.accessibilityLabel,
+    ).toBe('Cerrar');
+    expect(
+      StyleSheet.flatten(
+        within(detail).getByTestId('category-action-icon-copy-outline').props
+          .style,
+      ).color,
+    ).toBe(colors.textMuted);
+    expect(within(detail).getByTestId('category-action-icon-add')).toBeTruthy();
+    const actionButtons = within(
+      screen.getByTestId('category-detail-actions'),
+    ).getAllByRole('button');
+    expect(
+      actionButtons.map((button) => button.props.accessibilityLabel),
+    ).toEqual(['Añadir movimiento', 'Añadir presupuesto', 'Copiar en otro espacio']);
+    expect(StyleSheet.flatten(actionButtons[0]?.props.style)).toMatchObject({
+      ...shadows.subtle,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+    });
+
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Añadir presupuesto' }),
+    );
+    const budgetModal = screen.getByTestId('category-budget-modal');
+    expect(
+      within(budgetModal).getByTestId('category-budget-keypad'),
+    ).toBeTruthy();
+    expect(within(budgetModal).getByRole('button', { name: ',' })).toBeTruthy();
+    expect(
+      within(budgetModal).getByRole('button', { name: 'Borrar' }),
+    ).toBeTruthy();
+    await fireEvent.press(
+      within(budgetModal).getByRole('button', { name: '3' }),
+    );
+    await fireEvent.press(
+      within(budgetModal).getByRole('button', { name: '0' }),
+    );
+    expect(
+      StyleSheet.flatten(
+        within(budgetModal).getByTestId('category-budget-save-gradient').props
+          .style,
+      ).backgroundColor,
+    ).toBe(categoryColors.orange);
+    await fireEvent.press(
+      within(budgetModal).getByRole('button', { name: '0' }),
+    );
+    await fireEvent.press(
+      within(budgetModal).getByRole('button', { name: 'Guardar presupuesto' }),
+    );
+    expect(onSaveBudget).toHaveBeenCalledWith('food', 30_000);
+
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Copiar en otro espacio' }),
+    );
+    const spacePicker = screen.getByTestId('category-space-picker-modal');
+    await fireEvent.press(
+      within(spacePicker).getByRole('button', { name: 'Copiar a Pareja' }),
+    );
+    expect(onShare).toHaveBeenCalledWith('food', 'couple');
+
+    const detailActions = within(detail).getByTestId(
+      'category-detail-edit-delete-actions',
+    );
+    expect(
+      within(detailActions)
+        .getAllByRole('button')
+        .map((button) => button.props.accessibilityLabel),
+    ).toEqual(['Eliminar categoría', 'Editar categoría']);
+    expect(StyleSheet.flatten(detailActions.props.style).gap).toBe(spacing.md);
+    expect(within(detail).getByTestId('category-menu-edit-item')).toBeTruthy();
+    expect(
+      within(detail).getByTestId('category-menu-delete-item'),
+    ).toBeTruthy();
+    expect(
+      within(detail).getByTestId('category-menu-edit-item-icon'),
+    ).toBeTruthy();
+    expect(
+      within(detail).getByTestId('category-menu-delete-item-icon'),
+    ).toBeTruthy();
+    expect(
+      within(detail).getByTestId('category-menu-delete-item-icon').props.width,
+    ).toBe(iconSize.md);
+    expect(
+      within(detail).getByTestId('category-menu-edit-item-icon').props.width,
+    ).toBe(iconSize.sm);
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Editar categoría' }),
+    );
+    expect(onEdit).toHaveBeenCalledWith('food');
+
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Eliminar categoría' }),
+    );
+    const deletePanel = within(detail).getByTestId('category-delete-panel');
+    const metrics = within(detail).getByTestId(
+      'category-expense-metric',
+    ).parent;
+    expect(deletePanel.parent).toBe(metrics?.parent);
+    expect(deletePanel.parent?.children.indexOf(deletePanel)).toBeLessThan(
+      deletePanel.parent?.children.indexOf(metrics!) ?? 0,
+    );
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Eliminar' }),
+    );
+    expect(onDelete).toHaveBeenCalledWith('food');
+  });
+
+  it('muestra el presupuesto existente como progreso y saldo disponible', async () => {
+    const onSaveBudget = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <CategoryDetailModal
+          category={{ ...category, budgetMinor: 5000 }}
+          onAddTransaction={jest.fn()}
+          onClose={jest.fn()}
+          onDelete={jest.fn()}
+          onEdit={jest.fn()}
+          onSaveBudget={onSaveBudget}
+          onShare={jest.fn(() => true)}
+          shareTargets={[]}
+          transactions={[transaction]}
+          visible
+        />
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getByTestId('category-budget-summary')).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: 'Copiar en otro espacio' }),
+    ).toBeNull();
+    expect(screen.getByText(/31,10/)).toBeTruthy();
+    expect(screen.getByText(/^50\s*€$/)).toBeTruthy();
+    expect(screen.getByRole('progressbar').props.accessibilityValue).toEqual({
+      min: 0,
+      max: 100,
+      now: 38,
+      text: expect.stringContaining('31,10'),
+    });
+    expect(screen.getByTestId('category-budget-progress').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ width: '37.8%' })]),
+    );
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Editar presupuesto' }),
+    );
+    const budgetModal = screen.getByTestId('category-budget-modal');
+    const removeButton = within(budgetModal).getByRole('button', {
+      name: 'Quitar Presupuesto',
+    });
+    const removeButtonStyle = StyleSheet.flatten(removeButton.props.style);
+    const removeLabelStyle = StyleSheet.flatten(
+      within(removeButton).getByTestId('category-budget-remove-label').props
+        .style,
+    );
+
+    expect(removeButtonStyle).toMatchObject({ flexBasis: '40%' });
+    expect(removeButtonStyle.minHeight).toBeGreaterThanOrEqual(
+      layout.actionHeight.compact,
+    );
+    expect(removeLabelStyle.color).toBe(colors.textPrimary);
+    expect(within(removeButton).getByText('Quitar Presupuesto')).toBeTruthy();
+
+    await fireEvent.press(removeButton);
+    expect(onSaveBudget).toHaveBeenCalledWith('food', undefined);
+  });
+
+  it('omite gastos cuando la categoría solo tiene ingresos', async () => {
+    const incomeTransaction: SessionTransaction = {
+      ...transaction,
+      id: 'refund',
+      type: 'income',
+      amountMinor: 2400,
+      title: 'Reembolso',
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <CategoryDetailModal
+          category={category}
+          onAddTransaction={jest.fn()}
+          onClose={jest.fn()}
+          onDelete={jest.fn()}
+          onEdit={jest.fn()}
+          onSaveBudget={jest.fn()}
+          onShare={jest.fn(() => true)}
+          shareTargets={[]}
+          transactions={[incomeTransaction]}
+          visible
+        />
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getByTestId('category-income-metric')).toBeTruthy();
+    expect(screen.queryByTestId('category-expense-metric')).toBeNull();
+  });
+});

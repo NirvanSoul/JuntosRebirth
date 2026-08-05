@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npm run *)",
+      "Bash(node -e \"console.log\\(require\\('./package.json'\\).scripts\\)\")",
+      "Bash(npx prettier *)",
+      "Bash(npm ls *)",
+      "Bash(npm view *)",
+      "Bash(chmod +x scripts/tunnel.sh)",
+      "Bash(sh -n scripts/tunnel.sh)",
+      "Bash(npx jest *)",
+      "Bash(npm test *)",
+      "Bash(cp /tmp/debug_test.test.tsx \"src/features/transactions/components/PeriodComparisonIndicator/debug.test.tsx\")",
+      "Read(//tmp/**)",
+      "Bash(rm \"src/features/transactions/components/PeriodComparisonIndicator/debug.test.tsx\")"
+    ]
+  }
+}

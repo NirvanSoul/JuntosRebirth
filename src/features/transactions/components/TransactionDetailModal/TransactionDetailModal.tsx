@@ -1,0 +1,640 @@
+import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import {
+  AppModal,
+  useAppModalBottomInset,
+} from '@/components/overlays/AppModal/AppModal';
+import {
+  CopyToSpaceModal,
+  type CopyTarget,
+} from '@/components/overlays/CopyToSpaceModal/CopyToSpaceModal';
+import { DetailActionMenu } from '@/components/overlays/DetailActionMenu/DetailActionMenu';
+import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
+import { Text } from '@/components/ui/Text/Text';
+import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
+import type { Category } from '@/features/categories/types';
+import { TransactionReminderModal } from '@/features/transactions/components/TransactionReminderModal/TransactionReminderModal';
+import type {
+  SessionTransaction,
+  TransactionRecurrence,
+  TransactionReminder,
+} from '@/features/transactions/types';
+import {
+  getUpcomingTransactionDates,
+  parseProjectedTransactionId,
+} from '@/features/transactions/utils/transactionRecurrence';
+import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { triggerHaptic } from '@/lib/haptics/haptics';
+import { categoryColors } from '@/theme/categoryColors';
+import { colors } from '@/theme/colors';
+import { iconSize, layout } from '@/theme/layout';
+import { radii } from '@/theme/radii';
+import { shadows } from '@/theme/shadows';
+import { spacing } from '@/theme/spacing';
+
+type TransactionDetailModalProps = {
+  category: Category | null;
+  onClose: () => void;
+  onCopy: (
+    transactionId: string,
+    targetSpaceId: string,
+  ) => boolean | Promise<boolean>;
+  onDelete: (transactionId: string) => void;
+  onEdit: (transactionId: string) => void;
+  onRemoveReminder: (transactionId: string) => boolean | Promise<boolean>;
+  onSaveReminder: (
+    transactionId: string,
+    remindOn: string,
+    times: readonly string[],
+  ) => boolean | Promise<boolean>;
+  reminder: TransactionReminder | null;
+  shareTargets: readonly CopyTarget[];
+  transaction: SessionTransaction | null;
+  transactions: readonly SessionTransaction[];
+  visible: boolean;
+};
+
+const heroIconSize = 76;
+const recurrencePageSize = 5;
+
+const recurrenceLabels: Record<TransactionRecurrence, string> = {
+  once: 'Único',
+  weekly: 'Semanal',
+  biweekly: 'Quincenal',
+  monthly: 'Mensual',
+  custom: 'Personalizada',
+};
+
+function formatTransactionDate(occurredOn: string): string {
+  return new Intl.DateTimeFormat('es-ES', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${occurredOn}T12:00:00`));
+}
+
+export function TransactionDetailModal({
+  category,
+  onClose,
+  onCopy,
+  onDelete,
+  onEdit,
+  onRemoveReminder,
+  onSaveReminder,
+  reminder,
+  shareTargets,
+  transaction,
+  transactions,
+  visible,
+}: TransactionDetailModalProps) {
+  const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
+  const [isReminderModalVisible, setReminderModalVisible] = useState(false);
+  const [isDeleteVisible, setDeleteVisible] = useState(false);
+  const [isRecurrenceExpanded, setRecurrenceExpanded] = useState(false);
+  const [visibleRecurrenceCount, setVisibleRecurrenceCount] =
+    useState(recurrencePageSize);
+  const modalBottomInset = useAppModalBottomInset();
+
+  useEffect(() => {
+    if (visible) {
+      setSpacePickerVisible(false);
+      setReminderModalVisible(false);
+      setDeleteVisible(false);
+      setRecurrenceExpanded(false);
+      setVisibleRecurrenceCount(recurrencePageSize);
+    }
+  }, [transaction, visible]);
+
+  useEffect(() => {
+    if (visible) {
+      triggerHaptic('modalOpen');
+    }
+  }, [visible]);
+
+  if (!transaction) return null;
+
+  const isIncome = transaction.type === 'income';
+  const amount = formatCurrency(
+    transaction.amountMinor,
+    transaction.currency,
+    'es-ES',
+  );
+  const title = transaction.title.trim() || category?.name || 'Movimiento';
+  const isProjected = parseProjectedTransactionId(transaction.id) !== null;
+  const upcomingDates = getUpcomingTransactionDates({
+    count: visibleRecurrenceCount + 1,
+    transaction,
+    transactions,
+  });
+  const visibleUpcomingDates = upcomingDates.slice(0, visibleRecurrenceCount);
+  const nextOccurrenceOn = visibleUpcomingDates[0];
+  const hasMoreRecurrences =
+    transaction.recurrence !== 'custom'
+      ? nextOccurrenceOn !== undefined
+      : upcomingDates.length > visibleRecurrenceCount;
+  const nextRecurrenceValue = nextOccurrenceOn
+    ? formatTransactionDate(nextOccurrenceOn)
+    : transaction.recurrence === 'once'
+      ? 'No se repetirá'
+      : transaction.recurrence === 'custom'
+        ? 'No quedan repeticiones'
+        : 'Sin próxima fecha';
+
+  return (
+    <>
+      <AppModal
+        containsScrollable
+        extendContentIntoBottomInset
+        hideHandle
+        onClose={onClose}
+        testID="transaction-detail-modal"
+        variant="expanded"
+        visible={visible}
+      >
+        <View style={styles.container}>
+          <View style={styles.topBar} testID="transaction-detail-top-bar">
+            <DetailActionMenu
+              itemLabel="movimiento"
+              key={transaction.id}
+              onDelete={isProjected ? undefined : () => setDeleteVisible(true)}
+              onEdit={() => onEdit(transaction.id)}
+              testIDPrefix="transaction"
+            />
+            <ModalCloseButton onPress={onClose} />
+          </View>
+
+          <BottomSheetScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: modalBottomInset + spacing.md },
+            ]}
+            showsVerticalScrollIndicator={false}
+            style={styles.scroll}
+            testID="transaction-detail-scroll-view"
+          >
+            <View style={styles.hero}>
+              <View
+                style={[
+                  styles.heroIcon,
+                  {
+                    backgroundColor: category
+                      ? categoryColors[category.colorToken]
+                      : colors.textMuted,
+                  },
+                ]}
+              >
+                {category ? (
+                  <CategoryIcon
+                    color={colors.onBrand}
+                    name={category.icon}
+                    size={iconSize.xl}
+                  />
+                ) : (
+                  <Ionicons
+                    color={colors.onBrand}
+                    name="receipt"
+                    size={iconSize.xl}
+                  />
+                )}
+              </View>
+              <View style={styles.titleBlock}>
+                <Text
+                  align="center"
+                  testID="transaction-detail-context"
+                  tone="secondary"
+                  variant="overline"
+                  weight="medium"
+                >
+                  Movimiento
+                </Text>
+                <Text
+                  align="center"
+                  accessibilityRole="header"
+                  testID="transaction-detail-title"
+                  variant="heading"
+                >
+                  {title}
+                </Text>
+              </View>
+            </View>
+
+            {isDeleteVisible ? (
+              <View
+                style={styles.dangerPanel}
+                testID="transaction-delete-panel"
+              >
+                <Text variant="subheading">¿Eliminar este movimiento?</Text>
+                <Text tone="secondary" variant="footnote">
+                  Dejará de aparecer en este espacio y sus totales se
+                  actualizarán.
+                </Text>
+                <View style={styles.panelActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setDeleteVisible(false)}
+                    style={styles.secondaryButton}
+                  >
+                    <Text variant="label">Cancelar</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => onDelete(transaction.id)}
+                    style={styles.deleteButton}
+                  >
+                    <Text tone="onBrand" variant="label">
+                      Eliminar
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
+            <View
+              accessibilityLabel={`${isIncome ? 'Ingreso' : 'Gasto'} de ${amount}`}
+              accessible
+              style={styles.amountCard}
+              testID="transaction-detail-amount"
+            >
+              <Text tone="secondary" variant="caption">
+                {isIncome ? 'Importe ingresado' : 'Importe gastado'}
+              </Text>
+              <View style={styles.amountRow}>
+                <Text variant="amount">{amount}</Text>
+                <View
+                  style={[
+                    styles.directionIcon,
+                    isIncome ? styles.incomeIcon : styles.expenseIcon,
+                  ]}
+                  testID="transaction-detail-direction-icon"
+                >
+                  <View style={styles.diagonalArrow}>
+                    <Ionicons
+                      color={colors.onBrand}
+                      name={isIncome ? 'arrow-up' : 'arrow-down'}
+                      size={iconSize.xs}
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {!isProjected ? (
+              <View style={styles.actionsRow}>
+                <Pressable
+                  accessibilityLabel={
+                    reminder ? 'Editar recordatorio' : 'Programar recordatorio'
+                  }
+                  accessibilityRole="button"
+                  onPress={() => setReminderModalVisible(true)}
+                  style={({ pressed }) => [
+                    styles.secondaryAction,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Ionicons
+                    color={colors.textMuted}
+                    name="alarm-outline"
+                    size={iconSize.md}
+                    testID="transaction-action-icon-alarm-outline"
+                  />
+                  <Text align="center" variant="footnote" weight="semibold">
+                    {reminder ? 'Editar recordatorio' : 'Recordar'}
+                  </Text>
+                </Pressable>
+                {shareTargets.length > 0 ? (
+                  <Pressable
+                    accessibilityLabel="Copiar en otro espacio"
+                    accessibilityRole="button"
+                    onPress={() => setSpacePickerVisible(true)}
+                    style={({ pressed }) => [
+                      styles.secondaryAction,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Ionicons
+                      color={colors.textMuted}
+                      name="copy-outline"
+                      size={iconSize.md}
+                      testID="transaction-action-icon-copy-outline"
+                    />
+                    <Text align="center" variant="footnote" weight="semibold">
+                      Copiar en otro espacio
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+
+            <View style={styles.detailsCard}>
+              <View style={styles.detailRow}>
+                {category ? (
+                  <CategoryIcon
+                    color={categoryColors[category.colorToken]}
+                    name={category.icon}
+                    size={iconSize.sm}
+                  />
+                ) : (
+                  <Ionicons
+                    color={colors.textMuted}
+                    name="receipt-outline"
+                    size={iconSize.sm}
+                  />
+                )}
+                <View style={styles.detailCopy}>
+                  <Text tone="secondary" variant="caption">
+                    Categoría
+                  </Text>
+                  <Text variant="label">
+                    {category?.name ?? 'Sin categoría'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.detailRow}>
+                <Ionicons
+                  color={colors.textMuted}
+                  name="calendar-outline"
+                  size={iconSize.sm}
+                />
+                <View style={styles.detailCopy}>
+                  <Text tone="secondary" variant="caption">
+                    Fecha
+                  </Text>
+                  <Text variant="label">
+                    {formatTransactionDate(transaction.occurredOn)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.detailRow}>
+                <Ionicons
+                  color={colors.textMuted}
+                  name="sync-outline"
+                  size={iconSize.sm}
+                  testID="transaction-detail-recurrence-icon"
+                />
+                <View style={styles.detailCopy}>
+                  <Text tone="secondary" variant="caption">
+                    Recurrencia
+                  </Text>
+                  <Text variant="label">
+                    {recurrenceLabels[transaction.recurrence]}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <Pressable
+                accessibilityLabel={`Próxima repetición: ${nextRecurrenceValue}`}
+                accessibilityRole={nextOccurrenceOn ? 'button' : undefined}
+                accessibilityState={
+                  nextOccurrenceOn
+                    ? { expanded: isRecurrenceExpanded }
+                    : undefined
+                }
+                disabled={!nextOccurrenceOn}
+                onPress={() => setRecurrenceExpanded((current) => !current)}
+                style={({ pressed }) => [
+                  styles.detailRow,
+                  pressed && styles.pressed,
+                ]}
+                testID="transaction-detail-next-recurrence"
+              >
+                <Ionicons
+                  color={colors.textMuted}
+                  name="calendar-clear-outline"
+                  size={iconSize.sm}
+                />
+                <View style={styles.detailCopy}>
+                  <Text tone="secondary" variant="caption">
+                    Próxima repetición
+                  </Text>
+                  <Text variant="label">{nextRecurrenceValue}</Text>
+                </View>
+                {nextOccurrenceOn ? (
+                  <View
+                    style={
+                      isRecurrenceExpanded
+                        ? styles.recurrenceChevronExpanded
+                        : undefined
+                    }
+                    testID="transaction-detail-recurrence-chevron"
+                  >
+                    <Ionicons
+                      color={colors.textMuted}
+                      name="chevron-down"
+                      size={iconSize.sm}
+                    />
+                  </View>
+                ) : null}
+              </Pressable>
+              {isRecurrenceExpanded ? (
+                <View
+                  style={styles.recurrenceList}
+                  testID="transaction-detail-recurrence-list"
+                >
+                  <Text tone="secondary" variant="caption">
+                    Próximas repeticiones
+                  </Text>
+                  {visibleUpcomingDates.map((date, index) => (
+                    <View key={date} style={styles.recurrenceDateRow}>
+                      <Text tone="secondary" variant="footnote">
+                        {index + 1}.
+                      </Text>
+                      <Text variant="label">{formatTransactionDate(date)}</Text>
+                    </View>
+                  ))}
+                  {hasMoreRecurrences ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() =>
+                        setVisibleRecurrenceCount(
+                          (current) => current + recurrencePageSize,
+                        )
+                      }
+                      style={({ pressed }) => [
+                        styles.moreButton,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text tone="brand" variant="label" weight="semibold">
+                        Ver más
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          </BottomSheetScrollView>
+        </View>
+      </AppModal>
+
+      <CopyToSpaceModal
+        description="Elige dónde crear una copia independiente de este movimiento."
+        failureMessage={(target) =>
+          `No se pudo copiar el movimiento en ${target.name}.`
+        }
+        itemName={title}
+        onClose={() => setSpacePickerVisible(false)}
+        onSelect={(targetSpaceId) => onCopy(transaction.id, targetSpaceId)}
+        targets={shareTargets}
+        testID="transaction-space-picker-modal"
+        visible={isSpacePickerVisible}
+      />
+
+      <TransactionReminderModal
+        onClose={() => setReminderModalVisible(false)}
+        onRemove={() => onRemoveReminder(transaction.id)}
+        onSave={({ remindOn, times }) =>
+          onSaveReminder(transaction.id, remindOn, times)
+        }
+        reminder={reminder}
+        transactionOccurredOn={transaction.occurredOn}
+        transactionTitle={title}
+        visible={isReminderModalVisible}
+      />
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  topBar: {
+    zIndex: 2,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    minHeight: layout.minTouchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: spacing.xl,
+  },
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingTop: spacing.xl + layout.minTouchTarget,
+  },
+  hero: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
+  titleBlock: { alignItems: 'center', gap: spacing.xxs },
+  heroIcon: {
+    width: heroIconSize,
+    height: heroIconSize,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.round,
+    marginBottom: spacing.xs,
+  },
+  amountCard: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    marginTop: spacing.xl,
+    padding: spacing.lg,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  directionIcon: {
+    width: iconSize.lg,
+    height: iconSize.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.sm + spacing.xxs,
+  },
+  incomeIcon: { backgroundColor: colors.income },
+  expenseIcon: { backgroundColor: colors.expense },
+  diagonalArrow: { transform: [{ rotate: '45deg' }] },
+  detailsCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  detailRow: {
+    minHeight: layout.controlHeight.regular,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  detailCopy: { flex: 1, gap: spacing.xxs },
+  divider: { height: 1, backgroundColor: colors.border },
+  recurrenceChevronExpanded: { transform: [{ rotate: '180deg' }] },
+  recurrenceList: {
+    gap: spacing.sm,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    paddingBottom: spacing.lg,
+    paddingLeft: iconSize.sm + spacing.md,
+    paddingTop: spacing.md,
+  },
+  recurrenceDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: layout.minTouchTarget,
+  },
+  moreButton: {
+    minHeight: layout.minTouchTarget,
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    paddingRight: spacing.lg,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  secondaryAction: {
+    ...shadows.subtle,
+    minWidth: 0,
+    minHeight: 96,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    padding: spacing.xs,
+  },
+  dangerPanel: {
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderColor: colors.expense,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    marginTop: spacing.lg,
+    padding: spacing.lg,
+  },
+  panelActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+  },
+  secondaryButton: {
+    minHeight: layout.minTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderColor: colors.border,
+    borderRadius: radii.round,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+  },
+  deleteButton: {
+    minHeight: layout.minTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.expense,
+    borderRadius: radii.round,
+    paddingHorizontal: spacing.xl,
+  },
+  pressed: { opacity: 0.64 },
+});

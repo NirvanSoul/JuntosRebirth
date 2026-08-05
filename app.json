@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "juntoss",
+    "slug": "juntoss",
+    "scheme": "juntoss",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.juntoss.app"
+    },
+    "android": {
+      "package": "com.juntoss.app",
+      "predictiveBackGestureEnabled": true
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-notifications",
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}

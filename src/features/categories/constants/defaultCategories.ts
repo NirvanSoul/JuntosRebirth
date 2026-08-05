@@ -1,0 +1,114 @@
+import type { Category, CategoryIconName } from '@/features/categories/types';
+import type { CategoryColorToken } from '@/theme/categoryColors';
+
+export type DefaultCategoryDefinition = {
+  key: string;
+  name: string;
+  icon: CategoryIconName;
+  colorToken: CategoryColorToken;
+};
+
+export const defaultCategoryPages: readonly (readonly DefaultCategoryDefinition[])[] =
+  [
+    [
+      { key: 'salary', name: 'Salario', icon: 'money', colorToken: 'emerald' },
+      {
+        key: 'groceries',
+        name: 'Supermercado',
+        icon: 'shopping-cart',
+        colorToken: 'orange',
+      },
+      { key: 'housing', name: 'Vivienda', icon: 'house', colorToken: 'slate' },
+      { key: 'transport', name: 'Transporte', icon: 'car', colorToken: 'blue' },
+      {
+        key: 'utilities',
+        name: 'Servicios',
+        icon: 'lightning',
+        colorToken: 'yellow',
+      },
+      {
+        key: 'restaurants',
+        name: 'Restaurantes',
+        icon: 'fork-knife',
+        colorToken: 'coral',
+      },
+      {
+        key: 'shopping',
+        name: 'Compras',
+        icon: 'shopping-bag',
+        colorToken: 'pink',
+      },
+      { key: 'health', name: 'Salud', icon: 'heartbeat', colorToken: 'red' },
+      {
+        key: 'savings',
+        name: 'Salidas',
+        icon: 'wine',
+        colorToken: 'violet',
+      },
+    ],
+    [
+      {
+        key: 'freelance',
+        name: 'Freelance',
+        icon: 'briefcase',
+        colorToken: 'teal',
+      },
+      {
+        key: 'family',
+        name: 'Familia',
+        icon: 'users-three',
+        colorToken: 'green',
+      },
+      {
+        key: 'leisure',
+        name: 'Ocio',
+        icon: 'game-controller',
+        colorToken: 'plum',
+      },
+      {
+        key: 'education',
+        name: 'Educación',
+        icon: 'graduation-cap',
+        colorToken: 'indigo',
+      },
+      {
+        key: 'subscriptions',
+        name: 'Suscripciones',
+        icon: 'credit-card',
+        colorToken: 'rose',
+      },
+      {
+        key: 'travel',
+        name: 'Viajes',
+        icon: 'airplane-tilt',
+        colorToken: 'cyan',
+      },
+      {
+        key: 'pets',
+        name: 'Mascotas',
+        icon: 'paw-print',
+        colorToken: 'amber',
+      },
+      { key: 'debts', name: 'Deudas', icon: 'receipt', colorToken: 'brown' },
+      {
+        key: 'other',
+        name: 'Otros',
+        icon: 'dots-three-circle',
+        colorToken: 'steel',
+      },
+    ],
+  ] as const;
+
+export function createDefaultCategoryInputForSpace(
+  spaceId: string,
+  definition: DefaultCategoryDefinition,
+): Omit<Category, 'id' | 'isArchived'> {
+  return {
+    spaceId,
+    name: definition.name,
+    icon: definition.icon,
+    colorToken: definition.colorToken,
+    isDefault: true,
+    templateKey: definition.key,
+  };
+}

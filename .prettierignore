@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+.claude/
+coverage/
+dist/
+android/
+ios/
+package-lock.json
+Bible/

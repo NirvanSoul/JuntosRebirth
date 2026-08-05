@@ -1,0 +1,617 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
+
+import {
+  archiveLocalTransaction,
+  createLocalTransaction,
+  listLocalTransactions,
+  materializeDueRecurringTransactions,
+  updateLocalTransaction,
+} from '@/features/transactions/repositories/localTransactionRepository';
+
+const mockGetLocalDatabase = jest.fn<Promise<SQLiteDatabase>, []>();
+
+jest.mock('@/lib/storage/localDatabase', () => ({
+  getLocalDatabase: () => mockGetLocalDatabase(),
+}));
+
+jest.mock('@/lib/storage/localIdentity', () => ({
+  getOrCreateInstallationId: jest.fn(async () => 'installation-id'),
+}));
+
+jest.mock('expo-crypto', () => ({
+  randomUUID: jest.fn(),
+}));
+
+const mockRandomUUID = jest.requireMock('expo-crypto').randomUUID as jest.Mock;
+
+describe('localTransactionRepository', () => {
+  const runAsync = jest.fn(async () => ({ changes: 1, lastInsertRowId: 0 }));
+  const getFirstAsync = jest.fn();
+  const getAllAsync = jest.fn();
+  const withExclusiveTransactionAsync = jest.fn(
+    async (task: (transaction: SQLiteDatabase) => Promise<void>) =>
+      task(database),
+  );
+  const database = {
+    getFirstAsync,
+    getAllAsync,
+    runAsync,
+    withExclusiveTransactionAsync,
+  } as unknown as SQLiteDatabase;
+  const draft = {
+    spaceId: 'personal',
+    categoryId: 'category-id',
+    type: 'expense' as const,
+    amountMinor: 1250,
+    currency: 'EUR' as const,
+    title: 'Compra',
+    occurredOn: '2026-08-01',
+    recurrence: 'once' as const,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetLocalDatabase.mockResolvedValue(database);
+    mockRandomUUID.mockReturnValue('00000000-0000-4000-8000-000000000002');
+    getFirstAsync.mockResolvedValue(undefined);
+  });
+
+  it('crea y restaura un movimiento con un identificador estable', async () => {
+    const createdTransactions = await createLocalTransaction(draft);
+    const created = createdTransactions[0]!;
+    expect(created).toEqual({
+      ...draft,
+      id: '00000000-0000-4000-8000-000000000002',
+      nextOccurrenceOn: undefined,
+      recurrenceGroupId: undefined,
+      recurrenceSeriesId: undefined,
+      recurrenceStartsOn: undefined,
+      updatedAt: expect.any(String),
+    });
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO transactions'),
+      created.id,
+      'personal',
+      'category-id',
+      'installation-id',
+      'expense',
+      1250,
+      'EUR',
+      'Compra',
+      '2026-08-01',
+      'once',
+      null,
+      null,
+      null,
+      expect.any(String),
+      expect.any(String),
+    );
+
+    getAllAsync.mockResolvedValueOnce([]);
+    getAllAsync.mockResolvedValueOnce([
+      {
+        id: created.id,
+        space_id: 'personal',
+        category_id: 'category-id',
+        type: 'expense',
+        amount_minor: 1250,
+        currency: 'EUR',
+        title: 'Compra',
+        occurred_on: '2026-08-01',
+        recurrence: 'once',
+        next_occurrence_on: null,
+        recurrence_group_id: null,
+        recurrence_series_id: null,
+        recurrence_starts_on: null,
+        updated_at: created.updatedAt,
+      },
+    ]);
+    await expect(listLocalTransactions()).resolves.toEqual([created]);
+  });
+
+  it('acepta y restaura un movimiento en una moneda distinta a EUR', async () => {
+    const usdDraft = { ...draft, currency: 'USD' as const };
+    const createdTransactions = await createLocalTransaction(usdDraft);
+    const created = createdTransactions[0]!;
+    expect(created.currency).toBe('USD');
+
+    getAllAsync.mockResolvedValueOnce([]);
+    getAllAsync.mockResolvedValueOnce([
+      {
+        id: created.id,
+        space_id: 'personal',
+        category_id: 'category-id',
+        type: 'expense',
+        amount_minor: 1250,
+        currency: 'USD',
+        title: 'Compra',
+        occurred_on: '2026-08-01',
+        recurrence: 'once',
+        next_occurrence_on: null,
+        recurrence_group_id: null,
+        recurrence_series_id: null,
+        recurrence_starts_on: null,
+        updated_at: created.updatedAt,
+      },
+    ]);
+    await expect(listLocalTransactions()).resolves.toEqual([created]);
+  });
+
+  it('rechaza un movimiento con una moneda no reconocida', async () => {
+    await expect(
+      createLocalTransaction({
+        ...draft,
+        currency: 'XYZ' as unknown as typeof draft.currency,
+      }),
+    ).rejects.toThrow('El movimiento local no es válido');
+  });
+
+  it('crea una serie quincenal y calcula la próxima fecha a quince días', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce('series-id')
+      .mockReturnValueOnce('transaction-id');
+
+    const createdTransactions = await createLocalTransaction({
+      ...draft,
+      occurredOn: '2026-07-03',
+      recurrence: 'biweekly',
+    });
+    const created = createdTransactions[0]!;
+
+    expect(created).toMatchObject({
+      id: 'transaction-id',
+      nextOccurrenceOn: '2026-08-17',
+      recurrenceSeriesId: 'series-id',
+      recurrenceStartsOn: '2026-07-03',
+    });
+    expect(runAsync).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('INSERT INTO recurring_transaction_series'),
+      'series-id',
+      'personal',
+      'category-id',
+      'installation-id',
+      'expense',
+      1250,
+      'EUR',
+      'Compra',
+      'biweekly',
+      '2026-07-03',
+      3,
+      '2026-08-17',
+      expect.any(String),
+      expect.any(String),
+    );
+  });
+
+  it('crea un movimiento por cada fecha personalizada', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce('custom-group')
+      .mockReturnValueOnce('custom-1')
+      .mockReturnValueOnce('custom-2');
+
+    await expect(
+      createLocalTransaction({
+        ...draft,
+        recurrence: 'custom',
+        customOccurrenceDates: ['2026-08-20', '2026-08-05'],
+      }),
+    ).resolves.toMatchObject([
+      {
+        id: 'custom-1',
+        occurredOn: '2026-08-05',
+        recurrence: 'custom',
+        recurrenceGroupId: 'custom-group',
+      },
+      {
+        id: 'custom-2',
+        occurredOn: '2026-08-20',
+        recurrence: 'custom',
+        recurrenceGroupId: 'custom-group',
+      },
+    ]);
+    expect(runAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('materializa sin duplicar el origen de una serie quincenal migrada', async () => {
+    getAllAsync.mockResolvedValueOnce([
+      {
+        id: 'series-id',
+        space_id: 'personal',
+        category_id: 'category-id',
+        created_by: 'installation-id',
+        type: 'expense',
+        amount_minor: 1250,
+        currency: 'EUR',
+        title: 'Compra',
+        frequency: 'biweekly',
+        starts_on: '2026-07-03',
+        generated_occurrences: 0,
+        next_occurrence_on: '2026-07-03',
+      },
+    ]);
+    mockRandomUUID
+      .mockReturnValueOnce('original-ignored')
+      .mockReturnValueOnce('occurrence-2')
+      .mockReturnValueOnce('occurrence-3');
+
+    await materializeDueRecurringTransactions(database, '2026-08-02');
+
+    expect(runAsync).toHaveBeenCalledTimes(4);
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('UPDATE recurring_transaction_series'),
+      3,
+      '2026-08-17',
+      expect.any(String),
+      'series-id',
+    );
+  });
+
+  it('marca las ediciones y eliminaciones sincronizadas como pendientes', async () => {
+    await expect(
+      updateLocalTransaction('transaction-id', {
+        ...draft,
+        title: 'Compra editada',
+      }),
+    ).resolves.toMatchObject([
+      {
+        id: 'transaction-id',
+        title: 'Compra editada',
+        updatedAt: expect.any(String),
+      },
+    ]);
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("ELSE 'pending'"),
+      'category-id',
+      'expense',
+      1250,
+      'EUR',
+      'Compra editada',
+      '2026-08-01',
+      'once',
+      expect.any(String),
+      'transaction-id',
+      'personal',
+    );
+
+    await archiveLocalTransaction('transaction-id', 'personal');
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('SET is_archived = 1'),
+      expect.any(String),
+      expect.any(String),
+      'transaction-id',
+      'personal',
+    );
+  });
+
+  it('convierte una edición personalizada en un grupo de ocurrencias', async () => {
+    mockRandomUUID
+      .mockReturnValueOnce('edited-custom-group')
+      .mockReturnValueOnce('edited-custom-2')
+      .mockReturnValueOnce('edited-custom-3');
+
+    await expect(
+      updateLocalTransaction('transaction-id', {
+        ...draft,
+        recurrence: 'custom',
+        customOccurrenceDates: ['2026-08-20', '2026-08-05', '2026-08-12'],
+      }),
+    ).resolves.toMatchObject([
+      {
+        id: 'transaction-id',
+        occurredOn: '2026-08-05',
+        recurrenceGroupId: 'edited-custom-group',
+      },
+      {
+        id: 'edited-custom-2',
+        occurredOn: '2026-08-12',
+        recurrenceGroupId: 'edited-custom-group',
+      },
+      {
+        id: 'edited-custom-3',
+        occurredOn: '2026-08-20',
+        recurrenceGroupId: 'edited-custom-group',
+      },
+    ]);
+    expect(runAsync).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('recurrence_series_id = NULL'),
+      'category-id',
+      'expense',
+      1250,
+      'EUR',
+      'Compra',
+      '2026-08-05',
+      'edited-custom-group',
+      expect.any(String),
+      'transaction-id',
+      'personal',
+    );
+    expect(runAsync).toHaveBeenCalledTimes(3);
+  });
+
+  it('detiene la serie anterior al convertir una ocurrencia automática en personalizada', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      occurred_on: '2026-08-01',
+      recurrence: 'monthly',
+      recurrence_series_id: 'old-series',
+    });
+    mockRandomUUID
+      .mockReturnValueOnce('custom-group')
+      .mockReturnValueOnce('custom-2');
+
+    await updateLocalTransaction('transaction-id', {
+      ...draft,
+      recurrence: 'custom',
+      customOccurrenceDates: ['2026-08-01', '2026-08-20'],
+    });
+
+    expect(runAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('WHERE recurrence_series_id = ?'),
+      expect.any(String),
+      expect.any(String),
+      'old-series',
+      '2026-08-01',
+      'personal',
+    );
+    expect(runAsync).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('UPDATE recurring_transaction_series'),
+      expect.any(String),
+      expect.any(String),
+      'old-series',
+      'personal',
+    );
+  });
+
+  it('crea una serie real al cambiar un movimiento único a recurrencia automática', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      occurred_on: '2026-08-01',
+      recurrence: 'once',
+      recurrence_series_id: null,
+    });
+    mockRandomUUID.mockReturnValueOnce('new-series');
+
+    await expect(
+      updateLocalTransaction('transaction-id', {
+        ...draft,
+        recurrence: 'monthly',
+      }),
+    ).resolves.toMatchObject([
+      {
+        id: 'transaction-id',
+        recurrence: 'monthly',
+        recurrenceSeriesId: 'new-series',
+        recurrenceStartsOn: '2026-08-01',
+      },
+    ]);
+    expect(runAsync).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('INSERT INTO recurring_transaction_series'),
+      'new-series',
+      'personal',
+      'category-id',
+      'installation-id',
+      'expense',
+      1250,
+      'EUR',
+      'Compra',
+      'monthly',
+      '2026-08-01',
+      1,
+      '2026-09-01',
+      expect.any(String),
+      expect.any(String),
+    );
+  });
+
+  it('archiva la serie y sus fechas futuras al convertirla en movimiento único', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      occurred_on: '2026-08-01',
+      recurrence: 'monthly',
+      recurrence_series_id: 'old-series',
+    });
+
+    await updateLocalTransaction('transaction-id', draft);
+
+    expect(runAsync).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('recurrence_series_id = NULL'),
+      'category-id',
+      'expense',
+      1250,
+      'EUR',
+      'Compra',
+      '2026-08-01',
+      'once',
+      expect.any(String),
+      'transaction-id',
+      'personal',
+    );
+    expect(runAsync).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('UPDATE recurring_transaction_series'),
+      expect.any(String),
+      expect.any(String),
+      'old-series',
+      'personal',
+    );
+  });
+
+  it.each(['expense', 'income'] as const)(
+    'actualiza desde una ocurrencia recurrente de tipo %s sin reescribir las anteriores',
+    async (type) => {
+      getFirstAsync.mockResolvedValueOnce({
+        occurred_on: '2026-09-01',
+        recurrence: 'monthly',
+        recurrence_series_id: 'monthly-series',
+      });
+      getAllAsync.mockResolvedValueOnce([
+        {
+          id: 'occurrence-10',
+          space_id: 'personal',
+          category_id: 'category-id',
+          type,
+          amount_minor: 1800,
+          currency: 'EUR',
+          title: 'Cuota actualizada',
+          occurred_on: '2026-10-01',
+          recurrence: 'monthly',
+          next_occurrence_on: '2026-11-01',
+          recurrence_group_id: null,
+          recurrence_series_id: 'monthly-series',
+          recurrence_starts_on: '2026-01-01',
+        },
+        {
+          id: 'occurrence-9',
+          space_id: 'personal',
+          category_id: 'category-id',
+          type,
+          amount_minor: 1800,
+          currency: 'EUR',
+          title: 'Cuota actualizada',
+          occurred_on: '2026-09-01',
+          recurrence: 'monthly',
+          next_occurrence_on: '2026-11-01',
+          recurrence_group_id: null,
+          recurrence_series_id: 'monthly-series',
+          recurrence_starts_on: '2026-01-01',
+        },
+      ]);
+
+      await expect(
+        updateLocalTransaction('occurrence-9', {
+          ...draft,
+          type,
+          amountMinor: 1800,
+          title: 'Cuota actualizada',
+          occurredOn: '2026-09-01',
+          recurrence: 'monthly',
+        }),
+      ).resolves.toMatchObject([
+        { id: 'occurrence-10', amountMinor: 1800, type },
+        { id: 'occurrence-9', amountMinor: 1800, type },
+      ]);
+
+      expect(runAsync).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('occurred_on > ?'),
+        'category-id',
+        type,
+        1800,
+        'EUR',
+        'Cuota actualizada',
+        expect.any(String),
+        'monthly-series',
+        '2026-09-01',
+        'personal',
+      );
+      expect(runAsync).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining('UPDATE recurring_transaction_series'),
+        'category-id',
+        type,
+        1800,
+        'EUR',
+        'Cuota actualizada',
+        expect.any(String),
+        'monthly-series',
+        'personal',
+      );
+    },
+  );
+
+  it('materializa una ocurrencia futura al editarla y aplica el cambio desde esa fecha', async () => {
+    getFirstAsync
+      .mockResolvedValueOnce({
+        id: 'monthly-series',
+        space_id: 'personal',
+        category_id: 'category-id',
+        created_by: 'installation-id',
+        type: 'income',
+        amount_minor: 250_000,
+        currency: 'EUR',
+        title: 'Nómina',
+        frequency: 'monthly',
+        starts_on: '2026-08-05',
+        generated_occurrences: 1,
+        next_occurrence_on: '2026-09-05',
+      })
+      .mockResolvedValueOnce({ id: 'materialized-november' })
+      .mockResolvedValueOnce({
+        occurred_on: '2026-11-05',
+        recurrence: 'monthly',
+        recurrence_series_id: 'monthly-series',
+      });
+    getAllAsync.mockResolvedValueOnce([
+      {
+        id: 'materialized-november',
+        space_id: 'personal',
+        category_id: 'category-id',
+        type: 'income',
+        amount_minor: 275_000,
+        currency: 'EUR',
+        title: 'Nómina actualizada',
+        occurred_on: '2026-11-05',
+        recurrence: 'monthly',
+        next_occurrence_on: '2026-12-05',
+        recurrence_group_id: null,
+        recurrence_series_id: 'monthly-series',
+        recurrence_starts_on: '2026-08-05',
+      },
+    ]);
+
+    await expect(
+      updateLocalTransaction('projected-occurrence:monthly-series:2026-11-05', {
+        ...draft,
+        type: 'income',
+        amountMinor: 275_000,
+        title: 'Nómina actualizada',
+        occurredOn: '2026-11-05',
+        recurrence: 'monthly',
+      }),
+    ).resolves.toMatchObject([
+      {
+        id: 'materialized-november',
+        amountMinor: 275_000,
+        occurredOn: '2026-11-05',
+      },
+    ]);
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT OR IGNORE INTO transactions'),
+      expect.any(String),
+      'personal',
+      'category-id',
+      'installation-id',
+      'income',
+      250_000,
+      'EUR',
+      'Nómina',
+      '2026-09-05',
+      'monthly',
+      'monthly-series',
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('UPDATE recurring_transaction_series'),
+      'category-id',
+      'income',
+      275_000,
+      'EUR',
+      'Nómina actualizada',
+      expect.any(String),
+      'monthly-series',
+      'personal',
+    );
+  });
+
+  it('rechaza importes no representables en unidades menores', async () => {
+    await expect(
+      createLocalTransaction({ ...draft, amountMinor: 1.5 }),
+    ).rejects.toThrow('El movimiento local no es válido');
+    expect(runAsync).not.toHaveBeenCalled();
+  });
+});
