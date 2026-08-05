@@ -23,9 +23,9 @@ fi
 git add -A
 
 if git diff --cached --quiet; then
-  echo "No hay cambios por subir."
-  exit 0
+  echo "No hay cambios nuevos que comitear. Subiendo commits pendientes si los hay..."
+else
+  git commit -m "${MESSAGE}"
 fi
 
-git commit -m "${MESSAGE}"
 git push origin "${BRANCH}"
