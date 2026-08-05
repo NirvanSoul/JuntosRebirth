@@ -9,6 +9,8 @@
     "start:lan": "expo start --go --lan",
     "tunnel": "sh scripts/tunnel.sh",
     "start:tunnel": "npm run tunnel",
+    "upload": "sh scripts/git-upload.sh",
+    "download": "sh scripts/git-download.sh",
     "android": "expo start --go --android",
     "ios": "expo start --go --ios",
     "typecheck": "tsc --noEmit",
