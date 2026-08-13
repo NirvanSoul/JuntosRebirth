@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(12);
 
 select ok(
   exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'spaces'),
@@ -58,6 +58,23 @@ select ok(
     'EXECUTE'
   ),
   'any authenticated active space member can update a category budget, not only its author'
+);
+
+select ok(
+  exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'spaces'
+      and policyname = 'spaces_update_owner'
+  ),
+  'spaces_update_owner policy exists'
+);
+select ok(
+  exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'space_members'
+      and policyname = 'members_update_self_owner'
+  ),
+  'members_update_self_owner policy exists'
 );
 
 select * from finish();

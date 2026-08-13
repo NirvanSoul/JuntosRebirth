@@ -160,7 +160,8 @@ src/components/
 │   ├── Screen/
 │   ├── Stack/
 │   ├── Row/
-│   └── KeyboardAwareContainer/
+│   ├── KeyboardAwareContainer/
+│   └── SettingsList/
 ├── overlays/
 │   ├── AppModal/
 │   ├── BottomSheet/
@@ -186,14 +187,37 @@ src/features/
 ├── guest/
 ├── transactions/
 ├── categories/
+├── import/
 ├── spaces/
 ├── dashboard/
 ├── activity/
 ├── extras/
 ├── savings/
 ├── plans/
+├── legal/
 └── profile/
 ```
+
+`import` cubre la importación de movimientos desde archivos bancarios (Excel/CSV en la Fase 1, ver ADR-069). Su estructura interna añade capas propias del dominio sobre el patrón general de esta sección:
+
+```text
+features/import/
+├── screens/
+├── components/
+├── parsers/
+├── normalization/
+├── categorization/
+├── deduplication/
+├── validation/
+├── repositories/
+├── gateways/
+├── services/
+├── utils/
+├── constants/
+└── types.ts
+```
+
+Los movimientos importados se crean mediante `createLocalTransactions` en `features/transactions/repositories/localTransactionRepository.ts`, el mismo repositorio que usa la creación manual: no existe un segundo modelo de movimientos para importación.
 
 Una feature puede contener:
 
@@ -710,6 +734,11 @@ Prioridades:
 - El espacio activo visual no sustituye RLS.
 - Ningún secreto entra en el bundle.
 - Las operaciones destructivas son explícitas.
+- Las contraseñas nunca se persisten: viven solo en el estado en memoria del
+  formulario que las captura (registro, inicio de sesión, restablecer),
+  viajan una única vez por HTTPS hacia Supabase Auth (que las hashea del lado
+  del servidor) y no se escriben en AsyncStorage, SecureStore, SQLite ni
+  ningún log. Ver ADR-074 en `DECISIONS.md`.
 
 ---
 

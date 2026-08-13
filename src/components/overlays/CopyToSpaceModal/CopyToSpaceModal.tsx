@@ -6,10 +6,12 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { Text } from '@/components/ui/Text/Text';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 export type CopyTarget = {
   id: string;
@@ -39,6 +41,8 @@ export function CopyToSpaceModal({
   testID,
   visible,
 }: CopyToSpaceModalProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setSaving] = useState(false);
   const contentHeight = useMemo(
@@ -143,25 +147,27 @@ export function CopyToSpaceModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, gap: spacing.md },
-  header: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  headerCopy: { flex: 1, gap: spacing.xxs },
-  list: { gap: spacing.sm, marginTop: spacing.xs },
-  spaceRow: {
-    height: spaceRowHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.background,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-  },
-  spaceName: { flex: 1 },
-  pressed: { opacity: 0.64 },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    container: { flex: 1, gap: spacing.md },
+    header: {
+      minHeight: layout.minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    headerCopy: { flex: 1, gap: spacing.xxs },
+    list: { gap: spacing.sm, marginTop: spacing.xs },
+    spaceRow: {
+      height: spaceRowHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.background,
+      borderRadius: radii.md,
+      paddingHorizontal: spacing.md,
+    },
+    spaceName: { flex: 1 },
+    pressed: { opacity: 0.64 },
+  });
+}

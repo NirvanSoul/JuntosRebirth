@@ -27,20 +27,24 @@ import type {
   TransactionType,
 } from '@/features/transactions/types';
 import { calculatePeriodComparison } from '@/features/transactions/utils/periodComparison';
+import {
+  getAvailableCurrencies,
+  pickEffectiveCurrency,
+} from '@/features/transactions/utils/transactionCurrencyGrouping';
 import { summarizeTransactionTotals } from '@/features/transactions/utils/transactionSummary';
 import {
-  defaultCurrencyCode,
   getCurrencyFlag,
   getCurrencyName,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { triggerHaptic } from '@/lib/haptics/haptics';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 export type TransactionPeriodModalType = TransactionType | 'balance';
 
@@ -63,6 +67,8 @@ export function TransactionPeriodModal({
   type,
   visible,
 }: TransactionPeriodModalProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const [period, setPeriod] = useState<TransactionPeriod>('month');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode | null>(
@@ -93,17 +99,14 @@ export function TransactionPeriodModal({
   // al navegar entre periodos o cambiar el filtro, aunque el periodo actual
   // no tenga movimientos en esa moneda.
   const availableCurrencies = useMemo(
-    () =>
-      Array.from(
-        new Set(typeTransactions.map((transaction) => transaction.currency)),
-      ).sort(),
+    () => getAvailableCurrencies(typeTransactions),
     [typeTransactions],
   );
   const hasMultipleCurrencies = availableCurrencies.length > 1;
-  const effectiveCurrency: CurrencyCode =
-    (selectedCurrency && availableCurrencies.includes(selectedCurrency)
-      ? selectedCurrency
-      : availableCurrencies[0]) ?? defaultCurrencyCode;
+  const effectiveCurrency: CurrencyCode = pickEffectiveCurrency(
+    availableCurrencies,
+    selectedCurrency,
+  );
   const currencyTransactions = useMemo(
     () =>
       filteredTransactions.filter(
@@ -383,68 +386,70 @@ export function TransactionPeriodModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  headerCopy: { flex: 1 },
-  scrollContent: { flexGrow: 1 },
-  totalCard: {
-    ...shadows.subtle,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    marginTop: spacing.xl,
-    padding: spacing.lg,
-  },
-  totalCardCopy: { flex: 1, gap: spacing.xs },
-  comparisonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginTop: spacing.xxs,
-  },
-  currencyButton: {
-    ...shadows.subtle,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    borderColor: colors.border,
-    borderRadius: radii.round,
-    borderWidth: 1,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  currencyButtonFlag: { fontSize: 18 },
-  currencyPicker: { flex: 1, gap: spacing.lg },
-  currencyPickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  currencyPickerList: { gap: spacing.sm },
-  results: { marginTop: spacing.lg },
-  empty: {
-    flex: 1,
-    minHeight: layout.controlHeight.regular * 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    padding: spacing.xl,
-  },
-  diagonalArrow: { transform: [{ rotate: '45deg' }] },
-  addAction: { marginTop: spacing.xl },
-  pressed: { opacity: 0.72 },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    header: {
+      minHeight: layout.minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    headerCopy: { flex: 1 },
+    scrollContent: { flexGrow: 1 },
+    totalCard: {
+      ...shadows.subtle,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      marginTop: spacing.xl,
+      padding: spacing.lg,
+    },
+    totalCardCopy: { flex: 1, gap: spacing.xs },
+    comparisonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginTop: spacing.xxs,
+    },
+    currencyButton: {
+      ...shadows.subtle,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      borderColor: colors.border,
+      borderRadius: radii.round,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    currencyButtonFlag: { fontSize: 18 },
+    currencyPicker: { flex: 1, gap: spacing.lg },
+    currencyPickerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    currencyPickerList: { gap: spacing.sm },
+    results: { marginTop: spacing.lg },
+    empty: {
+      flex: 1,
+      minHeight: layout.controlHeight.regular * 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      padding: spacing.xl,
+    },
+    diagonalArrow: { transform: [{ rotate: '45deg' }] },
+    addAction: { marginTop: spacing.xl },
+    pressed: { opacity: 0.72 },
+  });
+}

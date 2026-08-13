@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CategoryDetailModal } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
@@ -37,6 +38,8 @@ const transaction: SessionTransaction = {
 describe('CategoryDetailModal', () => {
   it('expone presupuesto, compartir, edición y eliminación desde el detalle', async () => {
     const onSaveBudget = jest.fn();
+    const onSaveNote = jest.fn();
+    const onOpenTransactionDetail = jest.fn();
     const onShare = jest.fn(() => true);
     const onEdit = jest.fn();
     const onDelete = jest.fn();
@@ -47,18 +50,22 @@ describe('CategoryDetailModal', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <CategoryDetailModal
-          category={category}
-          onAddTransaction={jest.fn()}
-          onClose={jest.fn()}
-          onDelete={onDelete}
-          onEdit={onEdit}
-          onSaveBudget={onSaveBudget}
-          onShare={onShare}
-          shareTargets={[{ id: 'couple', name: 'Pareja' }]}
-          transactions={[transaction]}
-          visible
-        />
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={category}
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={onDelete}
+            onEdit={onEdit}
+            onOpenTransactionDetail={onOpenTransactionDetail}
+            onSaveBudget={onSaveBudget}
+            onSaveNote={onSaveNote}
+            onShare={onShare}
+            shareTargets={[{ id: 'couple', name: 'Pareja' }]}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const detail = screen.getByTestId('category-detail-modal');
@@ -86,6 +93,10 @@ describe('CategoryDetailModal', () => {
     ).toBe('Comida');
     expect(within(detail).queryByText('1 movimiento')).toBeNull();
     expect(within(detail).getByText('Almuerzo')).toBeTruthy();
+    await fireEvent.press(
+      within(detail).getByTestId('transaction-preview-card'),
+    );
+    expect(onOpenTransactionDetail).toHaveBeenCalledWith('lunch');
     expect(within(detail).getByTestId('category-expense-metric')).toBeTruthy();
     expect(within(detail).queryByTestId('category-income-metric')).toBeNull();
     expect(within(detail).queryByTestId('category-budget-summary')).toBeNull();
@@ -113,7 +124,11 @@ describe('CategoryDetailModal', () => {
     ).getAllByRole('button');
     expect(
       actionButtons.map((button) => button.props.accessibilityLabel),
-    ).toEqual(['Añadir movimiento', 'Añadir presupuesto', 'Copiar en otro espacio']);
+    ).toEqual([
+      'Añadir movimiento',
+      'Añadir presupuesto',
+      'Copiar en otro espacio',
+    ]);
     expect(StyleSheet.flatten(actionButtons[0]?.props.style)).toMatchObject({
       ...shadows.subtle,
       backgroundColor: colors.surface,
@@ -217,18 +232,22 @@ describe('CategoryDetailModal', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <CategoryDetailModal
-          category={{ ...category, budgetMinor: 5000 }}
-          onAddTransaction={jest.fn()}
-          onClose={jest.fn()}
-          onDelete={jest.fn()}
-          onEdit={jest.fn()}
-          onSaveBudget={onSaveBudget}
-          onShare={jest.fn(() => true)}
-          shareTargets={[]}
-          transactions={[transaction]}
-          visible
-        />
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={{ ...category, budgetMinor: 5000 }}
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={onSaveBudget}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -272,6 +291,84 @@ describe('CategoryDetailModal', () => {
     expect(onSaveBudget).toHaveBeenCalledWith('food', undefined);
   });
 
+  it('abre el editor de nota desde el botón del detalle y guarda al confirmar', async () => {
+    const onSaveNote = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={{ ...category, note: 'Nota previa' }}
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={jest.fn()}
+            onSaveNote={onSaveNote}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const noteButton = screen.getByTestId('category-detail-note');
+    expect(within(noteButton).getByText('Nota')).toBeTruthy();
+    expect(within(noteButton).getByText('Nota previa')).toBeTruthy();
+
+    await fireEvent.press(noteButton);
+    const noteModal = screen.getByTestId('category-note-modal');
+    const noteInput = within(noteModal).getByTestId(
+      'category-note-modal-input',
+    );
+    expect(noteInput.props.value).toBe('Nota previa');
+
+    await fireEvent.changeText(noteInput, 'Lista: pan, leche');
+    await fireEvent.press(
+      within(noteModal).getByRole('button', { name: 'Guardar nota' }),
+    );
+    expect(onSaveNote).toHaveBeenCalledWith('food', 'Lista: pan, leche');
+  });
+
+  it('muestra el marcador de posición cuando la categoría no tiene nota', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={category}
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={jest.fn()}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const noteButton = screen.getByTestId('category-detail-note');
+    expect(within(noteButton).getByText('Escribir Nota')).toBeTruthy();
+    expect(within(noteButton).queryByText('Nota')).toBeNull();
+  });
+
   it('omite gastos cuando la categoría solo tiene ingresos', async () => {
     const incomeTransaction: SessionTransaction = {
       ...transaction,
@@ -287,22 +384,75 @@ describe('CategoryDetailModal', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <CategoryDetailModal
-          category={category}
-          onAddTransaction={jest.fn()}
-          onClose={jest.fn()}
-          onDelete={jest.fn()}
-          onEdit={jest.fn()}
-          onSaveBudget={jest.fn()}
-          onShare={jest.fn(() => true)}
-          shareTargets={[]}
-          transactions={[incomeTransaction]}
-          visible
-        />
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={category}
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={jest.fn()}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[incomeTransaction]}
+            visible
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
     expect(screen.getByTestId('category-income-metric')).toBeTruthy();
     expect(screen.queryByTestId('category-expense-metric')).toBeNull();
+  });
+
+  it('separa los movimientos futuros del resto en su propia sección', async () => {
+    const futureTransaction: SessionTransaction = {
+      ...transaction,
+      id: 'future-groceries',
+      title: 'Compra programada',
+      occurredOn: '2999-01-15',
+      updatedAt: '2999-01-15T12:00:00.000Z',
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={category}
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={jest.fn()}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[transaction, futureTransaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const detail = screen.getByTestId('category-detail-modal');
+    const pastList = within(detail).getByTestId(
+      'category-detail-transaction-list',
+    );
+    const upcomingList = within(detail).getByTestId(
+      'category-detail-upcoming-transaction-list',
+    );
+
+    expect(within(pastList).getByText('Almuerzo')).toBeTruthy();
+    expect(within(pastList).queryByText('Compra programada')).toBeNull();
+    expect(within(upcomingList).getByText('Compra programada')).toBeTruthy();
+    expect(within(upcomingList).queryByText('Almuerzo')).toBeNull();
+    expect(within(detail).getByText('Movimientos futuros')).toBeTruthy();
   });
 });

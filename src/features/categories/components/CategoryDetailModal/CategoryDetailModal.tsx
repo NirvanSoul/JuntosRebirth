@@ -8,8 +8,10 @@ import {
   useAppModalBottomInset,
 } from '@/components/overlays/AppModal/AppModal';
 import { CopyToSpaceModal } from '@/components/overlays/CopyToSpaceModal/CopyToSpaceModal';
+import { DestructiveConfirmationPanel } from '@/components/overlays/DestructiveConfirmationPanel/DestructiveConfirmationPanel';
 import { DetailActionMenu } from '@/components/overlays/DetailActionMenu/DetailActionMenu';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
+import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
@@ -21,15 +23,22 @@ import type {
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { SessionTransaction } from '@/features/transactions/types';
-import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
+import {
+  getLocalDateKey,
+  listTransactionsThroughCurrentMonth,
+} from '@/features/transactions/utils/transactionSummary';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { triggerHaptic } from '@/lib/haptics/haptics';
-import { categoryColors } from '@/theme/categoryColors';
-import { colors } from '@/theme/colors';
+import {
+  categoryColors,
+  getCategoryContentContrast,
+} from '@/theme/categoryColors';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type DetailPanel = 'delete' | null;
 
@@ -39,7 +48,9 @@ type CategoryDetailModalProps = {
   onClose: () => void;
   onDelete: (categoryId: string) => void;
   onEdit: (categoryId: string) => void;
+  onOpenTransactionDetail: (transactionId: string) => void;
   onSaveBudget: (categoryId: string, budgetMinor?: number) => void;
+  onSaveNote: (categoryId: string, note: string | null) => void;
   onShare: (
     categoryId: string,
     targetSpaceId: string,
@@ -58,6 +69,9 @@ type ActionButtonProps = {
 };
 
 function ActionButton({ icon, label, onPress }: ActionButtonProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
+
   return (
     <Pressable
       accessibilityLabel={label}
@@ -84,14 +98,19 @@ export function CategoryDetailModal({
   onClose,
   onDelete,
   onEdit,
+  onOpenTransactionDetail,
   onSaveBudget,
+  onSaveNote,
   onShare,
   shareTargets,
   transactions,
   visible,
 }: CategoryDetailModalProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const [panel, setPanel] = useState<DetailPanel>(null);
   const [isBudgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
   const modalBottomInset = useAppModalBottomInset();
   const categoryTransactions = useMemo(
@@ -103,6 +122,42 @@ export function CategoryDetailModal({
         : [],
     [category, transactions],
   );
+  const allCategoryTransactions = useMemo(
+    () =>
+      category
+        ? transactions.filter(
+            (transaction) => transaction.categoryId === category.id,
+          )
+        : [],
+    [category, transactions],
+  );
+  const todayKey = getLocalDateKey();
+  const pastCategoryTransactions = useMemo(
+    () =>
+      categoryTransactions.filter(
+        (transaction) => transaction.occurredOn <= todayKey,
+      ),
+    [categoryTransactions, todayKey],
+  );
+  const upcomingCategoryTransactions = useMemo(() => {
+    const seenIds = new Set<string>();
+    const upcoming: SessionTransaction[] = [];
+
+    for (const transaction of [
+      ...allCategoryTransactions,
+      ...categoryTransactions,
+    ]) {
+      if (transaction.occurredOn <= todayKey || seenIds.has(transaction.id)) {
+        continue;
+      }
+      seenIds.add(transaction.id);
+      upcoming.push(transaction);
+    }
+
+    return upcoming.sort((left, right) =>
+      left.occurredOn.localeCompare(right.occurredOn),
+    );
+  }, [allCategoryTransactions, categoryTransactions, todayKey]);
   const summary = useMemo(
     () =>
       category
@@ -116,6 +171,7 @@ export function CategoryDetailModal({
 
     setPanel(null);
     setBudgetModalVisible(false);
+    setNoteModalVisible(false);
     setSpacePickerVisible(false);
   }, [category, visible]);
 
@@ -213,31 +269,13 @@ export function CategoryDetailModal({
             </View>
 
             {panel === 'delete' ? (
-              <View style={styles.dangerPanel} testID="category-delete-panel">
-                <Text variant="subheading">¿Eliminar esta categoría?</Text>
-                <Text tone="secondary" variant="footnote">
-                  Se ocultará de este espacio. Sus movimientos asociados se
-                  conservarán.
-                </Text>
-                <View style={styles.panelActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setPanel(null)}
-                    style={styles.secondaryButton}
-                  >
-                    <Text variant="label">Cancelar</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => onDelete(category.id)}
-                    style={styles.deleteButton}
-                  >
-                    <Text tone="onBrand" variant="label">
-                      Eliminar
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
+              <DestructiveConfirmationPanel
+                description="Se ocultará de este espacio. Sus movimientos asociados se conservarán."
+                onCancel={() => setPanel(null)}
+                onConfirm={() => onDelete(category.id)}
+                testID="category-delete-panel"
+                title="¿Eliminar esta categoría?"
+              />
             ) : null}
 
             {summary.expenseMinor > 0 || summary.incomeMinor > 0 ? (
@@ -245,12 +283,15 @@ export function CategoryDetailModal({
                 {summary.expenseMinor > 0 ? (
                   <View style={styles.metric} testID="category-expense-metric">
                     <View style={styles.metricHeading}>
-                      <Ionicons
-                        color={colors.expense}
-                        name="arrow-down"
-                        size={iconSize.sm}
-                        style={styles.diagonalArrow}
-                      />
+                      <View style={styles.metricIcon}>
+                        <View style={styles.diagonalArrow}>
+                          <Ionicons
+                            color={colors.expense}
+                            name="arrow-down"
+                            size={iconSize.sm}
+                          />
+                        </View>
+                      </View>
                       <Text tone="secondary" variant="caption">
                         Gastos
                       </Text>
@@ -263,12 +304,15 @@ export function CategoryDetailModal({
                 {summary.incomeMinor > 0 ? (
                   <View style={styles.metric} testID="category-income-metric">
                     <View style={styles.metricHeading}>
-                      <Ionicons
-                        color={colors.income}
-                        name="arrow-up"
-                        size={iconSize.sm}
-                        style={styles.diagonalArrow}
-                      />
+                      <View style={styles.metricIcon}>
+                        <View style={styles.diagonalArrow}>
+                          <Ionicons
+                            color={colors.income}
+                            name="arrow-up"
+                            size={iconSize.sm}
+                          />
+                        </View>
+                      </View>
                       <Text tone="secondary" variant="caption">
                         Ingresos
                       </Text>
@@ -280,6 +324,39 @@ export function CategoryDetailModal({
                 ) : null}
               </View>
             ) : null}
+
+            <Pressable
+              accessibilityLabel={
+                category.note ? category.note : 'Escribir nota'
+              }
+              accessibilityRole="button"
+              onPress={() => setNoteModalVisible(true)}
+              style={({ pressed }) => [
+                styles.noteButton,
+                pressed && styles.pressed,
+              ]}
+              testID="category-detail-note"
+            >
+              <View style={styles.noteButtonCopy}>
+                {category.note ? (
+                  <Text tone="secondary" variant="caption">
+                    Nota
+                  </Text>
+                ) : null}
+                <Text
+                  numberOfLines={category.note ? 2 : 1}
+                  tone={category.note ? 'primary' : 'secondary'}
+                  variant="label"
+                >
+                  {category.note ? category.note : 'Escribir Nota'}
+                </Text>
+              </View>
+              <Ionicons
+                color={colors.textMuted}
+                name="chevron-forward"
+                size={iconSize.sm}
+              />
+            </Pressable>
 
             {category.budgetMinor && budget && availableBudget ? (
               <View style={styles.budgetCard} testID="category-budget-summary">
@@ -336,15 +413,16 @@ export function CategoryDetailModal({
                 Movimientos
               </Text>
               <Text tone="secondary" variant="footnote">
-                {summary.transactionCount}
+                {pastCategoryTransactions.length}
               </Text>
             </View>
-            {categoryTransactions.length > 0 ? (
+            {pastCategoryTransactions.length > 0 ? (
               <TransactionPreviewList
                 categories={[category]}
                 groupingTransactions={transactions}
+                onOpenTransactionDetail={onOpenTransactionDetail}
                 testID="category-detail-transaction-list"
-                transactions={categoryTransactions}
+                transactions={pastCategoryTransactions}
               />
             ) : (
               <View style={styles.emptyMovements}>
@@ -358,6 +436,29 @@ export function CategoryDetailModal({
                 </Text>
               </View>
             )}
+
+            {upcomingCategoryTransactions.length > 0 ? (
+              <>
+                <View
+                  style={styles.movementsHeader}
+                  testID="category-detail-upcoming-header"
+                >
+                  <Text accessibilityRole="header" variant="subheading">
+                    Movimientos futuros
+                  </Text>
+                  <Text tone="secondary" variant="footnote">
+                    {upcomingCategoryTransactions.length}
+                  </Text>
+                </View>
+                <TransactionPreviewList
+                  categories={[category]}
+                  groupingTransactions={transactions}
+                  onOpenTransactionDetail={onOpenTransactionDetail}
+                  testID="category-detail-upcoming-transaction-list"
+                  transactions={upcomingCategoryTransactions}
+                />
+              </>
+            ) : null}
           </BottomSheetScrollView>
         </View>
       </AppModal>
@@ -376,6 +477,19 @@ export function CategoryDetailModal({
         }}
         visible={isBudgetModalVisible}
       />
+      <NoteEditorModal
+        onClose={() => setNoteModalVisible(false)}
+        onSave={(note) => {
+          onSaveNote(category.id, note);
+          setNoteModalVisible(false);
+        }}
+        saveColor={categoryColors[category.colorToken]}
+        saveTone={getCategoryContentContrast(category.colorToken).tone}
+        subtitle={category.name}
+        testID="category-note-modal"
+        value={category.note}
+        visible={isNoteModalVisible}
+      />
       <CopyToSpaceModal
         description="Elige dónde crear una copia independiente de esta categoría."
         failureMessage={(target) =>
@@ -392,125 +506,147 @@ export function CategoryDetailModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  topBar: {
-    zIndex: 2,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.xl,
-  },
-  scroll: { flex: 1 },
-  scrollContent: {
-    paddingTop: spacing.xl + layout.minTouchTarget,
-  },
-  hero: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
-  titleBlock: { alignItems: 'center', gap: spacing.xxs },
-  heroIcon: {
-    width: heroIconSize,
-    height: heroIconSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-    marginBottom: spacing.xs,
-  },
-  metrics: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-  },
-  metric: {
-    minWidth: 0,
-    flex: 1,
-    gap: spacing.xs,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md,
-  },
-  metricHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  diagonalArrow: { transform: [{ rotate: '45deg' }] },
-  budgetCard: {
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-  },
-  budgetHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  budgetTotal: { flexShrink: 1 },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  actionButton: {
-    ...shadows.subtle,
-    minWidth: 0,
-    minHeight: 96,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    padding: spacing.xs,
-  },
-  dangerPanel: {
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderColor: colors.expense,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-  },
-  panelActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-  },
-  secondaryButton: {
-    minHeight: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderColor: colors.border,
-    borderRadius: radii.round,
-    borderWidth: 1,
-    paddingHorizontal: spacing.lg,
-  },
-  deleteButton: {
-    minHeight: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.expense,
-    borderRadius: radii.round,
-    paddingHorizontal: spacing.xl,
-  },
-  movementsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    marginTop: spacing.xxl,
-  },
-  emptyMovements: {
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.xl,
-  },
-  pressed: { opacity: 0.64 },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    topBar: {
+      zIndex: 2,
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: spacing.xl,
+    },
+    scroll: { flex: 1 },
+    scrollContent: {
+      paddingTop: spacing.xl + layout.minTouchTarget,
+    },
+    hero: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
+    titleBlock: { alignItems: 'center', gap: spacing.xxs },
+    heroIcon: {
+      width: heroIconSize,
+      height: heroIconSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      marginBottom: spacing.xs,
+    },
+    metrics: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.xl,
+    },
+    metric: {
+      minWidth: 0,
+      flex: 1,
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.md,
+    },
+    metricHeading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    metricIcon: {
+      width: iconSize.lg,
+      height: iconSize.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+    },
+    diagonalArrow: { transform: [{ rotate: '45deg' }] },
+    noteButton: {
+      minHeight: layout.controlHeight.regular,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      marginTop: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    noteButtonCopy: { flex: 1, minWidth: 0, gap: spacing.xxs },
+    budgetCard: {
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      marginTop: spacing.lg,
+      padding: spacing.lg,
+    },
+    budgetHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    budgetTotal: { flexShrink: 1 },
+    actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+    actionButton: {
+      ...shadows.subtle,
+      minWidth: 0,
+      minHeight: 96,
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      padding: spacing.xs,
+    },
+    dangerPanel: {
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderColor: colors.expense,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      marginTop: spacing.lg,
+      padding: spacing.lg,
+    },
+    panelActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.sm,
+    },
+    secondaryButton: {
+      minHeight: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderColor: colors.border,
+      borderRadius: radii.round,
+      borderWidth: 1,
+      paddingHorizontal: spacing.lg,
+    },
+    deleteButton: {
+      minHeight: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.expense,
+      borderRadius: radii.round,
+      paddingHorizontal: spacing.xl,
+    },
+    movementsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+      marginTop: spacing.xxl,
+    },
+    emptyMovements: {
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.xl,
+    },
+    pressed: { opacity: 0.64 },
+  });
+}

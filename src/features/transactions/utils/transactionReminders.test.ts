@@ -76,6 +76,23 @@ describe('buildReminderTemplateVariables', () => {
     expect(variables.category).toBeUndefined();
     expect(variables.amount).toBeTruthy();
   });
+
+  it('omite el importe cuando showAmounts es falso', () => {
+    const variables = buildReminderTemplateVariables(
+      {
+        amountMinor: 1050,
+        currency: 'EUR',
+        categoryName: 'Supermercado',
+        title: 'Compra semanal',
+        type: 'expense',
+      },
+      false,
+    );
+
+    expect(variables.amount).toBeUndefined();
+    expect(variables.title).toBe('Compra semanal');
+    expect(variables.category).toBe('Supermercado');
+  });
 });
 
 describe('formatTimeOfDay y timeOfDayToDate', () => {

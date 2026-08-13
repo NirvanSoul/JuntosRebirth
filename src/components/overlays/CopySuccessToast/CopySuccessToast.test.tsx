@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { CopySuccessToast } from '@/components/overlays/CopySuccessToast/CopySuccessToast';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
 import { motion } from '@/theme/motion';
 
@@ -19,14 +20,16 @@ describe('CopySuccessToast', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <CopySuccessToast
-          notice={{
-            destinationName: 'Pareja',
-            id: 1,
-            itemName: 'Comida',
-          }}
-          onDismiss={jest.fn()}
-        />
+        <ThemeProvider initialAppearance="light">
+          <CopySuccessToast
+            notice={{
+              destinationName: 'Pareja',
+              id: 1,
+              itemName: 'Comida',
+            }}
+            onDismiss={jest.fn()}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -60,10 +63,12 @@ describe('CopySuccessToast', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <CopySuccessToast
-          notice={{ destinationName: 'Casa', id: 7, itemName: 'Taxi' }}
-          onDismiss={onDismiss}
-        />
+        <ThemeProvider initialAppearance="light">
+          <CopySuccessToast
+            notice={{ destinationName: 'Casa', id: 7, itemName: 'Taxi' }}
+            onDismiss={onDismiss}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 

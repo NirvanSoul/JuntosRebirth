@@ -3,11 +3,17 @@ import { useMemo } from 'react';
 
 import { linking } from '@/navigation/linking';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
+import { AccessScreen } from '@/features/access/screens/AccessScreen';
+import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { OnboardingNavigator } from '@/features/onboarding/OnboardingNavigator';
+import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import { useTheme } from '@/theme/useTheme';
 import { fontFamily } from '@/theme/fonts';
 
 export function RootNavigator() {
   const { colors, isDark } = useTheme();
+  const { isReady: isAuthReady, session } = useAuthSession();
+  const { isReady: isOnboardingReady, status } = useOnboardingStatus();
 
   const navigationTheme = useMemo(
     () => ({
@@ -30,9 +36,21 @@ export function RootNavigator() {
     [colors, isDark],
   );
 
+  if (!isAuthReady || !isOnboardingReady) {
+    return null;
+  }
+
+  const content = !status.completed ? (
+    <OnboardingNavigator />
+  ) : status.accessMode === 'authenticated' && !session ? (
+    <AccessScreen />
+  ) : (
+    <MainTabsNavigator />
+  );
+
   return (
     <NavigationContainer linking={linking} theme={navigationTheme}>
-      <MainTabsNavigator />
+      {content}
     </NavigationContainer>
   );
 }

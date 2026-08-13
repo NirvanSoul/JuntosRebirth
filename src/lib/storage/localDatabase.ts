@@ -1,9 +1,38 @@
 import * as SQLite from 'expo-sqlite';
 
 export const localDatabaseName = 'juntoss.db';
-export const localDatabaseVersion = 7;
+export const localDatabaseVersion = 16;
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+/**
+ * Salvaguarda puntual para `local_profile.display_name`: durante el
+ * desarrollo de esta sesión, un dispositivo llegó a quedar con
+ * `user_version = 16` (por haber corrido una build intermedia que ya subía
+ * la versión) sin que la columna se hubiera creado todavía, porque el
+ * bloque `currentVersion < 16` de abajo solo corre una vez por dispositivo.
+ * Como `currentVersion === localDatabaseVersion` corta la función antes de
+ * llegar a ese bloque, cualquier drift entre el número de versión y el
+ * esquema real queda sin forma de repararse. Esta comprobación es barata
+ * (una `PRAGMA table_info`) y corre siempre que el atajo de versión igual
+ * se toma, así un dispositivo con ese drift se autorepara en el próximo
+ * arranque en vez de fallar para siempre al guardar el nombre.
+ */
+async function ensureLocalProfileDisplayNameColumn(
+  database: SQLite.SQLiteDatabase,
+): Promise<void> {
+  const columns = await database.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(local_profile)',
+  );
+  const hasDisplayName = columns.some(
+    (column) => column.name === 'display_name',
+  );
+  if (!hasDisplayName) {
+    await database.execAsync(
+      'ALTER TABLE local_profile ADD COLUMN display_name TEXT',
+    );
+  }
+}
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -19,7 +48,10 @@ export async function migrateLocalDatabase(
   if (currentVersion > localDatabaseVersion) {
     throw new Error('La base local pertenece a una versión más reciente');
   }
-  if (currentVersion === localDatabaseVersion) return;
+  if (currentVersion === localDatabaseVersion) {
+    await ensureLocalProfileDisplayNameColumn(database);
+    return;
+  }
 
   await database.withExclusiveTransactionAsync(async (transaction) => {
     if (currentVersion < 1) {
@@ -312,21 +344,257 @@ export async function migrateLocalDatabase(
       `);
     }
 
+    if (currentVersion < 8) {
+      await transaction.execAsync(`
+        ALTER TABLE categories ADD COLUMN note TEXT;
+        ALTER TABLE transactions ADD COLUMN note TEXT;
+      `);
+    }
+
+    if (currentVersion < 9) {
+      await transaction.execAsync(`
+        CREATE TABLE local_profile (
+          singleton_id INTEGER PRIMARY KEY NOT NULL DEFAULT 1
+            CHECK (singleton_id = 1),
+          avatar_path TEXT,
+          avatar_updated_at TEXT
+        );
+      `);
+    }
+
+    if (currentVersion < 10) {
+      // categories.budget_minor only ever stored a single currency-less
+      // budget, assumed EUR before ADR-060 introduced per-movement
+      // currencies. This adds a per-currency budgets table (up to 3
+      // currencies per category, enforced in localCategoryRepository)
+      // without touching budget_minor: it stays as historical data and
+      // nothing writes to it anymore.
+      await transaction.execAsync(`
+        CREATE TABLE category_budgets (
+          id TEXT PRIMARY KEY NOT NULL,
+          category_id TEXT NOT NULL,
+          currency TEXT NOT NULL,
+          budget_minor INTEGER NOT NULL CHECK (budget_minor > 0),
+          sync_status TEXT NOT NULL DEFAULT 'local_only'
+            CHECK (sync_status IN ('local_only', 'pending', 'syncing', 'synced', 'failed', 'conflict')),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (category_id, currency),
+          FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX category_budgets_category_idx
+          ON category_budgets(category_id);
+
+        INSERT INTO category_budgets (
+          id, category_id, currency, budget_minor, sync_status, created_at, updated_at
+        )
+        SELECT 'legacy-budget-' || id, id, 'EUR', budget_minor, sync_status,
+               created_at, updated_at
+          FROM categories
+         WHERE budget_minor IS NOT NULL;
+      `);
+    }
+
+    if (currentVersion < 11) {
+      await transaction.execAsync(`
+        CREATE TABLE import_merchant_rules (
+          id TEXT PRIMARY KEY NOT NULL,
+          space_id TEXT NOT NULL,
+          normalized_merchant TEXT NOT NULL,
+          category_id TEXT NOT NULL,
+          confirmations INTEGER NOT NULL DEFAULT 1
+            CHECK (confirmations >= 1),
+          source TEXT NOT NULL DEFAULT 'import_correction'
+            CHECK (source IN ('manual', 'import_correction', 'system')),
+          last_used_at TEXT,
+          sync_status TEXT NOT NULL DEFAULT 'local_only'
+            CHECK (sync_status IN ('local_only', 'pending', 'syncing', 'synced', 'failed', 'conflict')),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (space_id, normalized_merchant),
+          FOREIGN KEY (category_id, space_id)
+            REFERENCES categories(id, space_id) ON DELETE RESTRICT
+        );
+
+        CREATE INDEX import_merchant_rules_space_merchant_idx
+          ON import_merchant_rules(space_id, normalized_merchant);
+        CREATE INDEX import_merchant_rules_sync_idx
+          ON import_merchant_rules(sync_status, updated_at);
+      `);
+    }
+
+    if (currentVersion < 12) {
+      await transaction.execAsync(`
+        CREATE TABLE import_batches (
+          id TEXT PRIMARY KEY NOT NULL,
+          space_id TEXT NOT NULL,
+          source_type TEXT NOT NULL CHECK (source_type IN ('xls', 'xlsx', 'csv')),
+          source_profile TEXT,
+          status TEXT NOT NULL CHECK (status IN (
+            'parsing', 'mapping_required', 'needs_review', 'ready',
+            'imported', 'failed', 'cancelled'
+          )),
+          total_items INTEGER NOT NULL DEFAULT 0 CHECK (total_items >= 0),
+          review_items INTEGER NOT NULL DEFAULT 0 CHECK (review_items >= 0),
+          duplicate_items INTEGER NOT NULL DEFAULT 0 CHECK (duplicate_items >= 0),
+          sync_status TEXT NOT NULL DEFAULT 'local_only'
+            CHECK (sync_status IN ('local_only', 'pending', 'syncing', 'synced', 'failed', 'conflict')),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          completed_at TEXT,
+          UNIQUE (id, space_id)
+        );
+
+        CREATE TABLE import_items (
+          id TEXT PRIMARY KEY NOT NULL,
+          batch_id TEXT NOT NULL,
+          space_id TEXT NOT NULL,
+          source_row INTEGER NOT NULL CHECK (source_row > 0),
+          raw_description TEXT NOT NULL,
+          normalized_merchant TEXT NOT NULL,
+          occurred_on TEXT,
+          amount_minor INTEGER,
+          currency TEXT,
+          movement_type TEXT NOT NULL CHECK (movement_type IN ('expense', 'income', 'unknown')),
+          suggested_category_id TEXT,
+          final_category_id TEXT,
+          duplicate_status TEXT NOT NULL CHECK (duplicate_status IN ('none', 'exact', 'probable')),
+          item_status TEXT NOT NULL CHECK (item_status IN (
+            'pending', 'ready', 'ignored', 'duplicate', 'imported', 'error'
+          )),
+          is_selected INTEGER NOT NULL DEFAULT 0 CHECK (is_selected IN (0, 1)),
+          created_transaction_id TEXT,
+          issues TEXT NOT NULL CHECK (json_valid(issues)),
+          sync_status TEXT NOT NULL DEFAULT 'local_only'
+            CHECK (sync_status IN ('local_only', 'pending', 'syncing', 'synced', 'failed', 'conflict')),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (batch_id, space_id)
+            REFERENCES import_batches(id, space_id) ON DELETE CASCADE,
+          FOREIGN KEY (final_category_id, space_id)
+            REFERENCES categories(id, space_id) ON DELETE RESTRICT
+        );
+
+        CREATE INDEX import_batches_space_status_idx
+          ON import_batches(space_id, status, updated_at DESC);
+        CREATE INDEX import_items_batch_idx ON import_items(batch_id);
+        CREATE INDEX import_items_sync_idx ON import_items(sync_status, updated_at);
+      `);
+    }
+
+    if (currentVersion < 13) {
+      await transaction.execAsync(`
+        CREATE TABLE remote_entity_links (
+          user_id TEXT NOT NULL,
+          entity_type TEXT NOT NULL
+            CHECK (entity_type IN ('space', 'category', 'transaction')),
+          remote_id TEXT NOT NULL,
+          local_id TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, entity_type, remote_id),
+          UNIQUE (user_id, entity_type, local_id)
+        );
+
+        CREATE INDEX remote_entity_links_local_idx
+          ON remote_entity_links(user_id, entity_type, local_id);
+      `);
+    }
+
+    if (currentVersion < 14) {
+      await transaction.execAsync(`
+        ALTER TABLE import_batches ADD COLUMN file_hash TEXT;
+
+        CREATE INDEX import_batches_file_hash_idx
+          ON import_batches(space_id, file_hash) WHERE file_hash IS NOT NULL;
+      `);
+    }
+
+    if (currentVersion < 15) {
+      await transaction.execAsync(`
+        CREATE TABLE merchant_feedback_queue (
+          id TEXT PRIMARY KEY NOT NULL,
+          import_item_id TEXT NOT NULL,
+          canonical_category_key TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending'
+            CHECK (status IN ('pending', 'syncing', 'synced', 'failed')),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (import_item_id)
+        );
+
+        CREATE INDEX merchant_feedback_queue_status_idx
+          ON merchant_feedback_queue(status, updated_at);
+      `);
+    }
+
+    if (currentVersion < 16) {
+      await transaction.execAsync(`
+        ALTER TABLE local_profile ADD COLUMN display_name TEXT;
+      `);
+    }
+
     await transaction.execAsync(
       `PRAGMA user_version = ${localDatabaseVersion}`,
     );
   });
 }
 
+/**
+ * Abre la base y migra. Si la migración falla (p. ej. `user_version` quedó
+ * por delante de `localDatabaseVersion` porque el dispositivo corrió una
+ * build de desarrollo con un esquema distinto, o el archivo quedó a medio
+ * migrar por un cierre abrupto), el archivo local no contiene nada que no
+ * se pueda regenerar: se borra y se reintenta una sola vez con una base
+ * nueva en vez de dejar la app rota hasta que alguien la reinstale a mano.
+ */
+async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
+  const database = await SQLite.openDatabaseAsync(localDatabaseName);
+  try {
+    await migrateLocalDatabase(database);
+    return database;
+  } catch (error) {
+    console.error(
+      '[localDatabase] La migración falló, reiniciando la base local',
+      error,
+    );
+    await resetLocalDatabase();
+    const freshDatabase = await SQLite.openDatabaseAsync(localDatabaseName);
+    await migrateLocalDatabase(freshDatabase);
+    return freshDatabase;
+  }
+}
+
 export function getLocalDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!databasePromise) {
-    databasePromise = SQLite.openDatabaseAsync(localDatabaseName).then(
-      async (database) => {
-        await migrateLocalDatabase(database);
-        return database;
-      },
-    );
+    databasePromise = openAndMigrate().catch((error: unknown) => {
+      // Si abrir o migrar falla (p. ej. un fallo transitorio en el primer
+      // arranque, o el reintento automático de arriba también falló), no
+      // dejamos la promesa en caché: así la próxima pantalla que pida la
+      // base de datos reintenta desde cero en vez de heredar el mismo
+      // rechazo para el resto de la sesión.
+      databasePromise = null;
+      throw error;
+    });
   }
 
   return databasePromise;
+}
+
+/**
+ * Descarta la conexión en caché y borra el archivo `.db` del dispositivo.
+ * Última vía de escape cuando abrir o migrar la base falla de forma
+ * persistente (p. ej. corrupción): la próxima llamada a `getLocalDatabase`
+ * parte de un archivo nuevo en vez de reintentar contra el mismo roto.
+ */
+export async function resetLocalDatabase(): Promise<void> {
+  databasePromise = null;
+  try {
+    await SQLite.deleteDatabaseAsync(localDatabaseName);
+  } catch {
+    // No hay archivo que borrar (ya no existía) o el borrado falló por una
+    // razón que de todos modos no podemos resolver aquí: lo importante es
+    // que la próxima apertura no reutilice una promesa/conexión rota.
+  }
 }

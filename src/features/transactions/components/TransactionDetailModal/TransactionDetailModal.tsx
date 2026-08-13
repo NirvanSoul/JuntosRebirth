@@ -11,8 +11,10 @@ import {
   CopyToSpaceModal,
   type CopyTarget,
 } from '@/components/overlays/CopyToSpaceModal/CopyToSpaceModal';
+import { DestructiveConfirmationPanel } from '@/components/overlays/DestructiveConfirmationPanel/DestructiveConfirmationPanel';
 import { DetailActionMenu } from '@/components/overlays/DetailActionMenu/DetailActionMenu';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
+import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { Category } from '@/features/categories/types';
@@ -28,12 +30,16 @@ import {
 } from '@/features/transactions/utils/transactionRecurrence';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { triggerHaptic } from '@/lib/haptics/haptics';
-import { categoryColors } from '@/theme/categoryColors';
-import { colors } from '@/theme/colors';
+import {
+  categoryColors,
+  getCategoryContentContrast,
+} from '@/theme/categoryColors';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type TransactionDetailModalProps = {
   category: Category | null;
@@ -44,7 +50,9 @@ type TransactionDetailModalProps = {
   ) => boolean | Promise<boolean>;
   onDelete: (transactionId: string) => void;
   onEdit: (transactionId: string) => void;
+  onOpenCategoryDetail?: (categoryId: string) => void;
   onRemoveReminder: (transactionId: string) => boolean | Promise<boolean>;
+  onSaveNote: (transactionId: string, note: string | null) => void;
   onSaveReminder: (
     transactionId: string,
     remindOn: string,
@@ -82,7 +90,9 @@ export function TransactionDetailModal({
   onCopy,
   onDelete,
   onEdit,
+  onOpenCategoryDetail,
   onRemoveReminder,
+  onSaveNote,
   onSaveReminder,
   reminder,
   shareTargets,
@@ -90,8 +100,11 @@ export function TransactionDetailModal({
   transactions,
   visible,
 }: TransactionDetailModalProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
   const [isReminderModalVisible, setReminderModalVisible] = useState(false);
+  const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [isDeleteVisible, setDeleteVisible] = useState(false);
   const [isRecurrenceExpanded, setRecurrenceExpanded] = useState(false);
   const [visibleRecurrenceCount, setVisibleRecurrenceCount] =
@@ -102,6 +115,7 @@ export function TransactionDetailModal({
     if (visible) {
       setSpacePickerVisible(false);
       setReminderModalVisible(false);
+      setNoteModalVisible(false);
       setDeleteVisible(false);
       setRecurrenceExpanded(false);
       setVisibleRecurrenceCount(recurrencePageSize);
@@ -222,34 +236,17 @@ export function TransactionDetailModal({
             </View>
 
             {isDeleteVisible ? (
-              <View
-                style={styles.dangerPanel}
+              <DestructiveConfirmationPanel
+                description={
+                  transaction.sourceTransactionId
+                    ? 'Es una copia de otro espacio. Se eliminará solo en este espacio; el movimiento original no se verá afectado.'
+                    : 'Dejará de aparecer en este espacio y sus totales se actualizarán.'
+                }
+                onCancel={() => setDeleteVisible(false)}
+                onConfirm={() => onDelete(transaction.id)}
                 testID="transaction-delete-panel"
-              >
-                <Text variant="subheading">¿Eliminar este movimiento?</Text>
-                <Text tone="secondary" variant="footnote">
-                  Dejará de aparecer en este espacio y sus totales se
-                  actualizarán.
-                </Text>
-                <View style={styles.panelActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setDeleteVisible(false)}
-                    style={styles.secondaryButton}
-                  >
-                    <Text variant="label">Cancelar</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => onDelete(transaction.id)}
-                    style={styles.deleteButton}
-                  >
-                    <Text tone="onBrand" variant="label">
-                      Eliminar
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
+                title="¿Eliminar este movimiento?"
+              />
             ) : null}
 
             <View
@@ -264,17 +261,15 @@ export function TransactionDetailModal({
               <View style={styles.amountRow}>
                 <Text variant="amount">{amount}</Text>
                 <View
-                  style={[
-                    styles.directionIcon,
-                    isIncome ? styles.incomeIcon : styles.expenseIcon,
-                  ]}
+                  style={styles.directionIcon}
                   testID="transaction-detail-direction-icon"
                 >
                   <View style={styles.diagonalArrow}>
                     <Ionicons
-                      color={colors.onBrand}
+                      color={isIncome ? colors.income : colors.expense}
                       name={isIncome ? 'arrow-up' : 'arrow-down'}
-                      size={iconSize.xs}
+                      size={iconSize.sm}
+                      testID="transaction-detail-direction-glyph"
                     />
                   </View>
                 </View>
@@ -329,7 +324,19 @@ export function TransactionDetailModal({
             ) : null}
 
             <View style={styles.detailsCard}>
-              <View style={styles.detailRow}>
+              <Pressable
+                accessibilityLabel={`Ver categoría: ${category?.name ?? 'Sin categoría'}`}
+                accessibilityRole={
+                  category && onOpenCategoryDetail ? 'button' : undefined
+                }
+                disabled={!category || !onOpenCategoryDetail}
+                onPress={() => category && onOpenCategoryDetail?.(category.id)}
+                style={({ pressed }) => [
+                  styles.detailRow,
+                  pressed && styles.pressed,
+                ]}
+                testID="transaction-detail-category-row"
+              >
                 {category ? (
                   <CategoryIcon
                     color={categoryColors[category.colorToken]}
@@ -351,7 +358,14 @@ export function TransactionDetailModal({
                     {category?.name ?? 'Sin categoría'}
                   </Text>
                 </View>
-              </View>
+                {category && onOpenCategoryDetail ? (
+                  <Ionicons
+                    color={colors.textMuted}
+                    name="chevron-forward"
+                    size={iconSize.sm}
+                  />
+                ) : null}
+              </Pressable>
               <View style={styles.divider} />
               <View style={styles.detailRow}>
                 <Ionicons
@@ -467,6 +481,41 @@ export function TransactionDetailModal({
                 </View>
               ) : null}
             </View>
+
+            {!isProjected ? (
+              <Pressable
+                accessibilityLabel={
+                  transaction.note ? transaction.note : 'Escribir nota'
+                }
+                accessibilityRole="button"
+                onPress={() => setNoteModalVisible(true)}
+                style={({ pressed }) => [
+                  styles.noteButton,
+                  pressed && styles.pressed,
+                ]}
+                testID="transaction-detail-note"
+              >
+                <View style={styles.noteButtonCopy}>
+                  {transaction.note ? (
+                    <Text tone="secondary" variant="caption">
+                      Nota
+                    </Text>
+                  ) : null}
+                  <Text
+                    numberOfLines={transaction.note ? 2 : 1}
+                    tone={transaction.note ? 'primary' : 'secondary'}
+                    variant="label"
+                  >
+                    {transaction.note ? transaction.note : 'Escribir Nota'}
+                  </Text>
+                </View>
+                <Ionicons
+                  color={colors.textMuted}
+                  name="chevron-forward"
+                  size={iconSize.sm}
+                />
+              </Pressable>
+            ) : null}
           </BottomSheetScrollView>
         </View>
       </AppModal>
@@ -495,146 +544,179 @@ export function TransactionDetailModal({
         transactionTitle={title}
         visible={isReminderModalVisible}
       />
+
+      <NoteEditorModal
+        onClose={() => setNoteModalVisible(false)}
+        onSave={(note) => {
+          onSaveNote(transaction.id, note);
+          setNoteModalVisible(false);
+        }}
+        saveColor={
+          category ? categoryColors[category.colorToken] : colors.textMuted
+        }
+        saveTone={
+          category
+            ? getCategoryContentContrast(category.colorToken).tone
+            : undefined
+        }
+        subtitle={title}
+        testID="transaction-note-modal"
+        value={transaction.note}
+        visible={isNoteModalVisible}
+      />
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  topBar: {
-    zIndex: 2,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.xl,
-  },
-  scroll: { flex: 1 },
-  scrollContent: {
-    paddingTop: spacing.xl + layout.minTouchTarget,
-  },
-  hero: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
-  titleBlock: { alignItems: 'center', gap: spacing.xxs },
-  heroIcon: {
-    width: heroIconSize,
-    height: heroIconSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-    marginBottom: spacing.xs,
-  },
-  amountCard: {
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    marginTop: spacing.xl,
-    padding: spacing.lg,
-  },
-  amountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  directionIcon: {
-    width: iconSize.lg,
-    height: iconSize.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.sm + spacing.xxs,
-  },
-  incomeIcon: { backgroundColor: colors.income },
-  expenseIcon: { backgroundColor: colors.expense },
-  diagonalArrow: { transform: [{ rotate: '45deg' }] },
-  detailsCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-  },
-  detailRow: {
-    minHeight: layout.controlHeight.regular,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  detailCopy: { flex: 1, gap: spacing.xxs },
-  divider: { height: 1, backgroundColor: colors.border },
-  recurrenceChevronExpanded: { transform: [{ rotate: '180deg' }] },
-  recurrenceList: {
-    gap: spacing.sm,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    paddingBottom: spacing.lg,
-    paddingLeft: iconSize.sm + spacing.md,
-    paddingTop: spacing.md,
-  },
-  recurrenceDateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: layout.minTouchTarget,
-  },
-  moreButton: {
-    minHeight: layout.minTouchTarget,
-    alignSelf: 'flex-start',
-    justifyContent: 'center',
-    paddingRight: spacing.lg,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-  },
-  secondaryAction: {
-    ...shadows.subtle,
-    minWidth: 0,
-    minHeight: 96,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    padding: spacing.xs,
-  },
-  dangerPanel: {
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderColor: colors.expense,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-  },
-  panelActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-  },
-  secondaryButton: {
-    minHeight: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderColor: colors.border,
-    borderRadius: radii.round,
-    borderWidth: 1,
-    paddingHorizontal: spacing.lg,
-  },
-  deleteButton: {
-    minHeight: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.expense,
-    borderRadius: radii.round,
-    paddingHorizontal: spacing.xl,
-  },
-  pressed: { opacity: 0.64 },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    topBar: {
+      zIndex: 2,
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      minHeight: layout.minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: spacing.xl,
+    },
+    scroll: { flex: 1 },
+    scrollContent: {
+      paddingTop: spacing.xl + layout.minTouchTarget,
+    },
+    hero: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
+    titleBlock: { alignItems: 'center', gap: spacing.xxs },
+    heroIcon: {
+      width: heroIconSize,
+      height: heroIconSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      marginBottom: spacing.xs,
+    },
+    amountCard: {
+      alignItems: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      marginTop: spacing.xl,
+      padding: spacing.lg,
+    },
+    amountRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    directionIcon: {
+      width: iconSize.lg,
+      height: iconSize.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+    },
+    diagonalArrow: { transform: [{ rotate: '45deg' }] },
+    detailsCard: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      marginTop: spacing.lg,
+      paddingHorizontal: spacing.lg,
+    },
+    noteButton: {
+      minHeight: layout.controlHeight.regular,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      marginTop: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    noteButtonCopy: { flex: 1, minWidth: 0, gap: spacing.xxs },
+    detailRow: {
+      minHeight: layout.controlHeight.regular,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    detailCopy: { flex: 1, gap: spacing.xxs },
+    divider: { height: 1, backgroundColor: colors.border },
+    recurrenceChevronExpanded: { transform: [{ rotate: '180deg' }] },
+    recurrenceList: {
+      gap: spacing.sm,
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      paddingBottom: spacing.lg,
+      paddingLeft: iconSize.sm + spacing.md,
+      paddingTop: spacing.md,
+    },
+    recurrenceDateRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minHeight: layout.minTouchTarget,
+    },
+    moreButton: {
+      minHeight: layout.minTouchTarget,
+      alignSelf: 'flex-start',
+      justifyContent: 'center',
+      paddingRight: spacing.lg,
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+    },
+    secondaryAction: {
+      ...shadows.subtle,
+      minWidth: 0,
+      minHeight: 96,
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      padding: spacing.xs,
+    },
+    dangerPanel: {
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderColor: colors.expense,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      marginTop: spacing.lg,
+      padding: spacing.lg,
+    },
+    panelActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.sm,
+    },
+    secondaryButton: {
+      minHeight: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderColor: colors.border,
+      borderRadius: radii.round,
+      borderWidth: 1,
+      paddingHorizontal: spacing.lg,
+    },
+    deleteButton: {
+      minHeight: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.expense,
+      borderRadius: radii.round,
+      paddingHorizontal: spacing.xl,
+    },
+    pressed: { opacity: 0.64 },
+  });
+}

@@ -84,10 +84,13 @@ export function ThemeProvider({
     };
   }, [initialAppearance]);
 
-  const setAppearance = useCallback(async (nextAppearance: AppearancePreference) => {
-    setAppearanceState(nextAppearance);
-    await saveAppPreferences({ appearance: nextAppearance });
-  }, []);
+  const setAppearance = useCallback(
+    async (nextAppearance: AppearancePreference) => {
+      setAppearanceState(nextAppearance);
+      await saveAppPreferences({ appearance: nextAppearance });
+    },
+    [],
+  );
 
   const colorScheme = resolveEffectiveScheme(appearance, systemScheme);
   const colors = useMemo(() => resolveColorTokens(colorScheme), [colorScheme]);

@@ -33,8 +33,12 @@ jest.mock(
 const mockRequestNotificationPermission = jest.fn();
 const mockScheduleLocalNotification = jest.fn();
 const mockCancelLocalNotification = jest.fn();
+const mockListScheduledLocalNotifications = jest.fn();
+let storedSchedule: { notificationId: string; scheduledOn: string } | null;
 
 jest.mock('@/lib/notifications/localNotifications', () => ({
+  listScheduledLocalNotifications: (...args: unknown[]) =>
+    mockListScheduledLocalNotifications(...args),
   requestNotificationPermission: (...args: unknown[]) =>
     mockRequestNotificationPermission(...args),
   scheduleLocalNotification: (...args: unknown[]) =>
@@ -81,7 +85,15 @@ describe('reconcileDailyReminder', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers().setSystemTime(new Date('2026-08-10T08:00:00'));
-    mockGetDailyReminderSchedule.mockResolvedValue(null);
+    storedSchedule = null;
+    mockGetDailyReminderSchedule.mockImplementation(async () => storedSchedule);
+    mockSaveDailyReminderSchedule.mockImplementation(async (schedule) => {
+      storedSchedule = schedule;
+    });
+    mockClearDailyReminderSchedule.mockImplementation(async () => {
+      storedSchedule = null;
+    });
+    mockListScheduledLocalNotifications.mockResolvedValue([]);
     mockRequestNotificationPermission.mockResolvedValue(true);
     mockScheduleLocalNotification.mockResolvedValue('daily-notif-1');
     mockBuildNotificationContent.mockResolvedValue({
@@ -95,15 +107,66 @@ describe('reconcileDailyReminder', () => {
   });
 
   it('cancela cualquier aviso previo antes de reprogramar', async () => {
-    mockGetDailyReminderSchedule.mockResolvedValue({
+    storedSchedule = {
       notificationId: 'stale-notif',
       scheduledOn: '2026-08-09',
-    });
+    };
 
     await reconcileDailyReminder({ transactions: [] });
 
     expect(mockCancelLocalNotification).toHaveBeenCalledWith('stale-notif');
     expect(mockClearDailyReminderSchedule).toHaveBeenCalled();
+  });
+
+  it('conserva el único aviso ya programado para la misma fecha', async () => {
+    storedSchedule = {
+      notificationId: 'daily-notif-1',
+      scheduledOn: '2026-08-10',
+    };
+
+    await reconcileDailyReminder({ transactions: [] });
+
+    expect(mockCancelLocalNotification).not.toHaveBeenCalled();
+    expect(mockScheduleLocalNotification).not.toHaveBeenCalled();
+    expect(mockBuildNotificationContent).not.toHaveBeenCalled();
+  });
+
+  it('serializa llamadas simultáneas para no crear avisos diarios duplicados', async () => {
+    await Promise.all([
+      reconcileDailyReminder({ transactions: [] }),
+      reconcileDailyReminder({ transactions: [] }),
+      reconcileDailyReminder({ transactions: [] }),
+      reconcileDailyReminder({ transactions: [] }),
+      reconcileDailyReminder({ transactions: [] }),
+    ]);
+
+    expect(mockScheduleLocalNotification).toHaveBeenCalledTimes(1);
+    expect(mockSaveDailyReminderSchedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('elimina avisos diarios duplicados de versiones anteriores antes de reprogramar uno', async () => {
+    storedSchedule = {
+      notificationId: 'daily-notif-1',
+      scheduledOn: '2026-08-10',
+    };
+    mockListScheduledLocalNotifications.mockResolvedValue([
+      { data: {}, id: 'daily-notif-1', title: 'Un minuto para organizarte' },
+      {
+        data: {},
+        id: 'legacy-daily-notif-2',
+        title: 'Mantén tu dinero al día',
+      },
+      {
+        data: {},
+        id: 'legacy-daily-notif-3',
+        title: '¿Gastaste algo hoy?',
+      },
+    ]);
+
+    await reconcileDailyReminder({ transactions: [] });
+
+    expect(mockCancelLocalNotification).toHaveBeenCalledTimes(3);
+    expect(mockScheduleLocalNotification).toHaveBeenCalledTimes(1);
   });
 
   it('programa siempre el aviso de hoy cuando la hora no pasó y no se registró nada', async () => {

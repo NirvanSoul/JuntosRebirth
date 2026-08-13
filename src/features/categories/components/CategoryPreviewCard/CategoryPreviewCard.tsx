@@ -13,13 +13,14 @@ import {
   getCategoryContentContrast,
   type CategoryColorToken,
 } from '@/theme/categoryColors';
-import { colors } from '@/theme/colors';
 import { createDiagonalGradient } from '@/theme/gradients';
 import { iconSize } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type CategoryPreviewCardProps = {
   name: string;
@@ -86,9 +87,10 @@ function CategoryTile({
       >
         <Text
           numberOfLines={1}
+          style={{ color: contentContrast.color }}
           tone={contentContrast.tone}
           variant="footnote"
-          weight="semibold"
+          weight="medium"
         >
           {name}
         </Text>
@@ -142,9 +144,10 @@ function CategoryTile({
         <Text
           adjustsFontSizeToFit
           numberOfLines={1}
+          style={{ color: contentContrast.color }}
           tone={contentContrast.tone}
           variant="footnote"
-          weight="semibold"
+          weight="medium"
         >
           {spent}
         </Text>
@@ -154,6 +157,10 @@ function CategoryTile({
 }
 
 export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
+  const { colors, shadows } = useTheme();
+  const themedStyles = useThemedStyles((palette) =>
+    createThemedStyles(palette, shadows),
+  );
   const { variant = 'row' } = props;
 
   if (variant === 'compact') {
@@ -174,7 +181,7 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
         disabled={!onPress}
         onPress={onPress}
         style={({ pressed }) => [
-          styles.compactCard,
+          themedStyles.compactCard,
           pressed && styles.cardPressed,
         ]}
         testID={testID}
@@ -238,7 +245,10 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
       accessibilityRole="button"
       disabled={!onPress}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        themedStyles.card,
+        pressed && styles.cardPressed,
+      ]}
       testID="category-preview-card"
     >
       <View
@@ -306,30 +316,35 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
   );
 }
 
+function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    card: {
+      minHeight: previewCardLayout.minHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      paddingHorizontal: previewCardLayout.paddingHorizontal,
+      paddingVertical: previewCardLayout.paddingVertical,
+    },
+    compactCard: {
+      ...shadows.subtle,
+      minHeight: compactCardMinHeight,
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      gap: spacing.xs,
+      borderRadius: radii.md,
+      borderColor: colors.border,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.xxs,
+      paddingVertical: spacing.sm,
+    },
+  });
+}
+
 const styles = StyleSheet.create({
-  card: {
-    minHeight: previewCardLayout.minHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    paddingHorizontal: previewCardLayout.paddingHorizontal,
-    paddingVertical: previewCardLayout.paddingVertical,
-  },
   cardPressed: { opacity: 0.64 },
-  compactCard: {
-    ...shadows.subtle,
-    minHeight: compactCardMinHeight,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: spacing.xs,
-    borderRadius: radii.md,
-    borderColor: colors.border,
-    borderWidth: 1,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.xxs,
-    paddingVertical: spacing.sm,
-  },
   compactIcon: {
     width: compactIconSize,
     height: compactIconSize,

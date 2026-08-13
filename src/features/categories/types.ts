@@ -32,6 +32,7 @@ export type Category = {
   budgetMinor?: number;
   isDefault: boolean;
   templateKey?: string;
+  note?: string;
   isArchived: boolean;
 };
 

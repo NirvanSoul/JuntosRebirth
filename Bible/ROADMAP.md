@@ -396,6 +396,7 @@ Agrupar movimientos, balance, filtros y categorías en una sección comprensible
 - [x] Filtro por tipo.
 - [x] Filtro por categoría.
 - [x] Filtro por recurrencia.
+- [x] Filtro por moneda cuando hay varias presentes en el espacio activo.
 - [x] Combinación de filtros.
 - [x] Limpiar filtros.
 - [x] Detalle de movimiento.
@@ -459,6 +460,16 @@ Permitir crear una cuenta sin perder los datos invitados.
 - [ ] Pantalla de registro.
 - [ ] Correo.
 - [ ] Contraseña.
+- [x] En el modal de crear cuenta, pedir confirmar la contraseña dos veces.
+- [x] Convertir el formulario de registro en 4 pasos, con barra de progreso
+  debajo del título del modal para dar sensación de avance y facilitar que
+  el usuario continúe. La barra anima su carga al entrar y cada paso del
+  formulario aparece con una transición breve al cambiar.
+- [x] Las contraseñas no pueden quedar guardadas en texto plano: deben viajar
+  solo en memoria hacia Supabase (que las hashea del lado del servidor) y no
+  deben persistirse en ninguna parte del dispositivo (AsyncStorage,
+  SecureStore, logs, estado persistido) fuera del campo de formulario
+  mientras se escribe.
 - [ ] Validaciones.
 - [ ] Verificación por código.
 - [ ] Entrada de código flexible.
@@ -468,7 +479,14 @@ Permitir crear una cuenta sin perder los datos invitados.
 - [ ] Cierre de sesión.
 - [ ] Recuperación de contraseña.
 - [ ] Mensajes de error normalizados.
-- [ ] Almacenamiento seguro de sesión.
+- [x] Almacenamiento seguro de sesión: `expo-secure-store` (Keychain/Keystore)
+  en nativo; en web, `sessionStorage` en vez de `localStorage` para acotar
+  la ventana de exposición ante XSS (ADR-075).
+- [x] Bloqueo temporal tras intentos fallidos de inicio de sesión: 9
+  intentos fallidos con el mismo correo bloquean 1 hora, aplicado en el
+  servidor (Edge Function `login-with-lockout`) para que el conteo no
+  dependa de un contador manipulable desde el cliente (ADR-075; ver
+  "Riesgos" del ADR sobre el límite de esta protección).
 - [ ] Manejo de cuenta ya existente.
 - [ ] Manejo de sesión caducada.
 
@@ -479,6 +497,8 @@ Permitir crear una cuenta sin perder los datos invitados.
 - El usuario puede reintentar.
 - La sesión se restaura de forma segura.
 - No se registran secretos ni tokens en logs.
+- Ninguna contraseña se guarda en texto plano ni se persiste localmente fuera
+  del estado en memoria del formulario que la captura.
 
 ---
 
@@ -880,6 +900,47 @@ Extender los espacios a más de dos miembros.
 - Historial.
 
 La base de datos debe permitir esta evolución, pero la interfaz inicial no debe construirla anticipadamente.
+
+---
+
+# Fase 20 — Importación de movimientos bancarios
+
+**Prioridad:** P2
+
+## Objetivo
+
+Permitir importar movimientos desde un archivo bancario (Excel o CSV) sin crear un segundo modelo de movimientos ni saltarse revisión, deduplicación y normalización. Especificación completa en `Bible/JUNTOSS_BANK_FILE_IMPORT_SYSTEM.md`; decisiones de alcance en ADR-069 (Excel/CSV primero) y ADR-073 (PDF eliminado por completo).
+
+## Decisión previa
+
+Excel/CSV se implementó primero porque ninguna opción on-device de PDF funcionaba dentro de Expo Go (ADR-069). PDF se sumó después 100% on-device con `expo-pdf-text-extract` (ADR-071), pero se eliminó por completo tras generar errores recurrentes y no justificar su coste de mantenimiento frente al uso esperado (ADR-073). La app vuelve a funcionar enteramente en Expo Go para importación.
+
+## Tareas
+
+- [x] Selección de archivo (XLS/XLSX/CSV) y copia temporal.
+- [x] Parser tabular con detección/mapeo de columnas.
+- [x] Normalización de fecha, importe, moneda, descripción y tipo.
+- [x] Detección local de duplicados contra el espacio activo.
+- [x] Sugerencia de categoría por regla personal o coincidencia exacta.
+- [x] Pantalla de revisión con edición y agrupación por comercio normalizado.
+- [x] Guardado atómico usando el mismo contrato de creación que los movimientos manuales (`createLocalTransactions`).
+- [x] Reglas personales locales por espacio y sincronización idempotente a Supabase.
+- [x] Batches e ítems de importación persistidos localmente y sincronizados.
+- [x] Centro de importaciones: reanudar, descartar o iniciar un batch pendiente.
+- [x] Esquema comunitario privado en Supabase para candidatos de regla global (revisión manual, nunca automática).
+- [x] Cola local de feedback comunitario conectada a `record_merchant_feedback`.
+- [ ] Commit remoto idempotente por `import_batch` (fase 12 interna, ver `IMPORT_IMPLEMENTATION_STATE.md`).
+- PDF (digital y escaneado) se intentó (ADR-071) y se eliminó por completo
+  (ADR-073): fuera de alcance, no planeado para retomar.
+- [ ] Categorización fuzzy y perfiles de importación por banco.
+
+## Criterios de terminado
+
+- Los movimientos importados usan el mismo modelo y flujo de creación que los manuales.
+- Ningún movimiento se guarda automáticamente sin pasar por normalización, deduplicación y revisión.
+- El backend valida autenticación, pertenencia al espacio y no confía únicamente en el cliente.
+- Funciona en iOS y Android para Excel/CSV.
+- No se conserva el archivo bancario original más allá del procesamiento.
 
 ---
 

@@ -20,6 +20,7 @@ type CategoryRow = {
   budget_minor: number | null;
   is_default: number;
   template_key: string | null;
+  note: string | null;
   is_archived: number;
 };
 
@@ -45,6 +46,7 @@ function mapCategory(row: CategoryRow): Category {
     ...(row.budget_minor === null ? {} : { budgetMinor: row.budget_minor }),
     isDefault: row.is_default === 1,
     ...(row.template_key === null ? {} : { templateKey: row.template_key }),
+    ...(row.note === null || row.note === undefined ? {} : { note: row.note }),
     isArchived: row.is_archived === 1,
   };
 }
@@ -68,7 +70,7 @@ export async function listLocalCategories(): Promise<Category[]> {
   const database = await getLocalDatabase();
   const rows = await database.getAllAsync<CategoryRow>(
     `SELECT id, space_id, name, icon, color_token, budget_minor,
-            is_default, template_key, is_archived
+            is_default, template_key, note, is_archived
        FROM categories
       ORDER BY created_at ASC`,
   );
@@ -93,9 +95,9 @@ export async function createLocalCategories(
       await transaction.runAsync(
         `INSERT INTO categories (
            id, space_id, name, icon, color_token, budget_minor, is_default,
-           template_key, source_category_id, created_by, sync_status,
+           template_key, note, source_category_id, created_by, sync_status,
            is_archived, created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
         id,
         input.spaceId,
         input.name.trim(),
@@ -104,6 +106,7 @@ export async function createLocalCategories(
         input.budgetMinor ?? null,
         input.isDefault ? 1 : 0,
         input.templateKey ?? null,
+        input.note ?? null,
         input.sourceCategoryId ?? null,
         createdBy,
         now,
@@ -122,6 +125,7 @@ export async function createLocalCategories(
         ...(input.templateKey === undefined
           ? {}
           : { templateKey: input.templateKey }),
+        ...(input.note === undefined ? {} : { note: input.note }),
         isArchived: false,
       });
     }
@@ -165,6 +169,31 @@ export async function updateLocalCategory(
   }
 
   return { ...category, name: category.name.trim() };
+}
+
+export async function updateLocalCategoryNote(
+  categoryId: string,
+  spaceId: string,
+  note: string | null,
+): Promise<void> {
+  const database = await getLocalDatabase();
+  const now = new Date().toISOString();
+  const result = await database.runAsync(
+    `UPDATE categories
+        SET note = ?, updated_at = ?,
+            sync_status = CASE
+              WHEN sync_status = 'local_only' THEN 'local_only'
+              ELSE 'pending'
+            END
+      WHERE id = ? AND space_id = ? AND is_archived = 0`,
+    note,
+    now,
+    categoryId,
+    spaceId,
+  );
+  if (result.changes !== 1) {
+    throw new Error('La categoría local ya no está disponible');
+  }
 }
 
 export async function archiveLocalCategory(

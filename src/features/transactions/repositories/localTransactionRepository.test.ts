@@ -3,9 +3,11 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import {
   archiveLocalTransaction,
   createLocalTransaction,
+  createLocalTransactions,
   listLocalTransactions,
   materializeDueRecurringTransactions,
   updateLocalTransaction,
+  updateLocalTransactionNote,
 } from '@/features/transactions/repositories/localTransactionRepository';
 
 const mockGetLocalDatabase = jest.fn<Promise<SQLiteDatabase>, []>();
@@ -282,6 +284,35 @@ describe('localTransactionRepository', () => {
       'transaction-id',
       'personal',
     );
+  });
+
+  it('guarda y limpia la nota de un movimiento sin tocar el resto de campos', async () => {
+    await updateLocalTransactionNote(
+      'transaction-id',
+      'personal',
+      'Comprar también servilletas',
+    );
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('SET note = ?'),
+      'Comprar también servilletas',
+      expect.any(String),
+      'transaction-id',
+      'personal',
+    );
+
+    await updateLocalTransactionNote('transaction-id', 'personal', null);
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('SET note = ?'),
+      null,
+      expect.any(String),
+      'transaction-id',
+      'personal',
+    );
+
+    runAsync.mockResolvedValueOnce({ changes: 0, lastInsertRowId: 0 });
+    await expect(
+      updateLocalTransactionNote('missing', 'personal', 'Nota'),
+    ).rejects.toThrow('El movimiento local ya no está disponible');
   });
 
   it('convierte una edición personalizada en un grupo de ocurrencias', async () => {
@@ -613,5 +644,65 @@ describe('localTransactionRepository', () => {
       createLocalTransaction({ ...draft, amountMinor: 1.5 }),
     ).rejects.toThrow('El movimiento local no es válido');
     expect(runAsync).not.toHaveBeenCalled();
+  });
+
+  describe('createLocalTransactions', () => {
+    it('inserta varios movimientos en una sola transacción exclusiva', async () => {
+      mockRandomUUID
+        .mockReturnValueOnce('00000000-0000-4000-8000-000000000010')
+        .mockReturnValueOnce('00000000-0000-4000-8000-000000000011');
+
+      const created = await createLocalTransactions([
+        draft,
+        { ...draft, amountMinor: 500, occurredOn: '2026-08-02' },
+      ]);
+
+      expect(created).toHaveLength(2);
+      expect(created[0]!.id).toBe('00000000-0000-4000-8000-000000000010');
+      expect(created[1]!.id).toBe('00000000-0000-4000-8000-000000000011');
+      expect(withExclusiveTransactionAsync).toHaveBeenCalledTimes(1);
+      expect(runAsync).toHaveBeenCalledTimes(2);
+      expect(runAsync).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('INSERT INTO transactions'),
+        '00000000-0000-4000-8000-000000000010',
+        'personal',
+        'category-id',
+        'installation-id',
+        'expense',
+        1250,
+        'EUR',
+        'Compra',
+        '2026-08-01',
+        'once',
+        null,
+        null,
+        null,
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+
+    it('no inserta nada si alguna fila del lote no es válida', async () => {
+      await expect(
+        createLocalTransactions([draft, { ...draft, amountMinor: 0 }]),
+      ).rejects.toThrow('El movimiento local no es válido');
+      expect(withExclusiveTransactionAsync).not.toHaveBeenCalled();
+      expect(runAsync).not.toHaveBeenCalled();
+    });
+
+    it('rechaza movimientos con recurrencia distinta de "once"', async () => {
+      await expect(
+        createLocalTransactions([{ ...draft, recurrence: 'monthly' }]),
+      ).rejects.toThrow(
+        'La creación en lote solo admite movimientos sin recurrencia',
+      );
+      expect(withExclusiveTransactionAsync).not.toHaveBeenCalled();
+    });
+
+    it('devuelve un array vacío sin tocar la base de datos', async () => {
+      await expect(createLocalTransactions([])).resolves.toEqual([]);
+      expect(mockGetLocalDatabase).not.toHaveBeenCalled();
+    });
   });
 });

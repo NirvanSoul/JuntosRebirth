@@ -6,11 +6,13 @@ import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { Category } from '@/features/categories/types';
 import { categoryColors } from '@/theme/categoryColors';
-import { colors } from '@/theme/colors';
 import { createDiagonalGradient } from '@/theme/gradients';
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type CategorySelectionCardProps = {
   accessibilityLabel?: string;
@@ -41,6 +43,8 @@ export function CategorySelectionCard({
   testID,
   width,
 }: CategorySelectionCardProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const categoryColor = categoryColors[category.colorToken];
 
   return (
@@ -103,34 +107,36 @@ export function CategorySelectionCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-    padding: spacing.sm,
-  },
-  selectedCard: { borderWidth: 0 },
-  selectedGradient: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: radii.md,
-  },
-  checkmark: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
-    zIndex: 2,
-  },
-  icon: {
-    width: categoryIconCircleSize,
-    height: categoryIconCircleSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-  },
-  pressed: { opacity: 0.72 },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    card: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      backgroundColor: colors.surface,
+      padding: spacing.sm,
+    },
+    selectedCard: { borderWidth: 0 },
+    selectedGradient: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: radii.md,
+    },
+    checkmark: {
+      position: 'absolute',
+      top: spacing.sm,
+      right: spacing.sm,
+      zIndex: 2,
+    },
+    icon: {
+      width: categoryIconCircleSize,
+      height: categoryIconCircleSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+    },
+    pressed: { opacity: 0.72 },
+  });
+}

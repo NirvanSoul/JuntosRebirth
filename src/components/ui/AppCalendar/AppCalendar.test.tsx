@@ -6,6 +6,7 @@ import {
   AppCalendar,
   getDominantScrollMonthIndex,
 } from '@/components/ui/AppCalendar/AppCalendar';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { typography } from '@/theme/typography';
@@ -19,7 +20,7 @@ describe('AppCalendar vertical', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        {calendar}
+        <ThemeProvider initialAppearance="light">{calendar}</ThemeProvider>
       </SafeAreaProvider>,
     );
 

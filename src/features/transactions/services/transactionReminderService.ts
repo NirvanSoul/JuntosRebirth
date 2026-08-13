@@ -1,3 +1,4 @@
+import { getShowAmountsInNotifications } from '@/features/transactions/repositories/notificationPrivacyPreferenceRepository';
 import {
   deleteLocalTransactionReminder,
   getLocalTransactionReminder,
@@ -80,10 +81,11 @@ export async function scheduleTransactionReminder(
     await Promise.all(existing.notificationIds.map(cancelLocalNotification));
   }
 
+  const showAmounts = await getShowAmountsInNotifications();
   const { title, body } = await buildNotificationContent({
     scheduledOn: input.remindOn,
     type: input.transaction.type,
-    variables: buildReminderTemplateVariables(input.transaction),
+    variables: buildReminderTemplateVariables(input.transaction, showAmounts),
   });
 
   const notificationIds = await Promise.all(

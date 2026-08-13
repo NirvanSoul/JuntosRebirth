@@ -19,12 +19,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { Text } from '@/components/ui/Text/Text';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ActiveSpaceHeaderProps = {
   onSpacePress: () => void;
@@ -50,6 +51,8 @@ export function ActiveSpaceHeader({
 }: ActiveSpaceHeaderProps) {
   const density = useLayoutDensity();
   const { width } = useWindowDimensions();
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const visibilityProgress = useSharedValue(visible ? 1 : 0);
 
   useEffect(() => {
@@ -113,8 +116,8 @@ export function ActiveSpaceHeader({
 
         {currencyFlag ? (
           <Pressable
-            accessibilityHint="Abre el selector de moneda para Inicio"
-            accessibilityLabel={`Moneda de Inicio: ${currencyFlag}`}
+            accessibilityHint="Cambia la moneda seleccionada"
+            accessibilityLabel={`Moneda seleccionada: ${currencyFlag}`}
             accessibilityRole="button"
             onPress={onCurrencyPress}
             style={({ pressed }) => [
@@ -131,73 +134,75 @@ export function ActiveSpaceHeader({
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    left: 0,
-    zIndex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: spacing.sm,
-    paddingTop: spacing.sm,
-  },
-  spaceButton: {
-    ...shadows.subtle,
-    maxWidth: '100%',
-    flexShrink: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: layout.minTouchTarget,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.round,
-    paddingLeft: spacing.sm,
-    paddingRight: spacing.lg,
-  },
-  spaceButtonPressed: {
-    opacity: 0.72,
-  },
-  avatar: {
-    width: avatarSize,
-    height: avatarSize,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-    backgroundColor: colors.brandSoft,
-  },
-  profileImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: radii.round,
-  },
-  currencyButton: {
-    ...shadows.subtle,
-    elevation: 4,
-    shadowOpacity: 0.12,
-    width: layout.minTouchTarget,
-    height: layout.minTouchTarget,
-    flexShrink: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.sm,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.round,
-  },
-  currencyFlag: {
-    fontSize: 20,
-    lineHeight: 24,
-    includeFontPadding: false,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-  },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    safeArea: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      left: 0,
+      zIndex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: spacing.sm,
+      paddingTop: spacing.sm,
+    },
+    spaceButton: {
+      ...shadows.subtle,
+      maxWidth: '100%',
+      flexShrink: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minHeight: layout.minTouchTarget,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.round,
+      paddingLeft: spacing.sm,
+      paddingRight: spacing.lg,
+    },
+    spaceButtonPressed: {
+      opacity: 0.72,
+    },
+    avatar: {
+      width: avatarSize,
+      height: avatarSize,
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      backgroundColor: colors.brandSoft,
+    },
+    profileImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: radii.round,
+    },
+    currencyButton: {
+      ...shadows.subtle,
+      elevation: 4,
+      shadowOpacity: 0.12,
+      width: layout.minTouchTarget,
+      height: layout.minTouchTarget,
+      flexShrink: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: spacing.sm,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.round,
+    },
+    currencyFlag: {
+      fontSize: 20,
+      lineHeight: 24,
+      includeFontPadding: false,
+      textAlign: 'center',
+      textAlignVertical: 'center',
+    },
+  });
+}

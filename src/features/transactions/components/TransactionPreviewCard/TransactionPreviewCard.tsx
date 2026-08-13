@@ -12,10 +12,12 @@ import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { categoryColors } from '@/theme/categoryColors';
-import { colors } from '@/theme/colors';
 import { iconSize } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type TransactionPreviewCardProps = {
   category: Category | null;
@@ -40,6 +42,8 @@ export function TransactionPreviewCard({
   stacked = false,
   transaction,
 }: TransactionPreviewCardProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const isExpandable = expandable ?? stacked;
   const isIncome = transaction.type === 'income';
   const amount = formatCurrency(
@@ -181,77 +185,79 @@ export function TransactionPreviewCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    minHeight: previewCardLayout.minHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: previewCardLayout.gap,
-    borderRadius: previewCardLayout.borderRadius,
-    backgroundColor: colors.surface,
-    paddingHorizontal: previewCardLayout.paddingHorizontal,
-    paddingVertical: previewCardLayout.paddingVertical,
-  },
-  stackedContainer: {
-    paddingBottom: stackLayerOffset * 2,
-  },
-  stackLayer: {
-    position: 'absolute',
-    left: stackLayerInset,
-    right: stackLayerInset,
-    minHeight: previewCardLayout.minHeight,
-    borderRadius: previewCardLayout.borderRadius,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  stackLayerBack: {
-    top: stackLayerOffset * 2,
-    left: stackLayerInset * 2,
-    right: stackLayerInset * 2,
-  },
-  stackLayerMiddle: {
-    top: stackLayerOffset,
-  },
-  categoryIcon: {
-    width: previewCardLayout.iconSize,
-    height: previewCardLayout.iconSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: previewCardLayout.iconRadius,
-  },
-  content: {
-    flex: 1,
-    minWidth: 0,
-  },
-  metadata: {
-    marginTop: previewCardLayout.metadataGap,
-  },
-  trailingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: previewCardLayout.metadataGap,
-    maxWidth: '48%',
-  },
-  amount: {
-    flexShrink: 1,
-  },
-  directionIcon: {
-    flexShrink: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  expandButton: {
-    minHeight: iconSize.md,
-    minWidth: iconSize.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  expandIconOpen: {
-    transform: [{ rotate: '180deg' }],
-  },
-  diagonalArrow: {
-    transform: [{ rotate: '45deg' }],
-  },
-  pressed: { opacity: 0.64 },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    card: {
+      minHeight: previewCardLayout.minHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: previewCardLayout.gap,
+      borderRadius: previewCardLayout.borderRadius,
+      backgroundColor: colors.surface,
+      paddingHorizontal: previewCardLayout.paddingHorizontal,
+      paddingVertical: previewCardLayout.paddingVertical,
+    },
+    stackedContainer: {
+      paddingBottom: stackLayerOffset * 2,
+    },
+    stackLayer: {
+      position: 'absolute',
+      left: stackLayerInset,
+      right: stackLayerInset,
+      minHeight: previewCardLayout.minHeight,
+      borderRadius: previewCardLayout.borderRadius,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+    },
+    stackLayerBack: {
+      top: stackLayerOffset * 2,
+      left: stackLayerInset * 2,
+      right: stackLayerInset * 2,
+    },
+    stackLayerMiddle: {
+      top: stackLayerOffset,
+    },
+    categoryIcon: {
+      width: previewCardLayout.iconSize,
+      height: previewCardLayout.iconSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: previewCardLayout.iconRadius,
+    },
+    content: {
+      flex: 1,
+      minWidth: 0,
+    },
+    metadata: {
+      marginTop: previewCardLayout.metadataGap,
+    },
+    trailingContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: previewCardLayout.metadataGap,
+      maxWidth: '48%',
+    },
+    amount: {
+      flexShrink: 1,
+    },
+    directionIcon: {
+      flexShrink: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    expandButton: {
+      minHeight: iconSize.md,
+      minWidth: iconSize.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    expandIconOpen: {
+      transform: [{ rotate: '180deg' }],
+    },
+    diagonalArrow: {
+      transform: [{ rotate: '45deg' }],
+    },
+    pressed: { opacity: 0.64 },
+  });
+}

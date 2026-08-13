@@ -13,11 +13,13 @@ import {
   formatAmountInputForDisplay,
   parseAmountMinor,
 } from '@/lib/currency/amountInput';
-import { colors } from '@/theme/colors';
 import { createDiagonalGradient } from '@/theme/gradients';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type CategoryBudgetModalProps = {
   categoryColor: string;
@@ -47,6 +49,8 @@ export function CategoryBudgetModal({
   visible,
 }: CategoryBudgetModalProps) {
   const density = useLayoutDensity();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [amountInput, setAmountInput] = useState('0');
   const budgetMinor = parseAmountMinor(amountInput);
   const displayAmount = formatAmountInputForDisplay(amountInput);
@@ -195,54 +199,56 @@ export function CategoryBudgetModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { gap: spacing.lg },
-  header: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  headerCopy: { flex: 1, gap: spacing.xxs },
-  amountArea: {
-    height: budgetAmountHeight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  keypad: { gap: spacing.sm },
-  keypadRow: { flexDirection: 'row', gap: spacing.sm },
-  key: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.keypad,
-    borderRadius: radii.md,
-  },
-  keyPressed: { opacity: 0.56, transform: [{ scale: 0.97 }] },
-  actions: { flexDirection: 'row', gap: spacing.sm },
-  removeButton: {
-    flexBasis: '40%',
-    flexShrink: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-  },
-  saveButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.keypad,
-    borderRadius: radii.md,
-    overflow: 'hidden',
-  },
-  saveButtonDisabled: { opacity: 0.72 },
-  saveGradient: { flex: 1, width: '100%' },
-  saveGradientContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    container: { gap: spacing.lg },
+    header: {
+      minHeight: layout.minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    headerCopy: { flex: 1, gap: spacing.xxs },
+    amountArea: {
+      height: budgetAmountHeight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    keypad: { gap: spacing.sm },
+    keypadRow: { flexDirection: 'row', gap: spacing.sm },
+    key: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.keypad,
+      borderRadius: radii.md,
+    },
+    keyPressed: { opacity: 0.56, transform: [{ scale: 0.97 }] },
+    actions: { flexDirection: 'row', gap: spacing.sm },
+    removeButton: {
+      flexBasis: '40%',
+      flexShrink: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      paddingHorizontal: spacing.md,
+    },
+    saveButton: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.keypad,
+      borderRadius: radii.md,
+      overflow: 'hidden',
+    },
+    saveButtonDisabled: { opacity: 0.72 },
+    saveGradient: { flex: 1, width: '100%' },
+    saveGradientContent: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
+}

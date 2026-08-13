@@ -34,13 +34,15 @@ import type { Category } from '@/features/categories/types';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { categoryColors } from '@/theme/categoryColors';
-import { colors } from '@/theme/colors';
 import { createDiagonalGradient } from '@/theme/gradients';
 import { iconSize, layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
 import { maxFontScale, typography } from '@/theme/typography';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 export type CategoryPickerSelection = {
   type: 'category';
@@ -92,6 +94,8 @@ function CategoryPageIndicatorDot({
   active: boolean;
   index: number;
 }) {
+  const { colors } = useTheme();
+  const themedStyles = useThemedStyles(createStyles);
   const progress = useSharedValue(active ? 1 : 0);
 
   useEffect(() => {
@@ -112,7 +116,7 @@ function CategoryPageIndicatorDot({
 
   return (
     <Animated.View
-      style={[styles.dot, animatedStyle]}
+      style={[themedStyles.dot, animatedStyle]}
       testID={`category-page-indicator-${index}`}
     />
   );
@@ -129,6 +133,8 @@ export function CategoryPickerModal({
   onSelect,
 }: CategoryPickerModalProps) {
   const density = useLayoutDensity();
+  const { colors } = useTheme();
+  const themedStyles = useThemedStyles(createStyles);
   const { width } = useWindowDimensions();
   const [displayMode, setDisplayMode] = useState<CategoryPickerMode>(mode);
   const gutter = layout.screenGutter[density];
@@ -326,7 +332,7 @@ export function CategoryPickerModal({
                       );
                     }}
                     style={({ pressed }) => [
-                      styles.categoryCard,
+                      themedStyles.categoryCard,
                       {
                         width: cardWidth,
                         height: categorySelectionCardHeight[density],
@@ -436,6 +442,27 @@ export function CategoryPickerModal({
   );
 }
 
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    categoryCard: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      backgroundColor: colors.surface,
+      padding: spacing.sm,
+    },
+    dot: {
+      width: spacing.md,
+      height: spacing.xs,
+      borderRadius: radii.round,
+      backgroundColor: colors.border,
+    },
+  });
+}
+
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
@@ -447,16 +474,6 @@ const styles = StyleSheet.create({
   subtitle: { marginTop: spacing.xs },
   pages: { flexGrow: 0, marginTop: spacing.xl },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  categoryCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-    padding: spacing.sm,
-  },
   selectedCategoryCard: {
     borderWidth: 0,
   },
@@ -478,12 +495,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.xs,
     marginTop: spacing.md,
-  },
-  dot: {
-    width: spacing.md,
-    height: spacing.xs,
-    borderRadius: radii.round,
-    backgroundColor: colors.border,
   },
   actions: {
     flexDirection: 'row',

@@ -117,6 +117,7 @@ create table public.transactions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   archived_at timestamptz,
+  unique (id, space_id),
   unique (space_id, source_installation_id, source_local_id),
   unique (recurrence_series_id, occurred_on),
   foreign key (category_id, space_id)

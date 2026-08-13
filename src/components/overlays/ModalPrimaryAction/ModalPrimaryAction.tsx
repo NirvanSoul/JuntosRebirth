@@ -9,11 +9,13 @@ import {
 import { GradientCard } from '@/components/ui/GradientCard/GradientCard';
 import { Text, type TextTone } from '@/components/ui/Text/Text';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
-import { colors } from '@/theme/colors';
 import { createDiagonalGradient } from '@/theme/gradients';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ModalPrimaryActionProps = {
   accessibilityLabel: string;
@@ -46,6 +48,8 @@ export function ModalPrimaryAction({
 }: ModalPrimaryActionProps) {
   const density = useLayoutDensity();
   const isCta = variant === 'cta';
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   return (
     <Pressable
@@ -109,30 +113,32 @@ export function ModalPrimaryAction({
   );
 }
 
-const styles = StyleSheet.create({
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    borderRadius: radii.md,
-    overflow: 'hidden',
-    paddingHorizontal: spacing.lg,
-  },
-  cta: { backgroundColor: colors.cta },
-  surface: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  gradientButton: { paddingHorizontal: spacing.none },
-  disabled: { opacity: 0.48 },
-  disabledBackground: { backgroundColor: colors.keypad },
-  pressed: { opacity: 0.72 },
-  gradient: { flex: 1, width: '100%' },
-  gradientContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    button: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.md,
+      borderRadius: radii.md,
+      overflow: 'hidden',
+      paddingHorizontal: spacing.lg,
+    },
+    cta: { backgroundColor: colors.cta },
+    surface: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+    },
+    gradientButton: { paddingHorizontal: spacing.none },
+    disabled: { opacity: 0.48 },
+    disabledBackground: { backgroundColor: colors.keypad },
+    pressed: { opacity: 0.72 },
+    gradient: { flex: 1, width: '100%' },
+    gradientContent: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
+}

@@ -1,5 +1,10 @@
 import { useMemo } from 'react';
-import { StyleSheet, type ImageStyle, type TextStyle, type ViewStyle } from 'react-native';
+import {
+  StyleSheet,
+  type ImageStyle,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 
 import { useTheme } from '@/theme/useTheme';
 import type { ColorTokens } from '@/theme/types';

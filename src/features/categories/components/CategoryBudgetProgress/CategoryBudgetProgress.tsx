@@ -1,8 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 
-import { colors } from '@/theme/colors';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type CategoryBudgetProgressProps = {
   accessibilityText: string;
@@ -19,6 +20,7 @@ export function CategoryBudgetProgress({
   size = 'regular',
   testID = 'category-budget-progress',
 }: CategoryBudgetProgressProps) {
+  const styles = useThemedStyles(createStyles);
   const normalizedProgress = Math.min(Math.max(progress, 0), 1);
 
   return (
@@ -48,19 +50,21 @@ export function CategoryBudgetProgress({
   );
 }
 
-const styles = StyleSheet.create({
-  track: {
-    width: '100%',
-    height: spacing.sm,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radii.round,
-  },
-  trackCompact: {
-    height: spacing.xs,
-  },
-  value: {
-    height: '100%',
-    borderRadius: radii.round,
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    track: {
+      width: '100%',
+      height: spacing.sm,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: radii.round,
+    },
+    trackCompact: {
+      height: spacing.xs,
+    },
+    value: {
+      height: '100%',
+      borderRadius: radii.round,
+    },
+  });
+}

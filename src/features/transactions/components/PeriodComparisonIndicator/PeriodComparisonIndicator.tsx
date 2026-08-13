@@ -3,9 +3,9 @@ import { StyleSheet, View } from 'react-native';
 
 import { Text, type TextTone } from '@/components/ui/Text/Text';
 import type { PeriodComparisonResult } from '@/features/transactions/utils/periodComparison';
-import { colors } from '@/theme/colors';
 import { iconSize } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
+import { useTheme } from '@/theme/useTheme';
 
 type PeriodComparisonIndicatorProps = {
   comparison: PeriodComparisonResult;
@@ -23,7 +23,8 @@ function resolveTone(
   }
 
   const risingIsFavorable = tone !== 'expense';
-  const isFavorable = direction === 'up' ? risingIsFavorable : !risingIsFavorable;
+  const isFavorable =
+    direction === 'up' ? risingIsFavorable : !risingIsFavorable;
 
   return isFavorable ? 'income' : 'expense';
 }
@@ -34,6 +35,7 @@ export function PeriodComparisonIndicator({
   testID,
   tone,
 }: PeriodComparisonIndicatorProps) {
+  const { colors } = useTheme();
   const textTone = resolveTone(tone, comparison.direction);
   const iconColor =
     textTone === 'income'
@@ -52,7 +54,11 @@ export function PeriodComparisonIndicator({
   return (
     <View style={styles.container} testID={testID}>
       <Ionicons color={iconColor} name={iconName} size={iconSize.xs} />
-      <Text tone={textTone} variant={compact ? 'overline' : 'caption'} weight="semibold">
+      <Text
+        tone={textTone}
+        variant={compact ? 'overline' : 'caption'}
+        weight="semibold"
+      >
         {label}
       </Text>
     </View>

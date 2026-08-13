@@ -7,18 +7,24 @@
     "start": "expo start --go --lan",
     "dev": "expo start --go --lan",
     "start:lan": "expo start --go --lan",
+    "start:dev-client": "expo start --dev-client --lan",
     "tunnel": "sh scripts/tunnel.sh",
     "start:tunnel": "npm run tunnel",
     "upload": "sh scripts/git-upload.sh",
     "download": "sh scripts/git-download.sh",
     "android": "expo start --go --android",
     "ios": "expo start --go --ios",
+    "prebuild:ios": "sh scripts/ios-development-build.sh prebuild",
+    "ios:dev": "sh scripts/ios-development-build.sh simulator",
+    "ios:device": "sh scripts/ios-development-build.sh device",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "jest --runInBand",
-    "validate": "npm run typecheck && npm run lint && npm run format:check && npm test"
+    "validate": "npm run typecheck && npm run lint && npm run format:check && npm test",
+    "generate:legal-site": "npx tsx scripts/generate-legal-site.ts",
+    "generate:oss-licenses": "sh scripts/generate-oss-licenses.sh"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -29,13 +35,20 @@
     "@react-navigation/bottom-tabs": "^7.18.14",
     "@react-navigation/drawer": "^7.13.5",
     "@react-navigation/native": "^7.3.14",
+    "@react-navigation/native-stack": "^7.18.8",
     "@supabase/supabase-js": "^2.111.0",
     "expo": "~54.0.35",
     "expo-asset": "~12.0.13",
     "expo-blur": "~15.0.8",
+    "expo-clipboard": "~8.0.8",
     "expo-crypto": "~15.0.9",
+    "expo-dev-client": "~6.0.21",
+    "expo-document-picker": "~14.0.8",
+    "expo-file-system": "~19.0.23",
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",
+    "expo-image-manipulator": "~14.0.8",
+    "expo-image-picker": "~17.0.11",
     "expo-notifications": "~0.32.17",
     "expo-secure-store": "~15.0.8",
     "expo-sqlite": "~16.0.10",
@@ -50,7 +63,8 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
     "react-native-url-polyfill": "^4.0.0",
-    "react-native-worklets": "0.5.1"
+    "react-native-worklets": "0.5.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",
@@ -72,6 +86,10 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
     },
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/services/"
+    ],
     "transformIgnorePatterns": [
       "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|phosphor-react-native))",
       "/node_modules/react-native-reanimated/plugin/"

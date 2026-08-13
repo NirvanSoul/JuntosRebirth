@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActivityScreen } from '@/features/activity/screens/ActivityScreen';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 
 const mockScrollTo = jest.fn();
 
@@ -87,12 +88,14 @@ describe('ActivityScreen scroll dirigido', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={categories}
-          targetRequestId={1}
-          targetSection="movements"
-          transactions={transactions}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            targetRequestId={1}
+            targetSection="movements"
+            transactions={transactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 

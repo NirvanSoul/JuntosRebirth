@@ -27,14 +27,14 @@ describe('formatCurrency', () => {
     ).toContain('12,00');
   });
 
-  it('coloca el símbolo real de cada moneda en el lado que corresponde', () => {
-    expect(formatCurrency(150_000, 'COP', 'es-ES')).toBe('$ 1.500');
-    expect(formatCurrency(150_000, 'MXN', 'es-ES')).toBe('$ 1.500');
-    expect(formatCurrency(150_000, 'VES', 'es-ES')).toBe('Bs. 1.500');
-    expect(formatCurrency(150_000, 'BOB', 'es-ES')).toBe('Bs. 1.500');
-    expect(formatCurrency(150_000, 'SEK', 'es-ES')).toBe('1.500 kr');
-    expect(formatCurrency(150_000, 'PLN', 'es-ES')).toBe('1.500 zł');
-    expect(formatCurrency(150_000, 'EUR', 'es-ES')).toBe('1.500 €');
+  it('coloca el símbolo real de cada moneda en el lado que corresponde, separado por NBSP', () => {
+    expect(formatCurrency(150_000, 'COP', 'es-ES')).toBe('$ 1.500');
+    expect(formatCurrency(150_000, 'MXN', 'es-ES')).toBe('$ 1.500');
+    expect(formatCurrency(150_000, 'VES', 'es-ES')).toBe('Bs. 1.500');
+    expect(formatCurrency(150_000, 'BOB', 'es-ES')).toBe('Bs. 1.500');
+    expect(formatCurrency(150_000, 'SEK', 'es-ES')).toBe('1.500 kr');
+    expect(formatCurrency(150_000, 'PLN', 'es-ES')).toBe('1.500 zł');
+    expect(formatCurrency(150_000, 'EUR', 'es-ES')).toBe('1.500 €');
   });
 
   it('funciona en runtimes sin Intl.NumberFormat.formatToParts', () => {

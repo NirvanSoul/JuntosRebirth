@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { Category } from '@/features/categories/types';
 import { TransactionDetailModal } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { createProjectedTransactionId } from '@/features/transactions/utils/transactionRecurrence';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { shadows } from '@/theme/shadows';
@@ -48,20 +50,23 @@ describe('TransactionDetailModal', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <TransactionDetailModal
-          category={category}
-          onClose={jest.fn()}
-          onCopy={jest.fn(() => true)}
-          onDelete={onDelete}
-          onEdit={onEdit}
-          onRemoveReminder={jest.fn(() => true)}
-          onSaveReminder={jest.fn(() => true)}
-          reminder={null}
-          shareTargets={[]}
-          transaction={transaction}
-          transactions={[transaction]}
-          visible
-        />
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={onDelete}
+            onEdit={onEdit}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={transaction}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const detail = screen.getByTestId('transaction-detail-modal');
@@ -88,11 +93,14 @@ describe('TransactionDetailModal', () => {
     ).toBeTruthy();
     expect(
       StyleSheet.flatten(
-        within(detail).getByTestId('transaction-detail-direction-icon').props
+        within(detail).getByTestId('transaction-detail-direction-glyph').props
           .style,
-      ).backgroundColor,
+      ).color,
     ).toBe(colors.expense);
     expect(within(detail).queryByText(/presupuesto/i)).toBeNull();
+    const noteButton = within(detail).getByTestId('transaction-detail-note');
+    expect(within(noteButton).getByText('Escribir Nota')).toBeTruthy();
+    expect(within(noteButton).queryByText('Nota')).toBeNull();
     expect(
       within(detail).queryByRole('button', { name: 'Copiar en otro espacio' }),
     ).toBeNull();
@@ -160,20 +168,23 @@ describe('TransactionDetailModal', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <TransactionDetailModal
-          category={category}
-          onClose={jest.fn()}
-          onCopy={jest.fn(() => true)}
-          onDelete={jest.fn()}
-          onEdit={jest.fn()}
-          onRemoveReminder={jest.fn(() => true)}
-          onSaveReminder={jest.fn(() => true)}
-          reminder={null}
-          shareTargets={[]}
-          transaction={{ ...transaction, type: 'income' }}
-          transactions={[{ ...transaction, type: 'income' }]}
-          visible
-        />
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={{ ...transaction, type: 'income' }}
+            transactions={[{ ...transaction, type: 'income' }]}
+            visible
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const detail = screen.getByTestId('transaction-detail-modal');
@@ -182,9 +193,9 @@ describe('TransactionDetailModal', () => {
     expect(within(detail).queryByText('Ingreso')).toBeNull();
     expect(
       StyleSheet.flatten(
-        within(detail).getByTestId('transaction-detail-direction-icon').props
+        within(detail).getByTestId('transaction-detail-direction-glyph').props
           .style,
-      ).backgroundColor,
+      ).color,
     ).toBe(colors.income);
   });
 
@@ -196,20 +207,23 @@ describe('TransactionDetailModal', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <TransactionDetailModal
-          category={category}
-          onClose={jest.fn()}
-          onCopy={jest.fn(() => true)}
-          onDelete={jest.fn()}
-          onEdit={jest.fn()}
-          onRemoveReminder={jest.fn(() => true)}
-          onSaveReminder={jest.fn(() => true)}
-          reminder={null}
-          shareTargets={[]}
-          transaction={{ ...transaction, title: '   ' }}
-          transactions={[{ ...transaction, title: '   ' }]}
-          visible
-        />
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={{ ...transaction, title: '   ' }}
+            transactions={[{ ...transaction, title: '   ' }]}
+            visible
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -230,20 +244,23 @@ describe('TransactionDetailModal', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <TransactionDetailModal
-          category={category}
-          onClose={jest.fn()}
-          onCopy={onCopy}
-          onDelete={jest.fn()}
-          onEdit={jest.fn()}
-          onRemoveReminder={jest.fn(() => true)}
-          onSaveReminder={jest.fn(() => true)}
-          reminder={null}
-          shareTargets={[{ id: 'couple', name: 'Pareja' }]}
-          transaction={transaction}
-          transactions={[transaction]}
-          visible
-        />
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={onCopy}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[{ id: 'couple', name: 'Pareja' }]}
+            transaction={transaction}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -291,20 +308,23 @@ describe('TransactionDetailModal', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <TransactionDetailModal
-          category={category}
-          onClose={jest.fn()}
-          onCopy={jest.fn(() => true)}
-          onDelete={jest.fn()}
-          onEdit={jest.fn()}
-          onRemoveReminder={jest.fn(() => true)}
-          onSaveReminder={jest.fn(() => true)}
-          reminder={null}
-          shareTargets={[]}
-          transaction={customTransactions[0]!}
-          transactions={customTransactions}
-          visible
-        />
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={customTransactions[0]!}
+            transactions={customTransactions}
+            visible
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const detail = screen.getByTestId('transaction-detail-modal');
@@ -321,5 +341,88 @@ describe('TransactionDetailModal', () => {
     await fireEvent.press(within(recurrenceList).getByText('Ver más'));
     expect(within(recurrenceList).getAllByText(/de 2099/)).toHaveLength(6);
     expect(within(recurrenceList).queryByText('Ver más')).toBeNull();
+  });
+
+  it('abre el editor de nota desde el botón del detalle y guarda al confirmar', async () => {
+    const onSaveNote = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={onSaveNote}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={{ ...transaction, note: 'Nota previa' }}
+            transactions={[{ ...transaction, note: 'Nota previa' }]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const noteButton = screen.getByTestId('transaction-detail-note');
+    expect(within(noteButton).getByText('Nota')).toBeTruthy();
+    expect(within(noteButton).getByText('Nota previa')).toBeTruthy();
+
+    await fireEvent.press(noteButton);
+    const noteModal = screen.getByTestId('transaction-note-modal');
+    const noteInput = within(noteModal).getByTestId(
+      'transaction-note-modal-input',
+    );
+    expect(noteInput.props.value).toBe('Nota previa');
+
+    await fireEvent.changeText(noteInput, '');
+    await fireEvent.press(
+      within(noteModal).getByRole('button', { name: 'Guardar nota' }),
+    );
+    expect(onSaveNote).toHaveBeenCalledWith('lunch', null);
+  });
+
+  it('oculta la nota en ocurrencias proyectadas sin materializar', async () => {
+    const projectedId = createProjectedTransactionId(
+      'monthly-series',
+      '2026-09-30',
+    );
+    const projectedTransaction = { ...transaction, id: projectedId };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={projectedTransaction}
+            transactions={[projectedTransaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.queryByTestId('transaction-detail-note')).toBeNull();
   });
 });

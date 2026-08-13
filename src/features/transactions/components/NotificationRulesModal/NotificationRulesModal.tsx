@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { AppModal } from '@/components/overlays/AppModal/AppModal';
+import {
+  AppModal,
+  useAppModalBottomInset,
+} from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
@@ -15,19 +18,22 @@ import type {
   TransactionNotificationRule,
   TransactionType,
 } from '@/features/transactions/types';
-import { colors } from '@/theme/colors';
-import { iconSize } from '@/theme/layout';
+import { useLayoutDensity } from '@/hooks/useLayoutDensity';
+import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
 import {
   getDisclosureEntering,
   getDisclosureLayoutTransition,
 } from '@/theme/transitions';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type NotificationRulesModalProps = {
   onClose: () => void;
   onSave: (input: SaveLocalNotificationRuleInput) => boolean | Promise<boolean>;
+  onSaved?: () => void;
   rules: readonly TransactionNotificationRule[];
   spaceId: string;
   visible: boolean;
@@ -64,10 +70,16 @@ function draftFromRule(
 export function NotificationRulesModal({
   onClose,
   onSave,
+  onSaved,
   rules,
   spaceId,
   visible,
 }: NotificationRulesModalProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
+  const density = useLayoutDensity();
+  const floatingButtonHeight = layout.actionHeight[density];
+  const modalBottomInset = useAppModalBottomInset();
   const [drafts, setDrafts] = useState<Record<TransactionType, RuleDraft>>({
     expense: draftFromRule(undefined),
     income: draftFromRule(undefined),
@@ -129,6 +141,7 @@ export function NotificationRulesModal({
     })()
       .then((results) => {
         if (results.every(Boolean)) {
+          onSaved?.();
           onClose();
           return;
         }
@@ -143,6 +156,7 @@ export function NotificationRulesModal({
   return (
     <AppModal
       containsScrollable
+      extendContentIntoBottomInset
       onClose={onClose}
       testID="notification-rules-modal"
       variant="expanded"
@@ -163,7 +177,13 @@ export function NotificationRulesModal({
         </View>
 
         <BottomSheetScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingBottom:
+                modalBottomInset + floatingButtonHeight + spacing.lg,
+            },
+          ]}
           showsVerticalScrollIndicator={false}
           testID="notification-rules-scroll"
         >
@@ -250,6 +270,10 @@ export function NotificationRulesModal({
         {error ? (
           <Text
             accessibilityLiveRegion="polite"
+            style={{
+              marginBottom:
+                modalBottomInset + floatingButtonHeight + spacing.sm,
+            }}
             tone="expense"
             variant="footnote"
           >
@@ -263,7 +287,7 @@ export function NotificationRulesModal({
           label={isSaving ? 'Guardando…' : 'Guardar'}
           mutedWhenDisabled
           onPress={handleSave}
-          style={styles.saveButton}
+          style={[styles.saveButton, { bottom: modalBottomInset }]}
           testID="notification-rules-save"
         />
       </View>
@@ -271,26 +295,37 @@ export function NotificationRulesModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, gap: spacing.lg },
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  headerText: { flex: 1, gap: spacing.xs },
-  scrollContent: { gap: spacing.lg, paddingBottom: spacing.md },
-  card: {
-    ...shadows.subtle,
-    gap: spacing.md,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-  },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  toggleOption: { flex: 1 },
-  diagonalArrow: { transform: [{ rotate: '45deg' }] },
-  cardContent: { gap: spacing.lg, marginTop: spacing.sm },
-  daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  dayOption: { flexGrow: 1 },
-  timesLabel: { marginTop: spacing.xs },
-  saveButton: { marginTop: spacing.sm },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    container: { flex: 1, gap: spacing.lg },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+    },
+    headerText: { flex: 1, gap: spacing.xs },
+    scrollContent: { gap: spacing.lg, paddingBottom: spacing.md },
+    card: {
+      ...shadows.subtle,
+      gap: spacing.md,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.lg,
+      backgroundColor: colors.surface,
+      padding: spacing.lg,
+    },
+    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    toggleOption: { flex: 1 },
+    diagonalArrow: { transform: [{ rotate: '45deg' }] },
+    cardContent: { gap: spacing.lg, marginTop: spacing.sm },
+    daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    dayOption: { flexGrow: 1 },
+    timesLabel: { marginTop: spacing.xs },
+    saveButton: {
+      ...shadows.subtle,
+      position: 'absolute',
+      left: 0,
+      right: 0,
+    },
+  });
+}

@@ -37,6 +37,13 @@ export type ThemeShadows = {
     shadowOpacity: number;
     shadowRadius: number;
   };
+  floatingAction: {
+    elevation: number;
+    shadowColor: string;
+    shadowOffset: { width: number; height: number };
+    shadowOpacity: number;
+    shadowRadius: number;
+  };
   mainMenu: {
     elevation: number;
     shadowColor: string;

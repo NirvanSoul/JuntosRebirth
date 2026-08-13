@@ -14,4 +14,5 @@ export type MainTabParamList = {
 export type RootDrawerParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Settings: undefined;
+  AcceptInvitation: { token: string };
 };

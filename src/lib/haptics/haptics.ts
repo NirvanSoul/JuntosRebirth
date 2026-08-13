@@ -19,9 +19,7 @@ export function triggerHaptic(event: HapticEvent): void {
       );
       return;
     case 'modalOpen':
-      safeTrigger(() =>
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
-      );
+      safeTrigger(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
       return;
     case 'categorySelect':
       safeTrigger(() => Haptics.selectionAsync());

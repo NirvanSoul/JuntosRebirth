@@ -1,5 +1,4 @@
-import { colors } from '@/theme/colors';
-import type { ColorTokens } from '@/theme/types';
+import { lightColors } from '@/theme/colors';
 
 export const categoryColors = {
   emerald: '#00C968',
@@ -24,16 +23,18 @@ export const categoryColors = {
 
 export type CategoryColorToken = keyof typeof categoryColors;
 
+/**
+ * Los fondos de categoría son colores fijos, ajenos al tema claro/oscuro, así
+ * que su contraste también debe serlo: `yellow` siempre necesita texto e
+ * iconografía oscuros, sin importar si la app está en modo oscuro.
+ */
 export const categoryContentContrast = {
-  default: { color: colors.onBrand, tone: 'onBrand' },
-  yellow: { color: colors.textPrimary, tone: 'primary' },
+  default: { color: lightColors.onBrand, tone: 'onBrand' },
+  yellow: { color: lightColors.textPrimary, tone: 'primary' },
 } as const;
 
-export function getCategoryContentContrast(
-  colorToken: CategoryColorToken,
-  palette: ColorTokens = colors,
-) {
+export function getCategoryContentContrast(colorToken: CategoryColorToken) {
   return colorToken === 'yellow'
-    ? { color: palette.textPrimary, tone: 'primary' as const }
+    ? categoryContentContrast.yellow
     : categoryContentContrast.default;
 }

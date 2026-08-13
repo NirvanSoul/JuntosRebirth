@@ -28,10 +28,11 @@ import {
 import type { SessionTransaction } from '@/features/transactions/types';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { categoryColors } from '@/theme/categoryColors';
-import { colors } from '@/theme/colors';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ChartMode = 'expense' | 'income';
 
@@ -204,6 +205,7 @@ export function CategoryDonutChart({
   onOpenCategoryDetail,
   transactions,
 }: CategoryDonutChartProps) {
+  const styles = useThemedStyles(createStyles);
   const [mode, setMode] = useState<ChartMode>('expense');
   const currentMonthKey = getCurrentMonthKey();
   const [monthKey, setMonthKey] = useState(currentMonthKey);
@@ -453,81 +455,83 @@ export function CategoryDonutChart({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    alignItems: 'center',
-  },
-  monthNavigator: {
-    marginBottom: spacing.md,
-  },
-  segmentedControl: {
-    width: segmentedControlWidth,
-    flexDirection: 'row',
-    backgroundColor: colors.keypad,
-    borderRadius: radii.round,
-    padding: segmentControlPadding,
-  },
-  segmentIndicator: {
-    position: 'absolute',
-    top: segmentControlPadding,
-    bottom: segmentControlPadding,
-    left: segmentControlPadding,
-    width: segmentIndicatorWidth,
-    backgroundColor: colors.surface,
-    borderRadius: radii.round,
-  },
-  segment: {
-    height: segmentVisualHeight,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-    zIndex: 1,
-  },
-  segmentPressed: {
-    opacity: 0.64,
-  },
-  chartArea: {
-    width: chartSize,
-    height: chartSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: spacing.lg,
-  },
-  chartCenter: {
-    position: 'absolute',
-    width: chartSize - chartStrokeWidth * 3,
-    alignItems: 'center',
-  },
-  total: {
-    width: '100%',
-    marginTop: spacing.xs,
-    textAlign: 'center',
-  },
-  legend: {
-    width: '100%',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.background,
-    borderRadius: radii.round,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  legendItemContainer: {
-    maxWidth: '100%',
-  },
-  legendItemPressed: {
-    backgroundColor: colors.surfaceMuted,
-  },
-  legendDot: {
-    width: legendDotSize,
-    height: legendDotSize,
-    borderRadius: radii.round,
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    card: {
+      alignItems: 'center',
+    },
+    monthNavigator: {
+      marginBottom: spacing.md,
+    },
+    segmentedControl: {
+      width: segmentedControlWidth,
+      flexDirection: 'row',
+      backgroundColor: colors.keypad,
+      borderRadius: radii.round,
+      padding: segmentControlPadding,
+    },
+    segmentIndicator: {
+      position: 'absolute',
+      top: segmentControlPadding,
+      bottom: segmentControlPadding,
+      left: segmentControlPadding,
+      width: segmentIndicatorWidth,
+      backgroundColor: colors.surface,
+      borderRadius: radii.round,
+    },
+    segment: {
+      height: segmentVisualHeight,
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      zIndex: 1,
+    },
+    segmentPressed: {
+      opacity: 0.64,
+    },
+    chartArea: {
+      width: chartSize,
+      height: chartSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginVertical: spacing.lg,
+    },
+    chartCenter: {
+      position: 'absolute',
+      width: chartSize - chartStrokeWidth * 3,
+      alignItems: 'center',
+    },
+    total: {
+      width: '100%',
+      marginTop: spacing.xs,
+      textAlign: 'center',
+    },
+    legend: {
+      width: '100%',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.background,
+      borderRadius: radii.round,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    legendItemContainer: {
+      maxWidth: '100%',
+    },
+    legendItemPressed: {
+      backgroundColor: colors.surfaceMuted,
+    },
+    legendDot: {
+      width: legendDotSize,
+      height: legendDotSize,
+      borderRadius: radii.round,
+    },
+  });
+}

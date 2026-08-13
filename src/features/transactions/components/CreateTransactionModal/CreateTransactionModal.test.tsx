@@ -1,10 +1,11 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent } from '@testing-library/react-native';
 import { type ComponentProps, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { Keyboard, StyleSheet } from 'react-native';
 
 import { CreateTransactionModal as ControlledCreateTransactionModal } from '@/features/transactions/components/CreateTransactionModal/CreateTransactionModal';
 import type { Category } from '@/features/categories/types';
 import type { TransactionType } from '@/features/transactions/types';
+import { renderWithTheme } from '@/test/renderWithTheme';
 import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { minTouchTarget } from '@/theme/layout';
@@ -59,7 +60,7 @@ jest.mock('@gorhom/bottom-sheet', () => {
 
 describe('CreateTransactionModal', () => {
   it('usa la fecha inicial recibida desde otra pantalla', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialDate="2026-08-18"
@@ -84,7 +85,7 @@ describe('CreateTransactionModal', () => {
 
   it('precarga un movimiento existente y guarda sus cambios', async () => {
     const onSubmit = jest.fn();
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialDraft={{
@@ -129,7 +130,7 @@ describe('CreateTransactionModal', () => {
 
   it('permite introducir un importe y devuelve un gasto en unidades menores', async () => {
     const onSubmit = jest.fn();
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -184,7 +185,7 @@ describe('CreateTransactionModal', () => {
   ])(
     'muestra la operación de una %s en vez de calcularla y la resuelve al pulsar =',
     async (_operation, keys, expectedExpressionLabel, expectedResult) => {
-      const screen = await render(
+      const screen = await renderWithTheme(
         <CreateTransactionModal
           activeSpaceId="personal"
           initialType="expense"
@@ -214,7 +215,7 @@ describe('CreateTransactionModal', () => {
   );
 
   it('permite encadenar varias operaciones antes de calcular el resultado final', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -254,7 +255,7 @@ describe('CreateTransactionModal', () => {
   });
 
   it('permite cambiar el operador antes de introducir el segundo importe', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -287,7 +288,7 @@ describe('CreateTransactionModal', () => {
   });
 
   it('permite borrar el operador y volver al importe anterior', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -318,7 +319,7 @@ describe('CreateTransactionModal', () => {
   });
 
   it('abre con el tipo solicitado y permite cambiar a ingreso', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -330,7 +331,9 @@ describe('CreateTransactionModal', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Gasto').props.accessibilityState).toEqual({
+    expect(
+      screen.getByLabelText('Gasto').props.accessibilityState,
+    ).toMatchObject({
       selected: true,
     });
     expect(
@@ -351,7 +354,9 @@ describe('CreateTransactionModal', () => {
 
     await fireEvent.press(screen.getByLabelText('Ingreso'));
 
-    expect(screen.getByLabelText('Ingreso').props.accessibilityState).toEqual({
+    expect(
+      screen.getByLabelText('Ingreso').props.accessibilityState,
+    ).toMatchObject({
       selected: true,
     });
     expect(
@@ -395,7 +400,7 @@ describe('CreateTransactionModal', () => {
   });
 
   it('mantiene compactos y alineados a la izquierda los controles superiores', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -422,7 +427,7 @@ describe('CreateTransactionModal', () => {
   });
 
   it('agrupa los millares mientras se introduce el importe', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -441,9 +446,10 @@ describe('CreateTransactionModal', () => {
 
     expect(screen.getByLabelText('1.000 euros')).toBeTruthy();
     expect(screen.getByTestId('transaction-amount')).toBeTruthy();
-    expect(
-      screen.getByTestId('transaction-amount-value').props.children[0],
-    ).toBe('1.000');
+    expect(screen.getByTestId('transaction-amount-value')).toHaveTextContent(
+      '1.000',
+      { exact: false },
+    );
     expect(
       StyleSheet.flatten(
         screen.getByTestId('transaction-amount-value').parent?.props.style,
@@ -467,7 +473,7 @@ describe('CreateTransactionModal', () => {
 
   it('no permite agregar un movimiento sin una categoría seleccionada', async () => {
     const onSubmit = jest.fn();
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -483,13 +489,13 @@ describe('CreateTransactionModal', () => {
 
     expect(
       screen.getByLabelText('Agregar movimiento').props.accessibilityState,
-    ).toEqual({ disabled: true });
+    ).toMatchObject({ disabled: true });
     await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('mantiene gris la categoría y aplica su color al borde, icono y CTA', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -546,7 +552,7 @@ describe('CreateTransactionModal', () => {
   });
 
   it('usa texto oscuro en el CTA de una categoría amarilla', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -573,7 +579,7 @@ describe('CreateTransactionModal', () => {
       String(now.getMonth() + 1).padStart(2, '0'),
       '15',
     ].join('-');
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -643,10 +649,12 @@ describe('CreateTransactionModal', () => {
     }
     await fireEvent.press(screen.getByLabelText('Quincenal'));
     expect(screen.getByLabelText('Guardar recurrencia')).toBeTruthy();
-    expect(screen.getByLabelText('Quincenal').props.accessibilityState).toEqual(
-      { checked: true },
-    );
-    expect(screen.getByLabelText('Único').props.accessibilityState).toEqual({
+    expect(
+      screen.getByLabelText('Quincenal').props.accessibilityState,
+    ).toMatchObject({ checked: true });
+    expect(
+      screen.getByLabelText('Único').props.accessibilityState,
+    ).toMatchObject({
       checked: false,
     });
     await fireEvent.press(screen.getByLabelText('Guardar recurrencia'));
@@ -677,7 +685,7 @@ describe('CreateTransactionModal', () => {
       String(now.getMonth() + 1).padStart(2, '0'),
       '20',
     ].join('-');
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="income"
@@ -734,7 +742,7 @@ describe('CreateTransactionModal', () => {
         day,
       ].join('-'),
     );
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -774,7 +782,7 @@ describe('CreateTransactionModal', () => {
   });
 
   it('mantiene los controles por encima del objetivo táctil mínimo', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -807,7 +815,7 @@ describe('CreateTransactionModal', () => {
   });
 
   it('no muestra el selector de moneda cuando solo hay una moneda activa', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         initialType="expense"
@@ -824,7 +832,7 @@ describe('CreateTransactionModal', () => {
 
   it('permite elegir la moneda del movimiento cuando hay varias activas', async () => {
     const onSubmit = jest.fn();
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
         availableCurrencies={['EUR', 'USD', 'MXN']}
@@ -855,5 +863,33 @@ describe('CreateTransactionModal', () => {
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ currency: 'USD' }),
     );
+  });
+
+  it('cierra el teclado nativo al tocar cualquier parte del modal', async () => {
+    const dismissSpy = jest.spyOn(Keyboard, 'dismiss');
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="personal"
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={jest.fn()}
+        selectedCategory={category}
+        visible
+      />,
+    );
+
+    dismissSpy.mockClear();
+    fireEvent(
+      screen.getByTestId('create-transaction-form'),
+      'startShouldSetResponderCapture',
+    );
+    expect(dismissSpy).toHaveBeenCalledTimes(1);
+
+    dismissSpy.mockClear();
+    fireEvent(screen.getByLabelText('5'), 'startShouldSetResponderCapture');
+    expect(dismissSpy).toHaveBeenCalledTimes(1);
+
+    dismissSpy.mockRestore();
   });
 });

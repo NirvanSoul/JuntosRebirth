@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createClient,
   processLock,
@@ -24,6 +23,28 @@ const secureSessionStorage: SupportedStorage = {
   },
 };
 
+/**
+ * En nativo, `expo-secure-store` guarda el token en Keychain/Keystore, fuera
+ * del alcance de cualquier JS que corra en la app. El navegador no tiene un
+ * equivalente: cualquier storage accesible desde JS (`localStorage`,
+ * `sessionStorage`, IndexedDB) queda expuesto por igual a un XSS. Se usa
+ * `sessionStorage` en vez de `localStorage` (el valor por defecto de
+ * `AsyncStorage` en web) para acotar la ventana de exposición: el token
+ * desaparece al cerrar la pestaña/navegador en vez de sobrevivir
+ * indefinidamente en disco. Ver ADR-075.
+ */
+const webSessionStorage: SupportedStorage = {
+  getItem: (key) => Promise.resolve(window.sessionStorage.getItem(key)),
+  setItem: (key, value) => {
+    window.sessionStorage.setItem(key, value);
+    return Promise.resolve();
+  },
+  removeItem: (key) => {
+    window.sessionStorage.removeItem(key);
+    return Promise.resolve();
+  },
+};
+
 let configuredClient: SupabaseClient | null = null;
 
 export function createSupabaseClient(
@@ -31,7 +52,7 @@ export function createSupabaseClient(
 ): SupabaseClient {
   return createClient(environment.url, environment.publishableKey, {
     auth: {
-      storage: Platform.OS === 'web' ? AsyncStorage : secureSessionStorage,
+      storage: Platform.OS === 'web' ? webSessionStorage : secureSessionStorage,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,

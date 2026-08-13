@@ -1,7 +1,7 @@
 -- Notification rules are a per-space setting, not authored content like a
 -- category's name or a transaction's amount: any active member should be
 -- able to turn a rule on or off or adjust its timing, not only whoever
--- created the row first. Unlike update_category_budget (202608040001), no
+-- created the row first. Unlike update_category_budget (03_shared_category_budget.sql), no
 -- narrower function is needed here because the whole row is the shared
 -- setting, so insert/update simply require active membership instead of
 -- authorship.

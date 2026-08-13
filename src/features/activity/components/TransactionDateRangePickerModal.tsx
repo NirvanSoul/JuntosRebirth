@@ -8,8 +8,8 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { AppCalendar } from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
 import { getLocalDateKey } from '@/features/transactions/utils/transactionSummary';
-import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
+import { useTheme } from '@/theme/useTheme';
 
 export type TransactionDateRange = {
   endDate: string;
@@ -52,6 +52,7 @@ export function TransactionDateRangePickerModal({
   onSelect,
   visible,
 }: TransactionDateRangePickerModalProps) {
+  const { colors } = useTheme();
   const today = getLocalDateKey(new Date());
   const [draftRange, setDraftRange] = useState<TransactionDateRange>({
     startDate: today,
@@ -77,7 +78,7 @@ export function TransactionDateRangePickerModal({
       date = addDay(date);
     }
     return dates;
-  }, [draftRange]);
+  }, [colors, draftRange]);
 
   const selectDate = (date: string) => {
     if (!selectingEnd) {

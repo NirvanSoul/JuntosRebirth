@@ -14,6 +14,7 @@ import {
   shouldShowWeekMonthLabel,
 } from '@/features/map/model/calendarPeriods';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 
@@ -51,14 +52,16 @@ function renderCalendar(
         insets: { top: 47, right: 0, bottom: 34, left: 0 },
       }}
     >
-      <WeeklyMovementCalendar
-        categories={[category]}
-        currentDate="2026-08-12"
-        onOpenTransactionDetail={onOpenTransactionDetail}
-        onSelectDate={onSelectDate}
-        testID="weekly-calendar"
-        transactions={[transaction]}
-      />
+      <ThemeProvider initialAppearance="light">
+        <WeeklyMovementCalendar
+          categories={[category]}
+          currentDate="2026-08-12"
+          onOpenTransactionDetail={onOpenTransactionDetail}
+          onSelectDate={onSelectDate}
+          testID="weekly-calendar"
+          transactions={[transaction]}
+        />
+      </ThemeProvider>
     </SafeAreaProvider>,
   );
 }
@@ -180,14 +183,16 @@ describe('WeeklyMovementCalendar', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <WeeklyMovementCalendar
-          categories={[category]}
-          currentDate="2026-08-03"
-          onFocusedMonthChange={onFocusedMonthChange}
-          onSelectDate={jest.fn()}
-          testID="weekly-calendar"
-          transactions={[]}
-        />
+        <ThemeProvider initialAppearance="light">
+          <WeeklyMovementCalendar
+            categories={[category]}
+            currentDate="2026-08-03"
+            onFocusedMonthChange={onFocusedMonthChange}
+            onSelectDate={jest.fn()}
+            testID="weekly-calendar"
+            transactions={[]}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const list = screen.getByTestId('weekly-calendar');

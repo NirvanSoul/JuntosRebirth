@@ -31,9 +31,10 @@ import {
   maximumCalendarDate,
   minimumCalendarDate,
 } from '@/lib/date/monthDistance';
-import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type WeeklyMovementCalendarProps = {
   categories: readonly Category[];
@@ -59,8 +60,10 @@ const weekdayLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 // sincronizado con el scroll. Los días vuelven a repetirse cada semana; solo
 // el nombre del día ya no lo hace.
 function WeekdayHeaderRow() {
+  const themedStyles = useThemedStyles(createThemedStyles);
+
   return (
-    <View style={styles.weekdayHeaderRow}>
+    <View style={themedStyles.weekdayHeaderRow}>
       {weekdayLabels.map((label) => (
         <View key={label} style={styles.weekdayHeaderColumn}>
           <Text
@@ -146,6 +149,7 @@ export const WeeklyMovementCalendar = memo(
       },
       ref,
     ) {
+      const themedStyles = useThemedStyles(createThemedStyles);
       const initialDate = useRef(currentDate).current;
       const calendarToday = today ?? initialDate;
       const listRef = useRef<FlatList<readonly string[]>>(null);
@@ -275,7 +279,7 @@ export const WeeklyMovementCalendar = memo(
         <View style={styles.container}>
           <WeekdayHeaderRow />
           <FlatList
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={themedStyles.listContent}
             data={weeks}
             getItemLayout={getItemLayout}
             initialNumToRender={6}
@@ -306,7 +310,7 @@ export const WeeklyMovementCalendar = memo(
             renderItem={({ item: week }) => {
               return (
                 <View
-                  style={styles.weekBlock}
+                  style={themedStyles.weekBlock}
                   testID={`${testID}-week-${week[0]}`}
                 >
                   <View style={styles.weekRow}>
@@ -331,8 +335,10 @@ export const WeeklyMovementCalendar = memo(
                             <View
                               style={[
                                 styles.dayNumber,
-                                isCurrentDate && !selected && styles.currentDay,
-                                selected && styles.selectedDay,
+                                isCurrentDate &&
+                                  !selected &&
+                                  themedStyles.currentDay,
+                                selected && themedStyles.selectedDay,
                               ]}
                             >
                               <Text
@@ -384,7 +390,7 @@ export const WeeklyMovementCalendar = memo(
               );
             }}
             showsVerticalScrollIndicator={false}
-            style={styles.list}
+            style={themedStyles.list}
             testID={testID}
             updateCellsBatchingPeriod={16}
             viewabilityConfig={viewabilityConfig.current}
@@ -398,26 +404,12 @@ export const WeeklyMovementCalendar = memo(
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  weekdayHeaderRow: {
-    flexDirection: 'row',
-    paddingTop: spacing.md,
-    backgroundColor: colors.surface,
-  },
   weekdayHeaderColumn: {
     flex: 1,
     minWidth: 0,
     paddingHorizontal: spacing.xxs,
   },
   weekdayHeaderLabel: { marginBottom: spacing.lg },
-  list: { flex: 1, backgroundColor: colors.surface },
-  listContent: {
-    backgroundColor: colors.surface,
-    paddingBottom: layout.floatingActionClearance,
-  },
-  weekBlock: {
-    backgroundColor: colors.surface,
-    paddingBottom: spacing.xl,
-  },
   weekRow: {
     flexDirection: 'row',
     marginTop: spacing.xl,
@@ -440,11 +432,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: spacing.sm,
   },
-  currentDay: {
-    borderColor: colors.cta,
-    borderWidth: 1,
-  },
-  selectedDay: { backgroundColor: colors.cta },
   movementList: { gap: spacing.xs },
   pressed: { opacity: 0.64 },
 });
+
+function createThemedStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    weekdayHeaderRow: {
+      flexDirection: 'row',
+      paddingTop: spacing.md,
+      backgroundColor: colors.surface,
+    },
+    list: { flex: 1, backgroundColor: colors.surface },
+    listContent: {
+      backgroundColor: colors.surface,
+      paddingBottom: layout.floatingActionClearance,
+    },
+    weekBlock: {
+      backgroundColor: colors.surface,
+      paddingBottom: spacing.xl,
+    },
+    currentDay: {
+      borderColor: colors.cta,
+      borderWidth: 1,
+    },
+    selectedDay: { backgroundColor: colors.cta },
+  });
+}

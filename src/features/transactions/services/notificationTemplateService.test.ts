@@ -81,11 +81,24 @@ describe('selectNotificationTemplate', () => {
   it('lanza un error si ninguna plantilla es compatible con las variables disponibles', async () => {
     await expect(
       selectNotificationTemplate({
-        type: 'income',
+        // Cada tipo real tiene una plantilla de reserva sin variables
+        // requeridas (para no dejar nunca un recordatorio sin contenido),
+        // así que este caso solo puede darse con un tipo inexistente.
+        type: 'invalid-type' as never,
         availableVariables: new Set(['amount']),
         scheduledOn: '2026-08-10',
       }),
     ).rejects.toThrow('No hay ninguna plantilla de notificación compatible');
+  });
+
+  it('cae de vuelta a la plantilla sin variables si ninguna con importe es compatible', async () => {
+    const template = await selectNotificationTemplate({
+      type: 'income',
+      availableVariables: new Set(),
+      scheduledOn: '2026-08-10',
+    });
+
+    expect(template.requiredVariables).toEqual([]);
   });
 
   it('excluye la plantilla usada el día anterior', async () => {

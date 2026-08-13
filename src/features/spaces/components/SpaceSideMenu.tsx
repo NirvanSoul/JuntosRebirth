@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -12,18 +12,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text/Text';
 import type { Space } from '@/features/spaces/types';
-import { colors } from '@/theme/colors';
 import { fontFamily } from '@/theme/fonts';
 import { iconSize, minTouchTarget } from '@/theme/layout';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { typography } from '@/theme/typography';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type SpaceSideMenuProps = {
   activeSpaceId: string;
   onClose: () => void;
   onCreateSpace: (name: string) => Promise<Space>;
+  onInvitePartner: () => void;
   onOpenSettings: () => void;
   onSelectSpace: (spaceId: string) => Promise<void>;
   spaces: readonly Space[];
@@ -37,15 +39,20 @@ export function SpaceSideMenu({
   activeSpaceId,
   onClose,
   onCreateSpace,
+  onInvitePartner,
   onOpenSettings,
   onSelectSpace,
   spaces,
   storageError = null,
 }: SpaceSideMenuProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const [isCreating, setCreating] = useState(false);
   const [isSaving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const hasCoupleSpace = spaces.some((space) => space.type === 'couple');
 
   const cancelCreation = () => {
     setCreating(false);
@@ -185,47 +192,77 @@ export function SpaceSideMenu({
               const isActive = space.id === activeSpaceId;
 
               return (
-                <Pressable
-                  accessibilityLabel={`Seleccionar espacio ${space.name}`}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: isActive }}
-                  key={space.id}
-                  onPress={() => void selectSpace(space.id)}
-                  style={({ pressed }) => [
-                    styles.spaceRow,
-                    isActive ? styles.spaceRowActive : null,
-                    pressed ? styles.pressed : null,
-                  ]}
-                >
-                  <View style={styles.spaceIcon}>
-                    <Ionicons
-                      color={colors.cta}
-                      name={
-                        space.type === 'personal'
-                          ? 'person'
-                          : space.type === 'couple'
-                            ? 'people'
-                            : 'wallet'
-                      }
-                      size={iconSize.sm}
-                    />
-                  </View>
-                  <Text
-                    numberOfLines={1}
-                    style={styles.spaceName}
-                    variant="label"
-                    weight="semibold"
+                <Fragment key={space.id}>
+                  <Pressable
+                    accessibilityLabel={`Seleccionar espacio ${space.name}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isActive }}
+                    onPress={() => void selectSpace(space.id)}
+                    style={({ pressed }) => [
+                      styles.spaceRow,
+                      isActive ? styles.spaceRowActive : null,
+                      pressed ? styles.pressed : null,
+                    ]}
                   >
-                    {space.name}
-                  </Text>
-                  {isActive ? (
-                    <Ionicons
-                      color={colors.cta}
-                      name="checkmark-circle"
-                      size={iconSize.md}
-                    />
+                    <View style={styles.spaceIcon}>
+                      <Ionicons
+                        color={colors.cta}
+                        name={
+                          space.type === 'personal'
+                            ? 'person'
+                            : space.type === 'couple'
+                              ? 'people'
+                              : 'wallet'
+                        }
+                        size={iconSize.sm}
+                      />
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={styles.spaceName}
+                      variant="label"
+                      weight="semibold"
+                    >
+                      {space.name}
+                    </Text>
+                    {isActive ? (
+                      <Ionicons
+                        color={colors.cta}
+                        name="checkmark-circle"
+                        size={iconSize.md}
+                      />
+                    ) : null}
+                  </Pressable>
+
+                  {space.type === 'personal' && !hasCoupleSpace ? (
+                    <Pressable
+                      accessibilityHint="Invita a tu pareja a compartir un espacio"
+                      accessibilityLabel="Espacio de pareja"
+                      accessibilityRole="button"
+                      onPress={onInvitePartner}
+                      style={({ pressed }) => [
+                        styles.coupleSpaceButton,
+                        pressed ? styles.pressed : null,
+                      ]}
+                    >
+                      <View style={styles.spaceIcon}>
+                        <Ionicons
+                          color={colors.cta}
+                          name="people"
+                          size={iconSize.sm}
+                        />
+                      </View>
+                      <Text
+                        numberOfLines={1}
+                        style={styles.spaceName}
+                        variant="label"
+                        weight="semibold"
+                      >
+                        Espacio de pareja
+                      </Text>
+                    </Pressable>
                   ) : null}
-                </Pressable>
+                </Fragment>
               );
             })}
             {error ? (
@@ -266,136 +303,150 @@ export function SpaceSideMenu({
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.xl,
-  },
-  header: {
-    minHeight: minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xl,
-    marginTop: spacing.sm,
-  },
-  iconButton: {
-    width: minTouchTarget,
-    height: minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-    backgroundColor: colors.surfaceMuted,
-  },
-  pressed: {
-    opacity: 0.68,
-  },
-  createContent: {
-    flex: 1,
-    gap: spacing.xl,
-  },
-  field: {
-    gap: spacing.sm,
-  },
-  input: {
-    minHeight: minTouchTarget,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-    fontFamily: fontFamily.light,
-    fontSize: typography.body.fontSize,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  createActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: 'auto',
-    paddingBottom: spacing.lg,
-  },
-  secondaryButton: {
-    minHeight: minTouchTarget,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.round,
-  },
-  primaryButton: {
-    minHeight: minTouchTarget,
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-    backgroundColor: colors.cta,
-  },
-  primaryPressed: {
-    backgroundColor: colors.ctaPressed,
-  },
-  spaceList: {
-    gap: spacing.sm,
-    paddingBottom: spacing.xl,
-  },
-  spaceScroll: {
-    flex: 1,
-  },
-  spaceRow: {
-    minHeight: spaceRowHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  spaceRowActive: {
-    backgroundColor: colors.surface,
-    borderColor: colors.cta,
-  },
-  spaceIcon: {
-    width: spaceIconSize,
-    height: spaceIconSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-    backgroundColor: colors.surface,
-  },
-  spaceName: {
-    minWidth: 0,
-    flex: 1,
-  },
-  addSpaceButton: {
-    ...shadows.subtle,
-    minHeight: minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.round,
-    backgroundColor: colors.surface,
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-  },
-  addSpaceButtonDisabled: {
-    opacity: 0.5,
-  },
-  footer: {
-    borderColor: colors.border,
-    borderTopWidth: 1,
-    paddingTop: spacing.md,
-  },
-  settingsButton: {
-    minHeight: minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-  },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.xl,
+    },
+    header: {
+      minHeight: minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.xl,
+      marginTop: spacing.sm,
+    },
+    iconButton: {
+      width: minTouchTarget,
+      height: minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      backgroundColor: colors.surfaceMuted,
+    },
+    pressed: {
+      opacity: 0.68,
+    },
+    createContent: {
+      flex: 1,
+      gap: spacing.xl,
+    },
+    field: {
+      gap: spacing.sm,
+    },
+    input: {
+      minHeight: minTouchTarget,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      backgroundColor: colors.surface,
+      color: colors.textPrimary,
+      fontFamily: fontFamily.light,
+      fontSize: typography.body.fontSize,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    createActions: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: 'auto',
+      paddingBottom: spacing.lg,
+    },
+    secondaryButton: {
+      minHeight: minTouchTarget,
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.round,
+    },
+    primaryButton: {
+      minHeight: minTouchTarget,
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      backgroundColor: colors.cta,
+    },
+    primaryPressed: {
+      backgroundColor: colors.ctaPressed,
+    },
+    spaceList: {
+      gap: spacing.sm,
+      paddingBottom: spacing.xl,
+    },
+    spaceScroll: {
+      flex: 1,
+    },
+    spaceRow: {
+      minHeight: spaceRowHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      borderRadius: radii.md,
+      paddingHorizontal: spacing.md,
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    spaceRowActive: {
+      backgroundColor: colors.surface,
+      borderColor: colors.cta,
+    },
+    spaceIcon: {
+      width: spaceIconSize,
+      height: spaceIconSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      backgroundColor: colors.surface,
+    },
+    spaceName: {
+      minWidth: 0,
+      flex: 1,
+    },
+    coupleSpaceButton: {
+      ...shadows.subtle,
+      minHeight: spaceRowHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      borderRadius: radii.md,
+      paddingHorizontal: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    addSpaceButton: {
+      ...shadows.subtle,
+      minHeight: minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.round,
+      backgroundColor: colors.surface,
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.lg,
+    },
+    addSpaceButtonDisabled: {
+      opacity: 0.5,
+    },
+    footer: {
+      borderColor: colors.border,
+      borderTopWidth: 1,
+      paddingTop: spacing.md,
+    },
+    settingsButton: {
+      minHeight: minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingHorizontal: spacing.md,
+    },
+  });
+}

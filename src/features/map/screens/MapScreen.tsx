@@ -46,12 +46,13 @@ import {
   getMonthDistance,
   maximumCalendarDate,
 } from '@/lib/date/monthDistance';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type MapScreenProps = {
   categories?: readonly Category[];
@@ -125,6 +126,10 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
   ) {
     const density = useLayoutDensity();
     const insets = useSafeAreaInsets();
+    const { colors, shadows } = useTheme();
+    const themedStyles = useThemedStyles((palette) =>
+      createThemedStyles(palette, shadows),
+    );
     const calendarRef = useRef<AppCalendarHandle>(null);
     const weeklyCalendarRef = useRef<WeeklyMovementCalendarHandle>(null);
     const currentMonth = today.slice(0, 7);
@@ -184,7 +189,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
         }
       }
       return dates;
-    }, [visibleTransactions]);
+    }, [colors, visibleTransactions]);
     const selectedTransactions = useMemo(
       () =>
         selectedDate
@@ -400,7 +405,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
               ver los detalles.
             </Text>
             <View style={styles.controlsRow}>
-              <View style={styles.monthTab} testID="map-month-tab">
+              <View style={themedStyles.monthTab} testID="map-month-tab">
                 <Text variant="bodyStrong">
                   {focusedMonthLabel.month}{' '}
                   <Text tone="secondary" variant="bodyStrong" weight="light">
@@ -419,7 +424,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
                 hitSlop={spacing.sm}
                 onPress={handleCalendarViewToggle}
                 style={({ pressed }) => [
-                  styles.viewToggle,
+                  themedStyles.viewToggle,
                   pressed && styles.viewTogglePressed,
                 ]}
                 testID="map-calendar-view-toggle"
@@ -443,7 +448,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
               }
               pointerEvents={calendarView === 'monthly' ? 'auto' : 'none'}
               style={[
-                styles.calendarLayer,
+                themedStyles.calendarLayer,
                 monthlyCalendarStyle,
                 calendarView === 'monthly'
                   ? styles.activeCalendarLayer
@@ -471,7 +476,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
               }
               pointerEvents={calendarView === 'weekly' ? 'auto' : 'none'}
               style={[
-                styles.calendarLayer,
+                themedStyles.calendarLayer,
                 weeklyCalendarStyle,
                 calendarView === 'weekly'
                   ? styles.activeCalendarLayer
@@ -517,7 +522,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
                 disabled={isCalendarResetting}
                 onPress={handleReturnToToday}
                 style={({ pressed }) => [
-                  styles.returnButton,
+                  themedStyles.returnButton,
                   pressed && styles.returnButtonPressed,
                 ]}
                 testID="map-return-today-button"
@@ -577,28 +582,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
-  monthTab: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.md,
-    borderTopRightRadius: radii.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  viewToggle: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopLeftRadius: radii.md,
-    borderTopRightRadius: radii.md,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
   viewTogglePressed: { opacity: 0.68 },
   calendarViewport: { flex: 1, position: 'relative' },
-  calendarLayer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.surface,
-  },
   activeCalendarLayer: { zIndex: 1 },
   cachedCalendarLayer: { zIndex: 0 },
   returnButtonPosition: {
@@ -608,18 +593,43 @@ const styles = StyleSheet.create({
     height: layout.floatingActionSize,
     justifyContent: 'center',
   },
-  returnButton: {
-    ...shadows.subtle,
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.round,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-  },
   returnButtonPressed: { opacity: 0.68 },
 });
+
+function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    monthTab: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: radii.md,
+      borderTopRightRadius: radii.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+    },
+    viewToggle: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderTopLeftRadius: radii.md,
+      borderTopRightRadius: radii.md,
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+    },
+    calendarLayer: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.surface,
+    },
+    returnButton: {
+      ...shadows.subtle,
+      minHeight: layout.minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.round,
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.lg,
+    },
+  });
+}

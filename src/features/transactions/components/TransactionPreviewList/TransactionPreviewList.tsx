@@ -10,11 +10,12 @@ import Animated, {
 import type { Category } from '@/features/categories/types';
 import { TransactionPreviewCard } from '@/features/transactions/components/TransactionPreviewCard/TransactionPreviewCard';
 import type { SessionTransaction } from '@/features/transactions/types';
-import { colors } from '@/theme/colors';
 import { motion } from '@/theme/motion';
 import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureLayoutTransition } from '@/theme/transitions';
+import type { ColorTokens } from '@/theme/types';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type TransactionPreviewListProps = {
   categories: readonly Category[];
@@ -93,6 +94,7 @@ export function TransactionPreviewList({
   testID,
   transactions,
 }: TransactionPreviewListProps) {
+  const styles = useThemedStyles(createStyles);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -210,21 +212,23 @@ export function TransactionPreviewList({
   );
 }
 
-const styles = StyleSheet.create({
-  list: {
-    gap: previewCardLayout.listGap,
-  },
-  mainCard: {
-    zIndex: 1,
-  },
-  tree: {
-    gap: previewCardLayout.listGap,
-    marginTop: spacing.sm,
-    marginLeft: spacing.lg,
-    paddingLeft: spacing.md,
-    borderLeftColor: colors.border,
-    borderLeftWidth: 2,
-    overflow: 'hidden',
-    zIndex: 0,
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    list: {
+      gap: previewCardLayout.listGap,
+    },
+    mainCard: {
+      zIndex: 1,
+    },
+    tree: {
+      gap: previewCardLayout.listGap,
+      marginTop: spacing.sm,
+      marginLeft: spacing.lg,
+      paddingLeft: spacing.md,
+      borderLeftColor: colors.border,
+      borderLeftWidth: 2,
+      overflow: 'hidden',
+      zIndex: 0,
+    },
+  });
+}

@@ -99,9 +99,11 @@ describe('periodos de movimientos', () => {
 
   it('obtiene los movimientos del periodo inmediatamente anterior', () => {
     expect(
-      getPreviousPeriodTransactions(transactions, 'fortnight', referenceDate).map(
-        ({ id }) => id,
-      ),
+      getPreviousPeriodTransactions(
+        transactions,
+        'fortnight',
+        referenceDate,
+      ).map(({ id }) => id),
     ).toEqual(['previous-fortnight']);
   });
 

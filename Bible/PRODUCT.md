@@ -171,11 +171,13 @@ Explicar el valor en dos a cuatro pantallas y permitir comenzar rápidamente.
 
 ### Flujo propuesto
 
-1. Bienvenida.
-2. Captura del nombre.
-3. Dos o tres láminas.
-4. Entrada como invitado.
-5. Creación automática de espacio personal local.
+1. Captura del nombre y bienvenida personal.
+2. Elección de país y moneda principal.
+3. Lámina de simplicidad y control diario.
+4. Lámina de calendario y mapa financiero.
+5. Lámina de uso personal y compartido.
+6. Entrada como invitado, creación de cuenta o inicio de sesión.
+7. Creación automática de espacio personal local.
 
 ### Mensajes sugeridos
 
@@ -241,8 +243,11 @@ La migración debe ser idempotente.
 ### Registro
 
 - Correo.
-- Contraseña.
+- Contraseña, con un segundo campo para confirmarla.
 - Nombre ya capturado o editable.
+- El modal de crear cuenta es un formulario de 4 pasos, con una barra de
+  progreso debajo del título del modal que da sensación de avance y facilita
+  que el usuario continúe.
 
 ### Verificación
 
@@ -346,6 +351,7 @@ Nombre de trabajo para agrupar:
 - Filtro por tipo.
 - Filtro por categoría.
 - Filtro por recurrencia.
+- Filtro por moneda cuando el espacio contiene movimientos en dos o más monedas.
 - Detalle de movimiento.
 - Categorías.
 - Detalle de categoría.
@@ -388,7 +394,8 @@ configuran en una hoja modal breve: las selecciones se preparan como borrador,
 se aplican juntas mediante una acción explícita y se descartan al cerrar sin
 aplicar. El grupo de tipo se puede plegar para reducir la altura de la hoja;
 tipo, categoría, recurrencia y fecha forman un acordeón animado que mantiene un
-solo grupo abierto. Todos reutilizan la opción seleccionable del formulario de
+solo grupo abierto; Moneda se integra en ese mismo acordeón cuando corresponde.
+Todos reutilizan la opción seleccionable del formulario de
 movimiento o la tarjeta existente de categoría, manteniendo un check visible al
 seleccionar.
 Categoría permite seleccionar varias tarjetas existentes y, como Recurrencia,
@@ -401,6 +408,11 @@ periodos regulares permiten recorrer fechas históricas y futuras. Las acciones 
 comunes de modal y `Aplicar filtros` usa el CTA violeta. Las
 animaciones respetan la preferencia de movimiento reducido. La interfaz interna
 puede usar segmentos o secciones, pero debe seguir siendo clara.
+Cuando el espacio activo contiene dos o más monedas, la hoja añade el grupo
+plegable `Moneda`, con una única divisa seleccionable. El listado, sus totales y
+el detalle por categoría se calculan con esa misma selección: no se suman ni se
+convierten importes de monedas distintas. Con una sola moneda presente el grupo
+no se muestra.
 
 ### Mapa
 
@@ -497,8 +509,13 @@ como una pantalla independiente, sin ocupar una pestaña principal. Reúne:
 Mientras una capacidad todavía no esté implementada, su fila permanece visible
 para validar la arquitectura de la pantalla, muestra un punto rojo junto a la
 acción y comunica al tocarla que está pendiente. Las acciones operativas no
-usan ese indicador. La pantalla explica el significado del punto rojo y no
-simula que la operación se haya completado.
+usan ese indicador ni simulan que la operación se haya completado.
+
+La tarjeta de perfil permite tocar la foto para elegir una imagen de la
+cámara o la galería; se recomprime en el dispositivo antes de guardarse para
+no acumular imágenes pesadas (`Bible/DATABASE.md` §5.4, versión 9). La fila
+«Iniciar sesión o crear cuenta» ya está preparada en la sección Cuenta, pero
+todavía es pendiente: hoy no existe pantalla de autenticación.
 
 La fila «Recordatorios y alertas» ya no es pendiente: abre un modal con una
 regla por tipo de movimiento del espacio activo (gastos e ingresos por
@@ -685,6 +702,16 @@ el elemento y el espacio de destino, y destaca en verde un icono de confirmació
 y la palabra «exitosamente». Esta confirmación se anuncia también a tecnologías
 de asistencia y desaparece automáticamente sin bloquear la interacción.
 
+Los movimientos asociados se dividen en dos secciones dentro del mismo bloque,
+en el mismo orden y ubicación de siempre. `Movimientos` reúne los que ya
+sucedieron, con fecha económica de hoy o anterior. Cuando existe al menos un
+movimiento con fecha posterior a hoy, aparece debajo una segunda sección
+`Movimientos futuros`, ordenada de la fecha más próxima a la más lejana, sin
+límite mensual: a diferencia de Inicio, un movimiento futuro de este espacio
+es visible aquí en cuanto se crea, sin esperar a que su mes llegue. Ambas
+secciones reutilizan la misma lista de vistas previas y el mismo detalle al
+tocar un movimiento.
+
 ### Detalle de movimiento
 
 El detalle de movimiento conserva la distribución general del detalle de
@@ -788,7 +815,7 @@ Los estados vacíos deben dirigir a una acción útil.
 - Respetar tamaños de texto cuando sea viable.
 - Formatos locales de moneda y fecha.
 - Español como idioma inicial sin cerrar otros idiomas.
-- Compatibilidad con modo claro y oscuro si se incorpora.
+- Compatibilidad con modo claro y oscuro, seleccionable mediante un interruptor en Ajustes.
 
 ---
 
@@ -809,7 +836,37 @@ No recopilar contenido financiero sensible sin necesidad, consentimiento y prote
 
 ---
 
-## 20. Fuera de alcance inicial
+## 20. Importación de movimientos bancarios
+
+Permite añadir varios gastos e ingresos a la vez desde un archivo del banco, en vez de crearlos uno por uno. Especificación completa en `Bible/JUNTOSS_BANK_FILE_IMPORT_SYSTEM.md`.
+
+### Formatos soportados
+
+Excel (`.xls`/`.xlsx`) y CSV. PDF se implementó on-device (ADR-071) y luego se eliminó por completo: generaba errores recurrentes y era una función de uso marginal frente a su coste de mantenimiento. Ver ADR-073.
+
+### Flujo
+
+1. Elegir un archivo dentro del espacio activo.
+2. Detectar y, si hace falta, mapear manualmente las columnas (fecha, descripción, importe).
+3. Normalizar fecha, importe, moneda y tipo (gasto o ingreso).
+4. Sugerir categoría a partir de reglas personales del usuario o coincidencia con comercios ya categorizados.
+5. Detectar duplicados contra los movimientos existentes del espacio.
+6. Revisar: los movimientos se agrupan por comercio normalizado, de forma que corregir una categoría se aplica a todas las filas de ese comercio conservando la fecha y el importe de cada una. Los duplicados exactos aparecen deseleccionados por defecto.
+7. Importar: los movimientos seleccionados se guardan con el mismo flujo de creación que un movimiento manual, y Inicio, Actividad y Mapa se actualizan de inmediato.
+
+Si el usuario cierra la revisión sin terminar, la importación queda pendiente y puede retomarse o descartarse desde un centro de importaciones dentro del espacio activo.
+
+### Aprendizaje
+
+Una categoría corregida durante la revisión se recuerda para ese comercio y ese espacio, y se sugiere automáticamente en la próxima importación. Estas correcciones también pueden alimentar, de forma anónima y solo tras suficiente consenso entre usuarios, candidatos de regla global para revisión manual; nunca se aplican automáticamente al catálogo general de categorías.
+
+### Fuera de esta versión
+
+PDF (digital o escaneado), reconocimiento óptico de texto, conexión bancaria directa y perfiles de importación por banco.
+
+---
+
+## 21. Fuera de alcance inicial
 
 - Gráficas complejas.
 - Grupos avanzados.
@@ -825,7 +882,7 @@ No recopilar contenido financiero sensible sin necesidad, consentimiento y prote
 
 ---
 
-## 21. Criterio de producto
+## 22. Criterio de producto
 
 Una nueva funcionalidad debe:
 

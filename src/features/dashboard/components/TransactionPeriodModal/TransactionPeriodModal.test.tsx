@@ -84,4 +84,31 @@ describe('TransactionPeriodModal', () => {
 
     expect(getByText('60%')).toBeTruthy();
   });
+
+  it('no reinterpreta movimientos de otra moneda', async () => {
+    const { getByTestId, getByText, queryByText } = await renderWithTheme(
+      <TransactionPeriodModal
+        categories={[]}
+        onAdd={jest.fn()}
+        onClose={jest.fn()}
+        transactions={[
+          transaction('eur-expense', 'expense', 1_000, '2026-07-12'),
+          {
+            ...transaction('cop-expense', 'expense', 5_000_000, '2026-07-12'),
+            currency: 'COP',
+          },
+        ]}
+        type="expense"
+        visible
+      />,
+    );
+
+    // COP se ordena antes que EUR: el total y el listado se limitan a COP,
+    // no muestran «50.000 €» ni suman divisas incompatibles.
+    expect(getByTestId('expense-period-total').props.children).toContain(
+      '50.000',
+    );
+    expect(queryByText('eur-expense')).toBeNull();
+    expect(getByText('cop-expense')).toBeTruthy();
+  });
 });

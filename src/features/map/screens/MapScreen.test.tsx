@@ -6,6 +6,7 @@ import type { Category } from '@/features/categories/types';
 import { MapScreen } from '@/features/map/screens/MapScreen';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { createProjectedTransactionId } from '@/features/transactions/utils/transactionRecurrence';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -221,13 +222,15 @@ function renderMap(
         insets: { top: 47, right: 0, bottom: 34, left: 0 },
       }}
     >
-      <MapScreen
-        categories={[category]}
-        onAddTransaction={onAddTransaction}
-        onOpenTransactionDetail={onOpenTransactionDetail}
-        today="2026-02-02"
-        transactions={[transaction, incomeTransaction]}
-      />
+      <ThemeProvider initialAppearance="light">
+        <MapScreen
+          categories={[category]}
+          onAddTransaction={onAddTransaction}
+          onOpenTransactionDetail={onOpenTransactionDetail}
+          today="2026-02-02"
+          transactions={[transaction, incomeTransaction]}
+        />
+      </ThemeProvider>
     </SafeAreaProvider>,
   );
 }

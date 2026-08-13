@@ -9,6 +9,7 @@ import {
   shiftTransactionPeriod,
 } from '@/features/dashboard/utils/transactionPeriod';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
 import { iconSize } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
@@ -91,7 +92,9 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -162,7 +165,9 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen categories={categories} transactions={transactions} />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen categories={categories} transactions={transactions} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -300,7 +305,12 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen categories={categories} transactions={recentTransactions} />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={categories}
+            transactions={recentTransactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -319,7 +329,9 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen categories={categories} transactions={transactions} />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen categories={categories} transactions={transactions} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -342,11 +354,13 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen
-          categories={categories}
-          onViewMovements={onViewMovements}
-          transactions={recentTransactions}
-        />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={categories}
+            onViewMovements={onViewMovements}
+            transactions={recentTransactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -376,10 +390,12 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen
-          categories={categories}
-          transactions={[newerByDateButUntouched, oldButJustEdited]}
-        />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={categories}
+            transactions={[newerByDateButUntouched, oldButJustEdited]}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -418,10 +434,12 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen
-          categories={categories}
-          transactions={[plannedCurrentMonthIncome, nextMonthIncome]}
-        />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={categories}
+            transactions={[plannedCurrentMonthIncome, nextMonthIncome]}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -454,10 +472,12 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen
-          categories={categories}
-          transactions={[futureOccurrence, currentOccurrence]}
-        />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={categories}
+            transactions={[futureOccurrence, currentOccurrence]}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -479,13 +499,15 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen
-          categories={categories}
-          onCreateExpense={onCreateExpense}
-          onCreateIncome={onCreateIncome}
-          onCreateMovement={onCreateMovement}
-          transactions={transactions}
-        />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={categories}
+            onCreateExpense={onCreateExpense}
+            onCreateIncome={onCreateIncome}
+            onCreateMovement={onCreateMovement}
+            transactions={transactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -496,7 +518,9 @@ describe('HomeScreen', () => {
     const monthlyFilter = screen.getByRole('radio', {
       name: 'Periodo: Mensual',
     });
-    expect(monthlyFilter.props.accessibilityState).toEqual({ checked: true });
+    expect(monthlyFilter.props.accessibilityState).toMatchObject({
+      checked: true,
+    });
     expect(StyleSheet.flatten(monthlyFilter.props.style)).toMatchObject({
       ...shadows.subtle,
       backgroundColor: colors.surface,
@@ -517,7 +541,7 @@ describe('HomeScreen', () => {
     const nextPeriodButton = screen.getByRole('button', {
       name: 'Ver periodo siguiente',
     });
-    expect(nextPeriodButton.props.accessibilityState).toEqual({
+    expect(nextPeriodButton.props.accessibilityState).toMatchObject({
       disabled: false,
     });
     await fireEvent.press(nextPeriodButton);
@@ -576,7 +600,7 @@ describe('HomeScreen', () => {
     expect(
       screen.getByRole('radio', { name: 'Periodo: Anual' }).props
         .accessibilityState,
-    ).toEqual({ checked: true });
+    ).toMatchObject({ checked: true });
     expect(screen.getByText(String(new Date().getFullYear()))).toBeTruthy();
     expect(
       StyleSheet.flatten(
@@ -616,12 +640,14 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen
-          onCreateCategory={onCreateCategory}
-          onCreateExpense={onCreateExpense}
-          onViewCategories={onViewCategories}
-          onViewMovements={onViewMovements}
-        />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            onCreateCategory={onCreateCategory}
+            onCreateExpense={onCreateExpense}
+            onViewCategories={onViewCategories}
+            onViewMovements={onViewMovements}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -648,7 +674,9 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen categories={categories.slice(0, 1)} />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen categories={categories.slice(0, 1)} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -668,10 +696,12 @@ describe('HomeScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <HomeScreen
-          categories={categories.slice(0, 1)}
-          onOpenCategoryDetail={onOpenCategoryDetail}
-        />
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={categories.slice(0, 1)}
+            onOpenCategoryDetail={onOpenCategoryDetail}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 

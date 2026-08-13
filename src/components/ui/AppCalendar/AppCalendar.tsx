@@ -29,11 +29,13 @@ import {
   getMonthDistance,
   minimumCalendarDate,
 } from '@/lib/date/monthDistance';
-import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
 import { typography } from '@/theme/typography';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type AppCalendarProps = {
   currentDate: string;
@@ -110,6 +112,7 @@ function ScrollCalendarDay({
   state,
   testID,
 }: ScrollCalendarDayProps) {
+  const themedStyles = useThemedStyles(createThemedStyles);
   const isSelected = Boolean(marking?.selected) || state === 'selected';
   const isDisabled = Boolean(marking?.disabled) || state === 'disabled';
   const isToday = state === 'today';
@@ -134,8 +137,8 @@ function ScrollCalendarDay({
       <View
         style={[
           styles.scrollDayNumber,
-          isToday && !isSelected && styles.scrollDayToday,
-          isSelected && styles.scrollDaySelected,
+          isToday && !isSelected && themedStyles.scrollDayToday,
+          isSelected && themedStyles.scrollDaySelected,
         ]}
       >
         <Text tone={isSelected ? 'onBrand' : 'primary'} variant="body">
@@ -214,8 +217,10 @@ function ScrollCalendarNullHeader() {
 }
 
 function ScrollWeekdayRow({ testID }: { testID: string }) {
+  const themedStyles = useThemedStyles(createThemedStyles);
+
   return (
-    <View style={styles.scrollWeekdayRow} testID={`${testID}.dayNames`}>
+    <View style={themedStyles.scrollWeekdayRow} testID={`${testID}.dayNames`}>
       {scrollWeekdayLabels.map((label) => (
         <View key={label} style={styles.scrollWeekdayColumn}>
           <Text
@@ -233,99 +238,101 @@ function ScrollWeekdayRow({ testID }: { testID: string }) {
   );
 }
 
-const calendarTheme = {
-  arrowColor: colors.textPrimary,
-  calendarBackground: colors.surface,
-  dayTextColor: colors.textPrimary,
-  monthTextColor: colors.textPrimary,
-  selectedDayBackgroundColor: colors.cta,
-  selectedDayTextColor: colors.onBrand,
-  textDayFontFamily: typography.body.fontFamily,
-  textDayFontSize: typography.body.fontSize,
-  textDayHeaderFontFamily: typography.footnote.fontFamily,
-  textDayHeaderFontSize: typography.footnote.fontSize,
-  textDisabledColor: colors.textMuted,
-  textMonthFontFamily: typography.bodyStrong.fontFamily,
-  textMonthFontSize: typography.bodyStrong.fontSize,
-  textSectionTitleColor: colors.textSecondary,
-  todayTextColor: colors.cta,
-  'stylesheet.calendar.header': {
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginTop: spacing.none,
-      paddingHorizontal: spacing.none,
+function createCalendarTheme(colors: ColorTokens): CalendarTheme {
+  return {
+    arrowColor: colors.textPrimary,
+    calendarBackground: colors.surface,
+    dayTextColor: colors.textPrimary,
+    monthTextColor: colors.textPrimary,
+    selectedDayBackgroundColor: colors.cta,
+    selectedDayTextColor: colors.onBrand,
+    textDayFontFamily: typography.body.fontFamily,
+    textDayFontSize: typography.body.fontSize,
+    textDayHeaderFontFamily: typography.footnote.fontFamily,
+    textDayHeaderFontSize: typography.footnote.fontSize,
+    textDisabledColor: colors.textMuted,
+    textMonthFontFamily: typography.bodyStrong.fontFamily,
+    textMonthFontSize: typography.bodyStrong.fontSize,
+    textSectionTitleColor: colors.textSecondary,
+    todayTextColor: colors.cta,
+    'stylesheet.calendar.header': {
+      header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: spacing.none,
+        paddingHorizontal: spacing.none,
+      },
+      monthText: {
+        color: colors.textPrimary,
+        fontFamily: typography.bodyStrong.fontFamily,
+        fontSize: typography.bodyStrong.fontSize,
+        marginVertical: spacing.xs,
+      },
+      week: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: spacing.xl,
+      },
+      dayHeader: {
+        width: spacing.xxl,
+        color: colors.textSecondary,
+        fontFamily: typography.footnote.fontFamily,
+        fontSize: typography.footnote.fontSize,
+        includeFontPadding: false,
+        letterSpacing: typography.footnote.letterSpacing,
+        lineHeight: typography.footnote.lineHeight,
+        marginBottom: spacing.lg,
+        textAlign: 'center',
+      },
     },
-    monthText: {
-      color: colors.textPrimary,
-      fontFamily: typography.bodyStrong.fontFamily,
-      fontSize: typography.bodyStrong.fontSize,
-      marginVertical: spacing.xs,
+    'stylesheet.calendar.main': {
+      container: {
+        paddingLeft: spacing.none,
+        paddingRight: spacing.none,
+        backgroundColor: colors.surface,
+      },
+      week: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginVertical: spacing.sm,
+      },
     },
-    week: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      marginTop: spacing.xl,
+    'stylesheet.calendar-list.main': {
+      flatListContainer: { flex: 1 },
     },
-    dayHeader: {
-      width: spacing.xxl,
-      color: colors.textSecondary,
-      fontFamily: typography.footnote.fontFamily,
-      fontSize: typography.footnote.fontSize,
-      includeFontPadding: false,
-      letterSpacing: typography.footnote.letterSpacing,
-      lineHeight: typography.footnote.lineHeight,
-      marginBottom: spacing.lg,
-      textAlign: 'center',
+    'stylesheet.day.basic': {
+      base: {
+        width: calendarDaySize,
+        height: calendarDaySize,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      today: {
+        borderColor: colors.cta,
+        borderRadius: radii.sm,
+        borderWidth: 1,
+      },
+      selected: {
+        backgroundColor: colors.cta,
+        borderRadius: radii.sm,
+      },
+      text: {
+        color: colors.textPrimary,
+        fontFamily: typography.body.fontFamily,
+        fontSize: typography.body.fontSize,
+        includeFontPadding: false,
+        lineHeight: calendarDaySize,
+        marginTop: spacing.none,
+        textAlign: 'center',
+        textAlignVertical: 'center',
+      },
+      todayText: { color: colors.cta },
+      selectedText: { color: colors.onBrand },
+      disabledText: { color: colors.textMuted },
     },
-  },
-  'stylesheet.calendar.main': {
-    container: {
-      paddingLeft: spacing.none,
-      paddingRight: spacing.none,
-      backgroundColor: colors.surface,
-    },
-    week: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      marginVertical: spacing.sm,
-    },
-  },
-  'stylesheet.calendar-list.main': {
-    flatListContainer: { flex: 1 },
-  },
-  'stylesheet.day.basic': {
-    base: {
-      width: calendarDaySize,
-      height: calendarDaySize,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    today: {
-      borderColor: colors.cta,
-      borderRadius: radii.sm,
-      borderWidth: 1,
-    },
-    selected: {
-      backgroundColor: colors.cta,
-      borderRadius: radii.sm,
-    },
-    text: {
-      color: colors.textPrimary,
-      fontFamily: typography.body.fontFamily,
-      fontSize: typography.body.fontSize,
-      includeFontPadding: false,
-      lineHeight: calendarDaySize,
-      marginTop: spacing.none,
-      textAlign: 'center',
-      textAlignVertical: 'center',
-    },
-    todayText: { color: colors.cta },
-    selectedText: { color: colors.onBrand },
-    disabledText: { color: colors.textMuted },
-  },
-} as CalendarTheme;
+  };
+}
 
 export const AppCalendar = memo(
   forwardRef<AppCalendarHandle, AppCalendarProps>(function AppCalendar(
@@ -341,6 +348,9 @@ export const AppCalendar = memo(
     },
     ref,
   ) {
+    const { colors } = useTheme();
+    const themedStyles = useThemedStyles(createThemedStyles);
+    const calendarTheme = useMemo(() => createCalendarTheme(colors), [colors]);
     const scrollAnchorDate = useRef(currentDate).current;
     const futureScrollRange = getCalendarFutureMonthRange(
       scrollAnchorDate,
@@ -374,7 +384,7 @@ export const AppCalendar = memo(
               },
             }
           : markedDates,
-      [markedDates, selectedDate],
+      [colors, markedDates, selectedDate],
     );
 
     useImperativeHandle(
@@ -412,7 +422,15 @@ export const AppCalendar = memo(
         testID,
         theme: calendarTheme,
       }),
-      [currentDate, dates, handleDayPress, mode, scrollAnchorDate, testID],
+      [
+        calendarTheme,
+        currentDate,
+        dates,
+        handleDayPress,
+        mode,
+        scrollAnchorDate,
+        testID,
+      ],
     );
     const handleScroll = useCallback(
       ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -449,7 +467,7 @@ export const AppCalendar = memo(
     );
     if (mode === 'scroll') {
       return (
-        <View style={styles.scrollContainer}>
+        <View style={themedStyles.scrollContainer}>
           <ScrollWeekdayRow testID={testID} />
           <FlatList
             contentContainerStyle={styles.calendarListContent}
@@ -511,17 +529,6 @@ const styles = StyleSheet.create({
     minHeight: calendarMonthHeight,
     paddingHorizontal: spacing.none,
   },
-  scrollContainer: {
-    flex: 1,
-    borderRadius: radii.md,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-  },
-  scrollWeekdayRow: {
-    flexDirection: 'row',
-    paddingTop: spacing.md,
-    backgroundColor: colors.surface,
-  },
   scrollWeekdayColumn: {
     flex: 1,
     minWidth: 0,
@@ -544,11 +551,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radii.sm,
   },
-  scrollDayToday: {
-    borderColor: colors.cta,
-    borderWidth: 1,
-  },
-  scrollDaySelected: { backgroundColor: colors.cta },
   calendarDots: {
     height: calendarDotSize,
     flexDirection: 'row',
@@ -561,3 +563,24 @@ const styles = StyleSheet.create({
     borderRadius: calendarDotSize / 2,
   },
 });
+
+function createThemedStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    scrollContainer: {
+      flex: 1,
+      borderRadius: radii.md,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+    },
+    scrollWeekdayRow: {
+      flexDirection: 'row',
+      paddingTop: spacing.md,
+      backgroundColor: colors.surface,
+    },
+    scrollDayToday: {
+      borderColor: colors.cta,
+      borderWidth: 1,
+    },
+    scrollDaySelected: { backgroundColor: colors.cta },
+  });
+}

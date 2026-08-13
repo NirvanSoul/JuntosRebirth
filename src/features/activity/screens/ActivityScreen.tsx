@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   ReduceMotion,
@@ -41,17 +41,26 @@ import { describePreviousPeriod } from '@/features/dashboard/utils/transactionPe
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import { TransactionSummaryBadges } from '@/features/transactions/components/TransactionSummaryBadges/TransactionSummaryBadges';
 import type { SessionTransaction } from '@/features/transactions/types';
+import {
+  getAvailableCurrencies,
+  pickEffectiveCurrency,
+} from '@/features/transactions/utils/transactionCurrencyGrouping';
 import { calculatePeriodComparison } from '@/features/transactions/utils/periodComparison';
 import {
   listTransactionsThroughCurrentMonth,
   summarizeTransactionTotals,
 } from '@/features/transactions/utils/transactionSummary';
-import { colors } from '@/theme/colors';
+import {
+  defaultCurrencyCode,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
 import { iconSize, minTouchTarget } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { previewCardLayout } from '@/theme/previewCard';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const categoryGroupBorderWidth = 2;
 const categorySeparatorThickness = 1;
@@ -70,6 +79,8 @@ function getComparisonPeriodLabel(
 
 type ActivityScreenProps = {
   categories?: readonly Category[];
+  /** Moneda elegida en el encabezado global; nunca se mezclan importes aquí. */
+  currency?: CurrencyCode;
   onCreateCategory?: () => void;
   onCreateExpense?: () => void;
   onCreateIncome?: () => void;
@@ -86,6 +97,7 @@ type ActivityScreenProps = {
 
 export function ActivityScreen({
   categories = [],
+  currency = defaultCurrencyCode,
   onCreateCategory,
   onCreateExpense,
   onCreateIncome,
@@ -99,6 +111,8 @@ export function ActivityScreen({
   targetSection,
   transactions = [],
 }: ActivityScreenProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const handledTargetKeyRef = useRef<string | null>(null);
@@ -114,6 +128,9 @@ export function ActivityScreen({
   const [recurrenceFilter, setRecurrenceFilter] =
     useState<RecurrenceFilter>('all');
   const [dateFilter, setDateFilter] = useState<TransactionDateFilter>('all');
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode | null>(
+    null,
+  );
   const [isFiltersModalVisible, setFiltersModalVisible] = useState(false);
   const [periodModalType, setPeriodModalType] =
     useState<TransactionPeriodModalType | null>(null);
@@ -121,29 +138,49 @@ export function ActivityScreen({
     () => listTransactionsThroughCurrentMonth(transactions),
     [transactions],
   );
-  const categorySummaries = useMemo(
-    () => summarizeCategories(categories, transactionsThroughCurrentMonth),
-    [categories, transactionsThroughCurrentMonth],
+  const availableCurrencies = useMemo(
+    () => getAvailableCurrencies(transactions),
+    [transactions],
   );
-  const matchesNonDateFilters = (transaction: SessionTransaction) =>
-    (transactionFilter === 'all' || transaction.type === transactionFilter) &&
-    (categoryFilter.length === 0 ||
-      categoryFilter.includes(transaction.categoryId)) &&
-    (recurrenceFilter === 'all' ||
-      transaction.recurrence === recurrenceFilter);
+  const effectiveCurrency = pickEffectiveCurrency(
+    availableCurrencies,
+    selectedCurrency ?? currency,
+    currency,
+  );
+  const currencyTransactionsThroughCurrentMonth = useMemo(
+    () =>
+      transactionsThroughCurrentMonth.filter(
+        (transaction) => transaction.currency === effectiveCurrency,
+      ),
+    [effectiveCurrency, transactionsThroughCurrentMonth],
+  );
+  const categorySummaries = useMemo(
+    () =>
+      summarizeCategories(categories, currencyTransactionsThroughCurrentMonth),
+    [categories, currencyTransactionsThroughCurrentMonth],
+  );
+  const matchesNonDateFilters = useCallback(
+    (transaction: SessionTransaction) =>
+      (transactionFilter === 'all' || transaction.type === transactionFilter) &&
+      (categoryFilter.length === 0 ||
+        categoryFilter.includes(transaction.categoryId)) &&
+      (recurrenceFilter === 'all' ||
+        transaction.recurrence === recurrenceFilter),
+    [categoryFilter, recurrenceFilter, transactionFilter],
+  );
   const filteredTransactions = useMemo(
     () =>
       transactionsThroughCurrentMonth.filter(
         (transaction) =>
+          transaction.currency === effectiveCurrency &&
           matchesNonDateFilters(transaction) &&
           matchesTransactionDateFilter(transaction.occurredOn, dateFilter),
       ),
     [
-      categoryFilter,
       dateFilter,
+      effectiveCurrency,
+      matchesNonDateFilters,
       transactionsThroughCurrentMonth,
-      recurrenceFilter,
-      transactionFilter,
     ],
   );
   const activeFilterCount =
@@ -166,16 +203,19 @@ export function ActivityScreen({
 
     const previousTransactions = transactionsThroughCurrentMonth.filter(
       (transaction) =>
+        transaction.currency === effectiveCurrency &&
         matchesNonDateFilters(transaction) &&
-        matchesTransactionDateFilter(transaction.occurredOn, previousDateFilter),
+        matchesTransactionDateFilter(
+          transaction.occurredOn,
+          previousDateFilter,
+        ),
     );
 
     return summarizeTransactionTotals(previousTransactions);
   }, [
-    categoryFilter,
+    effectiveCurrency,
+    matchesNonDateFilters,
     previousDateFilter,
-    recurrenceFilter,
-    transactionFilter,
     transactionsThroughCurrentMonth,
   ]);
   const comparisonPeriodLabel = getComparisonPeriodLabel(dateFilter);
@@ -275,7 +315,7 @@ export function ActivityScreen({
           <CategoryDonutChart
             categories={categories}
             onOpenCategoryDetail={onOpenCategoryDetail}
-            transactions={transactions}
+            transactions={currencyTransactionsThroughCurrentMonth}
           />
           <Animated.View
             layout={getActivityLayoutTransition()}
@@ -350,13 +390,13 @@ export function ActivityScreen({
             accessibilityRole="button"
             onPress={() => setFiltersModalVisible(true)}
             style={({ pressed }) => [
-              styles.filterButton,
-              pressed ? styles.filterPressed : null,
+              styles.filterLink,
+              pressed ? styles.filterLinkPressed : null,
             ]}
           >
             <Ionicons
               color={colors.textSecondary}
-              name="funnel-outline"
+              name="filter-circle-outline"
               size={iconSize.xs}
               testID="activity-filter-icon"
             />
@@ -434,8 +474,10 @@ export function ActivityScreen({
       </Screen>
       <TransactionFiltersModal
         categories={categories}
+        currencies={availableCurrencies}
         filters={{
           category: categoryFilter,
+          currency: effectiveCurrency,
           date: dateFilter,
           recurrence: recurrenceFilter,
           type: transactionFilter,
@@ -445,6 +487,7 @@ export function ActivityScreen({
           setCategoryFilter(filters.category);
           setRecurrenceFilter(filters.recurrence);
           setDateFilter(filters.date);
+          setSelectedCurrency(filters.currency);
           setFiltersModalVisible(false);
         }}
         onClose={() => setFiltersModalVisible(false)}
@@ -499,46 +542,48 @@ export function ActivityScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  movementsHeader: {
-    minHeight: minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.xxl,
-    marginBottom: spacing.md,
-  },
-  movementSummary: {
-    marginBottom: spacing.lg,
-  },
-  filterButton: {
-    minHeight: minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingLeft: spacing.lg,
-  },
-  filterPressed: {
-    opacity: 0.64,
-  },
-  categoryGroupShadow: {
-    ...shadows.subtle,
-    borderRadius: previewCardLayout.borderRadius,
-  },
-  categoryGroup: {
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-    borderColor: colors.categoryPreviewBorder,
-    borderRadius: previewCardLayout.borderRadius,
-    borderWidth: categoryGroupBorderWidth,
-  },
-  categorySeparator: {
-    height: categorySeparatorThickness,
-    backgroundColor: colors.categoryPreviewBorder,
-  },
-  categoryDetailTitle: {
-    marginBottom: spacing.md,
-    marginTop: spacing.xl,
-  },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    movementsHeader: {
+      minHeight: minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.xxl,
+      marginBottom: spacing.md,
+    },
+    movementSummary: {
+      marginBottom: spacing.lg,
+    },
+    filterLink: {
+      minHeight: minTouchTarget,
+      justifyContent: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingLeft: spacing.lg,
+    },
+    filterLinkPressed: {
+      opacity: 0.64,
+    },
+    categoryGroupShadow: {
+      ...shadows.subtle,
+      borderRadius: previewCardLayout.borderRadius,
+    },
+    categoryGroup: {
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+      borderColor: colors.categoryPreviewBorder,
+      borderRadius: previewCardLayout.borderRadius,
+      borderWidth: categoryGroupBorderWidth,
+    },
+    categorySeparator: {
+      height: categorySeparatorThickness,
+      backgroundColor: colors.categoryPreviewBorder,
+    },
+    categoryDetailTitle: {
+      marginBottom: spacing.md,
+      marginTop: spacing.xl,
+    },
+  });
+}

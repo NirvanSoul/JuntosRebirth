@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -26,9 +27,9 @@ import {
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
+import { useTheme } from '@/theme/useTheme';
 
 const recentTransactionLimit = 8;
 
@@ -45,6 +46,7 @@ type HomeScreenProps = {
   onScrollDirectionChange?: (direction: 'down' | 'up') => void;
   onViewCategories?: () => void;
   onViewMovements?: () => void;
+  topContent?: ReactNode;
   /** Muestra el % de cambio de Ingresos/Gastos frente al mes anterior. */
   showComparisonIndicators?: boolean;
   transactions?: readonly SessionTransaction[];
@@ -84,6 +86,8 @@ type TransactionListFooterProps = {
 };
 
 function TransactionListFooter({ onPress }: TransactionListFooterProps) {
+  const { colors } = useTheme();
+
   return (
     <Pressable
       accessibilityLabel="Ver más movimientos en Actividad"
@@ -121,8 +125,10 @@ export function HomeScreen({
   onViewCategories,
   onViewMovements,
   showComparisonIndicators = false,
+  topContent,
   transactions = [],
 }: HomeScreenProps) {
+  const { colors } = useTheme();
   const density = useLayoutDensity();
   const [isIncomeModalVisible, setIncomeModalVisible] = useState(false);
   const [isExpenseModalVisible, setExpenseModalVisible] = useState(false);
@@ -184,6 +190,7 @@ export function HomeScreen({
         onScrollDirectionChange={onScrollDirectionChange}
         testID="home-screen"
       >
+        {topContent}
         <Pressable
           accessibilityLabel={`Balance disponible: ${balance}`}
           accessibilityRole="button"

@@ -8,9 +8,11 @@ import {
 } from 'react-native';
 
 import { Text } from '@/components/ui/Text/Text';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type MonthDirection = 'left' | 'right';
 const monthArrowSize = 40;
@@ -32,8 +34,11 @@ export function MonthNavigatorArrow({
   direction: MonthDirection;
   disabled?: boolean;
 }) {
+  const { colors } = useTheme();
+  const themedStyles = useThemedStyles(createThemedStyles);
+
   return (
-    <View style={[styles.arrow, disabled && styles.disabled]}>
+    <View style={[themedStyles.arrow, disabled && styles.disabled]}>
       <Ionicons
         color={disabled ? colors.textMuted : colors.textPrimary}
         name={direction === 'left' ? 'chevron-back' : 'chevron-forward'}
@@ -101,15 +106,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  arrow: {
-    width: monthArrowSize,
-    height: monthArrowSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-    backgroundColor: colors.keypad,
-  },
   disabled: { opacity: 0.4 },
   label: { flex: 1 },
   pressed: { opacity: 0.72 },
 });
+
+function createThemedStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    arrow: {
+      width: monthArrowSize,
+      height: monthArrowSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      backgroundColor: colors.keypad,
+    },
+  });
+}

@@ -1,5 +1,7 @@
 import type { SessionTransaction } from '@/features/transactions/types';
+import { groupTransactionsByCurrency } from '@/features/transactions/utils/transactionCurrencyGrouping';
 import { projectRecurringTransactions } from '@/features/transactions/utils/transactionRecurrence';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
 export type TransactionSummary = {
   balanceMinor: number;
@@ -11,6 +13,16 @@ export type TransactionTotals = {
   balanceMinor: number;
   incomeMinor: number;
   expenseMinor: number;
+};
+
+export type TransactionTotalsByCurrency = {
+  currency: CurrencyCode;
+  totals: TransactionTotals;
+};
+
+export type TransactionSummaryByCurrency = {
+  currency: CurrencyCode;
+  summary: TransactionSummary;
 };
 
 export function getLocalDateKey(referenceDate = new Date()): string {
@@ -113,4 +125,27 @@ export function summarizeTransactions(
       monthExpenseMinor: 0,
     },
   );
+}
+
+export function summarizeTransactionTotalsByCurrency(
+  transactions: readonly SessionTransaction[],
+): readonly TransactionTotalsByCurrency[] {
+  return Array.from(groupTransactionsByCurrency(transactions))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, currencyTransactions]) => ({
+      currency,
+      totals: summarizeTransactionTotals(currencyTransactions),
+    }));
+}
+
+export function summarizeTransactionsByCurrency(
+  transactions: readonly SessionTransaction[],
+  referenceDate = new Date(),
+): readonly TransactionSummaryByCurrency[] {
+  return Array.from(groupTransactionsByCurrency(transactions))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, currencyTransactions]) => ({
+      currency,
+      summary: summarizeTransactions(currencyTransactions, referenceDate),
+    }));
 }

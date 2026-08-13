@@ -1,4 +1,10 @@
-import { type PropsWithChildren, useEffect, useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import {
+  type ComponentProps,
+  type PropsWithChildren,
+  useEffect,
+  useState,
+} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -35,9 +41,16 @@ import {
 import { TransactionPeriodSelector } from '@/features/transactions/components/TransactionPeriodSelector/TransactionPeriodSelector';
 import type { TransactionRecurrence } from '@/features/transactions/types';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
-import { colors } from '@/theme/colors';
-import { layout } from '@/theme/layout';
+import {
+  getCurrencyFlag,
+  getCurrencyName,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
+import { iconSize, layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 export type TransactionTypeFilter = 'all' | 'expense' | 'income';
 export type CategoryFilter = readonly string[];
@@ -45,6 +58,7 @@ export type RecurrenceFilter = 'all' | TransactionRecurrence;
 
 export type TransactionFilters = {
   category: CategoryFilter;
+  currency: CurrencyCode;
   date: TransactionDateFilter;
   recurrence: RecurrenceFilter;
   type: TransactionTypeFilter;
@@ -52,16 +66,19 @@ export type TransactionFilters = {
 
 type TransactionFiltersModalProps = {
   categories: readonly Category[];
+  currencies: readonly CurrencyCode[];
   filters: TransactionFilters;
   onApply: (filters: TransactionFilters) => void;
   onClose: () => void;
   visible: boolean;
 };
 
-type FilterGroup = 'type' | 'category' | 'recurrence' | 'date';
+type FilterGroup = 'type' | 'category' | 'recurrence' | 'date' | 'currency';
 
 type CollapsibleFilterGroupProps = PropsWithChildren<{
   expanded: boolean;
+  icon: ComponentProps<typeof Ionicons>['name'];
+  iconTestID: string;
   onToggle: () => void;
   title: string;
 }>;
@@ -101,13 +118,18 @@ const selectableOptionHeight = 56;
 function CollapsibleFilterGroup({
   children,
   expanded,
+  icon,
+  iconTestID,
   onToggle,
   title,
 }: CollapsibleFilterGroupProps) {
+  const { colors } = useTheme();
+  const themedStyles = useThemedStyles(createThemedStyles);
+
   return (
     <Animated.View
       layout={getActivityLayoutTransition()}
-      style={styles.filterGroup}
+      style={themedStyles.filterGroup}
     >
       <Pressable
         accessibilityHint={`${expanded ? 'Oculta' : 'Muestra'} las opciones de ${title.toLowerCase()}`}
@@ -121,7 +143,15 @@ function CollapsibleFilterGroup({
           pressed ? styles.pressed : null,
         ]}
       >
-        <Text variant="label">{title}</Text>
+        <View style={styles.groupTitle}>
+          <Ionicons
+            color={colors.textSecondary}
+            name={icon}
+            size={iconSize.xs}
+            testID={iconTestID}
+          />
+          <Text variant="label">{title}</Text>
+        </View>
         <AnimatedChevron expanded={expanded} />
       </Pressable>
       <AnimatedDisclosureContent expanded={expanded}>
@@ -133,6 +163,7 @@ function CollapsibleFilterGroup({
 
 export function TransactionFiltersModal({
   categories,
+  currencies,
   filters,
   onApply,
   onClose,
@@ -154,6 +185,7 @@ export function TransactionFiltersModal({
     categorySelectionCardHeight[density] * filterGridRows + spacing.sm;
   const recurrenceGridHeight =
     selectableOptionHeight * filterGridRows + spacing.sm;
+  const hasMultipleCurrencies = currencies.length >= 2;
 
   useEffect(() => {
     if (visible) {
@@ -176,12 +208,13 @@ export function TransactionFiltersModal({
     draft.date !== 'all';
 
   const clearDraft = () => {
-    setDraft({
+    setDraft((current) => ({
       type: 'all',
       category: [],
+      currency: current.currency,
       recurrence: 'all',
       date: 'all',
-    });
+    }));
   };
 
   const toggleGroup = (group: FilterGroup) => {
@@ -240,6 +273,8 @@ export function TransactionFiltersModal({
           <View style={styles.groups}>
             <CollapsibleFilterGroup
               expanded={expandedGroup === 'date'}
+              icon="calendar-outline"
+              iconTestID="date-filter-group-icon"
               onToggle={() => toggleGroup('date')}
               title="Fecha"
             >
@@ -265,8 +300,39 @@ export function TransactionFiltersModal({
               />
             </CollapsibleFilterGroup>
 
+            {hasMultipleCurrencies ? (
+              <CollapsibleFilterGroup
+                expanded={expandedGroup === 'currency'}
+                icon="cash-outline"
+                iconTestID="currency-filter-group-icon"
+                onToggle={() => toggleGroup('currency')}
+                title="Moneda"
+              >
+                <View
+                  accessibilityRole="radiogroup"
+                  style={styles.currencyOptions}
+                >
+                  {currencies.map((code) => (
+                    <SelectableOption
+                      accessibilityLabel={`Moneda: ${getCurrencyName(code)} (${code})`}
+                      indicatorTestID={`currency-filter-${code}-indicator`}
+                      key={code}
+                      label={`${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`}
+                      onPress={() =>
+                        setDraft((current) => ({ ...current, currency: code }))
+                      }
+                      selected={draft.currency === code}
+                      testID={`currency-filter-${code}`}
+                    />
+                  ))}
+                </View>
+              </CollapsibleFilterGroup>
+            ) : null}
+
             <CollapsibleFilterGroup
               expanded={expandedGroup === 'type'}
+              icon="swap-vertical-outline"
+              iconTestID="type-filter-group-icon"
               onToggle={() => toggleGroup('type')}
               title="Tipo de movimiento"
             >
@@ -293,6 +359,8 @@ export function TransactionFiltersModal({
 
             <CollapsibleFilterGroup
               expanded={expandedGroup === 'category'}
+              icon="pie-chart-outline"
+              iconTestID="category-filter-group-icon"
               onToggle={() => toggleGroup('category')}
               title="Categoría"
             >
@@ -348,6 +416,8 @@ export function TransactionFiltersModal({
 
             <CollapsibleFilterGroup
               expanded={expandedGroup === 'recurrence'}
+              icon="sync-outline"
+              iconTestID="recurrence-filter-group-icon"
               onToggle={() => toggleGroup('recurrence')}
               title="Recurrencia"
             >
@@ -436,12 +506,7 @@ const styles = StyleSheet.create({
     gap: spacing.xxs,
   },
   groups: {
-    gap: spacing.sm,
-  },
-  filterGroup: {
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingBottom: spacing.sm,
+    gap: spacing.md,
   },
   groupHeader: {
     minHeight: layout.minTouchTarget,
@@ -449,11 +514,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  groupTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   groupContent: {
     marginTop: spacing.sm,
   },
   typeOptions: {
     flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  currencyOptions: {
     gap: spacing.sm,
   },
   typeOption: {
@@ -480,3 +553,13 @@ const styles = StyleSheet.create({
     opacity: 0.64,
   },
 });
+
+function createThemedStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    filterGroup: {
+      borderBottomColor: colors.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      paddingBottom: spacing.md,
+    },
+  });
+}

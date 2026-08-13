@@ -3,16 +3,25 @@ import type { Icon } from 'phosphor-react-native';
 import { CalendarDots } from 'phosphor-react-native/src/icons/CalendarDots';
 import { House } from 'phosphor-react-native/src/icons/House';
 import { Receipt } from 'phosphor-react-native/src/icons/Receipt';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text/Text';
 import type { MainTabParamList } from '@/navigation/types';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
+import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type TabRouteName = keyof MainTabParamList;
 
@@ -38,13 +47,27 @@ type NavigationIconProps = {
 
 function NavigationIcon({ color, focused, presentation }: NavigationIconProps) {
   const IconComponent = presentation.icon;
+  const scale = useSharedValue(focused ? 1 : 0.9);
+
+  useEffect(() => {
+    scale.value = withSpring(focused ? 1 : 0.9, {
+      ...motion.tabIconSelectSpring,
+      reduceMotion: ReduceMotion.System,
+    });
+  }, [focused, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   return (
-    <IconComponent
-      color={color}
-      size={iconSize.md}
-      weight={focused ? 'fill' : 'regular'}
-    />
+    <Animated.View style={animatedStyle}>
+      <IconComponent
+        color={color}
+        size={iconSize.md}
+        weight={focused ? 'fill' : 'regular'}
+      />
+    </Animated.View>
   );
 }
 
@@ -54,6 +77,8 @@ export function AppTabBar({
   navigation,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
 
   return (
     <View
@@ -95,21 +120,28 @@ export function AppTabBar({
             key={route.key}
             onLongPress={handleLongPress}
             onPress={handlePress}
-            style={({ pressed }) => [
-              styles.item,
-              isFocused && styles.itemSelected,
-              pressed && styles.itemPressed,
-            ]}
+            style={styles.item}
             testID={options?.tabBarButtonTestID}
           >
-            <NavigationIcon
-              color={color}
-              focused={isFocused}
-              presentation={presentation}
-            />
-            <Text style={{ color }} variant="caption" weight="semibold">
-              {presentation.label}
-            </Text>
+            {({ pressed }) => (
+              <View
+                style={[
+                  styles.itemInner,
+                  isFocused && styles.itemInnerSelected,
+                  pressed && styles.itemInnerPressed,
+                ]}
+                testID={`app-tab-item-${route.name}`}
+              >
+                <NavigationIcon
+                  color={color}
+                  focused={isFocused}
+                  presentation={presentation}
+                />
+                <Text style={{ color }} variant="caption" weight="semibold">
+                  {presentation.label}
+                </Text>
+              </View>
+            )}
           </Pressable>
         );
       })}
@@ -117,29 +149,37 @@ export function AppTabBar({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    ...shadows.mainMenu,
-    minHeight: 66,
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.sm,
-  },
-  item: {
-    flex: 1,
-    minHeight: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    borderRadius: radii.sm,
-  },
-  itemPressed: {
-    backgroundColor: colors.background,
-  },
-  itemSelected: {
-    backgroundColor: colors.background,
-  },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    container: {
+      ...shadows.mainMenu,
+      minHeight: 66,
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderTopColor: colors.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      paddingHorizontal: spacing.sm,
+      paddingTop: spacing.sm,
+    },
+    item: {
+      flex: 1,
+      minHeight: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    itemInner: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radii.sm,
+    },
+    itemInnerPressed: {
+      backgroundColor: colors.background,
+    },
+    itemInnerSelected: {
+      backgroundColor: colors.background,
+    },
+  });
+}

@@ -88,6 +88,13 @@ const expenseTemplates: readonly NotificationTemplate[] = [
     body: '{{title}} en {{category}} · {{amount}}',
     requiredVariables: ['title', 'category', 'amount'],
   },
+  {
+    id: 'expense_reminder_11',
+    type: 'expense',
+    title: 'Tienes un movimiento pendiente',
+    body: 'Abre Juntos para ver los detalles.',
+    requiredVariables: [],
+  },
 ];
 
 const incomeTemplates: readonly NotificationTemplate[] = [
@@ -160,6 +167,13 @@ const incomeTemplates: readonly NotificationTemplate[] = [
     title: 'Este ingreso merece seguimiento',
     body: '{{title}} en {{category}} · {{amount}}',
     requiredVariables: ['title', 'category', 'amount'],
+  },
+  {
+    id: 'income_reminder_11',
+    type: 'income',
+    title: 'Tienes un movimiento pendiente',
+    body: 'Abre Juntos para ver los detalles.',
+    requiredVariables: [],
   },
 ];
 

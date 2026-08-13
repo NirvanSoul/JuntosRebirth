@@ -11,11 +11,12 @@ import {
   maxTransactionReminderTimesPerDay,
   normalizeReminderTimes,
 } from '@/features/transactions/utils/transactionReminders';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ReminderTimesEditorProps = {
   maxTimes?: number;
@@ -33,6 +34,8 @@ export function ReminderTimesEditor({
   onChange,
   times,
 }: ReminderTimesEditorProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [pickerValue, setPickerValue] = useState(() => new Date());
 
@@ -170,65 +173,67 @@ export function ReminderTimesEditor({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { gap: spacing.md },
-  timesList: { gap: spacing.sm },
-  timeRow: {
-    minHeight: layout.controlHeight.regular,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    paddingHorizontal: spacing.lg,
-  },
-  timeLabel: { flex: 1 },
-  removeTimeButton: {
-    width: layout.minTouchTarget,
-    height: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: -spacing.md,
-  },
-  addTimeButton: {
-    ...shadows.subtle,
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surface,
-    borderColor: colors.cta,
-    borderRadius: radii.md,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-  },
-  iosPickerCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  iosPickerActions: {
-    flexDirection: 'row',
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-  },
-  iosPickerCancel: {
-    flex: 1,
-    minHeight: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iosPickerConfirm: {
-    flex: 1,
-    minHeight: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.cta,
-  },
-  pressed: { opacity: 0.64 },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    container: { gap: spacing.md },
+    timesList: { gap: spacing.sm },
+    timeRow: {
+      minHeight: layout.controlHeight.regular,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      paddingHorizontal: spacing.lg,
+    },
+    timeLabel: { flex: 1 },
+    removeTimeButton: {
+      width: layout.minTouchTarget,
+      height: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: -spacing.md,
+    },
+    addTimeButton: {
+      ...shadows.subtle,
+      minHeight: layout.minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderColor: colors.cta,
+      borderRadius: radii.md,
+      borderStyle: 'dashed',
+      borderWidth: 1,
+    },
+    iosPickerCard: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    iosPickerActions: {
+      flexDirection: 'row',
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+    },
+    iosPickerCancel: {
+      flex: 1,
+      minHeight: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iosPickerConfirm: {
+      flex: 1,
+      minHeight: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.cta,
+    },
+    pressed: { opacity: 0.64 },
+  });
+}

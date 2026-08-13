@@ -10,7 +10,6 @@ import Animated, {
 
 import { Text } from '@/components/ui/Text/Text';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
-import { colors } from '@/theme/colors';
 import { iconSize, layout, minTouchTarget } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { previewCardLayout } from '@/theme/previewCard';
@@ -19,6 +18,9 @@ import {
   getDisclosureEntering,
   getDisclosureLayoutTransition,
 } from '@/theme/transitions';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ActivityCollapsibleSectionProps = PropsWithChildren<{
   expanded: boolean;
@@ -41,10 +43,9 @@ export function getActivityLayoutTransition() {
   return getDisclosureLayoutTransition();
 }
 
-export function AnimatedChevron({
-  color = colors.textSecondary,
-  expanded,
-}: AnimatedChevronProps) {
+export function AnimatedChevron({ color, expanded }: AnimatedChevronProps) {
+  const { colors } = useTheme();
+  const resolvedColor = color ?? colors.textSecondary;
   const rotation = useSharedValue(expanded ? 180 : 0);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export function AnimatedChevron({
       style={animatedStyle}
       testID={expanded ? 'disclosure-chevron-up' : 'disclosure-chevron-down'}
     >
-      <Ionicons color={color} name="chevron-down" size={iconSize.sm} />
+      <Ionicons color={resolvedColor} name="chevron-down" size={iconSize.sm} />
     </Animated.View>
   );
 }
@@ -98,6 +99,7 @@ export function ActivityCollapsibleSection({
   testID,
 }: ActivityCollapsibleSectionProps) {
   const density = useLayoutDensity();
+  const styles = useThemedStyles(createStyles);
   const screenGutter = layout.screenGutter[density];
 
   return (
@@ -136,23 +138,25 @@ export function ActivityCollapsibleSection({
   );
 }
 
-const styles = StyleSheet.create({
-  section: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: previewCardLayout.borderRadius,
-    paddingVertical: spacing.lg,
-  },
-  header: {
-    minHeight: minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerPressed: {
-    opacity: 0.64,
-  },
-  content: {
-    marginTop: spacing.md,
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    section: {
+      marginTop: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: previewCardLayout.borderRadius,
+      paddingVertical: spacing.lg,
+    },
+    header: {
+      minHeight: minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    headerPressed: {
+      opacity: 0.64,
+    },
+    content: {
+      marginTop: spacing.md,
+    },
+  });
+}

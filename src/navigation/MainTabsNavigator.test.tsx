@@ -1,4 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   fireEvent,
   render,
@@ -54,10 +55,65 @@ jest.mock(
           },
         ],
       ),
+      createLocalTransactions: jest.fn(
+        async (inputs: readonly Record<string, unknown>[]) =>
+          inputs.map((input) => ({ ...input, id: `transaction-${nextId++}` })),
+      ),
       listLocalTransactions: jest.fn(async () => []),
       updateLocalTransaction: jest.fn(async (id, draft) => [{ ...draft, id }]),
     };
   },
+);
+
+// `SettingsScreen` vive en el mismo drawer que la pantalla principal y
+// carga el avatar de perfil al montarse, también contra SQLite real.
+jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
+  getLocalProfile: jest.fn(async () => ({
+    avatarUri: null,
+    displayName: null,
+  })),
+  saveLocalProfileAvatar: jest.fn(async () => ({
+    avatarUri: null,
+    displayName: null,
+  })),
+}));
+
+// Reglas de notificación, recordatorios manuales y su caché de programación
+// se consultan al montar (`listLocalNotificationRules`) y al reconciliar
+// (`reconcileNotificationRules`). Los tres viven en SQLite real; sin este
+// mock, `getLocalDatabase()` intenta abrir una base nativa que no existe en
+// Jest y falla con "NativeDatabase is not a constructor".
+jest.mock(
+  '@/features/transactions/repositories/localTransactionNotificationRuleRepository',
+  () => ({
+    listLocalNotificationRules: jest.fn(async () => []),
+    saveLocalNotificationRule: jest.fn(async (input) => ({
+      ...input,
+      id: 'notification-rule-1',
+    })),
+  }),
+);
+
+jest.mock(
+  '@/features/transactions/repositories/localTransactionReminderRepository',
+  () => ({
+    listLocalTransactionReminders: jest.fn(async () => []),
+    getLocalTransactionReminder: jest.fn(async () => null),
+    saveLocalTransactionReminder: jest.fn(async (input) => ({
+      ...input,
+      id: 'reminder-1',
+    })),
+    deleteLocalTransactionReminder: jest.fn(async () => undefined),
+  }),
+);
+
+jest.mock(
+  '@/features/transactions/repositories/localNotificationRuleScheduleRepository',
+  () => ({
+    listSchedulesForRule: jest.fn(async () => []),
+    replaceSchedulesForRule: jest.fn(async () => undefined),
+    countAllScheduledNotifications: jest.fn(async () => 0),
+  }),
 );
 
 describe('MainTabsNavigator', () => {
@@ -113,9 +169,10 @@ describe('MainTabsNavigator', () => {
       ),
     ).not.toHaveProperty('backgroundColor');
     const homeTab = screen.getByRole('tab', { name: 'Inicio' });
-    expect(StyleSheet.flatten(homeTab.props.style).backgroundColor).toBe(
-      colors.background,
-    );
+    expect(
+      StyleSheet.flatten(screen.getByTestId('app-tab-item-Home').props.style)
+        .backgroundColor,
+    ).toBe(colors.background);
     expect(
       StyleSheet.flatten(within(homeTab).getByText('Inicio').props.style).color,
     ).toBe(colors.textPrimary);
@@ -140,9 +197,11 @@ describe('MainTabsNavigator', () => {
     expect(screen.getByTestId('persistent-app-header')).toBeTruthy();
     expect(screen.getByLabelText('Espacio Personal')).toBeTruthy();
     const activityTab = screen.getByRole('tab', { name: 'Actividad' });
-    expect(StyleSheet.flatten(activityTab.props.style).backgroundColor).toBe(
-      colors.background,
-    );
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('app-tab-item-Activity').props.style,
+      ).backgroundColor,
+    ).toBe(colors.background);
     expect(
       StyleSheet.flatten(within(activityTab).getByText('Actividad').props.style)
         .color,
@@ -155,7 +214,84 @@ describe('MainTabsNavigator', () => {
     expect(screen.getByTestId('map-screen')).toBeTruthy();
     expect(
       screen.getByRole('tab', { name: 'Mapa' }).props.accessibilityState,
-    ).toEqual({ selected: true });
+    ).toMatchObject({ selected: true });
+  });
+
+  it('alterna entre dos monedas desde Inicio y Actividad sin abrir el selector', async () => {
+    await AsyncStorage.setItem(
+      '@juntoss/currency-preferences/v1',
+      JSON.stringify({ currencies: ['EUR', 'USD'], version: 1 }),
+    );
+    await AsyncStorage.setItem(
+      '@juntoss/home-currency-selection/v1',
+      JSON.stringify({ currency: 'EUR', version: 1 }),
+    );
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Moneda seleccionada: 🇪🇺')).toBeTruthy(),
+    );
+    await fireEvent.press(screen.getByTestId('home-currency-flag-button'));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Moneda seleccionada: 🇺🇸')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('home-currency-picker')).toBeNull();
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+    await fireEvent.press(screen.getByTestId('home-currency-flag-button'));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Moneda seleccionada: 🇪🇺')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('home-currency-picker')).toBeNull();
+  });
+
+  it('abre el selector de moneda cuando hay tres monedas activas', async () => {
+    await AsyncStorage.setItem(
+      '@juntoss/currency-preferences/v1',
+      JSON.stringify({ currencies: ['EUR', 'USD', 'GBP'], version: 1 }),
+    );
+    await AsyncStorage.setItem(
+      '@juntoss/home-currency-selection/v1',
+      JSON.stringify({ currency: 'EUR', version: 1 }),
+    );
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Moneda seleccionada: 🇪🇺')).toBeTruthy(),
+    );
+    await fireEvent.press(screen.getByTestId('home-currency-flag-button'));
+
+    expect(await screen.findByTestId('home-currency-picker')).toBeTruthy();
   });
 
   it('desplaza el selector y fija el mismo resumen al recorrer movimientos', async () => {
@@ -257,7 +393,9 @@ describe('MainTabsNavigator', () => {
 
     await fireEvent.press(screen.getByLabelText('Crear primer gasto'));
     expect(await screen.findByLabelText('Título del movimiento')).toBeTruthy();
-    expect(screen.getByLabelText('Gasto').props.accessibilityState).toEqual({
+    expect(
+      screen.getByLabelText('Gasto').props.accessibilityState,
+    ).toMatchObject({
       selected: true,
     });
   });
@@ -282,7 +420,7 @@ describe('MainTabsNavigator', () => {
     expect(screen.getByRole('button', { name: 'Categorías' })).toBeTruthy();
     expect(
       screen.getByRole('tab', { name: 'Actividad' }).props.accessibilityState,
-    ).toEqual({ selected: true });
+    ).toMatchObject({ selected: true });
 
     await fireEvent.press(screen.getByRole('tab', { name: 'Inicio' }));
     await fireEvent.press(
@@ -291,7 +429,7 @@ describe('MainTabsNavigator', () => {
     expect(screen.getByText('Movimientos')).toBeTruthy();
     expect(
       screen.getByRole('tab', { name: 'Actividad' }).props.accessibilityState,
-    ).toEqual({ selected: true });
+    ).toMatchObject({ selected: true });
   });
 
   it('abre el menú desde el botón flotante y continúa al modal de gasto', async () => {
@@ -317,7 +455,9 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByLabelText('Crear gasto'));
 
     expect(await screen.findByLabelText('Título del movimiento')).toBeTruthy();
-    expect(screen.getByLabelText('Gasto').props.accessibilityState).toEqual({
+    expect(
+      screen.getByLabelText('Gasto').props.accessibilityState,
+    ).toMatchObject({
       selected: true,
     });
     expect(screen.getByTestId('floating-create-button')).toBeTruthy();
@@ -378,7 +518,9 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByTestId('floating-create-button'));
     await fireEvent.press(screen.getByLabelText('Crear ingreso'));
 
-    expect(screen.getByLabelText('Ingreso').props.accessibilityState).toEqual({
+    expect(
+      screen.getByLabelText('Ingreso').props.accessibilityState,
+    ).toMatchObject({
       selected: true,
     });
     expect(
@@ -410,7 +552,9 @@ describe('MainTabsNavigator', () => {
       }),
     );
 
-    expect(screen.getByLabelText('Gasto').props.accessibilityState).toEqual({
+    expect(
+      screen.getByLabelText('Gasto').props.accessibilityState,
+    ).toMatchObject({
       selected: true,
     });
     expect(screen.getByLabelText('Categoría Salario')).toBeTruthy();
@@ -435,7 +579,9 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByTestId('floating-create-button'));
     await fireEvent.press(screen.getByLabelText('Crear ingreso'));
 
-    expect(screen.getByLabelText('Ingreso').props.accessibilityState).toEqual({
+    expect(
+      screen.getByLabelText('Ingreso').props.accessibilityState,
+    ).toMatchObject({
       selected: true,
     });
     expect(StyleSheet.flatten(screen.getByText('+').props.style).color).toBe(
@@ -556,7 +702,9 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByLabelText('Salario'));
     await fireEvent.press(screen.getByLabelText('Supermercado'));
 
-    expect(screen.getByLabelText('Salario').props.accessibilityState).toEqual({
+    expect(
+      screen.getByLabelText('Salario').props.accessibilityState,
+    ).toMatchObject({
       checked: true,
       disabled: false,
     });
@@ -603,7 +751,7 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByLabelText('Crear categoría'));
 
     const createdSalary = screen.getByLabelText('Salario, ya creada');
-    expect(createdSalary.props.accessibilityState).toEqual({
+    expect(createdSalary.props.accessibilityState).toMatchObject({
       checked: false,
       disabled: true,
     });

@@ -5,6 +5,7 @@ import {
   createLocalCategories,
   listLocalCategories,
   updateLocalCategory,
+  updateLocalCategoryNote,
 } from '@/features/categories/repositories/localCategoryRepository';
 
 const mockGetLocalDatabase = jest.fn<Promise<SQLiteDatabase>, []>();
@@ -63,6 +64,7 @@ describe('localCategoryRepository', () => {
       1,
       'salary',
       null,
+      null,
       'installation-id',
       expect.any(String),
       expect.any(String),
@@ -78,6 +80,7 @@ describe('localCategoryRepository', () => {
         budget_minor: null,
         is_default: 1,
         template_key: 'salary',
+        note: null,
         is_archived: 0,
       },
     ]);
@@ -139,5 +142,30 @@ describe('localCategoryRepository', () => {
       'category-id',
       'personal',
     );
+  });
+
+  it('guarda y limpia la nota de una categoría sin tocar el resto de campos', async () => {
+    await updateLocalCategoryNote('category-id', 'personal', 'Revisar recibos');
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('SET note = ?'),
+      'Revisar recibos',
+      expect.any(String),
+      'category-id',
+      'personal',
+    );
+
+    await updateLocalCategoryNote('category-id', 'personal', null);
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('SET note = ?'),
+      null,
+      expect.any(String),
+      'category-id',
+      'personal',
+    );
+
+    runAsync.mockResolvedValueOnce({ changes: 0, lastInsertRowId: 0 });
+    await expect(
+      updateLocalCategoryNote('missing', 'personal', 'Nota'),
+    ).rejects.toThrow('La categoría local ya no está disponible');
   });
 });

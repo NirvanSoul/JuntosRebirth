@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import {
   cancelLocalNotification,
   ensureNotificationHandlerRegistered,
+  listScheduledLocalNotifications,
   requestNotificationPermission,
   scheduleLocalNotification,
 } from '@/lib/notifications/localNotifications';
@@ -11,6 +12,7 @@ jest.mock('expo-notifications', () => ({
   AndroidImportance: { HIGH: 4 },
   SchedulableTriggerInputTypes: { DATE: 'date' },
   cancelScheduledNotificationAsync: jest.fn(async () => undefined),
+  getAllScheduledNotificationsAsync: jest.fn(async () => []),
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
   scheduleNotificationAsync: jest.fn(async () => 'notification-id'),
@@ -109,6 +111,26 @@ describe('localNotifications', () => {
       },
       trigger: expect.objectContaining({ date, type: 'date' }),
     });
+  });
+
+  it('expone los avisos programados con los datos necesarios para reconciliarlos', async () => {
+    mockedNotifications.getAllScheduledNotificationsAsync.mockResolvedValue([
+      {
+        content: {
+          data: { notificationType: 'daily-engagement' },
+          title: 'Un minuto para organizarte',
+        },
+        identifier: 'daily-notification-id',
+      },
+    ] as never);
+
+    await expect(listScheduledLocalNotifications()).resolves.toEqual([
+      {
+        data: { notificationType: 'daily-engagement' },
+        id: 'daily-notification-id',
+        title: 'Un minuto para organizarte',
+      },
+    ]);
   });
 
   it('cancela una notificación programada sin lanzar si ya no existe', async () => {

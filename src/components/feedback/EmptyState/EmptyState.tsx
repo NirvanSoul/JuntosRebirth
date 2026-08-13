@@ -3,11 +3,12 @@ import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text/Text';
-import { colors } from '@/theme/colors';
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const emptyIconSize = 56;
 
@@ -30,6 +31,8 @@ export function EmptyState({
   testID,
   title,
 }: EmptyStateProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const content = (
     <>
       <View
@@ -76,7 +79,10 @@ export function EmptyState({
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed ? styles.cardPressed : null]}
+      style={({ pressed }) => [
+        styles.card,
+        pressed ? styles.cardPressed : null,
+      ]}
       testID={testID}
     >
       {content}
@@ -84,32 +90,34 @@ export function EmptyState({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    ...shadows.subtle,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    padding: spacing.lg,
-  },
-  cardPressed: {
-    opacity: 0.72,
-  },
-  icon: {
-    width: emptyIconSize,
-    height: emptyIconSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-  },
-  text: {
-    flex: 1,
-  },
-  description: {
-    marginTop: spacing.xxs,
-  },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    card: {
+      ...shadows.subtle,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      padding: spacing.lg,
+    },
+    cardPressed: {
+      opacity: 0.72,
+    },
+    icon: {
+      width: emptyIconSize,
+      height: emptyIconSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+    },
+    text: {
+      flex: 1,
+    },
+    description: {
+      marginTop: spacing.xxs,
+    },
+  });
+}

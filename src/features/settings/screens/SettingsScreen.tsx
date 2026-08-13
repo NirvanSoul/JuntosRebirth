@@ -1,39 +1,72 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ComponentProps, ComponentType, ReactNode } from 'react';
-import { useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   View,
 } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  SettingsDivider,
+  SettingsRow,
+  SettingsSection,
+  SettingsToggleRow,
+} from '@/components/layout/SettingsList/SettingsList';
+import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
+import {
+  SaveConfirmationToast,
+  type SaveConfirmationNotice,
+} from '@/components/overlays/SaveConfirmationToast/SaveConfirmationToast';
+import { Avatar } from '@/components/ui/Avatar/Avatar';
 import { Text } from '@/components/ui/Text/Text';
+import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
+import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { DataRightsScreen } from '@/features/legal/screens/DataRightsScreen';
+import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScreen';
+import { PermissionsScreen } from '@/features/legal/screens/PermissionsScreen';
+import { PrivacyChoicesScreen } from '@/features/legal/screens/PrivacyChoicesScreen';
+import { PrivacyLegalScreen } from '@/features/legal/screens/PrivacyLegalScreen';
+import {
+  getLocalProfile,
+  saveLocalProfileAvatar,
+} from '@/features/profile/repositories/localProfileRepository';
+import { pickAndStoreAvatar } from '@/features/profile/services/avatarImageService';
+import type { AvatarPickSource } from '@/features/profile/types';
+import { AuthModal } from '@/features/settings/components/AuthModal';
 import { CurrencyPreferencesModal } from '@/features/settings/components/CurrencyPreferencesModal/CurrencyPreferencesModal';
-import { ProfileEditIcon } from '@/features/settings/components/ProfileEditIcon/ProfileEditIcon';
+import type { Space } from '@/features/spaces/types';
 import { NotificationRulesModal } from '@/features/transactions/components/NotificationRulesModal/NotificationRulesModal';
 import type { SaveLocalNotificationRuleInput } from '@/features/transactions/repositories/localTransactionNotificationRuleRepository';
 import type { TransactionNotificationRule } from '@/features/transactions/types';
 import { getCurrencyName } from '@/lib/currency/currencyCatalog';
+import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import type { CurrencyPreferences } from '@/state/appPreferences/currencyPreferences';
 import { categoryColors } from '@/theme/categoryColors';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
-import { previewCardLayout } from '@/theme/previewCard';
 import { radii } from '@/theme/radii';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
-
-type IconName = ComponentProps<typeof Ionicons>['name'];
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type SettingsScreenProps = {
   activeSpaceId: string;
+  activeSpaceType: Space['type'];
   currencyPreferences: CurrencyPreferences;
   notificationRules: readonly TransactionNotificationRule[];
   onBack: () => void;
+  onDissolveCoupleSpace: () => Promise<void>;
   onSaveCurrencyPreferences: (preferences: CurrencyPreferences) => void;
   onSaveNotificationRule: (
     input: SaveLocalNotificationRuleInput,
@@ -42,38 +75,19 @@ type SettingsScreenProps = {
   showHomeComparisonIndicators: boolean;
 };
 
-type SettingsSectionProps = {
-  children: ReactNode;
-  emphasizeIcon?: boolean;
-  icon: IconName;
-  title: string;
-};
+type CoupleSpaceDissolutionState =
+  | { step: 'idle' }
+  | { step: 'confirming' }
+  | { step: 'dissolving' }
+  | { step: 'error'; message: string };
 
-type CustomSettingsIcon = ComponentType<{
-  color: string;
-  size: number;
-  testID?: string;
-}>;
-
-type SettingsRowBaseProps = {
-  destructive?: boolean;
-  iconBackgroundColor: string;
-  label: string;
-  onPress?: () => void;
-  pending?: boolean;
-  value?: string;
-};
-
-type SettingsRowProps = SettingsRowBaseProps &
-  (
-    | { icon: IconName; iconComponent?: never }
-    | { icon?: never; iconComponent: CustomSettingsIcon }
-  );
+/** Mismo retraso obligatorio que `DataRightsScreen` antes de habilitar la confirmación destructiva. */
+const confirmDissolveCoupleSpaceDelayMs = 5000;
+const confirmDissolveCoupleSpaceDelaySeconds =
+  confirmDissolveCoupleSpaceDelayMs / 1000;
 
 const profileIconSize = 56;
-const profileGlyphSize = iconSize.lg;
-const rowIconSize = previewCardLayout.iconSize;
-const rowGlyphSize = iconSize.sm;
+const developerContactEmail = 'aora.estudio.o@gmail.com';
 
 function showPendingNotice() {
   Alert.alert(
@@ -82,173 +96,46 @@ function showPendingNotice() {
   );
 }
 
-function SettingsSection({
-  children,
-  emphasizeIcon = true,
-  icon,
-  title,
-}: SettingsSectionProps) {
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionTitle}>
-        <View style={styles.sectionTitleIcon} testID={`section-icon-${title}`}>
-          <Ionicons
-            color={colors.textMuted}
-            name={icon}
-            size={iconSize.md}
-            style={emphasizeIcon ? styles.sectionGlyphEmphasized : undefined}
-            testID={`section-glyph-${title}`}
-          />
-        </View>
-        <Text accessibilityRole="header" variant="subheading">
-          {title}
-        </Text>
-      </View>
-      <View style={styles.sectionCard}>{children}</View>
-    </View>
-  );
-}
-
-function SettingsRow({
-  destructive = false,
-  icon,
-  iconComponent: IconComponent,
-  iconBackgroundColor,
-  label,
-  onPress,
-  pending = false,
-  value,
-}: SettingsRowProps) {
-  const content = (
-    <>
-      <View
-        style={[styles.rowIcon, { backgroundColor: iconBackgroundColor }]}
-        testID={`row-icon-${label}`}
-      >
-        {IconComponent ? (
-          <IconComponent
-            color={colors.onBrand}
-            size={rowGlyphSize}
-            testID={`row-glyph-${label}`}
-          />
-        ) : icon ? (
-          <Ionicons
-            color={colors.onBrand}
-            name={icon}
-            size={rowGlyphSize}
-            style={styles.rowGlyphEmphasized}
-            testID={`row-glyph-${label}`}
-          />
-        ) : null}
-      </View>
-      <View style={styles.rowText}>
-        <Text
-          tone={destructive ? 'expense' : 'primary'}
-          variant="label"
-          weight="semibold"
-        >
-          {label}
-        </Text>
-        {value ? (
-          <Text numberOfLines={1} tone="secondary" variant="footnote">
-            {value}
-          </Text>
-        ) : null}
-      </View>
-      {pending ? (
-        <View
-          accessibilityLabel="Pendiente de implementar"
-          accessibilityRole="text"
-          style={styles.pendingDot}
-          testID={`pending-${label}`}
-        />
-      ) : null}
-      {onPress ? (
-        <Ionicons
-          color={colors.textMuted}
-          name="chevron-forward"
-          size={iconSize.xs}
-        />
-      ) : null}
-    </>
-  );
-
-  if (!onPress) {
-    return <View style={styles.row}>{content}</View>;
-  }
-
-  return (
-    <Pressable
-      accessibilityHint={
-        pending ? 'Función pendiente de implementar' : 'Abre esta configuración'
-      }
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
-    >
-      {content}
-    </Pressable>
-  );
-}
-
-type ComparisonToggleRowProps = {
-  enabled: boolean;
-  onToggle: (enabled: boolean) => void;
-};
-
-function ComparisonToggleRow({ enabled, onToggle }: ComparisonToggleRowProps) {
-  return (
-    <View style={styles.row}>
-      <View
-        style={[styles.rowIcon, { backgroundColor: categoryColors.green }]}
-        testID="row-icon-Comparación en Inicio"
-      >
-        <Ionicons
-          color={colors.onBrand}
-          name="trending-up-outline"
-          size={rowGlyphSize}
-          style={styles.rowGlyphEmphasized}
-          testID="row-glyph-Comparación en Inicio"
-        />
-      </View>
-      <View style={styles.rowText}>
-        <Text tone="primary" variant="label" weight="semibold">
-          Comparación en Inicio
-        </Text>
-        <Text numberOfLines={1} tone="secondary" variant="footnote">
-          Compara con el mes anterior
-        </Text>
-      </View>
-      <Switch
-        accessibilityLabel="Comparación en Inicio"
-        onValueChange={onToggle}
-        style={styles.comparisonSwitch}
-        testID="home-comparison-toggle"
-        thumbColor={colors.surface}
-        trackColor={{ false: colors.border, true: colors.cta }}
-        value={enabled}
-      />
-    </View>
-  );
-}
-
-function Divider() {
-  return <View style={styles.divider} />;
-}
-
 export function SettingsScreen({
   activeSpaceId,
+  activeSpaceType,
   currencyPreferences,
   notificationRules,
   onBack,
+  onDissolveCoupleSpace,
   onSaveCurrencyPreferences,
   onSaveNotificationRule,
   onToggleHomeComparisonIndicators,
   showHomeComparisonIndicators,
 }: SettingsScreenProps) {
+  const { colors, isDark, setAppearance, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
+  const { session } = useAuthSession();
+  const { restartOnboarding } = useOnboardingStatus();
+  const [isAuthModalVisible, setAuthModalVisible] = useState(false);
+  const [isSigningOut, setSigningOut] = useState(false);
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [isNotificationRulesModalVisible, setNotificationRulesModalVisible] =
     useState(false);
+  const [isPrivacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [isDataUsageDocVisible, setDataUsageDocVisible] = useState(false);
+  const [isPrivacyChoicesVisible, setPrivacyChoicesVisible] = useState(false);
+  const [isPermissionsVisible, setPermissionsVisible] = useState(false);
+  const [isDataRightsVisible, setDataRightsVisible] = useState(false);
+  const [saveConfirmationNotice, setSaveConfirmationNotice] =
+    useState<SaveConfirmationNotice | null>(null);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [coupleDissolution, setCoupleDissolution] =
+    useState<CoupleSpaceDissolutionState>({ step: 'idle' });
+  const [
+    coupleDissolutionSecondsRemaining,
+    setCoupleDissolutionSecondsRemaining,
+  ] = useState(confirmDissolveCoupleSpaceDelaySeconds);
+  const coupleDissolutionProgress = useSharedValue(0);
+  const coupleDissolutionProgressStyle = useAnimatedStyle(() => ({
+    width: `${coupleDissolutionProgress.value * 100}%`,
+  }));
+  const nextSaveConfirmationId = useRef(1);
   const currencyValueLabel =
     currencyPreferences.currencies.length > 1
       ? currencyPreferences.currencies.join(' · ')
@@ -258,6 +145,142 @@ export function SettingsScreen({
   )
     ? 'Activadas'
     : 'Desactivadas';
+
+  useEffect(() => {
+    let isMounted = true;
+    void getLocalProfile().then((profile) => {
+      if (isMounted) setAvatarUri(profile.avatarUri);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (coupleDissolution.step !== 'confirming') {
+      coupleDissolutionProgress.value = 0;
+      return;
+    }
+
+    setCoupleDissolutionSecondsRemaining(
+      confirmDissolveCoupleSpaceDelaySeconds,
+    );
+    coupleDissolutionProgress.value = 0;
+    coupleDissolutionProgress.value = withTiming(1, {
+      duration: confirmDissolveCoupleSpaceDelayMs,
+      easing: Easing.linear,
+    });
+
+    const intervalId = setInterval(() => {
+      setCoupleDissolutionSecondsRemaining((current) =>
+        Math.max(0, current - 1),
+      );
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coupleDissolution.step]);
+
+  const handlePickAvatar = async (source: AvatarPickSource) => {
+    try {
+      const avatarPath = await pickAndStoreAvatar(source);
+      if (!avatarPath) return;
+      const profile = await saveLocalProfileAvatar(avatarPath);
+      setAvatarUri(profile.avatarUri);
+    } catch {
+      Alert.alert(
+        'No se pudo actualizar tu foto',
+        'Revisa los permisos de cámara o galería en los ajustes del sistema e inténtalo de nuevo.',
+      );
+    }
+  };
+
+  const handleChangeAvatar = () => {
+    Alert.alert(
+      'Foto de perfil',
+      'Para elegir una imagen, Juntoss necesita acceder a tus fotos o a la cámara. Se usará solo como tu foto de perfil.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Tomar foto', onPress: () => void handlePickAvatar('camera') },
+        {
+          text: 'Elegir de la galería',
+          onPress: () => void handlePickAvatar('library'),
+        },
+      ],
+    );
+  };
+
+  const showSaveConfirmation = (message: string) => {
+    setSaveConfirmationNotice({ id: nextSaveConfirmationId.current, message });
+    nextSaveConfirmationId.current += 1;
+  };
+
+  const dismissSaveConfirmation = (noticeId: number) => {
+    setSaveConfirmationNotice((current) =>
+      current?.id === noticeId ? null : current,
+    );
+  };
+
+  const handleAccountRowPress = () => {
+    if (session) {
+      Alert.alert(
+        'Cerrar sesión',
+        '¿Quieres cerrar la sesión de esta cuenta?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Cerrar sesión',
+            style: 'destructive',
+            onPress: () => void handleSignOut(),
+          },
+        ],
+      );
+      return;
+    }
+    setAuthModalVisible(true);
+  };
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setSigningOut(true);
+    try {
+      await createSupabaseAuthGateway().signOut();
+    } catch {
+      Alert.alert(
+        'No pudimos cerrar sesión',
+        'Inténtalo de nuevo en unos momentos.',
+      );
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
+  const handleContactDeveloper = () => {
+    void Clipboard.setStringAsync(developerContactEmail);
+    showSaveConfirmation(`Correo copiado: ${developerContactEmail}`);
+    void Linking.openURL(`mailto:${developerContactEmail}`);
+  };
+
+  const handleReplayOnboarding = () => {
+    void restartOnboarding().catch(() => {
+      Alert.alert(
+        'No pudimos abrir el onboarding',
+        'Inténtalo de nuevo en unos momentos.',
+      );
+    });
+  };
+
+  const handleConfirmDissolveCoupleSpace = () => {
+    if (coupleDissolutionSecondsRemaining > 0) return;
+
+    setCoupleDissolution({ step: 'dissolving' });
+    void onDissolveCoupleSpace().catch(() => {
+      setCoupleDissolution({
+        step: 'error',
+        message: 'No pudimos eliminar el espacio juntos. Inténtalo de nuevo.',
+      });
+    });
+  };
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -295,33 +318,40 @@ export function SettingsScreen({
         </View>
 
         <View style={styles.profileCard}>
-          <View style={styles.profileIcon}>
-            <Ionicons
-              color={colors.onBrand}
-              name="person"
-              size={profileGlyphSize}
+          <Pressable
+            accessibilityLabel="Cambiar foto de perfil"
+            accessibilityRole="button"
+            onPress={handleChangeAvatar}
+            style={({ pressed }) => [
+              styles.avatarButton,
+              pressed ? styles.rowPressed : null,
+            ]}
+            testID="settings-avatar-button"
+          >
+            <Avatar
+              size={profileIconSize}
+              testID="settings-avatar"
+              uri={avatarUri}
             />
-          </View>
+            <View style={styles.avatarEditBadge}>
+              <Ionicons color={colors.onBrand} name="camera" size={14} />
+            </View>
+          </Pressable>
           <View style={styles.profileText}>
             <Text variant="bodyStrong" weight="semibold">
               Tu perfil
             </Text>
             <Text tone="secondary" variant="footnote">
-              Invitado · Datos solo en este dispositivo
+              Toca tu foto para cambiarla
             </Text>
           </View>
-          <View style={styles.guestBadge}>
-            <Text tone="cta" variant="caption" weight="semibold">
-              Invitado
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.pendingLegend}>
-          <View style={styles.pendingDot} />
-          <Text tone="secondary" variant="footnote">
-            El punto rojo indica una función pendiente de implementar.
-          </Text>
+          {session ? null : (
+            <View style={styles.guestBadge}>
+              <Text tone="cta" variant="caption" weight="semibold">
+                Invitado
+              </Text>
+            </View>
+          )}
         </View>
 
         <SettingsSection
@@ -330,11 +360,11 @@ export function SettingsScreen({
           title="Cuenta"
         >
           <SettingsRow
-            iconBackgroundColor={categoryColors.green}
-            iconComponent={ProfileEditIcon}
-            label="Editar perfil"
-            onPress={showPendingNotice}
-            pending
+            icon={session ? 'log-out-outline' : 'log-in-outline'}
+            iconBackgroundColor={categoryColors.blue}
+            label={session ? 'Cerrar sesión' : 'Iniciar sesión o crear cuenta'}
+            onPress={handleAccountRowPress}
+            value={session?.user.email ?? undefined}
           />
         </SettingsSection>
 
@@ -350,12 +380,17 @@ export function SettingsScreen({
             onPress={() => setCurrencyModalVisible(true)}
             value={currencyValueLabel}
           />
-          <Divider />
-          <ComparisonToggleRow
+          <SettingsDivider />
+          <SettingsToggleRow
+            description="Compara con el mes anterior"
             enabled={showHomeComparisonIndicators}
+            icon="trending-up-outline"
+            iconBackgroundColor={categoryColors.green}
+            label="Comparación en Inicio"
             onToggle={onToggleHomeComparisonIndicators}
+            testID="home-comparison-toggle"
           />
-          <Divider />
+          <SettingsDivider />
           <SettingsRow
             icon="language-outline"
             iconBackgroundColor={categoryColors.blue}
@@ -364,14 +399,17 @@ export function SettingsScreen({
             pending
             value="Español"
           />
-          <Divider />
-          <SettingsRow
-            icon="sunny-outline"
+          <SettingsDivider />
+          <SettingsToggleRow
+            description="Usa una interfaz oscura"
+            enabled={isDark}
+            icon="moon-outline"
             iconBackgroundColor={categoryColors.blue}
-            label="Apariencia"
-            onPress={showPendingNotice}
-            pending
-            value="Claro"
+            label="Modo oscuro"
+            onToggle={(enabled) => {
+              void setAppearance(enabled ? 'dark' : 'light');
+            }}
+            testID="dark-mode-toggle"
           />
         </SettingsSection>
 
@@ -390,25 +428,115 @@ export function SettingsScreen({
             icon="phone-portrait-outline"
             iconBackgroundColor={categoryColors.violet}
             label="Estado de los datos"
+            onPress={() => setDataRightsVisible(true)}
             value="Guardados en este dispositivo"
+          />
+          <SettingsDivider />
+          <SettingsRow
+            icon="document-text-outline"
+            iconBackgroundColor={categoryColors.violet}
+            label="Cómo usamos tus datos"
+            onPress={() => setDataUsageDocVisible(true)}
+          />
+          <SettingsDivider />
+          <SettingsRow
+            icon="options-outline"
+            iconBackgroundColor={categoryColors.green}
+            label="Preferencias de privacidad"
+            onPress={() => setPrivacyChoicesVisible(true)}
+          />
+          <SettingsDivider />
+          <SettingsRow
+            icon="key-outline"
+            iconBackgroundColor={categoryColors.blue}
+            label="Permisos de la aplicación"
+            onPress={() => setPermissionsVisible(true)}
           />
         </SettingsSection>
 
+        {activeSpaceType === 'couple' ? (
+          <SettingsSection icon="people-outline" title="Espacio de pareja">
+            <SettingsRow
+              destructive
+              icon="trash-outline"
+              iconBackgroundColor={categoryColors.red}
+              label="Eliminar espacio juntos"
+              onPress={() => setCoupleDissolution({ step: 'confirming' })}
+            />
+          </SettingsSection>
+        ) : null}
+
+        {activeSpaceType === 'couple' &&
+        coupleDissolution.step === 'confirming' ? (
+          <View style={styles.warningCard}>
+            <Text tone="expense" variant="bodyStrong" weight="semibold">
+              Esta acción no se puede deshacer
+            </Text>
+            <Text tone="secondary" variant="label">
+              El espacio juntos se eliminará para ambas personas. Los
+              movimientos y categorías compartidos se conservan, pero dejarán de
+              estar disponibles desde este espacio.
+            </Text>
+            <View style={styles.progressTrack}>
+              <Animated.View
+                style={[styles.progressFill, coupleDissolutionProgressStyle]}
+              />
+            </View>
+            <View style={styles.actionsRow}>
+              <ModalPrimaryAction
+                accessibilityLabel="Cancelar eliminación del espacio juntos"
+                label="Cancelar"
+                onPress={() => setCoupleDissolution({ step: 'idle' })}
+                style={styles.actionButton}
+                variant="surface"
+              />
+              <ModalPrimaryAction
+                accessibilityLabel={
+                  coupleDissolutionSecondsRemaining > 0
+                    ? `Espera ${coupleDissolutionSecondsRemaining} segundos para confirmar la eliminación`
+                    : 'Confirmar eliminación del espacio juntos'
+                }
+                disabled={coupleDissolutionSecondsRemaining > 0}
+                label={
+                  coupleDissolutionSecondsRemaining > 0
+                    ? `Espera (${coupleDissolutionSecondsRemaining})`
+                    : 'Sí, eliminar'
+                }
+                onPress={handleConfirmDissolveCoupleSpace}
+                style={[styles.actionButton, styles.destructiveButton]}
+                testID="confirm-couple-space-dissolution"
+                variant="cta"
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {activeSpaceType === 'couple' && coupleDissolution.step === 'error' ? (
+          <Text tone="expense" variant="footnote">
+            {coupleDissolution.message}
+          </Text>
+        ) : null}
+
         <SettingsSection icon="help-circle-outline" title="Ayuda">
           <SettingsRow
-            icon="chatbubble-ellipses-outline"
-            iconBackgroundColor={categoryColors.amber}
-            label="Contactar con soporte"
-            onPress={showPendingNotice}
-            pending
+            icon="play-outline"
+            iconBackgroundColor={categoryColors.green}
+            label="Ver onboarding"
+            onPress={handleReplayOnboarding}
           />
-          <Divider />
+          <SettingsDivider />
+          <SettingsRow
+            icon="mail-outline"
+            iconBackgroundColor={categoryColors.amber}
+            label="Contactar con el desarrollador"
+            onPress={handleContactDeveloper}
+          />
+          <SettingsDivider />
           <SettingsRow
             icon="document-text-outline"
             iconBackgroundColor={categoryColors.violet}
             label="Política de privacidad"
-            onPress={showPendingNotice}
-            pending
+            onPress={() => setPrivacyModalVisible(true)}
           />
         </SettingsSection>
 
@@ -416,6 +544,11 @@ export function SettingsScreen({
           juntoss 0.1.0
         </Text>
       </ScrollView>
+
+      <AuthModal
+        onClose={() => setAuthModalVisible(false)}
+        visible={isAuthModalVisible}
+      />
 
       <CurrencyPreferencesModal
         onClose={() => setCurrencyModalVisible(false)}
@@ -430,151 +563,141 @@ export function SettingsScreen({
       <NotificationRulesModal
         onClose={() => setNotificationRulesModalVisible(false)}
         onSave={onSaveNotificationRule}
+        onSaved={() =>
+          showSaveConfirmation('Recordatorios y alertas actualizados.')
+        }
         rules={notificationRules}
         spaceId={activeSpaceId}
         visible={isNotificationRulesModalVisible}
+      />
+
+      <SaveConfirmationToast
+        notice={saveConfirmationNotice}
+        onDismiss={dismissSaveConfirmation}
+      />
+
+      <PrivacyLegalScreen
+        onClose={() => setPrivacyModalVisible(false)}
+        visible={isPrivacyModalVisible}
+      />
+
+      <LegalDocumentScreen
+        documentId="privacy-policy"
+        onClose={() => setDataUsageDocVisible(false)}
+        visible={isDataUsageDocVisible}
+      />
+
+      <PrivacyChoicesScreen
+        onClose={() => setPrivacyChoicesVisible(false)}
+        visible={isPrivacyChoicesVisible}
+      />
+
+      <PermissionsScreen
+        onClose={() => setPermissionsVisible(false)}
+        visible={isPermissionsVisible}
+      />
+
+      <DataRightsScreen
+        onClose={() => setDataRightsVisible(false)}
+        visible={isDataRightsVisible}
       />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.huge,
-  },
-  header: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-    marginTop: spacing.sm,
-  },
-  backButton: {
-    width: layout.minTouchTarget,
-    height: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backGlyphEmphasized: {
-    textShadowColor: colors.textPrimary,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 0.45,
-  },
-  profileCard: {
-    ...shadows.subtle,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-  },
-  profileIcon: {
-    width: profileIconSize,
-    height: profileIconSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.md,
-    backgroundColor: categoryColors.violet,
-  },
-  profileText: {
-    minWidth: 0,
-    flex: 1,
-    gap: spacing.xxs,
-  },
-  guestBadge: {
-    borderRadius: radii.round,
-    backgroundColor: colors.ctaSoft,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  pendingLegend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.sm,
-  },
-  pendingDot: {
-    width: spacing.sm,
-    height: spacing.sm,
-    flexShrink: 0,
-    borderRadius: radii.round,
-    backgroundColor: colors.expense,
-  },
-  section: {
-    gap: spacing.md,
-    marginTop: spacing.xxl,
-  },
-  sectionTitle: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  sectionTitleIcon: {
-    width: iconSize.md,
-    height: iconSize.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionGlyphEmphasized: {
-    textShadowColor: colors.textMuted,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 0.45,
-  },
-  sectionCard: {
-    ...shadows.subtle,
-    overflow: 'hidden',
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: previewCardLayout.borderRadius,
-    backgroundColor: colors.surface,
-  },
-  row: {
-    minHeight: previewCardLayout.minHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: previewCardLayout.paddingHorizontal,
-    paddingVertical: previewCardLayout.paddingVertical,
-  },
-  rowPressed: {
-    opacity: 0.68,
-  },
-  rowIcon: {
-    width: rowIconSize,
-    height: rowIconSize,
-    flexShrink: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: previewCardLayout.iconRadius,
-  },
-  rowGlyphEmphasized: {
-    textShadowColor: colors.onBrand,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 0.45,
-  },
-  rowText: {
-    minWidth: 0,
-    flex: 1,
-    gap: spacing.xxs,
-  },
-  comparisonSwitch: {
-    marginTop: spacing.sm,
-  },
-  divider: {
-    height: 1,
-    marginLeft: previewCardLayout.paddingHorizontal + rowIconSize + spacing.md,
-    backgroundColor: colors.categoryPreviewBorder,
-  },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.huge,
+    },
+    header: {
+      minHeight: layout.minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      gap: spacing.sm,
+      marginBottom: spacing.xl,
+      marginTop: spacing.sm,
+    },
+    backButton: {
+      width: layout.minTouchTarget,
+      height: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backGlyphEmphasized: {
+      textShadowColor: colors.textPrimary,
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 0.45,
+    },
+    profileCard: {
+      ...shadows.subtle,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.lg,
+      backgroundColor: colors.surface,
+      padding: spacing.lg,
+    },
+    avatarButton: {
+      position: 'relative',
+      width: profileIconSize,
+      height: profileIconSize,
+    },
+    avatarEditBadge: {
+      position: 'absolute',
+      right: -spacing.xxs,
+      bottom: -spacing.xxs,
+      width: 24,
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      borderWidth: 2,
+      borderColor: colors.surface,
+      backgroundColor: colors.brand,
+    },
+    profileText: {
+      minWidth: 0,
+      flex: 1,
+      gap: spacing.xxs,
+    },
+    guestBadge: {
+      borderRadius: radii.round,
+      backgroundColor: colors.ctaSoft,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+    },
+    rowPressed: {
+      opacity: 0.68,
+    },
+    warningCard: {
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    progressTrack: {
+      height: 4,
+      borderRadius: radii.round,
+      backgroundColor: colors.border,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: radii.round,
+      backgroundColor: categoryColors.red,
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+    },
+    actionButton: { flex: 1 },
+    destructiveButton: { backgroundColor: categoryColors.red },
+  });
+}

@@ -152,12 +152,14 @@ archivado y estado de sincronización.
 La versión 5 contiene:
 
 - `local_metadata`, con el identificador estable de instalación.
-- `categories`, con espacio, plantilla opcional, presupuesto, autor local,
-  origen de copia, archivado, fechas técnicas y estado de sincronización.
+- `categories`, con espacio, plantilla opcional, presupuesto, nota libre
+  opcional (desde la versión 8), autor local, origen de copia, archivado,
+  fechas técnicas y estado de sincronización.
 - `transactions`, con importe en unidades menores, moneda, fecha económica,
   recurrencia, serie recurrente opcional, grupo de presentación personalizado
-  opcional, categoría y espacio, autor local, origen de copia, archivado,
-  fechas técnicas y estado de sincronización.
+  opcional, nota libre opcional (desde la versión 8), categoría y espacio,
+  autor local, origen de copia, archivado, fechas técnicas y estado de
+  sincronización.
 - `recurring_transaction_series`, con la plantilla de una recurrencia semanal,
   quincenal o mensual, fecha inicial, cantidad de ocurrencias generadas y
   próxima fecha pendiente.
@@ -212,15 +214,76 @@ lugar de editarse fila a fila. Ambas tablas son independientes de
 por tipo comparten el mismo servicio de notificaciones locales y un
 presupuesto conjunto de notificaciones pendientes, pero no la misma tabla.
 
-No hay una versión 8: el historial de rotación de plantillas de notificación
-y el estado del recordatorio diario (ADR-063) se guardan en AsyncStorage, no
-en SQLite. Son datos pequeños, no relacionales y sin necesidad de consultas
-por espacio — el mismo criterio que ya usa `local_space_repository` para el
-catálogo de espacios. Conviven en el mismo mecanismo que las preferencias de
-moneda y apariencia (`src/state/appPreferences/`), aunque el historial de
-plantillas y el estado del recordatorio diario viven junto a los servicios de
-notificación en `src/features/transactions/repositories/` porque necesitan
-las utilidades de fecha local de esa misma feature.
+El historial de rotación de plantillas de notificación y el estado del
+recordatorio diario (ADR-063) se guardan en AsyncStorage, no en SQLite. Son
+datos pequeños, no relacionales y sin necesidad de consultas por espacio — el
+mismo criterio que ya usa `local_space_repository` para el catálogo de
+espacios. Conviven en el mismo mecanismo que las preferencias de moneda y
+apariencia (`src/state/appPreferences/`), aunque el historial de plantillas y
+el estado del recordatorio diario viven junto a los servicios de notificación
+en `src/features/transactions/repositories/` porque necesitan las utilidades
+de fecha local de esa misma feature.
+
+La versión 8 añade una columna `note` de texto libre y opcional a `categories`
+y a `transactions`. Es una nota manual sin formato pensada para listas o
+detalles cortos sobre una categoría o un movimiento concreto; no participa en
+totales, filtros ni recurrencia. Se edita desde un sub-modal dedicado
+(`NoteEditorModal`) abierto mediante un botón en el detalle de cada categoría
+o movimiento, con guardado explícito. Una ocurrencia proyectada de una serie
+recurrente (sin fila propia todavía) no admite nota hasta materializarse.
+
+La versión 9 añade `local_profile`, una fila única (`singleton_id = 1`) con
+`avatar_path` y `avatar_updated_at`. Guarda la foto de perfil del modo
+invitado: `avatar_path` apunta a un archivo JPEG dentro de
+`Paths.document/avatars/`, recomprimido a un máximo de 512×512 px y calidad
+0.6 con `expo-image-manipulator` antes de guardarse, para no acumular
+imágenes pesadas en el dispositivo. `avatar_updated_at` solo se usa para
+invalidar la caché de imagen de React Native al cambiar la foto (se añade
+como parámetro `?v=` a la uri leída), no como estado de sincronización. Esta
+tabla es exclusivamente local: al no existir todavía inicio de sesión, la
+foto de perfil no viaja a `public.profiles.avatar_url` (columna remota ya
+prevista en la sección 6.1); cuando se implemente la autenticación real, la
+migración de invitado a cuenta deberá decidir explícitamente si sube este
+archivo a Supabase Storage.
+
+La versión 10 sustituye el presupuesto local implícitamente asociado a EUR
+por `category_budgets`, una tabla por categoría y moneda. La columna histórica
+`categories.budget_minor` se conserva únicamente para migrar los valores ya
+existentes.
+
+La versión 11 añade `import_merchant_rules`: reglas personales locales de
+importación, únicas por `space_id + normalized_merchant`, que asocian un
+comercio normalizado con una categoría del mismo espacio. Cada corrección
+explícita actualiza la regla existente y conserva su contador de
+confirmaciones; su `sync_status` deja preparada la sincronización posterior
+sin enviar información mientras el usuario sea invitado.
+
+La versión 12 añade `import_batches` e `import_items` locales. Solo guardan
+las filas ya normalizadas y sus datos de revisión —categoría final, selección,
+duplicado, avisos y movimiento creado—; nunca el archivo original ni su JSON
+completo. La FK compuesta de cada ítem evita que una categoría de otro espacio
+se asigne durante la revisión. Las actualizaciones de revisión son
+transaccionales y el batch queda marcado como `imported` al asociar los
+movimientos creados.
+
+La versión 13 añade `remote_entity_links`, el mapa persistente por cuenta
+entre IDs remotos y locales para espacios, categorías y movimientos. Es la
+autoridad para restaurar datos sincronizados en otra instalación: nunca se
+infieren categorías por su nombre.
+
+La versión 14 añade `import_batches.file_hash`, un hash del archivo
+original (no el archivo en sí) para avisar si el usuario reimporta el mismo
+extracto; es solo informativo, nunca bloquea por sí solo.
+
+La versión 15 añade `merchant_feedback_queue` local: comercios confirmados
+con una categoría canónica (`templateKey`), listos para alimentar el
+consenso comunitario en cuanto su `import_item` remoto exista con categoría
+final. Único por `import_item_id`, para no encolar el mismo voto dos veces.
+
+La versión 16 añade `local_profile.display_name`. Guarda el nombre indicado
+durante el onboarding en la misma fila local que el avatar, sin sustituirlo;
+se conserva para personalizar el modo invitado y estará disponible para una
+migración posterior a una cuenta autenticada.
 
 ### 5.5 Identificadores
 
@@ -344,18 +407,18 @@ Restricciones:
 
 ### 6.4 `space_invitations`
 
-Invitaciones a un espacio compartido.
-
-Campos sugeridos:
+Invitaciones a un espacio compartido. Implementada en
+`07_couple_space_invitations.sql` (ADR-068), solo para espacios
+`type = 'couple'`.
 
 ```text
 id                  uuid, PK
-space_id            uuid, FK
-invited_by          uuid, FK
-invitee_email       text nullable
-token_hash          text
-status              text
-expires_at          timestamptz
+space_id            uuid, FK (on delete cascade)
+invited_by          uuid, FK (on delete set null)
+invitee_email       text nullable (normalizado a minúsculas; null = invitación por enlace)
+token_hash          text, unique (sha-256 hex del token; el token en texto plano nunca se guarda)
+status              text ('pending' | 'accepted' | 'revoked')
+expires_at          timestamptz (default now() + 7 días)
 accepted_by         uuid nullable
 created_at          timestamptz
 accepted_at         timestamptz nullable
@@ -363,10 +426,71 @@ accepted_at         timestamptz nullable
 
 Reglas:
 
-- No almacenar tokens de invitación en texto plano.
-- Las invitaciones deben caducar.
-- Aceptar una invitación debe ser idempotente.
-- Una invitación no debe permitir acceso antes de la aceptación válida.
+- No almacenar tokens de invitación en texto plano: solo su hash. El texto
+  plano solo existe en el valor de retorno de `create_space_invitation()`
+  para construir un enlace compartible manualmente.
+- No existe un estado `'expired'` almacenado: se calcula al leer
+  (`expires_at < now()`), para no depender de un job programado que este
+  proyecto no tiene configurado.
+- Puede coexistir una invitación `pending` dirigida a una cuenta y un enlace
+  manual; cada destino solo conserva una invitación pendiente por espacio.
+  Crear otra para ese mismo destino revoca la anterior.
+- Aceptar una invitación es idempotente (`accept_space_invitation`, mismo
+  usuario) y valida que el correo de quien acepta coincida con
+  `invitee_email` cuando la invitación se creó para un correo concreto.
+- Una invitación no debe permitir acceso antes de la aceptación válida: la
+  tabla no tiene ninguna política de insert/update/delete, solo `select`
+  para miembros activos del espacio o quien la creó. Toda mutación pasa por
+  funciones `SECURITY DEFINER`.
+- La tabla no expone `invitee_email` sin sesión: `get_space_invitation_preview()`
+  (la única función con permiso `anon`, necesaria porque el enlace puede
+  abrirse sin sesión) devuelve el correo enmascarado (`f***@gmail.com`), no
+  la fila completa.
+
+Funciones asociadas: `create_couple_space(p_name, p_currency)`,
+`create_space_invitation(p_space_id, p_invitee_email)`,
+`get_space_invitation_preview(p_token)`, `accept_space_invitation(p_token)`,
+`dissolve_couple_space(p_space_id)`. Ver ADR-068 para el detalle de cada una.
+
+La migración `16_in_app_space_invitations.sql` deja de enviar invitaciones con
+Resend. Una invitación dirigida solo se crea si ese correo ya pertenece a una
+cuenta; `get_current_user_pending_space_invitation()` la muestra únicamente a
+la sesión cuyo correo coincide y `accept_current_user_space_invitation(id)` la
+acepta de forma controlada. El enlace manual se conserva para compartirlo por
+el canal que el usuario elija.
+
+La migración `17_fix_space_invitation_column_reference.sql` corrige una
+referencia ambigua a `id` dentro del RPC de creación: tanto la invitación
+dirigida como el enlace manual vuelven a poder crearse en instalaciones que
+ya aplicaron la versión 16.
+
+### 6.4.1 Un espacio juntos por usuario
+
+`space_members` tiene una columna `space_type` (copiada una sola vez de
+`spaces.type` al crear la membresía, inmutable) y un índice único parcial
+`space_members_one_active_couple_per_user_idx` sobre
+`(user_id) where status='active' and space_type='couple'`. Es la aplicación
+real de "un usuario no puede tener dos espacios juntos activos a la vez": no
+es solo una comprobación de aplicación (que dejaría una condición de carrera
+entre dos aceptaciones concurrentes), sino una restricción de base de datos,
+igual que `spaces_one_active_personal_per_user_idx` ya resuelve el caso
+análogo para espacios personales. `create_couple_space()` y
+`accept_space_invitation()` hacen una comprobación amigable primero y
+capturan `unique_violation` como respaldo.
+
+Al aceptar una invitación, ambas personas quedan con `role = 'owner'`
+(anfitriones simétricos, sin jerarquía dueño/miembro) — no se introdujo un
+nuevo valor de `role` para esto.
+
+### 6.4.2 Eliminar (disolver) un espacio juntos
+
+`dissolve_couple_space(p_space_id)` archiva el espacio
+(`spaces.archived_at`) y desactiva ambas membresías activas
+(`space_members.status = 'removed'`), sin tocar movimientos ni categorías:
+se conservan, igual que la rama de espacio compartido de
+`request_account_deletion()`. No se introdujo un nuevo valor de `status`
+para distinguir esta disolución de una salida individual: la señal vive en
+`spaces.archived_at`.
 
 ---
 
@@ -503,7 +627,7 @@ Debe decidirse si:
 
 ### 6.8 `transaction_notification_rules`
 
-Preparada en migración (`202608040002_transaction_notification_rules.sql`),
+Preparada en migración (`04_transaction_notification_rules.sql`),
 sin conectar todavía: la app no tiene sesión ni cliente Supabase en runtime.
 
 ```text
@@ -570,6 +694,91 @@ Debe conservar:
 - Fecha.
 - Movimiento asociado opcional.
 - Estado.
+
+---
+
+### 6.11 Reglas e importaciones bancarias
+
+La migración `10_import_learning_system.sql` añade tres tablas, todas con RLS:
+
+- `user_merchant_rules`: aprendizaje personal, único por usuario, espacio y
+  comercio normalizado. La categoría usa una FK compuesta que obliga a que
+  pertenezca al mismo espacio.
+- `import_batches`: metadatos mínimos de una revisión, sin conservar el
+  archivo bancario original.
+- `import_items`: filas normalizadas pendientes o ya importadas; conserva
+  solo datos de revisión y enlaza categoría y movimientos mediante FKs del
+  mismo espacio.
+
+Las reglas personales se sincronizan tras la migración autenticada de los
+espacios y categorías. El RPC `sync_import_merchant_rules` recibe IDs locales
+de espacio y categoría, los resuelve mediante los mapas de la migración de
+invitado y hace un upsert protegido: el cliente nunca puede enviar un UUID
+remoto arbitrario. Una actualización retrasada no puede sobrescribir una
+corrección más nueva.
+
+Los batches e ítems se sincronizan tras las reglas personales mediante
+`sync_import_batches`. El RPC conserva los datos normalizados de revisión,
+incluida la selección local, resuelve categorías y duplicados con los mapas
+locales ya migrados y rechaza UUIDs remotos arbitrarios. El commit definitivo
+de movimientos continúa siendo un RPC separado e idempotente de la fase de
+commit.
+
+La migración `11_community_merchant_feedback.sql` separa estrictamente el
+aprendizaje comunitario de las reglas personales: `merchant_feedback_votes`
+solo guarda el voto actual privado de una cuenta, mientras los agregados y
+candidatos se actualizan exclusivamente mediante
+`record_merchant_feedback(import_item_id, canonical_category_key)`. No se
+guardan importes, fechas, textos crudos ni cuentas, y ningún candidato se
+publica automáticamente. La cola local `merchant_feedback_queue` (versión 15
+de SQLite) solo encola un voto una vez que el `import_item` correspondiente
+ya está sincronizado con su categoría final; nunca antes.
+
+La migración `12_fix_import_batches_source_type.sql` corrige un
+`source_type` que aceptaba `'tsv'` sin que el cliente pudiera producirlo
+nunca (auditoría del 2026-08-09). La migración
+`13_import_batches_file_hash_sync.sql` conecta la columna `file_hash`
+—preparada desde la migración 10 pero sin usar— al RPC `sync_import_batches`:
+si el hash entrante choca con un batch distinto del mismo usuario y espacio,
+el RPC lo guarda como `null` en vez de fallar, para no bloquear
+permanentemente a alguien que confirma reimportar el mismo archivo a
+propósito.
+
+La migración `14_import_batches_pdf_source_type.sql`, que añadía `'pdf'` al
+CHECK de `source_type` (ADR-071), se eliminó por completo (ADR-073): PDF se
+descartó del todo, así que `source_type` quedó tal como lo dejó la migración
+12, sin necesidad de ninguna migración de reversión adicional.
+
+### 6.12 `login_attempts`
+
+Migración `15_login_attempts_lockout.sql` (ADR-075). Bloqueo temporal tras
+intentos fallidos de inicio de sesión.
+
+```text
+email             text, PK (normalizado a minúsculas)
+failed_count      integer, default 0
+locked_until      timestamptz nullable
+last_attempt_at   timestamptz
+```
+
+Reglas:
+
+- RLS activado sin ninguna política: ni `anon` ni `authenticated` pueden
+  leer ni escribir esta tabla desde el cliente (`revoke all ... from anon,
+  authenticated`). Solo la Edge Function `login-with-lockout` la toca, con
+  la service role key.
+- No existe una función RPC pública para consultar o incrementar el
+  contador: el conteo solo es confiable si se actualiza en el mismo paso
+  que la validación real de la contraseña contra GoTrue, y esa validación
+  no ocurre en Postgres. Una función `SECURITY DEFINER` invocable desde el
+  cliente permitiría a cualquiera incrementar el contador de un correo
+  ajeno sin intentar iniciar sesión de verdad (un bloqueo como ataque de
+  denegación de servicio), así que ese camino se descartó a propósito.
+- A los 9 intentos fallidos consecutivos para un mismo correo, se bloquea
+  1 hora (`locked_until = now() + interval '1 hour'`) y el contador vuelve
+  a 0. Un bloqueo vencido se limpia en el siguiente intento en vez de
+  arrastrar el contador anterior.
+- Un inicio de sesión correcto borra la fila del correo.
 
 ---
 
@@ -827,6 +1036,27 @@ invitado y reenviar cambios locales pendientes después de iniciar sesión:
 La suscripción automática al estado de autenticación, el pull remoto, la cola
 continua, los conflictos y la edición simultánea permanecen en las fases 7, 9 y
 15; no se simula una sesión antes de implementar ese flujo.
+
+### Sincronización activa de espacios Juntos
+
+ADR-076 habilita una excepción acotada a los espacios `type = 'couple'`:
+
+- Al crear, editar o archivar una categoría, gasto, ingreso o recurrencia en
+  Juntos, SQLite conserva primero la intención local y `sync_couple_space_data`
+  la publica después dentro de una única transacción de PostgreSQL.
+- El RPC exige una membresía activa en ese espacio y resuelve las categorías y
+  series antes de sus movimientos; ningún cliente puede escribir en un espacio
+  ajeno ni construir una dependencia cruzada por su cuenta.
+- La migración 19 publica categorías, series y movimientos en
+  `supabase_realtime`. La otra instalación se suscribe al espacio activo y
+  recupera el snapshot al recibir el evento; volver a primer plano y el sondeo
+  cada 15 segundos permanecen como respaldo. Una fila local pendiente nunca se
+  sobrescribe durante esa recuperación.
+- Para esta primera versión, dos ediciones offline sobre el mismo campo usan
+  última escritura confirmada; no hay historial ni resolución manual todavía.
+
+Las notas libres, recordatorios y reglas de notificación siguen siendo locales:
+el esquema remoto actual no los modela y no forman parte de esta garantía.
 
 ---
 
@@ -1121,7 +1351,11 @@ Deben resolverse antes de las fases correspondientes:
    Resuelta como excepción explícita para el presupuesto de categoría, editable
    por cualquier miembro activo mediante `update_category_budget`; el resto de
    campos de una categoría ajena sigue sin poder editarse.
-2. Política de historial tras separación.
+2. Política de historial tras separación. Resuelta para espacios de pareja
+   (ADR-068): `dissolve_couple_space()` archiva el espacio y desactiva ambas
+   membresías sin borrar movimientos ni categorías. Sigue sin definir
+   exportación, copia automática de categorías al disolver y auditoría (ver
+   D-006 en `Bible/DECISIONS.md`).
 3. Unicidad de categorías por espacio.
 4. Ejecución remota de recurrencias cuando la aplicación no se abre.
 5. Retención de datos locales tras migración.

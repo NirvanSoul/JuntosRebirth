@@ -14,6 +14,7 @@ export const linking: LinkingOptions<RootDrawerParamList> = {
         },
       },
       Settings: 'ajustes',
+      AcceptInvitation: 'invitacion/:token',
     },
   },
 };

@@ -21,7 +21,15 @@ import type { LayoutDensity } from '@/theme/layout';
  * | subheading | Title 3      | Title large   |
  * | heading    | Title 1      | Headline med. |
  * | title      | Large Title  | Headline large|
+ * | heroTitle  | — (custom)   | Display medium|
  * | amount     | —            | Display small |
+ *
+ * `heroTitle` es el único hueco añadido a esta escala fuera de la
+ * correspondencia iOS/Material: los titulares de las láminas de onboarding
+ * necesitan sentirse más grandes que cualquier cabecera de pantalla o modal
+ * (`title`, ya el "Large Title" de iOS) sin pedir prestada la semántica de
+ * `amount`/`amountHero`, reservada a cifras de dinero. Se usa únicamente en
+ * `OnboardingScreenLayout`.
  *
  * Reglas de uso:
  *
@@ -89,6 +97,12 @@ export const typography = {
     letterSpacing: -0.8,
     fontFamily: fontFamily.bold,
   },
+  heroTitle: {
+    fontSize: 38,
+    lineHeight: 44,
+    letterSpacing: -0.9,
+    fontFamily: fontFamily.bold,
+  },
   amount: {
     fontSize: 40,
     lineHeight: 46,
@@ -116,6 +130,7 @@ const compactTypography = {
   subheading: { fontSize: 19, lineHeight: 24 },
   heading: { fontSize: 24, lineHeight: 30 },
   title: { fontSize: 30, lineHeight: 36 },
+  heroTitle: { fontSize: 33, lineHeight: 38 },
   amount: { fontSize: 36, lineHeight: 42 },
   amountHero: { fontSize: 44, lineHeight: 50 },
 } as const satisfies Partial<Record<TextVariant, TextStyle>>;
@@ -145,6 +160,7 @@ export const dynamicTypeRamp = {
   subheading: 'title3',
   heading: 'title2',
   title: 'title1',
+  heroTitle: 'largeTitle',
   amount: 'title1',
   amountHero: 'largeTitle',
 } as const satisfies Record<
@@ -168,6 +184,7 @@ export const maxFontScale = {
   subheading: 1.4,
   heading: 1.3,
   title: 1.25,
+  heroTitle: 1.2,
   amount: 1.15,
   amountHero: 1.1,
 } as const satisfies Record<TextVariant, number>;

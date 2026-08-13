@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
+import { renderWithTheme } from '@/test/renderWithTheme';
 import { colors } from '@/theme/colors';
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
@@ -16,15 +17,16 @@ jest.mock('@/components/overlays/AppModal/AppModal', () => ({
 }));
 
 describe('QuickCreateMenu', () => {
-  it('expone las tres acciones y devuelve la seleccionada', async () => {
+  it('expone las cuatro acciones y devuelve la seleccionada', async () => {
     const onSelect = jest.fn();
-    const screen = await render(
+    const screen = await renderWithTheme(
       <QuickCreateMenu onClose={jest.fn()} onSelect={onSelect} visible />,
     );
 
     expect(await screen.findByLabelText('Crear ingreso')).toBeTruthy();
     expect(await screen.findByLabelText('Crear gasto')).toBeTruthy();
     expect(await screen.findByLabelText('Crear categoría')).toBeTruthy();
+    expect(await screen.findByLabelText('Importar movimientos')).toBeTruthy();
     expect(
       screen.getByTestId('quick-create-category-icon').props.children,
     ).toContain(

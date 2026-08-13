@@ -25,8 +25,18 @@ export const motion = {
   disclosureRevealDuration: 240,
   floatingButtonVisibilityDuration: 280,
   inputPulseDuration: 48,
+  onboardingTextRevealBlockDuration: 420,
+  onboardingTextRevealBlockTravel: 10,
+  onboardingTextRevealBlockPause: 120,
+  authSuccessAutoContinueDelay: 1600,
+  stepProgressFillDuration: 540,
   stickyHeaderTransitionDuration: 240,
   stickySummaryPulseDuration: 90,
+  tabIconSelectSpring: {
+    damping: 14,
+    mass: 0.4,
+    stiffness: 260,
+  },
   transactionTypeSpring: {
     damping: 14,
     mass: 0.55,

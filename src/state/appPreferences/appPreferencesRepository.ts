@@ -13,9 +13,7 @@ type StoredAppPreferences = {
   appearance: AppearancePreference;
 };
 
-function isAppearancePreference(
-  value: unknown,
-): value is AppearancePreference {
+function isAppearancePreference(value: unknown): value is AppearancePreference {
   return value === 'light' || value === 'dark' || value === 'system';
 }
 

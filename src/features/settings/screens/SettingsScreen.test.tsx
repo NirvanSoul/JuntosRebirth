@@ -1,31 +1,81 @@
-import { fireEvent } from '@testing-library/react-native';
+import { act, fireEvent, waitFor } from '@testing-library/react-native';
+import type { ComponentProps } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 
+import {
+  getLocalProfile,
+  saveLocalProfileAvatar,
+} from '@/features/profile/repositories/localProfileRepository';
+import { pickAndStoreAvatar } from '@/features/profile/services/avatarImageService';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import type { CurrencyPreferences } from '@/state/appPreferences/currencyPreferences';
 import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
+import type { AppearancePreference } from '@/theme/types';
+
+const mockRestartOnboarding = jest.fn();
+
+jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
+  useOnboardingStatus: () => ({
+    restartOnboarding: mockRestartOnboarding,
+  }),
+}));
+
+jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
+  getLocalProfile: jest.fn(async () => ({
+    avatarUri: null,
+    displayName: null,
+  })),
+  saveLocalProfileAvatar: jest.fn(async (avatarPath: string) => ({
+    avatarUri: `${avatarPath}?v=stub`,
+    displayName: null,
+  })),
+}));
+
+jest.mock('@/features/profile/services/avatarImageService', () => ({
+  pickAndStoreAvatar: jest.fn(),
+}));
+
+const mockGetLocalProfile = jest.mocked(getLocalProfile);
+const mockSaveLocalProfileAvatar = jest.mocked(saveLocalProfileAvatar);
+const mockPickAndStoreAvatar = jest.mocked(pickAndStoreAvatar);
 
 describe('SettingsScreen', () => {
+  beforeEach(() => {
+    mockGetLocalProfile
+      .mockClear()
+      .mockResolvedValue({ avatarUri: null, displayName: null });
+    mockSaveLocalProfileAvatar.mockClear();
+    mockPickAndStoreAvatar.mockClear();
+    mockRestartOnboarding.mockReset().mockResolvedValue(undefined);
+  });
+
   const renderScreen = async (
     currencyPreferences: CurrencyPreferences = { currencies: ['EUR'] },
     showHomeComparisonIndicators = true,
+    overrides: Partial<ComponentProps<typeof SettingsScreen>> = {},
+    appearance: AppearancePreference = 'light',
   ) => {
     const props = {
       activeSpaceId: 'space-1',
+      activeSpaceType: 'personal' as const,
       currencyPreferences,
       notificationRules: [],
       onBack: jest.fn(),
+      onDissolveCoupleSpace: jest.fn().mockResolvedValue(undefined),
       onSaveCurrencyPreferences: jest.fn(),
       onSaveNotificationRule: jest.fn().mockResolvedValue(true),
       onToggleHomeComparisonIndicators: jest.fn(),
       showHomeComparisonIndicators,
+      ...overrides,
     };
 
     return {
       props,
-      screen: await renderWithTheme(<SettingsScreen {...props} />),
+      screen: await renderWithTheme(<SettingsScreen {...props} />, {
+        appearance,
+      }),
     };
   };
 
@@ -42,7 +92,7 @@ describe('SettingsScreen', () => {
       expect(screen.getByTestId(`section-icon-${title}`)).toBeTruthy();
     }
 
-    expect(screen.getByTestId('pending-Editar perfil')).toBeTruthy();
+    expect(screen.getByTestId('pending-Idioma')).toBeTruthy();
     expect(screen.queryByText('Gestionar espacios')).toBeNull();
     expect(screen.queryByText('Borrar mis datos')).toBeNull();
     expect(screen.queryByText('Cómo funciona Juntos')).toBeNull();
@@ -80,7 +130,6 @@ describe('SettingsScreen', () => {
         screen.getByTestId('row-icon-Estado de los datos').props.style,
       ).backgroundColor,
     ).toBe(categoryColors.violet);
-    expect(screen.getByTestId('row-glyph-Editar perfil')).toBeTruthy();
     expect(
       StyleSheet.flatten(screen.getByTestId('row-glyph-Idioma').props.style)
         .textShadowRadius,
@@ -99,7 +148,7 @@ describe('SettingsScreen', () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
     const { screen } = await renderScreen();
 
-    await fireEvent.press(screen.getByText('Editar perfil'));
+    await fireEvent.press(screen.getByText('Idioma'));
     expect(alertSpy).toHaveBeenCalledWith(
       'Función pendiente',
       expect.stringContaining('falta implementar'),
@@ -115,6 +164,36 @@ describe('SettingsScreen', () => {
 
     expect(alertSpy).not.toHaveBeenCalled();
     expect(screen.getByTestId('notification-rules-modal')).toBeTruthy();
+    alertSpy.mockRestore();
+  });
+
+  it('permite volver a abrir el onboarding desde Ayuda', async () => {
+    const { screen } = await renderScreen();
+
+    await fireEvent.press(screen.getByText('Ver onboarding'));
+
+    expect(mockRestartOnboarding).toHaveBeenCalledTimes(1);
+  });
+
+  it('confirma con un mensaje flotante al guardar las reglas de notificación', async () => {
+    const { screen } = await renderScreen();
+
+    await fireEvent.press(screen.getByText('Recordatorios y alertas'));
+    await fireEvent.press(screen.getByTestId('notification-rules-save'));
+
+    expect(
+      await screen.findByText('Recordatorios y alertas actualizados.'),
+    ).toBeTruthy();
+  });
+
+  it('abre la pantalla de privacidad en vez de mostrar el aviso pendiente', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+    const { screen } = await renderScreen();
+
+    await fireEvent.press(screen.getByText('Política de privacidad'));
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('privacy-legal-screen')).toBeTruthy();
     alertSpy.mockRestore();
   });
 
@@ -199,16 +278,15 @@ describe('SettingsScreen', () => {
   });
 
   it('permite activar y desactivar la comparación de Inicio', async () => {
-    const { props, screen } = await renderScreen(
-      { currencies: ['EUR'] },
-      true,
-    );
+    const { props, screen } = await renderScreen({ currencies: ['EUR'] }, true);
 
-    expect(screen.getByTestId('home-comparison-toggle').props.value).toBe(
-      true,
-    );
+    expect(screen.getByTestId('home-comparison-toggle').props.value).toBe(true);
 
-    fireEvent(screen.getByTestId('home-comparison-toggle'), 'valueChange', false);
+    fireEvent(
+      screen.getByTestId('home-comparison-toggle'),
+      'valueChange',
+      false,
+    );
 
     expect(props.onToggleHomeComparisonIndicators).toHaveBeenCalledWith(false);
   });
@@ -219,5 +297,157 @@ describe('SettingsScreen', () => {
     expect(screen.getByTestId('home-comparison-toggle').props.value).toBe(
       false,
     );
+  });
+
+  it('permite activar y desactivar el modo oscuro', async () => {
+    const { screen } = await renderScreen();
+
+    expect(screen.getByTestId('dark-mode-toggle').props.value).toBe(false);
+
+    fireEvent(screen.getByTestId('dark-mode-toggle'), 'valueChange', true);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('dark-mode-toggle').props.value).toBe(true),
+    );
+
+    fireEvent(screen.getByTestId('dark-mode-toggle'), 'valueChange', false);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('dark-mode-toggle').props.value).toBe(false),
+    );
+  });
+
+  it('muestra el modo oscuro activado cuando ya está seleccionado', async () => {
+    const { screen } = await renderScreen(undefined, undefined, {}, 'dark');
+
+    expect(screen.getByTestId('dark-mode-toggle').props.value).toBe(true);
+  });
+
+  it('ya no anuncia que los datos quedan solo en el dispositivo y explica cómo cambiar la foto', async () => {
+    const { screen } = await renderScreen();
+
+    expect(
+      screen.queryByText('Invitado · Datos solo en este dispositivo'),
+    ).toBeNull();
+    expect(screen.getByText('Toca tu foto para cambiarla')).toBeTruthy();
+  });
+
+  it('abre el modal de autenticación en vez de mostrar un aviso pendiente', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+    const { screen } = await renderScreen();
+
+    expect(
+      screen.queryByTestId('pending-Iniciar sesión o crear cuenta'),
+    ).toBeNull();
+    await fireEvent.press(screen.getByText('Iniciar sesión o crear cuenta'));
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('auth-modal-open-login')).toBeTruthy();
+    expect(screen.getByTestId('auth-modal-open-signup')).toBeTruthy();
+    alertSpy.mockRestore();
+  });
+
+  it('carga la foto de perfil guardada al abrir Ajustes', async () => {
+    mockGetLocalProfile.mockResolvedValue({
+      avatarUri: 'file:///avatar.jpg?v=1',
+      displayName: null,
+    });
+
+    const { screen } = await renderScreen();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-avatar').props.source).toEqual({
+        uri: 'file:///avatar.jpg?v=1',
+      }),
+    );
+  });
+
+  it('permite elegir una foto de la galería y actualiza el avatar mostrado', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+    mockPickAndStoreAvatar.mockResolvedValue(
+      'file:///document/avatars/profile-avatar.jpg',
+    );
+    const { screen } = await renderScreen();
+
+    await fireEvent.press(screen.getByTestId('settings-avatar-button'));
+    const buttons = alertSpy.mock.calls[0]![2] as {
+      text: string;
+      onPress?: () => void;
+    }[];
+    const galleryButton = buttons.find(
+      (button) => button.text === 'Elegir de la galería',
+    );
+    await act(async () => {
+      galleryButton?.onPress?.();
+    });
+
+    expect(mockPickAndStoreAvatar).toHaveBeenCalledWith('library');
+    expect(mockSaveLocalProfileAvatar).toHaveBeenCalledWith(
+      'file:///document/avatars/profile-avatar.jpg',
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-avatar').props.source).toEqual({
+        uri: 'file:///document/avatars/profile-avatar.jpg?v=stub',
+      }),
+    );
+    alertSpy.mockRestore();
+  });
+
+  it('avisa si no se pudo actualizar la foto de perfil', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+    mockPickAndStoreAvatar.mockRejectedValue(new Error('Permiso denegado'));
+    const { screen } = await renderScreen();
+
+    await fireEvent.press(screen.getByTestId('settings-avatar-button'));
+    const buttons = alertSpy.mock.calls[0]![2] as {
+      text: string;
+      onPress?: () => void;
+    }[];
+    const cameraButton = buttons.find((button) => button.text === 'Tomar foto');
+    await act(async () => {
+      cameraButton?.onPress?.();
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'No se pudo actualizar tu foto',
+      expect.stringContaining('permisos'),
+    );
+    alertSpy.mockRestore();
+  });
+
+  it('no muestra "Eliminar espacio juntos" fuera de un espacio de pareja', async () => {
+    const { screen } = await renderScreen();
+
+    expect(screen.queryByText('Eliminar espacio juntos')).toBeNull();
+  });
+
+  it('elimina el espacio juntos tras confirmar en un espacio de pareja', async () => {
+    jest.useFakeTimers();
+    const { props, screen } = await renderScreen(undefined, undefined, {
+      activeSpaceType: 'couple',
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Eliminar espacio juntos'));
+    });
+    expect(
+      screen.getByTestId('confirm-couple-space-dissolution').props
+        .accessibilityState.disabled,
+    ).toBe(true);
+
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(
+      screen.getByTestId('confirm-couple-space-dissolution').props
+        .accessibilityState.disabled,
+    ).toBe(false);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('confirm-couple-space-dissolution'));
+    });
+
+    expect(props.onDissolveCoupleSpace).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 });

@@ -1,8 +1,9 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent } from '@testing-library/react-native';
 
 import type { Category } from '@/features/categories/types';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { renderWithTheme } from '@/test/renderWithTheme';
 
 const category: Category = {
   id: 'groceries',
@@ -41,7 +42,7 @@ function transaction(
 
 describe('TransactionPreviewList', () => {
   it('agrupa únicamente las ocurrencias de una recurrencia personalizada', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <TransactionPreviewList
         categories={[category]}
         transactions={[
@@ -81,7 +82,7 @@ describe('TransactionPreviewList', () => {
   });
 
   it('aplica el límite después de agrupar las ocurrencias', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <TransactionPreviewList
         categories={[category]}
         limit={2}
@@ -104,7 +105,7 @@ describe('TransactionPreviewList', () => {
       'custom',
       'custom-group',
     );
-    const screen = await render(
+    const screen = await renderWithTheme(
       <TransactionPreviewList
         categories={[category]}
         groupingTransactions={[
@@ -124,7 +125,7 @@ describe('TransactionPreviewList', () => {
   });
 
   it('muestra una preview independiente por ocurrencia automática con su fecha real', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <TransactionPreviewList
         categories={[category]}
         transactions={[
@@ -156,7 +157,7 @@ describe('TransactionPreviewList', () => {
   });
 
   it('respeta la fecha proyectada del mes visible en lugar de la próxima fecha de la serie', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <TransactionPreviewList
         categories={[category]}
         transactions={[

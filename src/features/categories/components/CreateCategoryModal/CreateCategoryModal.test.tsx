@@ -1,8 +1,9 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent } from '@testing-library/react-native';
 import { DeviceEventEmitter, Platform, StyleSheet } from 'react-native';
 
 import { CreateCategoryModal } from '@/features/categories/components/CreateCategoryModal/CreateCategoryModal';
 import type { Category } from '@/features/categories/types';
+import { renderWithTheme } from '@/test/renderWithTheme';
 import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
@@ -20,7 +21,7 @@ jest.mock('@/components/overlays/AppModal/AppModal', () => ({
 
 describe('CreateCategoryModal', () => {
   it('muestra el CTA de continuar en morado', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateCategoryModal
         categories={[]}
         onClose={jest.fn()}
@@ -50,7 +51,7 @@ describe('CreateCategoryModal', () => {
 
   it('usa volver para regresar al nombre y después cerrar el flujo', async () => {
     const onClose = jest.fn();
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateCategoryModal
         categories={[]}
         onClose={onClose}
@@ -82,7 +83,7 @@ describe('CreateCategoryModal', () => {
   });
 
   it('acerca la acción al campo mientras el teclado está visible', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateCategoryModal
         categories={[]}
         onClose={jest.fn()}
@@ -119,7 +120,7 @@ describe('CreateCategoryModal', () => {
 
   it('crea la categoría con el color y el icono seleccionados', async () => {
     const onSubmit = jest.fn();
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateCategoryModal
         categories={[]}
         onClose={jest.fn()}
@@ -138,12 +139,12 @@ describe('CreateCategoryModal', () => {
     await fireEvent.press(screen.getByLabelText('Color red'));
     await fireEvent.press(screen.getByLabelText('Icono house'));
 
-    expect(screen.getByLabelText('Color red').props.accessibilityState).toEqual(
-      { checked: true },
-    );
+    expect(
+      screen.getByLabelText('Color red').props.accessibilityState,
+    ).toMatchObject({ checked: true });
     expect(
       screen.getByLabelText('Icono house').props.accessibilityState,
-    ).toEqual({ checked: true });
+    ).toMatchObject({ checked: true });
     expect(
       StyleSheet.flatten(screen.getByLabelText('Icono house').props.style)
         .backgroundColor,
@@ -160,7 +161,7 @@ describe('CreateCategoryModal', () => {
   });
 
   it('ofrece los 18 colores de las plantillas para una categoría personalizada', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateCategoryModal
         categories={[]}
         onClose={jest.fn()}
@@ -194,7 +195,7 @@ describe('CreateCategoryModal', () => {
       isArchived: false,
     };
     const onSubmit = jest.fn();
-    const screen = await render(
+    const screen = await renderWithTheme(
       <CreateCategoryModal
         categories={[category]}
         category={category}

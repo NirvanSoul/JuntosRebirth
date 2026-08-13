@@ -8,6 +8,12 @@ import type {
   GuestMigrationGateway,
   GuestMigrationResult,
 } from '@/features/sync/types';
+import { createSupabaseMerchantRuleGateway } from '@/features/import/gateways/supabaseMerchantRuleGateway';
+import { createSupabaseImportBatchGateway } from '@/features/import/gateways/supabaseImportBatchGateway';
+import { createSupabaseMerchantFeedbackGateway } from '@/features/import/gateways/supabaseMerchantFeedbackGateway';
+import { syncLocalImportBatches } from '@/features/import/services/syncImportBatches';
+import { syncLocalMerchantFeedback } from '@/features/import/services/syncMerchantFeedback';
+import { syncLocalMerchantRules } from '@/features/import/services/syncMerchantRules';
 import { createSupabaseGuestMigrationGateway } from '@/features/sync/gateways/supabaseGuestMigrationGateway';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 
@@ -52,10 +58,24 @@ export async function syncPendingLocalDataForCurrentSession(input: {
     throw new Error('Debes iniciar sesión antes de sincronizar');
   }
 
-  return migrateAuthenticatedGuestData({
+  const result = await migrateAuthenticatedGuestData({
     userId: data.user.id,
     spaces: input.spaces,
     confirmOwnership: input.confirmOwnership,
     gateway: createSupabaseGuestMigrationGateway(client),
   });
+  await syncLocalMerchantRules({
+    userId: data.user.id,
+    gateway: createSupabaseMerchantRuleGateway(client),
+  });
+  await syncLocalImportBatches({
+    userId: data.user.id,
+    gateway: createSupabaseImportBatchGateway(client),
+  });
+  // Solo puede resolver votos cuyo import_item ya exista en Supabase con
+  // categoría final, así que corre después de sincronizar los batches.
+  await syncLocalMerchantFeedback({
+    gateway: createSupabaseMerchantFeedbackGateway(client),
+  });
+  return result;
 }

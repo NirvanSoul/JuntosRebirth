@@ -1,7 +1,7 @@
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -42,7 +42,6 @@ import {
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { triggerHaptic } from '@/lib/haptics/haptics';
-import { colors } from '@/theme/colors';
 import {
   categoryColors,
   getCategoryContentContrast,
@@ -51,7 +50,10 @@ import { iconSize, type LayoutDensity, layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
 import { maxFontScale, typography } from '@/theme/typography';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 import { TransactionDatePickerModal } from './TransactionDatePickerModal';
 import { TransactionCustomRecurrenceModal } from './TransactionCustomRecurrenceModal';
 
@@ -63,6 +65,14 @@ type CreateTransactionModalProps = {
   /** Moneda del movimiento más reciente del espacio activo. Se preselecciona
    * al crear un movimiento nuevo, para no obligar a elegirla cada vez. */
   lastUsedCurrency?: CurrencyCode;
+  /**
+   * Oculta el selector interactivo de tipo (muestra `type` como una
+   * insignia fija) y tiñe el botón de guardar de verde o rojo según `type`
+   * en vez del color de la categoría. Solo para el onboarding: en el resto
+   * de la app siempre se puede alternar entre gasto e ingreso, y el botón
+   * sigue reflejando el color de la categoría elegida.
+   */
+  hideTypeToggle?: boolean;
   type: TransactionType;
   selectedCategory: Category | null;
   visible: boolean;
@@ -107,6 +117,10 @@ const operatorPresentation: Record<
   add: { label: 'Sumar', symbol: '+' },
 };
 
+/** Referencia estable: un array literal en el valor por defecto se recrearía en cada render. */
+const defaultAvailableCurrencies: readonly CurrencyCode[] = [
+  defaultCurrencyCode,
+];
 /** Altura del bloque del importe antes de repartir el espacio sobrante. */
 const amountAreaMinHeight = { compact: 64, regular: 88 } as const;
 /** Límites visuales que evitan el autoajuste defectuoso de texto en iOS. */
@@ -137,7 +151,8 @@ function getToday(): string {
 
 export function CreateTransactionModal({
   activeSpaceId,
-  availableCurrencies = [defaultCurrencyCode],
+  availableCurrencies = defaultAvailableCurrencies,
+  hideTypeToggle = false,
   initialDate,
   initialDraft,
   lastUsedCurrency,
@@ -150,7 +165,8 @@ export function CreateTransactionModal({
   onTypeChange,
 }: CreateTransactionModalProps) {
   const density = useLayoutDensity();
-  const styles = useMemo(() => createStyles(density), [density]);
+  const { colors } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, density));
   const [title, setTitle] = useState('');
   const [amountInput, setAmountInput] = useState('0');
   const [pendingOperations, setPendingOperations] = useState<
@@ -211,6 +227,19 @@ export function CreateTransactionModal({
   const selectedCategoryContentContrast = selectedCategory
     ? getCategoryContentContrast(selectedCategory.colorToken)
     : null;
+  /**
+   * Con el tipo fijo (`hideTypeToggle`, solo onboarding) el botón de guardar
+   * se tiñe de verde/rojo según el tipo en vez del color de la categoría,
+   * para reforzar visualmente si es un ingreso o un gasto.
+   */
+  const submitGradientColor = hideTypeToggle
+    ? type === 'income'
+      ? colors.income
+      : colors.expense
+    : (selectedCategoryColor ?? undefined);
+  const submitGradientTextTone = hideTypeToggle
+    ? 'onBrand'
+    : selectedCategoryContentContrast?.tone;
   const dateLabel = useMemo(
     () =>
       new Intl.DateTimeFormat('es-ES', {
@@ -437,60 +466,90 @@ export function CreateTransactionModal({
         variant="expanded"
         visible={visible}
       >
-        <View style={styles.container}>
+        <View
+          onStartShouldSetResponderCapture={() => {
+            Keyboard.dismiss();
+            return false;
+          }}
+          style={styles.container}
+          testID="create-transaction-form"
+        >
           <View style={styles.header}>
-            <View
-              accessibilityRole="tablist"
-              onLayout={(event) =>
-                setSegmentedControlWidth(event.nativeEvent.layout.width)
-              }
-              style={styles.segmentedControl}
-              testID="transaction-type-selector"
-            >
-              <Animated.View
-                pointerEvents="none"
+            {hideTypeToggle ? (
+              <View
                 style={[
-                  styles.segmentIndicator,
+                  styles.lockedTypeBadge,
                   {
                     backgroundColor:
                       type === 'income' ? colors.income : colors.expense,
                   },
-                  typeIndicatorStyle,
                 ]}
                 testID={`transaction-type-indicator-${type}`}
-              />
-              {(['expense', 'income'] as const).map((option) => {
-                const selected = type === option;
-                const isIncome = option === 'income';
-                return (
-                  <Pressable
-                    accessibilityLabel={isIncome ? 'Ingreso' : 'Gasto'}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected }}
-                    key={option}
-                    onPress={() => onTypeChange(option)}
-                    style={({ pressed }) => [
-                      styles.segment,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Ionicons
-                      color={selected ? colors.onBrand : colors.textMuted}
-                      name={isIncome ? 'arrow-up' : 'arrow-down'}
-                      size={iconSize.sm}
-                      style={styles.diagonalArrow}
-                    />
-                    <Text
-                      tone={selected ? 'onBrand' : 'muted'}
-                      variant="label"
-                      weight="semibold"
+              >
+                <Ionicons
+                  color={colors.onBrand}
+                  name={type === 'income' ? 'arrow-up' : 'arrow-down'}
+                  size={iconSize.sm}
+                  style={styles.diagonalArrow}
+                />
+                <Text tone="onBrand" variant="label" weight="semibold">
+                  {type === 'income' ? 'Ingreso' : 'Gasto'}
+                </Text>
+              </View>
+            ) : (
+              <View
+                accessibilityRole="tablist"
+                onLayout={(event) =>
+                  setSegmentedControlWidth(event.nativeEvent.layout.width)
+                }
+                style={styles.segmentedControl}
+                testID="transaction-type-selector"
+              >
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.segmentIndicator,
+                    {
+                      backgroundColor:
+                        type === 'income' ? colors.income : colors.expense,
+                    },
+                    typeIndicatorStyle,
+                  ]}
+                  testID={`transaction-type-indicator-${type}`}
+                />
+                {(['expense', 'income'] as const).map((option) => {
+                  const selected = type === option;
+                  const isIncome = option === 'income';
+                  return (
+                    <Pressable
+                      accessibilityLabel={isIncome ? 'Ingreso' : 'Gasto'}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected }}
+                      key={option}
+                      onPress={() => onTypeChange(option)}
+                      style={({ pressed }) => [
+                        styles.segment,
+                        pressed && styles.pressed,
+                      ]}
                     >
-                      {isIncome ? 'Ingreso' : 'Gasto'}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+                      <Ionicons
+                        color={selected ? colors.onBrand : colors.textMuted}
+                        name={isIncome ? 'arrow-up' : 'arrow-down'}
+                        size={iconSize.sm}
+                        style={styles.diagonalArrow}
+                      />
+                      <Text
+                        tone={selected ? 'onBrand' : 'muted'}
+                        variant="label"
+                        weight="semibold"
+                      >
+                        {isIncome ? 'Ingreso' : 'Gasto'}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
             <ModalCloseButton onPress={onClose} />
           </View>
 
@@ -776,8 +835,8 @@ export function CreateTransactionModal({
             <ModalPrimaryAction
               accessibilityLabel={primaryActionAccessibilityLabel}
               disabled={isCalculationPending ? false : isSubmitDisabled}
-              gradientColor={selectedCategoryColor ?? undefined}
-              gradientTextTone={selectedCategoryContentContrast?.tone}
+              gradientColor={submitGradientColor}
+              gradientTextTone={submitGradientTextTone}
               gradientTestID="transaction-submit-gradient"
               label={primaryActionLabel}
               mutedWhenDisabled
@@ -988,7 +1047,7 @@ function TransactionRecurrencePickerModal({
   );
 }
 
-function createStyles(density: LayoutDensity) {
+function createStyles(colors: ColorTokens, density: LayoutDensity) {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -1028,6 +1087,15 @@ function createStyles(density: LayoutDensity) {
     },
     diagonalArrow: {
       transform: [{ rotate: '45deg' }],
+    },
+    lockedTypeBadge: {
+      height: layout.minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      borderRadius: radii.lg,
+      paddingHorizontal: spacing.lg,
     },
     titleInput: {
       minHeight: layout.controlHeight[density],

@@ -52,22 +52,22 @@ export function timeOfDayToDate(time: string): Date {
  * recordatorio, a partir de los datos de un movimiento. Función pura: no
  * decide qué plantilla se usa, solo prepara los valores que podría necesitar.
  */
-export function buildReminderTemplateVariables(transaction: {
-  amountMinor: number;
-  currency: CurrencyCode;
-  categoryName?: string;
-  title: string;
-  type: TransactionType;
-}): Partial<Record<NotificationTemplateVariable, string>> {
-  const amount = formatCurrency(
-    transaction.amountMinor,
-    transaction.currency,
-    'es-ES',
-  );
+export function buildReminderTemplateVariables(
+  transaction: {
+    amountMinor: number;
+    currency: CurrencyCode;
+    categoryName?: string;
+    title: string;
+    type: TransactionType;
+  },
+  showAmounts = true,
+): Partial<Record<NotificationTemplateVariable, string>> {
   const title = transaction.title.trim();
 
   return {
-    amount,
+    amount: showAmounts
+      ? formatCurrency(transaction.amountMinor, transaction.currency, 'es-ES')
+      : undefined,
     category: transaction.categoryName?.trim() || undefined,
     title: title || undefined,
   };

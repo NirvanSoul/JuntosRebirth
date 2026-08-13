@@ -10,11 +10,12 @@ import {
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
-import { colors } from '@/theme/colors';
 import { iconSize } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
-import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ComparisonPlacement = 'amount' | 'title';
 
@@ -64,6 +65,8 @@ function MetricBadge({
   onPress,
   testIDPrefix,
 }: MetricBadgeProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const isBalance = icon === 'balance';
   const isIncome = icon === 'income';
   const iconName = isBalance
@@ -173,6 +176,8 @@ export function TransactionSummaryBadges({
   style,
   testIDPrefix,
 }: TransactionSummaryBadgesProps) {
+  const { shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const income = formatCurrency(incomeMinor, currency, 'es-ES');
   const expense = formatCurrency(expenseMinor, currency, 'es-ES');
   const balance =
@@ -239,66 +244,68 @@ export function TransactionSummaryBadges({
   );
 }
 
-const styles = StyleSheet.create({
-  comparisonLabel: {
-    marginBottom: spacing.xxs,
-    textAlign: 'center',
-  },
-  badges: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  badge: {
-    ...shadows.subtle,
-    minWidth: 0,
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: previewCardLayout.borderRadius,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  compactBadge: {
-    paddingHorizontal: spacing.sm,
-  },
-  borderedBadge: {
-    borderColor: colors.border,
-    borderWidth: 1,
-  },
-  metricText: {
-    minWidth: 0,
-    flex: 1,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-  },
-  icon: {
-    width: iconSize.md,
-    height: iconSize.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: previewCardLayout.directionIconRadius,
-  },
-  compactIcon: {
-    width: iconSize.sm,
-    height: iconSize.sm,
-  },
-  incomeIcon: {
-    backgroundColor: colors.incomeSoft,
-  },
-  expenseIcon: {
-    backgroundColor: colors.expenseSoft,
-  },
-  balanceIcon: {
-    backgroundColor: colors.cta,
-  },
-  diagonalArrow: {
-    transform: [{ rotate: '45deg' }],
-  },
-  pressed: { opacity: 0.72 },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    comparisonLabel: {
+      marginBottom: spacing.xxs,
+      textAlign: 'center',
+    },
+    badges: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: spacing.sm,
+    },
+    badge: {
+      ...shadows.subtle,
+      minWidth: 0,
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: previewCardLayout.borderRadius,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+    },
+    compactBadge: {
+      paddingHorizontal: spacing.sm,
+    },
+    borderedBadge: {
+      borderColor: colors.border,
+      borderWidth: 1,
+    },
+    metricText: {
+      minWidth: 0,
+      flex: 1,
+    },
+    labelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xxs,
+    },
+    icon: {
+      width: iconSize.md,
+      height: iconSize.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: previewCardLayout.directionIconRadius,
+    },
+    compactIcon: {
+      width: iconSize.sm,
+      height: iconSize.sm,
+    },
+    incomeIcon: {
+      backgroundColor: colors.incomeSoft,
+    },
+    expenseIcon: {
+      backgroundColor: colors.expenseSoft,
+    },
+    balanceIcon: {
+      backgroundColor: colors.cta,
+    },
+    diagonalArrow: {
+      transform: [{ rotate: '45deg' }],
+    },
+    pressed: { opacity: 0.72 },
+  });
+}

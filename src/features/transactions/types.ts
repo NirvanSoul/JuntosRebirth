@@ -25,6 +25,9 @@ export type SessionTransaction = CreateTransactionDraft & {
   recurrenceGroupId?: string;
   recurrenceSeriesId?: string;
   recurrenceStartsOn?: string;
+  /** Id del movimiento original si este es una copia creada en otro espacio. */
+  sourceTransactionId?: string;
+  note?: string;
 };
 
 /** Configuración de recordatorios locales de un movimiento: un día con una o varias horas. */

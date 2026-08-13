@@ -63,7 +63,7 @@ describe('TransactionReminderModal', () => {
     );
     expect(
       screen.getByLabelText('Guardar recordatorio').props.accessibilityState,
-    ).toEqual({ disabled: true });
+    ).toMatchObject({ disabled: true });
     expect(screen.getByText('Añade al menos una hora.')).toBeTruthy();
 
     await fireEvent.press(screen.getByLabelText('Añadir hora de recordatorio'));
@@ -75,7 +75,7 @@ describe('TransactionReminderModal', () => {
     expect(screen.getByText('09:30')).toBeTruthy();
     expect(
       screen.getByLabelText('Guardar recordatorio').props.accessibilityState,
-    ).toEqual({ disabled: false });
+    ).toMatchObject({ disabled: false });
 
     await fireEvent.press(screen.getByLabelText('Guardar recordatorio'));
 

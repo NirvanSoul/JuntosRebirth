@@ -22,8 +22,7 @@ function parseStoredHomeComparisonIndicatorsPreference(
     throw new Error('La preferencia de comparación de Inicio no es válida');
   }
 
-  const candidate =
-    parsed as Partial<StoredHomeComparisonIndicatorsPreference>;
+  const candidate = parsed as Partial<StoredHomeComparisonIndicatorsPreference>;
   if (candidate.version !== 1 || typeof candidate.enabled !== 'boolean') {
     throw new Error('La preferencia de comparación de Inicio no es válida');
   }
@@ -32,9 +31,7 @@ function parseStoredHomeComparisonIndicatorsPreference(
 }
 
 export async function loadHomeComparisonIndicatorsPreference(): Promise<HomeComparisonIndicatorsPreference> {
-  const stored = await AsyncStorage.getItem(
-    homeComparisonIndicatorsStorageKey,
-  );
+  const stored = await AsyncStorage.getItem(homeComparisonIndicatorsStorageKey);
 
   if (stored === null) {
     return defaultHomeComparisonIndicatorsPreference;

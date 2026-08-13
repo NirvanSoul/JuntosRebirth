@@ -1,4 +1,4 @@
--- categories_update_author (202608030001) restricts direct UPDATEs on
+-- categories_update_author (01_initial_finance_schema.sql) restricts direct UPDATEs on
 -- public.categories to the category's creator. In a shared space both
 -- members should be able to set or clear a category's budget without
 -- gaining rights over its name, icon, color or archived state, so budget

@@ -6,6 +6,7 @@ import {
   type ReplaceScheduleEntry,
 } from '@/features/transactions/repositories/localNotificationRuleScheduleRepository';
 import { listLocalTransactionReminders } from '@/features/transactions/repositories/localTransactionReminderRepository';
+import { getShowAmountsInNotifications } from '@/features/transactions/repositories/notificationPrivacyPreferenceRepository';
 import { buildNotificationContent } from '@/features/transactions/services/notificationTemplateService';
 import type {
   SessionTransaction,
@@ -75,6 +76,8 @@ export async function reconcileNotificationRules({
 }: ReconcileNotificationRulesInput): Promise<void> {
   const rules = await listLocalNotificationRules();
   if (rules.length === 0) return;
+
+  const showAmounts = await getShowAmountsInNotifications();
 
   const categoryNameById = new Map(
     categories.map((category) => [category.id, category.name] as const),
@@ -170,15 +173,18 @@ export async function reconcileNotificationRules({
         const { title, body } = await buildNotificationContent({
           scheduledOn: candidate.remindOn,
           type: candidate.transaction.type,
-          variables: buildReminderTemplateVariables({
-            amountMinor: candidate.transaction.amountMinor,
-            categoryName: categoryNameById.get(
-              candidate.transaction.categoryId,
-            ),
-            currency: candidate.transaction.currency,
-            title: candidate.transaction.title,
-            type: candidate.transaction.type,
-          }),
+          variables: buildReminderTemplateVariables(
+            {
+              amountMinor: candidate.transaction.amountMinor,
+              categoryName: categoryNameById.get(
+                candidate.transaction.categoryId,
+              ),
+              currency: candidate.transaction.currency,
+              title: candidate.transaction.title,
+              type: candidate.transaction.type,
+            },
+            showAmounts,
+          ),
         });
         const notificationIds = await Promise.all(
           scheduledEntries.map(({ date }) =>

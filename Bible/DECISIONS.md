@@ -280,6 +280,7 @@ Utilizar un onboarding de un máximo de cuatro láminas, además de la captura m
 
 - Registrar ingresos y gastos.
 - Organizar mediante categorías.
+- Elegir una moneda principal.
 - Compartir cuando el usuario decida.
 - Probar localmente y sincronizar más adelante.
 
@@ -289,6 +290,36 @@ Utilizar un onboarding de un máximo de cuatro láminas, además de la captura m
 - Debe poder completarse rápidamente.
 - No debe repetirse sin motivo.
 - Su efectividad puede medirse.
+
+## Ampliación — láminas 6 a 9, acción real en vez de solo mensaje
+
+El límite pasa de cuatro a ocho láminas de valor (además de la captura de
+nombre): se añaden cuatro pantallas al final del flujo, antes de la de
+acceso, que hacen que el invitado termine el onboarding con datos reales en
+su espacio personal local, no solo con mensajes:
+
+- **6 — Crear la primera categoría.** Reutiliza sin modificar
+  `CategoryPickerModal` (catálogo de 18 plantillas) y `CreateCategoryModal`
+  (categoría personalizada), los mismos componentes que usa la app ya
+  autenticada, contra el espacio local `personal` del invitado (`useSpaces()`,
+  disponible sin sesión). Botón `Crear categoría`.
+- **7 — Añadir el primer ingreso** y **8 — Añadir el primer gasto.** Ambas
+  reutilizan sin modificar `CreateTransactionModal`. Para esto se añadió el
+  único cambio de comportamiento a un componente existente: un prop opcional
+  `hideTypeToggle` que, solo cuando está activo, oculta el selector
+  interactivo de gasto/ingreso y muestra el `type` recibido como una
+  insignia fija — necesario porque cada una de estas dos láminas debe
+  registrar exactamente un tipo, sin dejar cambiarlo. Ninguna otra pantalla
+  de la app pasa este prop, así que el comportamiento por defecto (selector
+  interactivo) no cambia en ningún otro lugar. Botones `Añadir ingreso` /
+  `Añadir gasto`.
+- **9 — Cierre.** Solo mensaje («Creces tan rápido…»). Botón `Empezar`,
+  el que de verdad completa el onboarding.
+
+Cada lámina de acción real avanza el flujo al completar su acción (crear la
+categoría, guardar el movimiento), no mediante un botón `Continuar`
+independiente. Ver `Bible/JUNTOSS_ONBOARDING_GUIDE.md` §6.1–§6.4 para el copy
+exacto y el detalle de cada componente.
 
 ---
 
@@ -950,29 +981,29 @@ reapertura ocurrida durante la animación.
 - Verificación manual en Mapa: abrir un día, cerrar y volver a tocar el mismo
   día debe reabrir el detalle con un solo toque.
 
-## Corrección — un remontaje reciente podía ignorar el primer `present()`
+## Corrección — la primera apertura no debe depender de frames externos
 
-Tras la corrección anterior, cerrar y volver a abrir el mismo modal seguía
-exigiendo dos toques, pero de otra forma: el primer toque solo actualizaba la
-marca visual de selección (por ejemplo, el día quedaba resaltado en Mapa) sin
-llegar a presentar la hoja; el segundo toque sí la abría. Cada cierre completo
-desmonta el `BottomSheetModal` (`isMounted` vuelve a `false`) y cada apertura
-posterior lo vuelve a montar desde cero. `AppModal` esperaba un único
-`requestAnimationFrame` tras ese remontaje antes de llamar a
-`modalRef.current?.present()`, y un solo frame no siempre alcanza para que el
-sheet nativo recién creado termine de registrarse en su
-`BottomSheetModalProvider`; si `present()` llega antes de ese registro, la
-llamada se pierde en silencio y no queda ningún reintento pendiente.
+`BottomSheetModal` ya programa internamente su montaje mediante un
+`requestAnimationFrame`. Añadir otro ciclo de montaje, dos frames y reintentos
+desde `AppModal` retrasaba la primera apertura y podía cruzarse con un cierre
+anterior. En particular, una hoja creada inicialmente con `visible=false`
+podía llegar a tratar su primer cambio a `true` como si aún estuviera
+cerrándose, sin solicitar la presentación.
 
-La corrección encadena un segundo `requestAnimationFrame` dentro del primero
-antes de llamar a `present()`, dando un frame adicional para que ese registro
-se asiente. Esto afecta a todo remontaje de `AppModal` (cualquier apertura
-tras un cierre completo), no solo a Mapa.
+`AppModal` mantiene ahora su instancia de `BottomSheetModal` montada desde el
+primer render —la librería conserva vacío su portal hasta `present()`— y usa
+`useLayoutEffect` para invocar `modalRef.current?.present()` directamente al
+recibir `visible=true`. `hasPresentedRef` impide solicitar `dismiss()` para una
+hoja que nunca se presentó; `dismissRequestedByParentRef` sigue distinguiendo
+el cierre del padre de un gesto y, si una reapertura coincide con el cierre,
+solicita la presentación una vez que este termina. Así el botón de filtros no
+depende de un segundo toque ni de una espera temporal arbitraria.
 
 ### Validación de la corrección
 
-- `AppModal.test.tsx` cubre que, tras montar y hacerse visible, `present()`
-  se invoca una vez que la animación termina de asentarse.
+- `AppModal.test.tsx` cubre que una hoja inicialmente oculta invoca `present()`
+  en su primer cambio a visible y que una reapertura durante el cierre vuelve a
+  solicitarla al terminar.
 - `npm run validate` completo sin regresiones.
 - Verificación manual en Mapa: tocar un día debe abrir su detalle en un solo
   toque, sin importar si ese día ya estaba marcado como seleccionado.
@@ -2862,8 +2893,10 @@ posterior.
 
 ## Pendiente
 
-Desglosar cuánto se ha gastado en cada moneda activa (Inicio, Actividad,
-categorías) es la siguiente entrega de esta misma iniciativa.
+Inicio y los presupuestos por categoría todavía no desglosan monedas. Actividad
+sí permite escoger una moneda cuando hay dos o más presentes en el espacio
+activo, y aplica esa selección al listado, sus totales y el detalle por
+categoría; no muestra un agregado ni una conversión entre divisas.
 
 ## Corrección — símbolos reales y posición por moneda, y `formatCurrency` ligado a `'EUR'`
 
@@ -3355,6 +3388,1215 @@ porque ahí el usuario ya está mirando activamente un periodo concreto.
 
 ---
 
+# ADR-065 — Adopción completa de `useTheme()` para terminar el modo oscuro
+
+**Estado:** Aceptada
+
+## Contexto
+
+El sistema de modo oscuro ya existía a nivel de infraestructura desde hacía
+tiempo: `src/theme/types.ts` (`ColorTokens`, `ThemeShadows`,
+`AppearancePreference`), `src/theme/colors.ts` y `src/theme/shadows.ts`
+(paletas `light`/`dark` y `resolveColorTokens`/`resolveShadows`),
+`ThemeProvider`/`useTheme` (persistiendo la preferencia mediante
+`src/state/appPreferences/`) y `useThemedStyles`/`useThemeOptional`. El
+proveedor ya estaba montado en `src/app/AppProviders.tsx` y `AppBootstrap.tsx`
+ya sincronizaba la barra de estado del sistema con `isDark`.
+
+Sin embargo, la adopción real era mínima: solo 7 archivos de producción
+llamaban a `useTheme()`. El resto (43 archivos: pantallas completas, todos los
+modales de `overlays/`, `AppTabBar`, `MainTabsNavigator`, las features de
+transacciones, categorías, actividad, mapa y espacios) importaban el alias
+estático `colors`/`shadows` de `@/theme/colors` y `@/theme/shadows` — pensado
+únicamente como valor por defecto para pruebas —, de modo que permanecían
+fijos en modo claro sin importar la preferencia del usuario. Además, no
+existía ninguna forma de que la persona usuaria eligiera apariencia: la fila
+«Apariencia» de Ajustes era un `SettingsRow` con `pending` que solo mostraba
+una alerta «Función pendiente», y `app.json` no declaraba
+`userInterfaceStyle`, por lo que el proyecto nativo generado
+(`ios/juntoss/Info.plist`) quedaba fijado a `Light`.
+
+## Decisión
+
+Terminar la implementación ya diseñada, sin cambiar su arquitectura:
+
+- Migrar los 43 archivos que importaban los alias estáticos `colors`/
+  `shadows` para que obtengan ambos de `useTheme()`, usando `useThemedStyles`
+  (o `useTheme` + `useMemo` cuando además hacía falta `shadows`) para
+  recalcular sus `StyleSheet` cuando cambia el esquema. Los componentes
+  privados auxiliares que leían `colors`/`styles` de módulo (por ejemplo
+  `AnimatedChevron` en `ActivityCollapsibleSection`, `DetailActionButton` en
+  `CategoryDetailModal`, filas de `SettingsScreen`) pasan a llamar el hook
+  localmente, siguiendo el patrón ya usado en
+  `src/components/ui/SelectableOption/SelectableOption.tsx`.
+- `categoryColors.ts` se deja fuera deliberadamente: los colores de categoría
+  son independientes del esquema claro/oscuro por diseño.
+- `AppModal` (la primitiva de bottom sheet compartida) ahora resuelve también
+  el `tint` del `BlurView` de su backdrop según `isDark`, en vez de
+  `tint="default"`, para que el desenfoque seguido de la preferencia elegida
+  y no del esquema del sistema cuando ambos difieren.
+- La fila «Apariencia» se sustituye por el interruptor booleano «Modo oscuro»
+  de `SettingsScreen`, que guarda explícitamente `dark` al activarse y `light`
+  al desactivarse mediante `useTheme().setAppearance`. El valor `system` se
+  conserva únicamente para interpretar preferencias ya guardadas.
+- `app.json` declara `"userInterfaceStyle": "automatic"` bajo `expo`, para que
+  una futura generación nativa (`expo prebuild`) deje de fijar `Light` en el
+  proyecto iOS/Android. No se ejecutó `expo prebuild` como parte de este
+  cambio: el proyecto se ejecuta actualmente mediante Expo Go (ADR-033), que
+  no usa los directorios nativos generados, así que no había nada que
+  regenerar de forma inmediata.
+- `ErrorBoundary` (`src/app/ErrorBoundary.tsx`) se deja deliberadamente sin
+  migrar: envuelve a `AppProviders`/`ThemeProvider` en `App.tsx`, así que no
+  puede depender de `useTheme()` sin arriesgar un fallo si el propio
+  `ThemeProvider` es la causa del error capturado. Su fondo claro fijo es un
+  respaldo intencional, no una omisión.
+
+## Motivo
+
+La arquitectura de theming ya estaba bien diseñada (paletas resueltas por
+esquema, hook único, persistencia); el problema era puramente de adopción.
+Cambiar de arquitectura habría violado la regla de «el mejor cambio es el
+menor cambio» (`PROJECT_RULES.md` §29): bastaba con terminar de conectar cada
+consumidor a la fuente de verdad ya existente.
+
+## Consecuencias positivas
+
+- Activar el modo oscuro en Ajustes afecta a toda la aplicación:
+  pestañas, cabeceras, modales, tarjetas, calendarios y listas.
+- El desenfoque de los modales sigue la preferencia elegida en vez del
+  esquema del sistema.
+- Ningún color se declaró de forma nueva: todos los tokens `light`/`dark` ya
+  existían en `colors.ts`/`shadows.ts` y no se modificaron.
+
+## Consecuencias negativas
+
+- El diff toca un número muy alto de archivos (más de 60) aunque cada cambio
+  individual es mecánico; la revisión debe apoyarse en que el patrón es
+  idéntico en todos los casos, no en leer cada archivo con el mismo detalle.
+- `ErrorBoundary` sigue sin modo oscuro por diseño; si su pantalla de error
+  molesta visualmente en modo oscuro, requiere una solución distinta (por
+  ejemplo, leer la preferencia guardada directamente desde
+  `appPreferencesRepository` sin pasar por el contexto de React).
+
+## Riesgos
+
+- Un componente nuevo que vuelva a importar el alias estático `colors`/
+  `shadows` en lugar de `useTheme()` pasaría desapercibido en revisión si no
+  se comprueba explícitamente; ambos alias se mantienen exportados a
+  propósito porque las pruebas y los valores por defecto los siguen usando.
+- Corrección relacionada encontrada durante la validación: el valor por
+  defecto `availableCurrencies = [defaultCurrencyCode]` en
+  `CreateTransactionModal` creaba un array nuevo en cada render y formaba
+  parte de las dependencias de un `useEffect` que reinicia el formulario,
+  produciendo un bucle de renderizado infinito. No es un defecto de modo
+  oscuro, pero solo se manifestaba al montar el componente correctamente
+  (antes quedaba enmascarado porque las pruebas fallaban antes, por falta de
+  `ThemeProvider`); se corrigió moviendo el valor por defecto a una constante
+  de módulo (`defaultAvailableCurrencies`) con referencia estable.
+
+## Validación
+
+- `npx tsc --noEmit` sin errores.
+- `npm run lint` sin errores (2 advertencias `react-hooks/exhaustive-deps` en
+  `ActivityScreen.tsx` son preexistentes y no relacionadas, confirmadas
+  comparando contra el estado previo a este cambio).
+- `npm run format:check` limpio en todos los archivos tocados.
+- `npm test`: 341/347 pruebas en verde. Las 6 restantes son preexistentes y no
+  relacionadas: diferencias de forma de `accessibilityState` de
+  `@testing-library/react-native` (claves adicionales `busy`/`disabled`/
+  `expanded`/`selected`), datos ICU/locale del entorno de pruebas para el
+  separador de miles, y un mock de `expo-sqlite` ya roto en un flujo de copia
+  de movimientos entre espacios que no forma parte de este cambio.
+- Pendiente: verificación manual en iOS y Android alternando modo claro y
+  oscuro.
+
+---
+
+# ADR-066 — Sistema de privacidad, cumplimiento legal y eliminación de cuenta
+
+**Estado:** Aceptada
+
+## Contexto
+
+`Legal/JUNTOSS_LEGAL_PRIVACY_SYSTEM.md` (investigación previa) exige que juntoss
+declare correctamente sus datos ante App Store Connect y Google Play Console,
+ofrezca eliminación de cuenta dentro de la app (obligatorio en ambas tiendas
+si se permite crear cuentas), y separe consentimiento de términos, privacidad
+y publicidad. La auditoría real del código (Fase 1 de ese documento) encontró:
+
+- Sin analítica, ads ni crash reporting instalados; solo Supabase, notificaciones
+  locales (`expo-notifications`) y almacenamiento local.
+- La fila `Ajustes → Ayuda → Política de privacidad` (`SettingsScreen.tsx`)
+  abría un `Alert` de "función pendiente".
+- Ninguna pantalla de registro/login todavía: la app es 100% invitado, por lo
+  que "eliminar cuenta" hoy equivale en la práctica a "borrar mis datos
+  locales", pero el backend de borrado real debía quedar listo para cuando
+  exista registro.
+- `notificationTemplates.ts` siempre incluía `{{amount}}` en gasto/ingreso, sin
+  alternativa sin importe (gap señalado por el propio documento legal §41 y por
+  `Bible/JUNTOSS_NOTIFICATIONS.md` §10).
+
+## Opciones consideradas
+
+1. Pantallas legales como rutas nuevas en un `Stack.Navigator` de Settings.
+2. Pantallas legales como `AppModal` apilables (mismo patrón que
+   `CurrencyPreferencesModal`/`NotificationRulesModal`), sin tocar navegación.
+3. Instalar `react-native-google-mobile-ads` ya, dejando la integración de
+   anuncios a medio construir para cuando haga falta.
+4. Documentar la integración de AdMob sin instalar el SDK, hasta que exista
+   una superficie real de anuncios.
+5. Reasignar `created_by` a una cuenta "tombstone" ficticia insertada a mano
+   en `auth.users` al eliminar una cuenta con espacio compartido.
+6. Permitir `created_by` nulo con `on delete set null`, dejando que Postgres
+   limpie la referencia automáticamente al borrar el usuario.
+
+## Decisión
+
+- **Navegación (opción 2):** ninguna pantalla de Settings usa hoy un
+  `Stack.Navigator`; introducir uno solo para esta feature habría sido el
+  cambio más amplio posible para el problema más pequeño. `PrivacyLegalScreen`,
+  `LegalDocumentScreen`, `PrivacyChoicesScreen`, `DataRightsScreen` y
+  `PermissionsScreen` (`src/features/legal/screens/`) son `AppModal` variant
+  `expanded` con `stackBehavior="push"` para las subpantallas, igual que
+  `CategoryPickerModal`/`CreateCategoryModal`.
+- **Componentes de lista:** `SettingsSection`/`SettingsRow`/`Divider` vivían
+  como funciones privadas de `SettingsScreen.tsx`. Se extrajeron sin cambiar su
+  API a `src/components/layout/SettingsList/SettingsList.tsx` (añadiendo
+  `SettingsToggleRow` y `SettingsPendingDot`), y tanto `SettingsScreen` como
+  las pantallas legales las importan de ahí. Evita exactamente los componentes
+  duplicados que el documento legal prohíbe por nombre (`PrivacySettingsRow`,
+  `LegalSettingsRow`).
+- **AdMob (opción 4):** se documenta el plan completo en
+  `docs/privacy/SDK_INVENTORY.md` (CMP/UMP, ATT, orden de inicialización,
+  regla de release) pero no se instala el SDK ni se añade una fila de
+  preferencia de anuncios sin funcionalidad real, siguiendo la regla explícita
+  del documento legal de "no mostrar filas sin funcionalidad real" y la de
+  `PROJECT_RULES.md` de no instalar dependencias sin necesidad.
+- **Eliminación de cuenta (opción 6):** `categories.created_by`,
+  `recurring_transaction_series.created_by`, `transactions.created_by` y
+  `spaces.created_by` pasan a admitir `null` con
+  `on delete set null` (migración `06_account_deletion.sql`). La
+  función `request_account_deletion()` (SECURITY DEFINER) borra por completo
+  los espacios donde el usuario es el único miembro activo, y en espacios
+  compartidos solo marca su membresía como `removed`: el resto de datos
+  sobrevive y su autoría queda en `null` automáticamente cuando la Edge
+  Function `delete-account` borra la fila de `auth.users` con la Admin API (una
+  función SQL normal no puede hacerlo). Se descartó la opción 5 (cuenta
+  tombstone) por el riesgo de insertar a mano una fila en el esquema interno
+  `auth.users`, cuyas columnas obligatorias no están completamente
+  documentadas y no se pueden verificar sin una instancia real de Supabase.
+- **Ruta según sesión real:** como hoy no existe ninguna pantalla de
+  registro, `dataDeletionService.deleteMyAccountOrData()` comprueba
+  `auth.getUser()` (mismo patrón que
+  `syncPendingLocalDataForCurrentSession`) y, si no hay sesión, borra solo los
+  datos locales (SQLite + todas las claves `@juntoss/*` de AsyncStorage +
+  `signOut`), cubriendo el 100% de los usuarios actuales sin dejar el backend
+  remoto sin construir.
+- **Exportación de datos:** `Share.share()` con un JSON, sin instalar
+  `expo-file-system`/`expo-sharing`, suficiente para el volumen de datos de
+  una app de finanzas personales.
+- **Importes en notificaciones:** se añaden plantillas de reserva sin
+  variables (`expense_reminder_11`, `income_reminder_11`,
+  `notificationTemplates.ts`) y un parámetro `showAmounts` en
+  `buildReminderTemplateVariables` (`transactionReminders.ts`), leído desde un
+  nuevo repositorio `notificationPrivacyPreferenceRepository.ts` (mismo patrón
+  que `dailyReminderScheduleRepository.ts`) antes de construir el contenido en
+  `transactionReminderService.ts` y `notificationRuleService.ts`.
+- **Contenido legal:** Política de privacidad y Términos
+  (`src/features/legal/content/*.ts`) son la única fuente de verdad; un
+  script (`scripts/generate-legal-site.ts`, ejecutable con `npx tsx`) genera
+  las páginas estáticas de `Legal/site/` para publicar en `aoraestudio.com` a
+  partir de ese mismo contenido, evitando mantener el texto duplicado a mano.
+  Cualquier dato no confirmable (nombre legal, dirección, región de Supabase,
+  retención, ley aplicable) queda marcado `LEGAL_REVIEW_REQUIRED` en vez de
+  inventarse, siguiendo la regla explícita del documento legal.
+- **Manifest de privacidad de iOS:** declarado en `app.json`
+  (`expo.ios.privacyManifests`), no como archivo suelto en `ios/juntoss/`
+  (esa carpeta está en `.gitignore` y la regenera `expo prebuild`); el plugin
+  de Expo escribe `PrivacyInfo.xcprivacy` y lo registra en el proyecto de
+  Xcode automáticamente.
+
+## Consecuencias positivas
+
+- La fila "Política de privacidad" de Ajustes deja de ser un `Alert` de
+  función pendiente y abre un sistema completo (documentos, preferencias,
+  permisos, exportación y eliminación).
+- El backend de eliminación de cuenta queda correcto y probado a nivel de
+  esquema para cuando exista registro, sin coste en el bundle de la app (vive
+  en `supabase/`).
+- Ningún dato financiero (importe, categoría, título) se envía por defecto a
+  analítica/logs porque no existe ningún sistema de analítica instalado; el
+  inventario en `docs/privacy/` deja constancia explícita de ello para cuando
+  se audite antes de publicar.
+
+## Consecuencias negativas
+
+- Si quien crea un espacio compartido elimina su cuenta, `spaces.created_by`
+  queda en `null` y la política `spaces_update_owner` deja de admitir cambios
+  sobre ese espacio hasta que se diseñe una transferencia de propiedad;
+  documentado como limitación conocida en la propia migración y en
+  `Legal/JUNTOSS_LEGAL_PRIVACY_SYSTEM.md` §17 (requiere revisión de producto).
+  No se resuelve aquí porque hoy no existe ningún usuario real afectado.
+- El texto legal vive duplicado en dos formatos (contenido TS para la app,
+  HTML generado para la web); se mitiga con el script generador, pero un
+  cambio de contenido sigue exigiendo recordar regenerar `Legal/site/`.
+- Identidad del responsable (Alan Rios y Alejandro Perez, Venezuela y España)
+  y audiencia objetivo (a partir de 14 años, sin contenido sensible) ya están
+  confirmadas por el responsable del proyecto y reflejadas en el texto legal.
+  Sigue pendiente de confirmar la región real del proyecto Supabase y los
+  periodos exactos de retención de copias de seguridad antes de publicar.
+
+## Riesgos
+
+- Las migraciones y funciones SQL (`legal_acceptances`,
+  `request_account_deletion`) no se han ejecutado contra una instancia real de
+  Supabase ni contra `supabase test db`: solo se verificaron por lectura
+  cuidadosa contra el esquema de `01_initial_finance_schema.sql`
+  (nombres de constraints FK por defecto, acciones `on delete` de cada
+  columna). Deben ejecutarse antes de desplegar.
+- Las Edge Functions (`delete-account`, `export-user-data`) tampoco se han
+  desplegado ni probado contra un proyecto real.
+
+## Validación
+
+- `npx tsc --noEmit` sin errores tras excluir `scripts/` del `tsconfig.json`
+  (el único archivo TypeScript ahí, `generate-legal-site.ts`, es una
+  herramienta de Node ejecutada con `npx tsx`, no código de la app).
+- `npm test` sobre los archivos tocados/nuevos en verde (`SettingsScreen`,
+  `notificationPrivacyPreferenceRepository`, `transactionReminders`,
+  `notificationTemplateService`, `dataDeletionService`). Los 2 fallos de
+  `CreateTransactionModal.test.tsx` son preexistentes y no relacionados
+  (confirmado comparando con `git stash`, que ya fallaba de forma distinta sin
+  ningún cambio de esta tarea).
+- Pendiente: `supabase test db` (pgTAP) contra una instancia real, desplegar
+  las Edge Functions, y publicar `Legal/site/*` en `aoraestudio.com`.
+
+---
+
+# ADR-067 — Nota libre en categorías y movimientos, y apertura de movimiento desde el detalle de categoría
+
+**Estado:** Aceptada
+
+## Contexto
+
+Se pidió una nota de texto libre (para listas o detalles cortos) visible desde
+el detalle de una categoría, justo debajo de su resumen de gastos e ingresos,
+y desde el detalle de un movimiento, justo debajo de su recurrencia. Ninguno
+de los dos modelos (`Category`, `SessionTransaction`) tenía ese campo, y
+`CategoryDetailModal` no ofrecía un patrón de edición in place: toda mutación
+existente pasa por un modal de creación/edición completo (`CreateCategoryModal`,
+`CreateTransactionModal`) o por un sub-modal dedicado (`CategoryBudgetModal`).
+
+Al revisar `CategoryDetailModal` para insertar la nota se encontró un defecto
+aparte: su lista de movimientos (`TransactionPreviewList`) ya admite un prop
+`onOpenTransactionDetail` que activa la navegación al detalle de un movimiento,
+pero `CategoryDetailModal` nunca lo recibía ni lo reenviaba, así que tocar un
+movimiento desde el detalle de categoría no hacía nada.
+
+## Opciones consideradas
+
+1. Nota como parte del flujo de edición completo (`CreateCategoryModal`/
+   `CreateTransactionModal`), sin edición directa desde el detalle.
+2. Campo de texto multilínea editado directamente en el detalle, que guarda
+   al perder el foco (sin botón de guardado). Primera implementación de esta
+   ADR; se descartó a petición explícita en favor de la opción 3 porque un
+   campo multilínea permanente ocupa espacio en el detalle aunque no haya
+   nota, y guardar sin confirmación visible es menos cómodo para un texto
+   largo que para un valor corto como el presupuesto.
+3. Fila cerrada tipo botón ("Escribir Nota" + chevron) que abre un sub-modal
+   dedicado a editar la nota, con guardado explícito mediante un botón.
+
+## Decisión
+
+Se adopta la opción 3, reutilizando la estructura del paso "nombre" de
+`CreateCategoryModal` (cabecera con volver, campo único, acción principal
+fija abajo) por ser ya el patrón más simple del proyecto para "un campo, un
+botón de guardar". `NoteEditorModal`
+(`src/components/ui/NoteEditorModal/`) es ese sub-modal compartido: mismo
+`AppModal` `variant="expanded"` con `stackBehavior="push"`, mismo estilo de
+`BottomSheetTextInput` con borde (ahora `multiline`), y un
+`ModalPrimaryAction` con `gradientColor` como botón de guardar — el mismo
+prop que ya usa `CreateTransactionModal` para su botón de envío coloreado
+por categoría, así que el color de fondo del botón de guardar sale del token
+de color de la categoría (`categoryColors[colorToken]`) y su contraste de
+texto de `getCategoryContentContrast`, reutilizando la misma excepción de
+texto oscuro sobre amarillo ya resuelta para las tarjetas de categoría.
+
+`CategoryDetailModal` y `TransactionDetailModal` ya no muestran el campo
+directamente: en su lugar renderizan una fila-botón (`Pressable` con el
+texto de la nota o el marcador "Escribir Nota" y un `chevron-forward`) justo
+debajo del resumen de gastos e ingresos y de la tarjeta de recurrencia
+respectivamente, oculta en `TransactionDetailModal` para ocurrencias
+proyectadas de una serie recurrente (sin fila propia todavía en
+`transactions`, por lo que no hay nada que actualizar). Tocarla abre
+`NoteEditorModal` apilado sobre el detalle. Ambos detalles siguen sin llamar
+a un repositorio directamente: invocan `onSaveNote(id, note)`, que
+`MainTabsNavigator` resuelve contra
+`updateLocalCategoryNote`/`updateLocalTransactionNote`.
+
+Esas dos funciones son deliberadamente independientes de
+`updateLocalCategory`/`updateLocalTransaction`: la primera ya acepta una
+categoría completa y solo necesitaba la columna nueva, pero
+`updateLocalTransaction` tiene cientos de líneas de ramas para reescribir
+series recurrentes: añadir la nota ahí habría acoplado un campo simple a esa
+complejidad. Las funciones nuevas hacen un `UPDATE ... SET note = ?` directo,
+igual que `archiveLocalCategory`/`archiveLocalTransaction`.
+
+El esquema local sube a la versión 8 (`ALTER TABLE categories/transactions
+ADD COLUMN note TEXT`, nulo por defecto). El campo no participa en la
+creación (`CreateCategoryModal`/`CreateTransactionModal` no lo piden); una
+categoría o movimiento nuevo empieza sin nota.
+
+Para el defecto de navegación, `CategoryDetailModal` gana un prop
+`onOpenTransactionDetail` obligatorio que reenvía a `TransactionPreviewList`.
+`MainTabsNavigator` le pasa `setDetailTransactionId` (el mismo estado que ya
+usan Inicio, Actividad y Mapa). Como `AppModal` usa `stackBehavior="replace"`
+por defecto en ambos detalles, abrir el de movimiento sobre el de categoría
+cierra este último automáticamente a través de su `onClose` existente, sin
+lógica adicional.
+
+## Motivo
+
+- Un botón cerrado mantiene el detalle compacto cuando no hay nota, y un
+  sub-modal dedicado deja espacio cómodo para leer y editar listas o textos
+  más largos que una fila de una línea.
+- Reutilizar la estructura del paso "nombre" de `CreateCategoryModal` evita
+  inventar un patrón de modal nuevo para algo tan simple como "un campo, un
+  botón de guardar": ya es el ejemplo más sencillo de ese patrón en el
+  proyecto.
+- Colorear el botón de guardar con el color de la categoría (vía
+  `ModalPrimaryAction`/`gradientColor`, igual que el envío de
+  `CreateTransactionModal`) conecta visualmente la nota con su categoría sin
+  inventar un token de color nuevo.
+- Aislar la escritura de la nota en funciones de repositorio dedicadas evita
+  tocar las ramas de recurrencia de `updateLocalTransaction`, la parte más
+  compleja y frágil del repositorio de movimientos.
+- Arreglar la apertura del detalle de movimiento desde categoría era el
+  motivo explícito por el que se pidió revisar esa lista: ya tenía el prop
+  necesario en `TransactionPreviewList`, solo faltaba conectarlo.
+
+## Consecuencias positivas
+
+- Persona usuaria puede anotar listas o detalles cortos en cualquier
+  categoría o movimiento sin abrir el modal de edición completo, en un
+  espacio cómodo dedicado a ese texto.
+- Tocar un movimiento desde el detalle de su categoría abre su propio
+  detalle, como ya ocurría desde Inicio, Actividad y Mapa.
+- `NoteEditorModal` queda disponible para cualquier detalle futuro que
+  necesite el mismo patrón de "fila cerrada + editor dedicado".
+
+## Consecuencias negativas
+
+- Una ocurrencia proyectada no admite nota hasta materializarse (se le pierde
+  de vista temporalmente); documentado como limitación, no como error.
+- El campo no se sincroniza todavía con Supabase (no hay motor de sync activo
+  para categorías/movimientos); cuando exista, la migración remota deberá
+  añadir la misma columna.
+
+## Riesgos
+
+- La migración no se ha ejecutado contra una base local ya poblada en
+  dispositivo real, solo contra los mocks de `localDatabase.test.ts`.
+
+## Validación
+
+- `npx tsc --noEmit` y `eslint` sin errores en los archivos tocados.
+- `npm test` en verde sobre `localDatabase`, `localCategoryRepository`,
+  `localTransactionRepository`, `CategoryDetailModal`, `TransactionDetailModal`
+  y las suites de Inicio/Actividad/Mapa/`MainTabsNavigator` que montan estos
+  detalles. Los fallos preexistentes de `CreateTransactionModal.test.tsx`,
+  `ActivityScreen.test.tsx`, `HomeScreen.test.tsx` y `MainTabsNavigator.test.tsx`
+  (forma de `accessibilityState` y `NativeDatabase` en el entorno de test) son
+  ajenos a esta tarea, confirmados comparando con `git stash` de los archivos
+  no tocados aquí.
+
+---
+
+# ADR-068 — Espacios de pareja, invitaciones y autenticación con Resend
+
+**Estado:** Aceptada
+
+## Contexto
+
+`ROADMAP.md` Fase 7 (Autenticación, P0) y Fase 11 (Espacio de pareja, P1)
+seguían sin empezar: no existía ninguna pantalla de registro, verificación,
+inicio de sesión o recuperación de contraseña (`src/features/auth/` no
+existía), y `space_invitations` solo era un boceto sin migrar en
+`Bible/DATABASE.md` §6.4. `space_members` solo permitía que el creador de un
+espacio se añadiera a sí mismo: no había ninguna vía para que una segunda
+persona entrara. El responsable del proyecto pidió: invitar a otra persona
+por correo o por enlace; que cada usuario tenga como máximo un espacio juntos
+activo, y que al aceptar una invitación ambas personas queden como
+anfitriones simétricos (sin jerarquía dueño/miembro); una opción en Ajustes
+para "Eliminar espacio juntos" con alerta de confirmación; y correo
+(confirmación de cuenta, recuperación de contraseña, invitación) enviado a
+través de Resend.
+
+Al auditar el esquema existente se encontraron dos bugs que esta tarea debía
+corregir antes de construir nada nuevo encima:
+
+- `spaces_update_owner` dependía de `spaces.created_by`, que puede quedar
+  `NULL` tras borrar la cuenta de quien creó el espacio (limitación ya
+  documentada como pendiente en el propio comentario de
+  `06_account_deletion.sql` y en ADR-066, "Consecuencias
+  negativas"). Con espacios de pareja reales esto deja de ser hipotético.
+- Todo dispositivo invitado arrancaba con un espacio local `type: 'couple'`
+  ("Juntos", `id: 'juntos'`) puramente decorativo
+  (`src/features/spaces/types.ts`), que `migrate_guest_data()` subía tal
+  cual a Supabase. Aplicar ingenuamente la regla de "un espacio juntos por
+  usuario" habría bloqueado a todo usuario que se registrara de crear o
+  aceptar un espacio de pareja real, porque el sistema ya lo creería
+  ocupado.
+
+## Opciones consideradas
+
+1. **Un espacio juntos por usuario**: comprobación solo a nivel de
+   aplicación (`select exists(...)` antes del insert) vs. una columna
+   denormalizada `space_members.space_type` (copiada una vez de
+   `spaces.type` al crear la membresía) más un índice único parcial sobre
+   `(user_id) where status='active' and space_type='couple'`.
+2. **Caducidad de invitación**: guardar un estado `'expired'` actualizado
+   por un job programado vs. calcular el estado efectivo al leer
+   (`expires_at < now()`).
+3. **Señal de que un espacio de pareja se disolvió**: un nuevo valor
+   `space_members.status = 'dissolved'` vs. reutilizar el `'removed'` que
+   ya usa `request_account_deletion()` y dejar la señal en
+   `spaces.archived_at`.
+4. **Pantallas de autenticación**: un `Stack.Navigator` dedicado dentro de
+   Ajustes vs. componentes presentacionales (`onSuccess`/`onCancel`, sin
+   `AppModal` propio) reutilizables tanto desde un modal (`AuthModal`,
+   Ajustes) como desde una pantalla completa (`AcceptInvitationScreen`,
+   enlace de invitación).
+5. **Correo**: reemplazar todo el envío de Supabase Auth con Auth Hooks
+   personalizados llamando siempre a la API de Resend, vs. configurar
+   Resend como SMTP personalizado en el Dashboard de Supabase (cubre
+   confirmación de cuenta y recuperación de contraseña con las plantillas
+   nativas de Auth) y usar una Edge Function propia solo para el correo de
+   invitación, que no es un flujo nativo de Supabase Auth.
+
+## Decisión
+
+- **Opción 2 en la decisión 1 (índice único parcial):** una comprobación
+  solo de aplicación deja una condición de carrera real entre el
+  `select exists` y el `insert` de dos aceptaciones concurrentes. Se añadió
+  `space_members.space_type` (`not null`, backfill desde `spaces.type`) y
+  `space_members_one_active_couple_per_user_idx`, igual que
+  `spaces_one_active_personal_per_user_idx` ya resuelve el caso análogo para
+  espacios personales. `create_couple_space()` y `accept_space_invitation()`
+  hacen primero una comprobación amigable (`raise exception
+  'already_in_couple_space: ...'`) y además capturan `unique_violation` como
+  respaldo ante la carrera real.
+- **Opción 2 en la decisión 2 (calculado al leer):** el proyecto no tiene
+  `pg_cron` configurado; `get_space_invitation_preview()` y
+  `accept_space_invitation()` comparan `expires_at < now()` en cada lectura
+  en vez de depender de un job.
+- **Opción 2 en la decisión 3 (reutilizar `'removed'` + `archived_at`):**
+  evita una migración de `CHECK` adicional y mantiene el enum estable;
+  `dissolve_couple_space()` marca `spaces.archived_at = now()` y ambas
+  membresías activas en `status = 'removed'`, sin tocar movimientos ni
+  categorías (se conservan, igual que la rama de espacio compartido de
+  `request_account_deletion()`).
+- **Opción 2 en la decisión 4 (componentes presentacionales reutilizables):**
+  `src/features/auth/screens/*` (`SignUpScreen`, `VerifyCodeScreen`,
+  `LoginScreen`, `ForgotPasswordScreen`, `ResetPasswordScreen`) no incluyen
+  ningún wrapper de modal propio. `AuthModal`
+  (`src/features/settings/components/AuthModal.tsx`) los envuelve en
+  `AppModal` para Ajustes; `AcceptInvitationScreen`
+  (`src/features/spaces/screens/AcceptInvitationScreen.tsx`) los renderiza a
+  pantalla completa cuando alguien abre un enlace de invitación sin sesión,
+  sin duplicar la lógica de formulario.
+- **Opción 2 en la decisión 5 (SMTP + Edge Function separada):** documentado
+  en `docs/setup/RESEND_SETUP.md`. Confirmación de cuenta y recuperación de
+  contraseña siguen el flujo nativo de Supabase Auth (código, no enlace, per
+  `Bible/PRODUCT.md` §10) enviado vía SMTP de Resend configurado en el
+  Dashboard. La invitación a un espacio (tabla propia `space_invitations`,
+  no es un flujo de Auth) se envía desde la Edge Function
+  `send-space-invitation-email`, que llama directamente a la API HTTP de
+  Resend con el token en texto plano que le pasa el cliente — ese token
+  nunca se guarda en la base de datos, solo existe en la respuesta de
+  `create_space_invitation()` y en el cuerpo del correo.
+- **Revisión — invitaciones dentro de la app:** se elimina el envío de
+  invitaciones mediante Resend. El enlace se comparte manualmente y, si el
+  correo indicado ya corresponde a una cuenta, esa sesión ve la invitación al
+  abrir Juntoss y puede aceptarla o dejarla para más tarde. La consulta y la
+  aceptación nuevas siguen siendo RPC `SECURITY DEFINER`, por lo que un
+  cliente nunca puede enumerar invitaciones o correos ajenos.
+- **Corrección de `spaces_update_owner`:** pasa a comprobar una membresía
+  activa con `role = 'owner'` en vez de `spaces.created_by`, resolviendo la
+  limitación documentada en ADR-066.
+- **Corrección de `members_update_self_owner`:** excluye espacios
+  `type = 'couple'` de la auto-edición directa desde el cliente. Antes
+  cualquier `owner` podía poner su propia fila en `status = 'removed'` sin
+  pasar por ninguna función controlada; inofensivo para espacios
+  personales/otros (un único dueño de sí mismo), pero se habría convertido
+  en un "abandono silencioso" no gobernado en cuanto existieran dos
+  anfitriones simétricos en un espacio de pareja.
+- **Corrección de `migrate_guest_data()`:** degrada cualquier espacio local
+  `type: 'couple'` a `'other'` al subirlo, y
+  `src/features/spaces/types.ts` deja de incluir el `coupleSpace` stub en
+  `initialSpacesState` — los invitados nuevos arrancan solo con
+  `personalSpace`. Es un cambio de producto visible (el "Juntos" que
+  aparecía por defecto en el menú lateral deja de mostrarse a invitados
+  nuevos) pero necesario: sin él, todo usuario que se registrara quedaría
+  bloqueado para siempre de crear o aceptar un espacio de pareja real.
+- **Alcance de sincronización:** un espacio de pareja solo sincroniza su
+  identidad y membresía (`spaces`, `space_members`) con Supabase. Sus
+  categorías y movimientos siguen siendo tan locales como los de cualquier
+  otro espacio hoy — no existe todavía sincronización remota general para
+  ningún tipo de espacio (`Bible/DATABASE.md` §13, fase 13 sin empezar), así
+  que extenderla aquí habría sido un alcance muy superior al pedido.
+
+## Consecuencias positivas
+
+- Corrige dos limitaciones ya documentadas como pendientes (ADR-066) antes
+  de que un espacio de pareja real pudiera activarlas.
+- La fila "Iniciar sesión o crear cuenta" de Ajustes deja de ser un `Alert`
+  de función pendiente.
+- La regla de "un espacio juntos por usuario" está garantizada por la base
+  de datos, no solo por la interfaz, incluida la carrera de dos aceptaciones
+  simultáneas.
+- El token de invitación nunca se guarda en texto plano.
+
+## Consecuencias negativas
+
+- No existe todavía una acción explícita de "revocar invitación sin
+  reemplazarla" — solo se revoca implícitamente al crear una nueva para el
+  mismo espacio. Aceptable porque la caducidad (7 días) acota la ventana;
+  queda como mejora futura pequeña.
+- No existe transferencia de propiedad más allá de la disolución simétrica:
+  si se necesitara en el futuro que un espacio de pareja sobreviva con un
+  único anfitrión (por ejemplo, tras borrar la cuenta del otro), no hay
+  mecanismo para ello — hoy `dissolve_couple_space()` siempre desactiva a
+  ambos miembros a la vez.
+- Al pulsar "Espacio de pareja" sin sesión, `AuthModal` se abre y al
+  autenticarse simplemente se cierra; el usuario debe volver a pulsar
+  "Espacio de pareja" una segunda vez en vez de encadenarse
+  automáticamente, porque la interfaz pública de `AuthModal` no distingue
+  éxito de cancelación. Mejora de UX pendiente, no un defecto de datos.
+- `loginService.ts` puede ofrecer combinar datos de invitado incluso cuando
+  lo único "extra" en el dispositivo es un espacio de pareja ya fusionado en
+  una sesión anterior (la entrada persiste localmente entre sesiones); es un
+  patrón ya existente antes de esta tarea, no una regresión introducida
+  aquí, pero vale la pena revisarlo.
+
+## Riesgos
+
+- Ninguna migración ni Edge Function de esta tarea se ha ejecutado contra
+  una instancia real de Supabase: se verificaron por lectura cuidadosa
+  contra el esquema existente y con pgTAP nuevo
+  (`space_invitations.test.sql`, `couple_space_constraints.test.sql`,
+  adiciones a `rls_policies.test.sql`), pero deben correrse contra
+  `supabase test db` o un proyecto de prueba antes de producción, ya que la
+  migración altera dos políticas RLS en vivo (`spaces_update_owner`,
+  `members_update_self_owner`).
+- La condición de carrera de "un espacio juntos por usuario" se cierra a
+  nivel de índice único, pero no se probó con dos conexiones concurrentes
+  reales (pgTAP no lo permite fácilmente) — validar a mano con dos sesiones
+  en un proyecto de prueba antes de confiar en ella en producción.
+- Si el correo de invitación falla al enviarse, la invitación ya existe (no
+  se revierte); la interfaz debe ofrecer el enlace como respaldo en ese
+  caso — implementado en `InvitePartnerScreen`, pero no probado contra un
+  envío real de Resend todavía.
+- No se ejecutó la app en un simulador o dispositivo real para ninguna de
+  las pantallas nuevas: solo verificación estática (`tsc`, `eslint`) y
+  pruebas unitarias/de componente con Jest.
+
+## Validación
+
+- `npx tsc --noEmit` y `npm run lint` sin errores en todo el proyecto.
+- Suites de Jest nuevas o actualizadas en verde: `supabaseAuthGateway`,
+  `loginService`, `supabaseInvitationGateway`, `useSpaces`, `SpaceSideMenu`,
+  `SettingsScreen`, `localSpaceRepository`. El resto de la suite del
+  proyecto (72 archivos) se corrió completa; los 7 fallos preexistentes
+  (`HomeScreen`, `ActivityScreen`, `CreateTransactionModal`,
+  `MainTabsNavigator`, problemas de `accessibilityState`/mock de SQLite en
+  el entorno de test) se confirmaron ajenos a esta tarea comparando con
+  `git stash`.
+- Pendiente: `supabase test db` (pgTAP) contra una instancia real y una
+  verificación manual completa en dispositivo/simulador (iOS y Android)
+  del flujo de extremo a extremo: invitado → registro con código → crear
+  espacio de pareja → invitar por enlace → aceptar desde otra cuenta →
+  confirmar ambos como anfitriones → "Eliminar espacio juntos".
+
+---
+
+# ADR-069 — Importación bancaria Fase 1 (Excel/CSV) sin soporte de PDF
+
+**Estado:** Aceptada
+
+## Contexto
+
+`Bible/JUNTOSS_BANK_FILE_IMPORT_SYSTEM.md` especifica un sistema de
+importación de movimientos desde XLSX/XLS/CSV y PDF. Se implementó la Fase 1
+(Excel/CSV) completa: selección de archivo, mapeo de columnas, normalización
+de fecha/importe/tipo, sugerencia de categoría, deduplicado, revisión y
+commit por lote reutilizando `CreateTransactionDraft`/`createLocalTransactions`.
+
+Antes de encarar PDF (Fase 2 del documento), se investigó si existe alguna
+forma de extraer texto de un PDF digital dentro de Expo Go, que es el flujo
+de desarrollo actual del proyecto (`expo start --go`, sin dev client). Es la
+misma restricción que ya descartó `@react-native-documents/picker` en favor
+de `expo-document-picker`.
+
+## Opciones consideradas
+
+1. **`expo-pdf-text-extract`** — módulo nativo (PDFKit/PDFBox). Su propio
+   README dice explícitamente: *"requires an Expo development build. It
+   will not work in Expo Go."*
+2. **`pdfjs-dist`** (PDF.js) — sin build para React Native. El propio
+   repositorio de Mozilla tiene un hilo abierto sin resolver intentando esto
+   (`mozilla/pdf.js#18734`); nadie logró un resultado funcional en iOS, y
+   solo un intento parcial en Android con una build legacy.
+3. **`unpdf`** — pensada para "entornos sin Node/DOM", en teoría la más
+   cercana, pero sin ningún caso documentado de uso en React Native/Expo.
+   Adoptarla sería descubrir en producción si funciona o no.
+4. **Backend propio para procesar PDF** (`pdf-parse` sobre un worker o Edge
+   Function, tal como ya prevé el documento en su §20 y §26) — viable en
+   principio, pero requiere infraestructura nueva (autenticación, límites de
+   subida, borrado garantizado) que no existe hoy.
+5. **Migrar todo el proyecto a un dev client de Expo** — habilitaría
+   `expo-pdf-text-extract` y cualquier módulo nativo futuro, pero es una
+   decisión que afecta el flujo de desarrollo completo, no solo esta
+   feature.
+6. **Descartar PDF por ahora**, mantener Excel/CSV como únicos formatos
+   soportados, y comunicarlo con claridad en la interfaz.
+
+## Decisión
+
+Se elige la opción 6: **no se implementa lectura de PDF.** La importación
+soporta únicamente `.xlsx`, `.xls` y `.csv`. La tarjeta "Importar
+movimientos" del menú de creación rápida y el mensaje de error ante un
+archivo no soportado dicen explícitamente "Excel o CSV", sin mencionar PDF
+en ningún punto de la interfaz.
+
+## Motivo
+
+Ninguna opción on-device es reproducible ni está probada en el flujo de
+Expo Go actual, y las dos alternativas viables (backend propio o dev
+client) son decisiones de arquitectura transversales que no deben tomarse
+como efecto colateral de una sola feature. El principio del propio documento
+de importación —"Automatizar lo seguro... nunca inventar"— aplica también
+a la propia decisión de alcance: mejor no ofrecer PDF que ofrecerlo sobre
+una base no verificada.
+
+## Consecuencias positivas
+
+- Cero deuda técnica ni dependencias nuevas por una integración a medias.
+- El usuario nunca ve una opción de "importar PDF" que luego falla o
+  requiere una contraseña de archivo sin poder completarse.
+- Deja documentada la investigación completa (librerías, issues, fuentes)
+  para no repetirla si se retoma más adelante.
+
+## Consecuencias negativas
+
+- Un usuario cuyo banco solo exporta PDF no puede usar la importación
+  todavía; debe convertir manualmente a Excel/CSV o registrar los
+  movimientos a mano.
+
+## Riesgos
+
+- Si en el futuro se retoma PDF sin releer este ADR, se puede repetir la
+  misma investigación desde cero.
+- `unpdf` queda como la única vía on-device no descartada del todo por
+  falta de evidencia (no por evidencia de que falle): un spike acotado
+  (~1 hora) sigue siendo razonable antes de invertir en backend o dev
+  client si PDF se vuelve prioritario.
+
+## Validación
+
+Investigación documentada con fuentes (repositorio y README de
+`expo-pdf-text-extract`, `mozilla/pdf.js#18734`, documentación de `unpdf`,
+issues de `pdf-lib` confirmando que no extrae texto). No se escribió código
+de PDF en ningún punto: `src/features/import/` solo contiene parsers de
+spreadsheet.
+
+## Reemplaza
+
+Ninguno. Complementa la Fase 1 de `JUNTOSS_BANK_FILE_IMPORT_SYSTEM.md`.
+
+---
+
+# ADR-070 — Importación bancaria Fase 2: PDF digital vía backend/worker
+
+**Estado:** Reemplazada por ADR-071.
+
+> Esta decisión duró menos de un día: al aclarar que "probar en el entorno
+> real" para la opción on-device significaba compilar un development build
+> (no simplemente correr en un teléfono físico dentro de Expo Go), se pidió
+> explícitamente una implementación 100% offline sin backend propio. Se deja
+> el análisis completo porque documenta por qué se consideró esta opción y
+> qué se investigó, aunque el código de esta ADR ya no existe en el
+> repositorio.
+
+## Contexto
+
+Tras ADR-069, se retomó la pregunta de si conviene extraer texto de PDF
+directamente en el teléfono, y si eso volvería la app lenta. La extracción
+de texto de un PDF digital de pocas páginas es en sí misma rápida (del
+orden de milisegundos a pocos segundos); lo que bloqueaba la opción
+on-device no era el rendimiento sino que Expo Go no puede cargar módulos
+nativos como `expo-pdf-text-extract` (ADR-069). El propio spec
+(`JUNTOSS_BANK_FILE_IMPORT_SYSTEM.md` §20, §26, §27) ya preveía un backend
+para esto.
+
+## Opciones consideradas
+
+1. **On-device migrando a un dev client de Expo** — habilitaría
+   `expo-pdf-text-extract`, pero sigue siendo una decisión transversal de
+   build que no debe tomarse como efecto colateral de esta feature (mismo
+   argumento de ADR-069).
+2. **Backend/worker**: una Edge Function de Supabase autentica, firma la
+   subida y orquesta; un microservicio externo (Node + `pdf-parse`) hace la
+   extracción pesada fuera del teléfono; el cliente reutiliza el mismo
+   pipeline de normalización/categorización/dedup/revisión que ya usa para
+   Excel/CSV sobre las filas extraídas.
+3. **Seguir posponiendo PDF** — descartada: el usuario pidió avanzar ahora.
+
+## Decisión
+
+Se elige la opción 2. La Edge Function (`supabase/functions/import-pdf-extract/`)
+solo autentica, valida tamaño/tipo y reenvía al worker — nunca procesa el
+PDF ella misma (spec §27: Edge Functions para auth/firma/validación ligera,
+un worker dedicado para PDF pesado). El worker
+(`services/pdf-import-worker/`) es un servicio Node/TypeScript standalone
+que extrae texto con `pdf-parse` y devuelve `{ headers, rows }` con la
+misma forma que `ParsedSheet`, para que el cliente lo procese exactamente
+igual que hoy procesa una hoja de Excel: mismo `detectColumnMapping`,
+mismo `buildImportCandidates`, mismo commit vía `createLocalTransactions`.
+No se crea una tabla remota nueva: cuando se active, un PDF será un
+`import_batches` más con `source_type = 'pdf'`.
+
+Esta decisión **no** habilita todavía PDF en el selector de archivos ni en
+`ImportSourceExtension`. Esa parte queda para la siguiente entrega, una vez
+desplegado el worker (ver "Riesgos").
+
+## Motivo
+
+Mantiene Expo Go como flujo de desarrollo sin forzar una migración
+transversal por una sola feature. Saca el trabajo pesado del teléfono, que
+es precisamente lo que resuelve la preocupación de rendimiento que motivó
+esta conversación. Reutiliza el pipeline existente en vez de duplicar
+normalización/categorización para PDF (regla central del spec, §2).
+Reutilizar `import_batches`/`import_items` evita crear una tabla remota
+solo por anticipación (spec §31).
+
+## Consecuencias positivas
+
+- Ningún impacto de rendimiento en el dispositivo: la extracción ocurre
+  fuera del teléfono.
+- Cero duplicación de la lógica de normalización, categorización o
+  deduplicación.
+- El esquema remoto ya soporta la reanudación/revisión/commit de un PDF sin
+  cambios adicionales una vez que `source_type` acepte `'pdf'`.
+
+## Consecuencias negativas
+
+- Requiere operar un servicio externo (hosting, monitoreo, disponibilidad)
+  que hoy no existe.
+- La importación de PDF deja de funcionar completamente offline (Excel/CSV
+  sí sigue funcionando sin red).
+- La heurística de extracción (separar líneas por espacios, sin detección
+  real de tablas ni OCR) puede fallar en extractos visualmente complejos
+  (spec §18); esas filas deben cubrirse con el mapeo manual de columnas ya
+  existente, igual que un Excel ambiguo.
+
+## Riesgos
+
+- **El worker no está desplegado.** Antes de exponer PDF en el selector de
+  archivos hace falta: (1) elegir dónde se hospeda el servicio, (2)
+  configurar `PDF_WORKER_URL` y el secreto compartido con la Edge Function,
+  (3) el spike de al menos 20 layouts ficticios/autorizados que pide el
+  spec §81 Fase 2. Sin esto, no debe añadirse `'pdf'` a
+  `importAcceptedExtensions` ni a los CHECK de `source_type`: repetiría el
+  mismo error que corrigió la auditoría del 2026-08-09 (un valor aceptado
+  por el esquema que el cliente nunca puede producir todavía).
+- Un extracto bancario en tránsito hacia el worker debe seguir las mismas
+  garantías de ciclo de vida que un archivo local (spec §9, §63): URL de
+  subida de corta duración, borrado tras procesar, sin logs de contenido.
+
+## Validación
+
+Esquema y Edge Function cubiertos por pruebas equivalentes a
+`supabase/tests/import_learning.test.sql` (existencia, RLS, permisos). El
+worker tiene pruebas unitarias con texto de fixture, nunca extractos reales
+(spec §72). La validación end-to-end contra layouts bancarios reales queda
+pendiente como el siguiente paso explícito antes de habilitar esto para
+usuarios reales.
+
+## Reemplaza
+
+Ninguno. Extiende la opción de backend que ADR-069 ya dejaba abierta; no
+reabre la opción on-device, que sigue descartada por las mismas razones.
+
+---
+
+# ADR-071 — Importación bancaria Fase 2: PDF digital 100% on-device, sin backend
+
+**Estado:** Aceptada
+
+## Contexto
+
+ADR-070 eligió un backend/worker para no depender de un development build.
+Al aclarar la implicación real de la opción on-device —no es "probar en un
+teléfono físico", es dejar de usar Expo Go y compilar un development build
+propio (`eas build --profile development` o Xcode/Android Studio
+localmente)— se pidió explícitamente una importación de PDF **completamente
+offline**, sin ningún servicio externo.
+
+## Opciones consideradas
+
+1. **Mantener el backend/worker de ADR-070.** Descartada: requiere operar
+   infraestructura externa y el extracto bancario sale del dispositivo,
+   justo lo que se quiere evitar.
+2. **On-device con `expo-pdf-text-extract`.** Módulo nativo (PDFKit en iOS,
+   PDFBox en Android) ya investigado en ADR-069. Requiere development
+   build; no funciona en Expo Go bajo ninguna circunstancia, ni en
+   simulador ni en dispositivo físico.
+3. **Seguir sin PDF.** Descartada: contradice la instrucción explícita de
+   avanzar con una versión offline.
+
+## Decisión
+
+Se elige la opción 2. `expo-pdf-text-extract` (MIT, sin dependencias,
+`extractTextWithInfo()` como variante que no lanza excepciones y devuelve
+`{ text, pageCount, success, isEncrypted, passwordRequired, errorCode }`)
+se añade como dependencia de la app. El extracto nunca sale del teléfono: el
+texto se extrae localmente y se reutiliza el mismo heurístico de separación
+en columnas ya escrito para la opción de backend
+(`src/features/import/parsers/extractPdfRows.ts`, portado sin cambios de
+lógica), y de ahí en adelante el mismo pipeline que ya procesa Excel/CSV
+(`detectColumnMapping`, `buildImportCandidates`, revisión, commit).
+
+Se elimina por completo `services/pdf-import-worker/` y
+`supabase/functions/import-pdf-extract/` de ADR-070.
+
+`import_batches.source_type` y `ImportSourceExtension` pasan a aceptar
+`'pdf'` en el mismo cambio que habilita el selector de archivos, evitando
+la capacidad muerta que corrigió la auditoría del 2026-08-09: aquí sí hay
+código cliente real que produce `'pdf'` desde el primer commit.
+
+## Motivo
+
+Cumple la instrucción explícita de una versión offline. Coincide además con
+el orden de preferencia que el propio spec ya establecía (Bible
+`JUNTOSS_BANK_FILE_IMPORT_SYSTEM.md` §28: "1. On-device, 2. Backend propio
+temporal, 3. IA externa solo como fallback"): on-device siempre fue la
+opción preferida: solo se había descartado por la limitación de Expo Go, no
+por ser peor en sí misma. Un extracto bancario nunca sale del dispositivo,
+que es la postura más privada posible.
+
+## Consecuencias positivas
+
+- Cero infraestructura externa que operar, monitorear o pagar.
+- El PDF nunca sale del teléfono: mejor postura de privacidad posible.
+- Funciona sin conexión, igual que Excel/CSV.
+- Cero duplicación de lógica: mismo heurístico y mismo pipeline que ya
+  existían para la opción de backend y para Excel/CSV respectivamente.
+
+## Consecuencias negativas
+
+- **El proyecto deja de poder desarrollarse únicamente con Expo Go.**
+  A partir de esta feature, probar la importación de PDF (y cualquier
+  cambio que la toque) requiere un development build instalado en el
+  dispositivo o simulador. El resto de la app sigue funcionando en Expo Go
+  sin cambios.
+- La heurística de extracción sigue siendo best-effort (spec §18): sin
+  detección real de tablas ni OCR. PDFs escaneados o con maquetación
+  compleja necesitan el mapeo manual de columnas ya existente o quedan
+  fuera con un mensaje claro.
+- No hay build de desarrollo configurado todavía en este repositorio
+  (`eas.json` no existe): generarlo y aprender el nuevo flujo de
+  instalación es trabajo adicional que no existía antes de esta feature.
+
+## Riesgos
+
+- El spike de al menos 20 layouts ficticios/autorizados que pide el spec
+  §81 Fase 2 no se ha corrido: no se puede compilar ni ejecutar un
+  development build desde este entorno de agente. Antes de considerar esto
+  terminado para usuarios reales, alguien con un dispositivo y el build
+  instalado debe probarlo contra PDFs ficticios de bancos reales.
+- `expo-pdf-text-extract` es una librería joven (3 versiones en el
+  registro). Si deja de mantenerse, la alternativa de backend de ADR-070
+  queda documentada como plan B, no borrada de la memoria del proyecto.
+- Un PDF con contraseña pide la contraseña del archivo una sola vez, no la
+  persiste, y no debe registrarla en logs ni analítica (spec §29).
+
+## Validación
+
+`extractPdfRows.ts` tiene pruebas unitarias con texto de fixture (nunca un
+extracto real, spec §72). `pdfParser.ts` tiene pruebas unitarias mockeando
+`expo-pdf-text-extract` para los casos de éxito, PDF protegido, PDF
+corrupto y PDF sin texto (escaneado). La validación contra PDFs reales en
+un development build queda pendiente y es responsabilidad de quien
+compile y pruebe el build, no de este cambio.
+
+## Reemplaza
+
+ADR-070 en su totalidad: no queda código de la opción de backend en el
+repositorio.
+
+---
+
+# ADR-072 — Development build local para validar módulos nativos en iOS
+
+**Estado:** Aceptada
+
+## Contexto
+
+ADR-071 incorpora `expo-pdf-text-extract`, que depende de código nativo y no
+puede ejecutarse en Expo Go. El repositorio no tenía una forma documentada y
+reproducible de generar una app iOS propia para un iPhone real o Xcode.
+
+## Opciones consideradas
+
+1. Mantener solo Expo Go.
+2. Configurar una development build local con `expo-dev-client` y Expo CNG.
+3. Configurar primero una distribución remota mediante EAS.
+
+## Decisión
+
+Se instala `expo-dev-client` compatible con Expo SDK 54 y se adopta el flujo
+local `expo run:ios`. Los comandos `prebuild:ios`, `ios:dev`, `ios:device` y
+`start:dev-client` exponen ese flujo sin retirar Expo Go. El proyecto `ios/`
+se genera desde `app.json` y las dependencias; continúa ignorado por Git.
+
+## Motivo
+
+La compilación local con Xcode permite probar en un dispositivo conectado sin
+requerir una cuenta de Expo ni introducir todavía distribución remota. Cumple
+la necesidad inmediata de validar PDF en el teléfono y conserva Expo Go para
+iteraciones que no usan módulos nativos adicionales.
+
+## Consecuencias positivas
+
+- Xcode puede abrir `ios/juntoss.xcworkspace` tras `npm run prebuild:ios`.
+- `npm run ios:device` instala una development build en un iPhone conectado.
+- Los módulos nativos presentes, incluido el extractor de PDF, se compilan en
+  la app propia.
+
+## Consecuencias negativas
+
+- La primera compilación requiere Xcode, CocoaPods, firma local y modo de
+  desarrollo activado en el dispositivo.
+- Al cambiar una dependencia o configuración nativa hay que regenerar y
+  recompilar la development build.
+
+## Riesgos
+
+- La firma depende de un equipo de desarrollo de Apple configurado localmente;
+  no se puede declarar en el repositorio ni seleccionar de forma segura por
+  otra persona.
+- Los directorios nativos generados se reemplazan con `expo prebuild`, por lo
+  que no deben recibir cambios manuales.
+
+## Validación
+
+- `expo install --check` y `expo-doctor` sin incidencias de compatibilidad.
+- `npm run prebuild:ios` genera el workspace y completa `pod install`.
+- Compilación de Debug para `iphoneos` y prueba manual en un dispositivo real,
+  incluida la importación de un PDF de prueba autorizado.
+
+## Reemplaza
+
+No reemplaza ADR-033: Expo Go sigue como vía rápida de validación. Extiende
+ADR-071 con el flujo de development build que esa decisión requería.
+
+---
+
+# ADR-073 — Eliminar la importación de PDF por completo; solo Excel/CSV
+
+**Estado:** Aceptada
+
+## Contexto
+
+La implementación on-device de ADR-071 (`expo-pdf-text-extract`) generó
+errores repetidos durante el desarrollo y nunca se validó contra el spike de
+20 layouts reales que pedía el spec §81 (ver "Riesgos" de ADR-071 y "Known
+issues" de `IMPORT_IMPLEMENTATION_STATE.md`, 2026-08-09). El propietario del
+producto valora la importación de PDF como una función de uso marginal frente
+al coste de mantenerla — heurística best-effort, dependencia nativa joven,
+requisito de development build, contraseñas de archivo — y pidió eliminarla
+en vez de seguir invirtiendo en corregirla.
+
+## Opciones consideradas
+
+1. **Seguir depurando `expo-pdf-text-extract`.** Descartada: el spike de
+   validación seguía pendiente y el propietario del producto ya no quiere
+   invertir más en esta ruta.
+2. **Dejar el código de PDF apagado pero presente ("por si acaso").**
+   Descartada: el propio pedido es que no quede código estorbando; código
+   muerto sin fecha de reactivación es peor que no tenerlo.
+3. **Eliminar PDF por completo; Excel/XLS/CSV siguen exactamente igual.**
+   Elegida.
+
+## Decisión
+
+Se elimina toda la ruta de PDF, tanto cliente como Supabase:
+
+- Cliente: `src/features/import/parsers/pdfParser.ts`,
+  `extractPdfRows.ts` y sus tests se borran. `ImportScreen.tsx` pierde la
+  fase `pdf-password` y su rama de parseo; `ImportSourceExtension`,
+  `importAcceptedExtensions`, `importAcceptedMimeTypes` y
+  `importFileSizeLimitBytes` dejan de incluir `'pdf'`.
+  `validateImportFile` ahora rechaza `.pdf` con `unsupported_file`.
+- Dependencia: `expo-pdf-text-extract` se desinstala de `package.json`.
+- SQLite local: se elimina la migración 16 (que solo existía para que
+  `source_type` aceptara `'pdf'`); `localDatabaseVersion` vuelve a 15, que ya
+  dejaba `import_batches.source_type` en `('xls', 'xlsx', 'csv')`.
+- Supabase: se elimina
+  `supabase/migrations/14_import_batches_pdf_source_type.sql`. La migración
+  12 ya dejaba `source_type` y `sync_import_batches` sin `'pdf'`, así que no
+  hace falta ninguna migración de reversión adicional.
+- No existía ninguna Edge Function de PDF que eliminar: la de ADR-070
+  (`supabase/functions/import-pdf-extract/`) ya se había borrado por
+  completo al adoptar ADR-071.
+
+Excel (`.xls`/`.xlsx`) y CSV no cambian: usan el mismo parser (`SheetJS` vía
+`spreadsheetParser.ts`) y el mismo pipeline de siempre.
+
+## Motivo
+
+El propietario del producto priorizó estabilidad y superficie de código
+reducida sobre una función de bajo uso esperado que, además, todavía no
+había pasado su propia validación mínima. Mantener código apagado de PDF no
+aporta nada si no hay fecha de retomarlo, y complica cualquier lectura futura
+del pipeline de importación.
+
+## Consecuencias positivas
+
+- Menos superficie de fallo: ya no hay dependencia nativa, contraseñas de
+  archivo, ni heurística best-effort de columnas por huecos.
+- El proyecto ya no depende de un development build para nada relacionado
+  con importación: Excel/CSV siempre funcionó en Expo Go.
+- Menos rutas de test y de UI que mantener sincronizadas entre sí.
+
+## Consecuencias negativas
+
+- Un usuario que solo tenga el extracto en PDF debe convertirlo a Excel/CSV
+  fuera de la app antes de importar.
+- Se pierde el trabajo de ADR-071 (heurística de columnas, extracción
+  on-device, manejo de contraseña); si se retoma en el futuro, es una
+  reimplementación, no una reactivación.
+
+## Riesgos
+
+- Ninguno nuevo: esta decisión reduce superficie en vez de añadirla.
+
+## Validación
+
+- `validateImportFile.test.ts` verifica que un `.pdf` se rechaza con
+  `unsupported_file`.
+- `ImportScreen.test.tsx` ya no referencia `pdfParser` ni la fase de
+  contraseña.
+- `npm run typecheck` y la suite de tests de `import/` pasan sin referencias
+  a PDF.
+
+## Reemplaza
+
+Deja sin efecto ADR-071 en cuanto a soporte de PDF. ADR-072
+(development build local) no se revierte: sigue disponible para otros
+módulos nativos que la app pueda necesitar en el futuro, aunque ya no lo
+motive la importación de PDF.
+
+---
+
+# ADR-074 — Las contraseñas nunca se persisten en el dispositivo
+
+**Estado:** Aceptada
+
+## Contexto
+
+Al construir el wizard de registro de 4 pasos con confirmación de
+contraseña (2026-08-10/11) se pidió explícitamente verificar que ninguna
+contraseña quedara guardada en texto plano ni en ninguna otra parte local
+vulnerable de la app. Antes de esa auditoría no existía una decisión
+registrada que fijara esto como una restricción de arquitectura; dependía
+únicamente de que cada pantalla de auth nueva se escribiera "bien" por
+convención, sin nada que lo hiciera explícito para quien tocara ese código
+después.
+
+## Opciones consideradas
+
+1. **No documentar nada, confiar en la revisión de código.** Descartada:
+   sin una regla explícita, es fácil que una futura pantalla de auth (por
+   ejemplo, un "recordar contraseña" o un modo de depuración) empiece a
+   guardar el valor sin que nadie lo note como una regresión de seguridad.
+2. **Cifrar la contraseña y guardarla localmente "por si acaso".**
+   Descartada: no hay ningún caso de uso en el producto que necesite leer
+   la contraseña de vuelta en el dispositivo (no hay biometría local ni
+   autocompletado propio); guardar un secreto que nunca se lee es riesgo
+   puro sin beneficio.
+3. **Fijar como regla de arquitectura que la contraseña solo existe en
+   memoria mientras se captura, más una prueba de regresión que lo
+   verifique.** Elegida.
+
+## Decisión
+
+- La contraseña vive únicamente como `useState` local en las pantallas que
+  la piden (`SignUpScreen.tsx`, `LoginScreen.tsx`, `ResetPasswordScreen.tsx`)
+  y se pasa en memoria, una sola vez, a `supabaseAuthGateway.ts`
+  (`signUp`, `signInWithPassword`, `updateUser`), que la envía por HTTPS a
+  Supabase Auth. Supabase la hashea del lado del servidor; el cliente nunca
+  recibe ni guarda un hash ni la contraseña original.
+- Ningún gateway, servicio o repositorio de `features/auth/` escribe la
+  contraseña en `AsyncStorage`, `expo-secure-store`, SQLite local ni la
+  registra con `console.*` o cualquier logger.
+- Lo único que sí se persiste localmente es la *sesión* (JWT/refresh token),
+  ya cubierto por Fase 7 del ROADMAP ("Almacenamiento seguro de sesión"):
+  `expo-secure-store` (Keychain/Keystore) en nativo, `AsyncStorage` en web
+  vía `createSupabaseClient` (`src/lib/supabase/supabaseClient.ts`). Es un
+  secreto de corta vida y revocable, no la contraseña.
+- `SignUpScreen.test.tsx` incluye una prueba de regresión
+  (`no persiste la contraseña en AsyncStorage ni SecureStore`) que espía
+  `AsyncStorage.setItem` y `SecureStore.setItemAsync` durante un registro
+  completo y falla si el valor de la contraseña aparece en cualquier
+  llamada.
+
+## Motivo
+
+Una contraseña que nunca se lee de vuelta en el dispositivo no necesita
+persistirse ni cifrada: el único lugar donde debe validarse es el servidor
+de Supabase. Fijar esto como regla explícita, con una prueba que la
+verifique, evita que una futura pantalla la persista "por comodidad" sin que
+nadie lo note como una regresión de seguridad.
+
+## Consecuencias positivas
+
+- No hay superficie de ataque local para la contraseña: ni un backup del
+  dispositivo, ni un debugger conectado, ni un log pueden filtrarla, porque
+  nunca sale de la memoria del formulario.
+- La prueba de regresión falla de inmediato si alguien introduce
+  accidentalmente una persistencia futura (por ejemplo, un "recordar
+  contraseña" mal implementado).
+
+## Consecuencias negativas
+
+- Ninguna funcionalmente: el producto no ofrece (ni planea) autocompletar
+  la contraseña desde almacenamiento propio: para eso ya existe el
+  `autoComplete`/`textContentType` del teclado del sistema operativo.
+
+## Riesgos
+
+- Ninguno nuevo: esta decisión documenta y verifica un comportamiento que
+  ya era correcto: no reduce ni añade superficie de ataque.
+
+## Validación
+
+- Auditoría manual de `src/features/auth/` (2026-08-11): ningún hit del
+  término "password" corresponde a persistencia o logging; todos son
+  `useState` local, DTOs en memoria, o metadatos de autofill del teclado.
+- `SignUpScreen.test.tsx` → `no persiste la contraseña en AsyncStorage ni
+  SecureStore` pasa y falla intencionalmente si se reintroduce una llamada
+  de persistencia con el valor de la contraseña.
+- `npm run typecheck`, `npm run lint` y la suite de tests de `auth/` pasan.
+
+## Reemplaza
+
+Ninguna. Formaliza y verifica una propiedad que ya cumplía el código
+existente; no cambia ningún comportamiento visible.
+
+---
+
 ## 3. Decisiones pendientes prioritarias
 
 ### D-001 — Herramienta de persistencia local
@@ -3380,14 +4622,15 @@ Definir:
 
 ### D-006 — Política de separación
 
-Definir:
+Parcialmente resuelta mediante ADR-068 para espacios de pareja:
+`dissolve_couple_space()` archiva el espacio y desactiva ambas membresías,
+conservando movimientos y categorías (visibilidad histórica resuelta,
+reversibilidad descartada). Siguen sin definir:
 
-- Visibilidad histórica.
-- Exportación.
-- Copia de categorías.
-- Administración del espacio.
-- Reversibilidad.
-- Auditoría.
+- Exportación de un espacio de pareja disuelto.
+- Copia de categorías al separar (sí existe para copia manual entre
+  espacios activos, no automática al disolver).
+- Auditoría de la disolución.
 
 ### D-007 — Nombre definitivo de `Actividad`
 
@@ -3452,6 +4695,222 @@ Cómo se comprobará.
 
 ADR anterior, si aplica.
 ```
+
+---
+
+---
+
+# ADR-075 — Revisión de seguridad de autenticación: sesión en web y bloqueo de intentos fallidos
+
+**Estado:** Aceptada
+
+## Contexto
+
+Auditoría de seguridad solicitada explícitamente (2026-08-11) sobre tres
+puntos: dónde se guarda el token de sesión, si existen comprobaciones de
+autorización que solo viven en el cliente, y si el login tiene límite de
+intentos.
+
+- **Token de sesión:** `createSupabaseClient` (`src/lib/supabase/
+  supabaseClient.ts`) ya usaba `expo-secure-store` (Keychain/Keystore) en
+  nativo, correcto desde ADR-074. En web usaba `AsyncStorage`, cuya
+  implementación en `react-native-web` es `window.localStorage`: cualquier
+  script con XSS en la página puede leerlo, y el token persiste
+  indefinidamente entre sesiones del navegador.
+- **Comprobaciones de autorización solo en cliente:** auditoría de
+  `src/` no encontró ningún concepto de "admin" ni ninguna decisión de
+  autorización que se tome solo en el cliente. Los únicos roles son
+  `owner`/`member` de `space_members` (Bible/DATABASE.md §6.3), y toda
+  mutación sensible (presupuesto de categoría, disolución de espacio,
+  aceptar invitación, eliminar cuenta) pasa por RLS y funciones `SECURITY
+  DEFINER`, verificado en `supabase/tests/rls_policies.test.sql`. La UI
+  oculta botones según el estado local (por ejemplo, quién puede editar una
+  categoría), pero eso es una comodidad de UX: el servidor vuelve a
+  validarlo igual si alguien construye la petición a mano. No había nada
+  que arreglar en este punto; se documenta para que una futura auditoría no
+  repita la misma búsqueda.
+- **Límite de intentos de login:** no existía ninguno. `signInWithPassword`
+  llamaba directo a `client.auth.signInWithPassword`, sin límite propio más
+  allá del rate limit genérico de GoTrue.
+
+## Opciones consideradas — sesión en web
+
+1. **Dejar `localStorage` (el valor por defecto de Supabase-js en web).**
+   Descartada: es el status quo que motivó la auditoría.
+2. **Cookies `httpOnly` gestionadas por un backend propio.** Descartada:
+   este proyecto no tiene backend propio, solo Supabase directo desde el
+   cliente (Bible/ARCHITECTURE.md); añadir uno solo para esto es una
+   inversión de infraestructura desproporcionada para una app que hoy ni
+   siquiera publica build de web (`app.json` no declara plataforma `web`).
+3. **`sessionStorage` en vez de `localStorage`.** Elegida: mismo mecanismo
+   de storage inyectable que ya usa Supabase-js (`SupportedStorage`), sin
+   dependencias nuevas. No elimina el riesgo de XSS (sigue siendo JS
+   leyendo JS del mismo origen), pero acota la ventana: el token
+   desaparece al cerrar la pestaña o el navegador en vez de sobrevivir
+   indefinidamente en disco entre sesiones.
+
+## Opciones consideradas — límite de intentos de login
+
+1. **Contador en el cliente (AsyncStorage/estado local).** Descartada:
+   trivial de evadir borrando datos de la app o reinstalando, e
+   inconsistente con el objetivo mismo de esta auditoría (no depender de
+   comprobaciones que el cliente controla).
+2. **Función RPC de Postgres invocable por el cliente que incrementa un
+   contador por correo.** Descartada: permitiría a cualquiera bloquear la
+   cuenta de otra persona llamando la función con su correo, sin intentar
+   ninguna contraseña real — un bloqueo como denegación de servicio.
+3. **Edge Function que envuelve `signInWithPassword` de verdad y actualiza
+   el contador en el mismo paso, con la service role key.** Elegida: el
+   contador solo se mueve junto con un intento real de autenticación contra
+   GoTrue, no por una llamada aislada.
+
+## Decisión
+
+- `webSessionStorage` en `src/lib/supabase/supabaseClient.ts` reemplaza
+  `AsyncStorage` como storage de sesión en `Platform.OS === 'web'`,
+  respaldado por `window.sessionStorage`. Nativo no cambia.
+- Migración `15_login_attempts_lockout.sql` crea `public.login_attempts`
+  (Bible/DATABASE.md §6.12): RLS activado, sin ninguna política ni grant a
+  `anon`/`authenticated` — solo la service role la toca.
+- Edge Function `supabase/functions/login-with-lockout/index.ts`
+  concentra el flujo: revisa si el correo está bloqueado, si no intenta
+  `signInWithPassword` de verdad, y actualiza el contador según el
+  resultado. A los 9 intentos fallidos consecutivos bloquea 1 hora y
+  reinicia el contador; un login correcto lo limpia.
+- `supabaseAuthGateway.signInWithPassword` ya no llama a
+  `client.auth.signInWithPassword` directamente: invoca la Edge Function
+  y, si responde con sesión válida, la hidrata con `client.auth.setSession`
+  para que el storage configurado (Keychain/Keystore o `sessionStorage`)
+  la persista igual que antes. Si la función responde bloqueo, lanza
+  `AccountLockedError` con el mensaje "Por tu seguridad, debes esperar 1
+  hora antes de volver a intentarlo." — la misma instancia de `Error` que
+  ya maneja `LoginScreen`, sin cambios adicionales de UI necesarios.
+
+## Motivo
+
+Acotar la sesión de web a `sessionStorage` reduce el daño de un XSS de
+"persistente hasta que alguien lo note" a "vale mientras la pestaña siga
+abierta", con cambio mínimo y sin infraestructura nueva. El bloqueo de
+intentos solo tiene sentido como protección real si se aplica en el mismo
+lugar donde se valida la contraseña de verdad; hacerlo en el cliente o en
+una función Postgres aislada habría creado una protección de cartón (o, en
+el caso de la función Postgres pública, una vulnerabilidad nueva).
+
+## Consecuencias positivas
+
+- Un XSS en la versión web ya no obtiene un token utilizable
+  indefinidamente entre sesiones del navegador.
+- El bloqueo de intentos fallidos es real: no depende de un contador que
+  el propio atacante controla, y no puede usarse para bloquear cuentas
+  ajenas sin intentar una contraseña real.
+- `AccountLockedError` es reutilizable por cualquier pantalla futura que
+  necesite distinguir "credenciales incorrectas" de "cuenta bloqueada".
+
+## Consecuencias negativas
+
+- En web, cerrar la pestaña obliga a iniciar sesión de nuevo (antes la
+  sesión sobrevivía indefinidamente). Aceptable: la app no publica build de
+  web activamente hoy, y es el trade-off esperado al no tener backend
+  propio para cookies `httpOnly`.
+- El login ahora depende de una Edge Function desplegada
+  (`supabase functions deploy login-with-lockout`) además de la migración
+  aplicada; si no se despliega, el login falla por completo en vez de
+  degradar a sin límite. Se documenta aquí para que el despliegue no se
+  olvide.
+
+## Riesgos
+
+- **La protección de bloqueo no es infranqueable.** La URL y la clave
+  `anon` de Supabase son públicas (van embebidas en la app). Un atacante
+  que reimplemente la llamada HTTP directamente contra el endpoint de
+  token de GoTrue, sin pasar por `login-with-lockout`, evita el bloqueo por
+  completo. Esto es una limitación estructural de cualquier arquitectura
+  de solo-cliente-más-BaaS sin un backend obligatorio delante: no hay forma
+  de impedir que alguien hable directo con la API pública de Supabase. La
+  mitigación real de ese escenario es el rate limiting propio de Supabase
+  Auth (configurable en el dashboard del proyecto, fuera de este
+  repositorio) más una contraseña con buena entropía; `login-with-lockout`
+  protege el flujo normal de la app y a usuarios reales que se equivocan de
+  contraseña, no a un atacante que ataca la API directamente.
+- **`sessionStorage` sigue siendo legible por cualquier script del mismo
+  origen.** No es una mitigación de XSS, es una reducción de la ventana de
+  exposición. La mitigación real de XSS es no tener XSS (sanitizar
+  contenido, no usar `dangerouslySetInnerHTML`-equivalentes, CSP si
+  algún día se sirve la build de web).
+
+## Validación
+
+- `npx jest src/features/auth` pasa, incluye dos pruebas nuevas en
+  `supabaseAuthGateway.test.ts` (`AccountLockedError` ante bloqueo, mensaje
+  correcto ante credenciales inválidas) y dos pruebas existentes
+  actualizadas para el nuevo flujo vía Edge Function.
+- `supabase/tests/login_attempts.test.sql` (pgTAP, no corre en CI, se
+  ejecuta con `supabase test db` como el resto de `supabase/tests/`):
+  confirma que la tabla existe, tiene RLS activado, no define ninguna
+  política y ni `anon` ni `authenticated` tienen `SELECT`.
+- `npm run typecheck`, `npm run lint` y `npm run format:check`.
+
+## Reemplaza
+
+Ninguna. Completa la tarea pendiente "Almacenamiento seguro de sesión" de
+Bible/ROADMAP.md Fase 7 y añade "Bloqueo temporal tras intentos fallidos",
+no listada antes.
+
+---
+
+# ADR-076 — Sincronización financiera bidireccional en espacios Juntos
+
+**Estado:** Aceptada
+
+## Contexto
+
+Un espacio de pareja ya compartía identidad y membresía (ADR-068), pero cada
+categoría y movimiento seguía únicamente en SQLite. Por ello, si una persona
+creaba un gasto en Juntos, su pareja no podía verlo aunque ambas tuvieran acceso
+al mismo espacio remoto.
+
+## Decisión
+
+Sincronizar exclusivamente las entidades financieras de los espacios
+`type = 'couple'` mediante el RPC transaccional
+`sync_couple_space_data(...)` (migración 18). La UI mantiene el patrón
+local-first: guarda primero en SQLite, publica categorías/series/movimientos
+en orden de dependencia y marca una fila `synced` solo tras éxito remoto.
+
+La lectura usa el snapshot remoto existente sin sobrescribir filas locales
+pendientes. La migración 19 publica las tres tablas financieras en Supabase
+Realtime y, mientras Juntos está activo, el cliente se suscribe a sus cambios
+por `space_id`; volver al primer plano y un sondeo de 15 segundos son el
+respaldo ante una desconexión del socket. Todo miembro activo puede editar los
+datos compartidos; el servidor valida siempre la membresía y el tipo de espacio
+antes de ejecutar el lote.
+
+## Consecuencias
+
+- Los gastos e ingresos de Juntos aparecen en ambas cuentas inmediatamente sin
+  depender de reiniciar sesión, mientras ambas tengan la app abierta en ese
+  espacio.
+- Los espacios personales, otros espacios y los usuarios invitados permanecen
+  fuera de este transporte y no se escriben remotamente por esta vía.
+- La concurrencia inicial es última escritura confirmada. Historial de cambios,
+  conflictos manuales, notas libres, recordatorios y reglas de notificación
+  compartidas quedan fuera del alcance; los tres últimos siguen locales.
+- Las migraciones 18 y 19 deben aplicarse al proyecto Supabase antes de
+  distribuir esta versión. Sin la 18, la escritura queda pendiente de forma
+  segura en SQLite y se reintenta, pero no llega al otro miembro; sin la 19,
+  sigue funcionando el respaldo de lectura, pero no hay aviso inmediato.
+
+## Validación
+
+- Pruebas unitarias del lote local cubren serialización, confirmación y el caso
+  sin cambios.
+- Debe ejecutarse una prueba manual con dos cuentas: crear categoría y gasto
+  con A, abrir Juntos con B y comprobar que llega; repetir edición y archivado.
+
+## Reemplaza
+
+La limitación de ADR-068 que mantenía categorías y movimientos de Juntos solo
+en local.
 
 ---
 

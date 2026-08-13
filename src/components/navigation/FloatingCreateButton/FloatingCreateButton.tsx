@@ -10,11 +10,13 @@ import Animated, {
 import Svg, { Line } from 'react-native-svg';
 
 import { triggerHaptic } from '@/lib/haptics/haptics';
-import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type FloatingCreateButtonProps = {
   bottom: number;
@@ -33,6 +35,8 @@ export function FloatingCreateButton({
   visible = true,
   onPress,
 }: FloatingCreateButtonProps) {
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const visibilityProgress = useSharedValue(visible ? 1 : 0);
 
   useEffect(() => {
@@ -105,31 +109,29 @@ export function FloatingCreateButton({
   );
 }
 
-const styles = StyleSheet.create({
-  position: {
-    position: 'absolute',
-    right: spacing.xl,
-    zIndex: 10,
-    elevation: 20,
-    width: buttonSize,
-    height: buttonSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  button: {
-    width: buttonSize,
-    height: buttonSize,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-    backgroundColor: colors.cta,
-    elevation: 6,
-    shadowColor: colors.textPrimary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  buttonPressed: {
-    backgroundColor: colors.ctaPressed,
-  },
-});
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    position: {
+      position: 'absolute',
+      right: spacing.xl,
+      zIndex: 10,
+      elevation: 20,
+      width: buttonSize,
+      height: buttonSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    button: {
+      width: buttonSize,
+      height: buttonSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+      backgroundColor: colors.cta,
+      ...shadows.floatingAction,
+    },
+    buttonPressed: {
+      backgroundColor: colors.ctaPressed,
+    },
+  });
+}

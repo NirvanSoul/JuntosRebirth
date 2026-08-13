@@ -16,6 +16,13 @@ function createShadows(scheme: ColorScheme): ThemeShadows {
 
   return {
     subtle,
+    floatingAction: {
+      elevation: 6,
+      shadowColor,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: scheme === 'dark' ? 0.44 : 0.2,
+      shadowRadius: 8,
+    },
     mainMenu: {
       ...subtle,
       shadowOffset: { width: 0, height: -4 },

@@ -4,15 +4,17 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ActivityScreen } from '@/features/activity/screens/ActivityScreen';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
-import { iconSize, minTouchTarget } from '@/theme/layout';
+import { minTouchTarget } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
@@ -75,7 +77,9 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen categories={categories} transactions={transactions} />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen categories={categories} transactions={transactions} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -259,7 +263,7 @@ describe('ActivityScreen', () => {
     expect(
       within(chart).getByRole('button', { name: 'Ver mes siguiente' }).props
         .accessibilityState,
-    ).toEqual({ disabled: true });
+    ).toMatchObject({ disabled: true });
 
     await fireEvent.press(within(chart).getByRole('tab', { name: 'Ingresos' }));
 
@@ -302,13 +306,15 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={categories}
-          onCreateExpense={onCreateExpense}
-          onCreateIncome={onCreateIncome}
-          onCreateMovement={onCreateMovement}
-          transactions={transactions}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            onCreateExpense={onCreateExpense}
+            onCreateIncome={onCreateIncome}
+            onCreateMovement={onCreateMovement}
+            transactions={transactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -352,11 +358,13 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={categories}
-          onOpenCategoryDetail={onOpenCategoryDetail}
-          transactions={transactions}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            onOpenCategoryDetail={onOpenCategoryDetail}
+            transactions={transactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -374,11 +382,13 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={categories}
-          onOpenCategoryDetail={onOpenCategoryDetail}
-          transactions={transactions}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            onOpenCategoryDetail={onOpenCategoryDetail}
+            transactions={transactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const chart = screen.getByTestId('category-donut-chart');
@@ -400,7 +410,9 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen categories={categories} transactions={transactions} />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen categories={categories} transactions={transactions} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -435,11 +447,13 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={categories}
-          onOpenTransactionDetail={onOpenTransactionDetail}
-          transactions={transactions}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            onOpenTransactionDetail={onOpenTransactionDetail}
+            transactions={transactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -466,10 +480,12 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={categories}
-          transactions={[...transactions, previousMonthTransaction]}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            transactions={[...transactions, previousMonthTransaction]}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const chart = screen.getByTestId('category-donut-chart');
@@ -483,7 +499,7 @@ describe('ActivityScreen', () => {
     expect(
       within(chart).getByRole('button', { name: 'Ver mes siguiente' }).props
         .accessibilityState,
-    ).toEqual({ disabled: false });
+    ).toMatchObject({ disabled: false });
   });
 
   it('orienta el estado vacío a asociar un movimiento con una categoría', async () => {
@@ -494,7 +510,9 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen categories={categories} transactions={[]} />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen categories={categories} transactions={[]} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const chart = screen.getByTestId('category-donut-chart');
@@ -528,12 +546,14 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={[]}
-          onCreateCategory={onCreateCategory}
-          onCreateExpense={onCreateExpense}
-          transactions={[]}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={[]}
+            onCreateCategory={onCreateCategory}
+            onCreateExpense={onCreateExpense}
+            transactions={[]}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -564,10 +584,12 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={[...categories, otherCategory]}
-          transactions={transactions}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={[...categories, otherCategory]}
+            transactions={transactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -596,10 +618,12 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={[categoryWithoutBudget]}
-          transactions={transactions}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={[categoryWithoutBudget]}
+            transactions={transactions}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const categoryCard = screen.getByTestId('category-preview-card');
@@ -654,10 +678,12 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={[...categories, subscriptionCategory]}
-          transactions={[...transactions, recurringTransaction]}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={[...categories, subscriptionCategory]}
+            transactions={[...transactions, recurringTransaction]}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -678,10 +704,10 @@ describe('ActivityScreen', () => {
     expect(
       screen.getByLabelText('Categoría: Suscripciones').props
         .accessibilityState,
-    ).toEqual({ checked: true });
+    ).toMatchObject({ checked: true });
     expect(
       screen.getByLabelText('Categoría: General').props.accessibilityState,
-    ).toEqual({ checked: true });
+    ).toMatchObject({ checked: true });
     expect(screen.getByTestId('category-subscriptions-checkmark')).toBeTruthy();
     expect(screen.getByTestId('category-general-checkmark')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Recurrencia' }));
@@ -721,7 +747,9 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen categories={categories} transactions={transactions} />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen categories={categories} transactions={transactions} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -737,7 +765,9 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen categories={categories} transactions={transactions} />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen categories={categories} transactions={transactions} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -756,7 +786,7 @@ describe('ActivityScreen', () => {
     expect(screen.queryByTestId('category-donut-chart')).toBeNull();
     expect(screen.queryByTestId('category-preview-card')).toBeNull();
     expect(screen.queryByText('Detalle por categoría')).toBeNull();
-    expect(categoriesToggle.props.accessibilityState).toEqual({
+    expect(categoriesToggle.props.accessibilityState).toMatchObject({
       expanded: false,
     });
     expect(
@@ -774,7 +804,9 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen categories={categories} transactions={transactions} />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen categories={categories} transactions={transactions} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
     const filterButton = screen.getByRole('button', { name: 'Filtros' });
@@ -782,12 +814,16 @@ describe('ActivityScreen', () => {
     const filterLabelStyle = StyleSheet.flatten(
       within(filterButton).getByText('Filtrar').props.style,
     );
-    const filterIconStyle = StyleSheet.flatten(
-      screen.getByTestId('activity-filter-icon').props.style,
-    );
 
     expect(screen.queryByTestId('transaction-filters-modal')).toBeNull();
-    expect(filterButtonStyle).toMatchObject({ minHeight: minTouchTarget });
+    expect(filterButtonStyle).toMatchObject({
+      minHeight: minTouchTarget,
+      justifyContent: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingLeft: spacing.lg,
+    });
     expect(filterButtonStyle).not.toHaveProperty('backgroundColor');
     expect(filterButtonStyle).not.toHaveProperty('borderWidth');
     expect(filterLabelStyle).toMatchObject({
@@ -795,13 +831,13 @@ describe('ActivityScreen', () => {
       fontFamily: 'Gilroy-Light',
       fontSize: 13,
     });
-    expect(filterIconStyle).toMatchObject({
-      color: colors.textSecondary,
-      fontSize: iconSize.xs,
-    });
-    await fireEvent.press(filterButton);
+    expect(screen.getByTestId('activity-filter-icon').props.children).toContain(
+      String.fromCodePoint(Number(Ionicons.glyphMap['filter-circle-outline'])),
+    );
+    await fireEvent.press(within(filterButton).getByText('Filtrar'));
     expect(screen.getByTestId('transaction-filters-modal')).toBeTruthy();
     expect(screen.getByText('Filtrar movimientos')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Moneda' })).toBeNull();
 
     const typeToggle = screen.getByRole('button', {
       name: 'Tipo de movimiento',
@@ -812,22 +848,47 @@ describe('ActivityScreen', () => {
     });
     const dateToggle = screen.getByRole('button', { name: 'Fecha' });
 
+    expect(
+      screen.getByTestId('date-filter-group-icon').props.children,
+    ).toContain(
+      String.fromCodePoint(Number(Ionicons.glyphMap['calendar-outline'])),
+    );
+    expect(
+      screen.getByTestId('type-filter-group-icon').props.children,
+    ).toContain(
+      String.fromCodePoint(Number(Ionicons.glyphMap['swap-vertical-outline'])),
+    );
+    expect(
+      screen.getByTestId('category-filter-group-icon').props.children,
+    ).toContain(
+      String.fromCodePoint(Number(Ionicons.glyphMap['pie-chart-outline'])),
+    );
+    expect(
+      screen.getByTestId('recurrence-filter-group-icon').props.children,
+    ).toContain(
+      String.fromCodePoint(Number(Ionicons.glyphMap['sync-outline'])),
+    );
+
     expect(StyleSheet.flatten(dateToggle.parent?.props.style)).toMatchObject({
       borderBottomColor: colors.border,
       borderBottomWidth: StyleSheet.hairlineWidth,
     });
 
-    expect(typeToggle.props.accessibilityState).toEqual({ expanded: false });
-    expect(categoryToggle.props.accessibilityState).toEqual({
+    expect(typeToggle.props.accessibilityState).toMatchObject({
       expanded: false,
     });
-    expect(recurrenceToggle.props.accessibilityState).toEqual({
+    expect(categoryToggle.props.accessibilityState).toMatchObject({
       expanded: false,
     });
-    expect(dateToggle.props.accessibilityState).toEqual({ expanded: true });
+    expect(recurrenceToggle.props.accessibilityState).toMatchObject({
+      expanded: false,
+    });
+    expect(dateToggle.props.accessibilityState).toMatchObject({
+      expanded: true,
+    });
     expect(
       screen.getByLabelText('Periodo: Todos').props.accessibilityState,
-    ).toEqual({ checked: true });
+    ).toMatchObject({ checked: true });
     expect(
       StyleSheet.flatten(
         screen.getByTestId('activity-date-period-selector-all').props.style,
@@ -851,8 +912,12 @@ describe('ActivityScreen', () => {
     await fireEvent.press(typeToggle);
     const allType = screen.getByTestId('type-filter-all');
     const incomeType = screen.getByTestId('type-filter-income');
-    expect(dateToggle.props.accessibilityState).toEqual({ expanded: false });
-    expect(typeToggle.props.accessibilityState).toEqual({ expanded: true });
+    expect(dateToggle.props.accessibilityState).toMatchObject({
+      expanded: false,
+    });
+    expect(typeToggle.props.accessibilityState).toMatchObject({
+      expanded: true,
+    });
     expect(StyleSheet.flatten(allType.props.style)).toMatchObject({
       ...shadows.subtle,
       minHeight: 56,
@@ -875,8 +940,12 @@ describe('ActivityScreen', () => {
       ).color,
     ).toBe(colors.textMuted);
     await fireEvent.press(categoryToggle);
-    expect(typeToggle.props.accessibilityState).toEqual({ expanded: false });
-    expect(categoryToggle.props.accessibilityState).toEqual({ expanded: true });
+    expect(typeToggle.props.accessibilityState).toMatchObject({
+      expanded: false,
+    });
+    expect(categoryToggle.props.accessibilityState).toMatchObject({
+      expanded: true,
+    });
     expect(screen.queryByLabelText('Tipo: Ingresos')).toBeNull();
     expect(
       StyleSheet.flatten(screen.getByTestId('category-filter-all').props.style),
@@ -905,10 +974,10 @@ describe('ActivityScreen', () => {
     });
 
     await fireEvent.press(recurrenceToggle);
-    expect(categoryToggle.props.accessibilityState).toEqual({
+    expect(categoryToggle.props.accessibilityState).toMatchObject({
       expanded: false,
     });
-    expect(recurrenceToggle.props.accessibilityState).toEqual({
+    expect(recurrenceToggle.props.accessibilityState).toMatchObject({
       expanded: true,
     });
     expect(
@@ -936,10 +1005,12 @@ describe('ActivityScreen', () => {
     });
 
     await fireEvent.press(dateToggle);
-    expect(recurrenceToggle.props.accessibilityState).toEqual({
+    expect(recurrenceToggle.props.accessibilityState).toMatchObject({
       expanded: false,
     });
-    expect(dateToggle.props.accessibilityState).toEqual({ expanded: true });
+    expect(dateToggle.props.accessibilityState).toMatchObject({
+      expanded: true,
+    });
     expect(screen.getByLabelText('Periodo: Semanal')).toBeTruthy();
     expect(screen.getByLabelText('Periodo: Quincenal')).toBeTruthy();
     expect(screen.getByLabelText('Periodo: Mensual')).toBeTruthy();
@@ -958,8 +1029,12 @@ describe('ActivityScreen', () => {
     ).toBe(17);
 
     await fireEvent.press(typeToggle);
-    expect(dateToggle.props.accessibilityState).toEqual({ expanded: false });
-    expect(typeToggle.props.accessibilityState).toEqual({ expanded: true });
+    expect(dateToggle.props.accessibilityState).toMatchObject({
+      expanded: false,
+    });
+    expect(typeToggle.props.accessibilityState).toMatchObject({
+      expanded: true,
+    });
 
     await fireEvent.press(screen.getByLabelText('Tipo: Ingresos'));
     const reopenedIncomeType = screen.getByTestId('type-filter-income');
@@ -991,7 +1066,9 @@ describe('ActivityScreen', () => {
     ).toBe(colors.cta);
 
     await fireEvent.press(typeToggle);
-    expect(typeToggle.props.accessibilityState).toEqual({ expanded: false });
+    expect(typeToggle.props.accessibilityState).toMatchObject({
+      expanded: false,
+    });
     expect(screen.queryByLabelText('Tipo: Ingresos')).toBeNull();
 
     await fireEvent.press(screen.getByRole('button', { name: 'Cerrar' }));
@@ -1006,7 +1083,57 @@ describe('ActivityScreen', () => {
     );
     expect(
       screen.getByLabelText('Tipo: Todos').props.accessibilityState,
-    ).toEqual({ checked: true });
+    ).toMatchObject({ checked: true });
+  });
+
+  it('ofrece moneda en filtros solo si el espacio tiene varias y aplica la selección', async () => {
+    const usdTransaction: SessionTransaction = {
+      ...transactions[0]!,
+      id: 'session-usd',
+      amountMinor: 3000,
+      currency: 'USD',
+      title: 'Compra en dólares',
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            currency="EUR"
+            transactions={[...transactions, usdTransaction]}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Filtros' }));
+    const currencyToggle = screen.getByRole('button', { name: 'Moneda' });
+    expect(
+      screen.getByTestId('currency-filter-group-icon').props.children,
+    ).toContain(
+      String.fromCodePoint(Number(Ionicons.glyphMap['cash-outline'])),
+    );
+    expect(currencyToggle.props.accessibilityState).toMatchObject({
+      expanded: false,
+    });
+
+    await fireEvent.press(currencyToggle);
+    expect(screen.getByLabelText('Moneda: Euro (EUR)')).toBeTruthy();
+    await fireEvent.press(
+      screen.getByLabelText('Moneda: Dólar estadounidense (USD)'),
+    );
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Aplicar filtros' }),
+    );
+
+    expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(1);
+    expect(screen.getByText('Compra en dólares')).toBeTruthy();
+    expect(screen.queryByText('Compra semanal')).toBeNull();
   });
 
   it('navega y filtra los movimientos con el periodo compartido', async () => {
@@ -1023,10 +1150,12 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen
-          categories={categories}
-          transactions={[...transactions, olderTransaction]}
-        />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            transactions={[...transactions, olderTransaction]}
+          />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 
@@ -1067,7 +1196,9 @@ describe('ActivityScreen', () => {
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ActivityScreen categories={categories} transactions={transactions} />
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen categories={categories} transactions={transactions} />
+        </ThemeProvider>
       </SafeAreaProvider>,
     );
 

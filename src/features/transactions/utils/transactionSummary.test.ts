@@ -2,7 +2,9 @@ import type { SessionTransaction } from '@/features/transactions/types';
 import {
   sortTransactionsByRecentActivity,
   summarizeTransactions,
+  summarizeTransactionsByCurrency,
   summarizeTransactionTotals,
+  summarizeTransactionTotalsByCurrency,
 } from '@/features/transactions/utils/transactionSummary';
 
 const transactions: SessionTransaction[] = [
@@ -177,6 +179,73 @@ describe('summarizeTransactionTotals', () => {
       incomeMinor: 250_000,
       expenseMinor: 50_000,
     });
+  });
+});
+
+describe('summarizeTransactionTotalsByCurrency', () => {
+  it('agrupa los totales por la moneda de cada movimiento en vez de sumarlos juntos', () => {
+    const copExpense: SessionTransaction = {
+      ...transactions[1]!,
+      id: 'cop-expense',
+      currency: 'COP',
+      amountMinor: 50_000,
+    };
+
+    expect(
+      summarizeTransactionTotalsByCurrency([...transactions, copExpense]),
+    ).toEqual([
+      {
+        currency: 'COP',
+        totals: { balanceMinor: -50_000, incomeMinor: 0, expenseMinor: 50_000 },
+      },
+      {
+        currency: 'EUR',
+        totals: {
+          balanceMinor: 160_000,
+          incomeMinor: 200_000,
+          expenseMinor: 40_000,
+        },
+      },
+    ]);
+  });
+
+  it('devuelve un arreglo vacío sin movimientos', () => {
+    expect(summarizeTransactionTotalsByCurrency([])).toEqual([]);
+  });
+});
+
+describe('summarizeTransactionsByCurrency', () => {
+  it('agrupa el resumen mensual por la moneda de cada movimiento', () => {
+    const copIncome: SessionTransaction = {
+      ...transactions[0]!,
+      id: 'cop-income',
+      currency: 'COP',
+      amountMinor: 500_000,
+    };
+
+    expect(
+      summarizeTransactionsByCurrency(
+        [...transactions, copIncome],
+        new Date('2026-07-31T12:00:00'),
+      ),
+    ).toEqual([
+      {
+        currency: 'COP',
+        summary: {
+          balanceMinor: 500_000,
+          monthIncomeMinor: 500_000,
+          monthExpenseMinor: 0,
+        },
+      },
+      {
+        currency: 'EUR',
+        summary: {
+          balanceMinor: 160_000,
+          monthIncomeMinor: 200_000,
+          monthExpenseMinor: 35_000,
+        },
+      },
+    ]);
   });
 });
 

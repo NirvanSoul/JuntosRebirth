@@ -1,1 +1,5 @@
-export { ThemeProvider, useTheme, useThemeOptional } from '@/theme/ThemeProvider';
+export {
+  ThemeProvider,
+  useTheme,
+  useThemeOptional,
+} from '@/theme/ThemeProvider';

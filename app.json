@@ -5,9 +5,21 @@
     "scheme": "juntoss",
     "version": "0.1.0",
     "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.juntoss.app"
+      "bundleIdentifier": "com.juntoss.app",
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
+      }
     },
     "android": {
       "package": "com.juntoss.app",
@@ -19,7 +31,16 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-notifications",
-      "@react-native-community/datetimepicker"
+      "expo-document-picker",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Juntoss necesita acceso a tus fotos para que elijas una imagen de perfil.",
+          "cameraPermission": "Juntoss necesita acceso a la cámara para tomar tu foto de perfil.",
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }

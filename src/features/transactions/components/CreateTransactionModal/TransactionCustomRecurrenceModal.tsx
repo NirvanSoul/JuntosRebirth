@@ -9,11 +9,13 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { AppCalendar } from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
 import { normalizeCustomOccurrenceDates } from '@/features/transactions/utils/transactionRecurrence';
-import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
 import { maxFontScale, typography } from '@/theme/typography';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type TransactionCustomRecurrenceModalProps = {
   initialDate: string;
@@ -32,6 +34,8 @@ export function TransactionCustomRecurrenceModal({
   onClose,
   onSelect,
 }: TransactionCustomRecurrenceModalProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [step, setStep] = useState<Step>('amount');
   const [amountInput, setAmountInput] = useState('1');
   const [draftDates, setDraftDates] = useState<readonly string[]>([]);
@@ -59,7 +63,7 @@ export function TransactionCustomRecurrenceModal({
           },
         ]),
       ),
-    [draftDates],
+    [colors, draftDates],
   );
 
   const handleDatePress = (date: string) => {
@@ -172,26 +176,28 @@ export function TransactionCustomRecurrenceModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { gap: spacing.lg },
-  header: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  amountContent: { gap: spacing.lg },
-  amountInput: {
-    minHeight: layout.controlHeight.regular,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-    fontFamily: typography.body.fontFamily,
-    fontSize: typography.body.fontSize,
-    letterSpacing: typography.body.letterSpacing,
-    paddingHorizontal: spacing.lg,
-  },
-  saveButton: { marginTop: spacing.lg },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    container: { gap: spacing.lg },
+    header: {
+      minHeight: layout.minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    amountContent: { gap: spacing.lg },
+    amountInput: {
+      minHeight: layout.controlHeight.regular,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
+      color: colors.textPrimary,
+      fontFamily: typography.body.fontFamily,
+      fontSize: typography.body.fontSize,
+      letterSpacing: typography.body.letterSpacing,
+      paddingHorizontal: spacing.lg,
+    },
+    saveButton: { marginTop: spacing.lg },
+  });
+}

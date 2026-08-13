@@ -1,9 +1,10 @@
-import { render, within } from '@testing-library/react-native';
+import { within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import type { Category } from '@/features/categories/types';
 import { TransactionPreviewCard } from '@/features/transactions/components/TransactionPreviewCard/TransactionPreviewCard';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { renderWithTheme } from '@/test/renderWithTheme';
 import { colors } from '@/theme/colors';
 
 const category: Category = {
@@ -31,7 +32,7 @@ const transaction: SessionTransaction = {
 
 describe('TransactionPreviewCard', () => {
   it('usa la categoría como título cuando el movimiento no tiene uno', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <TransactionPreviewCard category={category} transaction={transaction} />,
     );
     const card = within(screen.getByTestId('transaction-preview-card'));
@@ -68,7 +69,7 @@ describe('TransactionPreviewCard', () => {
   });
 
   it('prioriza el título escrito por el usuario', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <TransactionPreviewCard
         category={category}
         transaction={{ ...transaction, title: 'Compra semanal' }}
@@ -79,7 +80,7 @@ describe('TransactionPreviewCard', () => {
   });
 
   it('muestra la flecha verde sin fondo para un ingreso', async () => {
-    const screen = await render(
+    const screen = await renderWithTheme(
       <TransactionPreviewCard
         category={category}
         transaction={{ ...transaction, type: 'income' }}

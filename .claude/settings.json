@@ -13,7 +13,15 @@
       "Bash(npm test *)",
       "Bash(cp /tmp/debug_test.test.tsx \"src/features/transactions/components/PeriodComparisonIndicator/debug.test.tsx\")",
       "Read(//tmp/**)",
-      "Bash(rm \"src/features/transactions/components/PeriodComparisonIndicator/debug.test.tsx\")"
+      "Bash(rm \"src/features/transactions/components/PeriodComparisonIndicator/debug.test.tsx\")",
+      "Bash(npx --yes license-checker --production --json --excludePrivatePackages)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(npx --yes tsx scripts/generate-legal-site.ts)",
+      "Bash(npx tsc *)",
+      "Bash(npm install *)",
+      "Bash(xxd)",
+      "Bash(python3 -)",
+      "Bash(node -e ' *)"
     ]
   }
 }

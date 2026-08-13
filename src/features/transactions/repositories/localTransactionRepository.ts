@@ -32,6 +32,8 @@ type TransactionRow = {
   recurrence_group_id: string | null;
   recurrence_series_id: string | null;
   recurrence_starts_on: string | null;
+  source_transaction_id: string | null;
+  note: string | null;
   updated_at: string;
 };
 
@@ -102,6 +104,8 @@ function mapTransaction(row: TransactionRow): SessionTransaction {
     recurrenceGroupId: row.recurrence_group_id ?? undefined,
     recurrenceSeriesId: row.recurrence_series_id ?? undefined,
     recurrenceStartsOn: row.recurrence_starts_on ?? undefined,
+    sourceTransactionId: row.source_transaction_id ?? undefined,
+    ...(row.note === null || row.note === undefined ? {} : { note: row.note }),
     updatedAt: row.updated_at,
   };
 }
@@ -246,6 +250,7 @@ export async function listLocalTransactions(): Promise<SessionTransaction[]> {
             transactions.occurred_on, transactions.recurrence,
             transactions.recurrence_group_id,
             transactions.recurrence_series_id, transactions.updated_at,
+            transactions.source_transaction_id, transactions.note,
             recurring_transaction_series.next_occurrence_on,
             recurring_transaction_series.starts_on AS recurrence_starts_on
        FROM transactions
@@ -360,6 +365,62 @@ export async function createLocalTransaction(
     recurrenceGroupId: recurrenceGroupId ?? undefined,
     recurrenceSeriesId: seriesId ?? undefined,
     recurrenceStartsOn: automatic ? input.occurredOn : undefined,
+    sourceTransactionId: input.sourceTransactionId,
+    updatedAt: now,
+  }));
+}
+
+/**
+ * Inserta varios movimientos únicos en una sola transacción SQLite,
+ * siguiendo el mismo patrón que `createLocalCategories`. A diferencia de
+ * `createLocalTransaction`, no materializa series recurrentes: está pensada
+ * para importación por lotes, donde cada fila ya es una ocurrencia concreta
+ * con fecha propia (Bible §55-§57).
+ */
+export async function createLocalTransactions(
+  inputs: readonly CreateLocalTransactionInput[],
+): Promise<SessionTransaction[]> {
+  if (inputs.length === 0) return [];
+  inputs.forEach((input) => {
+    assertTransaction(input);
+    if (input.recurrence !== 'once') {
+      throw new Error(
+        'La creación en lote solo admite movimientos sin recurrencia',
+      );
+    }
+  });
+
+  const database = await getLocalDatabase();
+  const createdBy = await getOrCreateInstallationId(database);
+  const now = new Date().toISOString();
+  const ids = inputs.map((input) => input.id ?? randomUUID());
+
+  await database.withExclusiveTransactionAsync(async (transaction) => {
+    for (const [index, input] of inputs.entries()) {
+      await insertTransaction(
+        transaction,
+        input,
+        ids[index]!,
+        createdBy,
+        input.occurredOn,
+        null,
+        null,
+        now,
+      );
+    }
+  });
+
+  return inputs.map((input, index) => ({
+    id: ids[index]!,
+    spaceId: input.spaceId,
+    categoryId: input.categoryId,
+    type: input.type,
+    amountMinor: input.amountMinor,
+    currency: input.currency,
+    title: input.title,
+    occurredOn: input.occurredOn,
+    recurrence: 'once',
+    sourceTransactionId: input.sourceTransactionId,
     updatedAt: now,
   }));
 }
@@ -736,6 +797,7 @@ export async function updateLocalTransaction(
               transactions.title, transactions.occurred_on,
               transactions.recurrence, transactions.recurrence_group_id,
               transactions.recurrence_series_id, transactions.updated_at,
+              transactions.source_transaction_id,
               recurring_transaction_series.next_occurrence_on,
               recurring_transaction_series.starts_on AS recurrence_starts_on
          FROM transactions
@@ -859,6 +921,31 @@ export async function archiveLocalTransaction(
             END
       WHERE id = ? AND space_id = ? AND is_archived = 0`,
     now,
+    now,
+    transactionId,
+    spaceId,
+  );
+  if (result.changes !== 1) {
+    throw new Error('El movimiento local ya no está disponible');
+  }
+}
+
+export async function updateLocalTransactionNote(
+  transactionId: string,
+  spaceId: string,
+  note: string | null,
+): Promise<void> {
+  const database = await getLocalDatabase();
+  const now = new Date().toISOString();
+  const result = await database.runAsync(
+    `UPDATE transactions
+        SET note = ?, updated_at = ?,
+            sync_status = CASE
+              WHEN sync_status = 'local_only' THEN 'local_only'
+              ELSE 'pending'
+            END
+      WHERE id = ? AND space_id = ? AND is_archived = 0`,
+    note,
     now,
     transactionId,
     spaceId,

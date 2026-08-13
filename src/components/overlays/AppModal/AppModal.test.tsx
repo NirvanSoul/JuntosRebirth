@@ -4,9 +4,10 @@ import { Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 
 let latestOnDismiss: (() => void) | null = null;
-let latestPresent: jest.Mock = jest.fn();
+let mockLatestPresent = jest.fn();
 
 jest.mock('@gorhom/bottom-sheet', () => {
   const React = jest.requireActual('react');
@@ -18,10 +19,8 @@ jest.mock('@gorhom/bottom-sheet', () => {
       ref: React.ForwardedRef<{ present: () => void; dismiss: () => void }>,
     ) => {
       latestOnDismiss = onDismiss ?? null;
-      const present = jest.fn();
-      latestPresent = present;
       React.useImperativeHandle(ref, () => ({
-        present,
+        present: mockLatestPresent,
         dismiss: jest.fn(),
       }));
       return <View>{children}</View>;
@@ -40,8 +39,14 @@ jest.mock('@gorhom/bottom-sheet', () => {
 
 jest.mock('expo-blur', () => ({ BlurView: () => null }));
 
-function Harness({ onCloseSpy }: { onCloseSpy: () => void }) {
-  const [visible, setVisible] = useState(true);
+function Harness({
+  initialVisible = true,
+  onCloseSpy,
+}: {
+  initialVisible?: boolean;
+  onCloseSpy: () => void;
+}) {
+  const [visible, setVisible] = useState(initialVisible);
   const close = () => {
     onCloseSpy();
     setVisible(false);
@@ -54,13 +59,15 @@ function Harness({ onCloseSpy }: { onCloseSpy: () => void }) {
         insets: { top: 47, right: 0, bottom: 34, left: 0 },
       }}
     >
-      <View>
-        <Pressable onPress={close} testID="close" />
-        <Pressable onPress={() => setVisible(true)} testID="reopen" />
-        <AppModal onClose={close} visible={visible}>
-          <Text>Contenido</Text>
-        </AppModal>
-      </View>
+      <ThemeProvider initialAppearance="light">
+        <View>
+          <Pressable onPress={close} testID="close" />
+          <Pressable onPress={() => setVisible(true)} testID="reopen" />
+          <AppModal onClose={close} visible={visible}>
+            <Text>Contenido</Text>
+          </AppModal>
+        </View>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -68,16 +75,19 @@ function Harness({ onCloseSpy }: { onCloseSpy: () => void }) {
 describe('AppModal', () => {
   beforeEach(() => {
     latestOnDismiss = null;
+    mockLatestPresent = jest.fn();
   });
 
-  it('presenta un montaje recién creado tras asentarse la animación', async () => {
+  it('presenta la hoja inmediatamente cuando cambia a visible', async () => {
     const onCloseSpy = jest.fn();
-    await render(<Harness onCloseSpy={onCloseSpy} />);
+    const screen = await render(
+      <Harness initialVisible={false} onCloseSpy={onCloseSpy} />,
+    );
 
-    await act(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-    await act(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    expect(mockLatestPresent).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('reopen'));
 
-    expect(latestPresent).toHaveBeenCalledTimes(1);
+    expect(mockLatestPresent).toHaveBeenCalledTimes(1);
   });
 
   it('no queda cerrado si se reabre antes de que termine la animación de cierre previa', async () => {
@@ -93,6 +103,7 @@ describe('AppModal', () => {
 
     expect(onCloseSpy).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Contenido')).toBeTruthy();
+    expect(mockLatestPresent).toHaveBeenCalledTimes(2);
   });
 
   it('cierra normalmente cuando no se reabre antes de que termine la animación', async () => {

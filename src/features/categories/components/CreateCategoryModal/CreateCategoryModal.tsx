@@ -22,11 +22,13 @@ import {
   categoryColors,
   type CategoryColorToken,
 } from '@/theme/categoryColors';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
 import { maxFontScale, typography } from '@/theme/typography';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type CreateCategoryModalProps = {
   categories: readonly Category[];
@@ -52,6 +54,8 @@ export function CreateCategoryModal({
   onSubmit,
 }: CreateCategoryModalProps) {
   const density = useLayoutDensity();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [step, setStep] = useState<'name' | 'appearance'>('name');
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<CategoryIconName>(defaultIcon);
@@ -307,73 +311,75 @@ export function CreateCategoryModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  headerButton: {
-    width: layout.minTouchTarget,
-    height: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerText: { flex: 1 },
-  subtitle: { marginTop: spacing.xs },
-  nameStep: { flex: 1 },
-  input: {
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-    fontFamily: typography.body.fontFamily,
-    fontSize: typography.body.fontSize,
-    letterSpacing: typography.body.letterSpacing,
-    marginTop: spacing.xxl,
-    paddingHorizontal: spacing.lg,
-  },
-  inputError: { borderColor: colors.expense },
-  error: { marginTop: spacing.sm },
-  bottomAction: { flex: 1, justifyContent: 'flex-end' },
-  keyboardAction: { flex: 0, justifyContent: 'flex-start' },
-  keyboardPrimaryButton: { marginTop: spacing.md },
-  primaryButtonLayout: { marginTop: spacing.xl },
-  appearanceStep: { flex: 1 },
-  appearanceScroll: { flex: 1 },
-  appearanceContent: { paddingTop: spacing.xl, paddingBottom: spacing.md },
-  preview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  previewIcon: {
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-  },
-  sectionTitle: { marginBottom: spacing.md, marginTop: spacing.xl },
-  optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  colorOption: {
-    width: layout.minTouchTarget,
-    height: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.round,
-  },
-  selectedOption: { borderColor: colors.textPrimary, borderWidth: 3 },
-  iconOption: {
-    width: layout.minTouchTarget,
-    height: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-  },
-  selectedIconOption: {
-    borderColor: colors.textPrimary,
-    borderWidth: 3,
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    headerButton: {
+      width: layout.minTouchTarget,
+      height: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerText: { flex: 1 },
+    subtitle: { marginTop: spacing.xs },
+    nameStep: { flex: 1 },
+    input: {
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      backgroundColor: colors.surface,
+      color: colors.textPrimary,
+      fontFamily: typography.body.fontFamily,
+      fontSize: typography.body.fontSize,
+      letterSpacing: typography.body.letterSpacing,
+      marginTop: spacing.xxl,
+      paddingHorizontal: spacing.lg,
+    },
+    inputError: { borderColor: colors.expense },
+    error: { marginTop: spacing.sm },
+    bottomAction: { flex: 1, justifyContent: 'flex-end' },
+    keyboardAction: { flex: 0, justifyContent: 'flex-start' },
+    keyboardPrimaryButton: { marginTop: spacing.md },
+    primaryButtonLayout: { marginTop: spacing.xl },
+    appearanceStep: { flex: 1 },
+    appearanceScroll: { flex: 1 },
+    appearanceContent: { paddingTop: spacing.xl, paddingBottom: spacing.md },
+    preview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    previewIcon: {
+      width: 56,
+      height: 56,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+    },
+    sectionTitle: { marginBottom: spacing.md, marginTop: spacing.xl },
+    optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+    colorOption: {
+      width: layout.minTouchTarget,
+      height: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+    },
+    selectedOption: { borderColor: colors.textPrimary, borderWidth: 3 },
+    iconOption: {
+      width: layout.minTouchTarget,
+      height: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      backgroundColor: colors.surface,
+    },
+    selectedIconOption: {
+      borderColor: colors.textPrimary,
+      borderWidth: 3,
+    },
+  });
+}

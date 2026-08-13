@@ -126,6 +126,29 @@ describe('NotificationRulesModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('avisa con onSaved al guardar con éxito, pero no si falla', async () => {
+    const onSaved = jest.fn();
+    const onSave = jest.fn().mockResolvedValue(true);
+    const screen = await renderWithTheme(
+      <NotificationRulesModal
+        onClose={jest.fn()}
+        onSave={onSave}
+        onSaved={onSaved}
+        rules={[]}
+        spaceId="personal"
+        visible
+      />,
+    );
+
+    await fireEvent.press(screen.getByTestId('notification-rules-save'));
+    expect(onSaved).toHaveBeenCalledTimes(1);
+
+    onSave.mockResolvedValueOnce(false);
+    onSaved.mockClear();
+    await fireEvent.press(screen.getByTestId('notification-rules-save'));
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
   it('no dispara el segundo guardado hasta que el primero resuelve', async () => {
     let resolveExpense: (value: boolean) => void = () => undefined;
     const onSave = jest

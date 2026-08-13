@@ -6,14 +6,16 @@ import {
 } from '@gorhom/bottom-sheet';
 import { BlurView } from 'expo-blur';
 import type { PropsWithChildren } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
-import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type AppModalProps = PropsWithChildren<{
   visible: boolean;
@@ -37,7 +39,6 @@ type AppModalProps = PropsWithChildren<{
 /** Espacio vertical que la librería reserva al tirador del bottom sheet. */
 const bottomSheetHandleHeight = 24;
 const expandedSnapRatio = 0.94;
-
 export function useAppModalBottomInset(): number {
   const insets = useSafeAreaInsets();
   const density = useLayoutDensity();
@@ -69,6 +70,8 @@ export function AppModal({
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const density = useLayoutDensity();
+  const { isDark } = useTheme();
+  const themedStyles = useThemedStyles(createThemedStyles);
   const isExpanded = variant === 'expanded';
   const isCatalog = variant === 'catalog';
   const modalBottomPadding = useAppModalBottomInset();
@@ -85,7 +88,8 @@ export function AppModal({
   const catalogContentHeight =
     catalogSheetHeight === null ? null : catalogSheetHeight - modalHandleHeight;
   const hasFixedHeight = isExpanded || catalogSheetHeight !== null;
-  const [isMounted, setMounted] = useState(visible);
+  const [isContentVisible, setContentVisible] = useState(visible);
+  const [presentationRequest, setPresentationRequest] = useState(0);
   /**
    * Distingue un cierre pedido por el padre (`visible` pasó a `false`) de uno
    * iniciado por gesto (deslizar o tocar el backdrop). `onDismiss` puede
@@ -94,6 +98,9 @@ export function AppModal({
    * obsoleto y volvería a cerrar lo que el usuario acaba de reabrir.
    */
   const dismissRequestedByParentRef = useRef(false);
+  const hasPresentedRef = useRef(false);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const snapPoints = useMemo(
     () =>
       isExpanded
@@ -104,49 +111,40 @@ export function AppModal({
     [catalogSheetHeight, isExpanded],
   );
 
-  useEffect(() => {
-    if (visible) {
-      setMounted(true);
-      return;
-    }
-
-    if (isMounted) {
-      dismissRequestedByParentRef.current = true;
-      modalRef.current?.dismiss();
-    }
-  }, [isMounted, visible]);
-
-  useEffect(() => {
-    if (!visible || !isMounted) {
-      return;
-    }
-
-    // Un único frame no basta en un montaje recién creado: el sheet nativo
-    // todavía puede no estar registrado en su Provider cuando llega ese
-    // primer frame, y `present()` se pierde en silencio. Un segundo frame
-    // deja que ese registro se asiente antes de presentar.
-    let secondFrame: number | null = null;
-    const firstFrame = requestAnimationFrame(() => {
-      secondFrame = requestAnimationFrame(() => {
-        modalRef.current?.present();
-      });
-    });
-
-    return () => {
-      cancelAnimationFrame(firstFrame);
-      if (secondFrame !== null) {
-        cancelAnimationFrame(secondFrame);
+  useLayoutEffect(() => {
+    if (!visible) {
+      if (hasPresentedRef.current) {
+        dismissRequestedByParentRef.current = true;
+        modalRef.current?.dismiss();
       }
-    };
-  }, [isMounted, visible]);
+      return;
+    }
+
+    setContentVisible(true);
+    if (!dismissRequestedByParentRef.current) {
+      hasPresentedRef.current = true;
+      modalRef.current?.present();
+    }
+  }, [presentationRequest, visible]);
 
   const handleDismiss = useCallback(() => {
-    setMounted(false);
+    hasPresentedRef.current = false;
     const wasRequestedByParent = dismissRequestedByParentRef.current;
     dismissRequestedByParentRef.current = false;
+
     if (!wasRequestedByParent) {
+      setContentVisible(false);
       onClose();
+      return;
     }
+
+    if (visibleRef.current) {
+      setContentVisible(true);
+      setPresentationRequest((current) => current + 1);
+      return;
+    }
+
+    setContentVisible(false);
   }, [onClose]);
 
   const renderBackdrop = useCallback(
@@ -167,17 +165,13 @@ export function AppModal({
           intensity={20}
           pointerEvents="none"
           style={StyleSheet.absoluteFill}
-          tint="default"
+          tint={isDark ? 'dark' : 'light'}
         />
-        <View pointerEvents="none" style={styles.backdropShade} />
+        <View pointerEvents="none" style={themedStyles.backdropShade} />
       </BottomSheetBackdrop>
     ),
-    [],
+    [isDark, themedStyles.backdropShade],
   );
-
-  if (!isMounted) {
-    return null;
-  }
 
   const contentStyle = [
     isExpanded && { height: expandedContentHeight },
@@ -194,7 +188,7 @@ export function AppModal({
       ]}
       testID={testID ? `${testID}-content` : undefined}
     >
-      {children}
+      {isContentVisible ? children : null}
     </View>
   );
 
@@ -203,14 +197,14 @@ export function AppModal({
       android_keyboardInputMode="adjustResize"
       backdropComponent={renderBackdrop}
       backgroundStyle={[
-        styles.background,
-        (isExpanded || isCatalog) && styles.expandedBackground,
+        themedStyles.background,
+        (isExpanded || isCatalog) && themedStyles.expandedBackground,
       ]}
       containerComponent={ModalLayer}
       enableDynamicSizing={!hasFixedHeight}
       enablePanDownToClose
       handleComponent={hideHandle ? null : undefined}
-      handleIndicatorStyle={styles.handle}
+      handleIndicatorStyle={themedStyles.handle}
       index={0}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
@@ -221,15 +215,17 @@ export function AppModal({
       stackBehavior={stackBehavior}
       topInset={insets.top}
     >
-      {containsScrollable ? (
-        <View style={contentStyle} testID={testID}>
-          {innerContent}
-        </View>
-      ) : (
-        <BottomSheetView style={contentStyle} testID={testID}>
-          {innerContent}
-        </BottomSheetView>
-      )}
+      {isContentVisible ? (
+        containsScrollable ? (
+          <View style={contentStyle} testID={testID}>
+            {innerContent}
+          </View>
+        ) : (
+          <BottomSheetView style={contentStyle} testID={testID}>
+            {innerContent}
+          </BottomSheetView>
+        )
+      ) : null}
     </BottomSheetModal>
   );
 }
@@ -240,26 +236,31 @@ const styles = StyleSheet.create({
     zIndex: 100,
     elevation: 20,
   },
-  background: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-  },
-  expandedBackground: {
-    backgroundColor: colors.modalBackground,
-  },
-  handle: {
-    width: 42,
-    height: 5,
-    backgroundColor: colors.border,
-  },
   fixedInnerContent: {
     flex: 1,
   },
   transparentBackdrop: {
     backgroundColor: 'transparent',
   },
-  backdropShade: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.overlaySoft,
-  },
 });
+
+function createThemedStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    background: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+    },
+    expandedBackground: {
+      backgroundColor: colors.modalBackground,
+    },
+    handle: {
+      width: 42,
+      height: 5,
+      backgroundColor: colors.border,
+    },
+    backdropShade: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlaySoft,
+    },
+  });
+}

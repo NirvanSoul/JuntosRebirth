@@ -1,3 +1,5 @@
+import { normalizeSearchText } from '@/lib/text/normalizeSearchText';
+
 type CurrencySymbolPosition = 'before' | 'after';
 
 type CurrencyCatalogEntry = {
@@ -366,25 +368,19 @@ export function getCurrencyFlag(code: CurrencyCode): string {
 /**
  * Coloca el símbolo de la moneda junto a un importe ya formateado, en el
  * lado que corresponde a su uso real (antes o después), separado por un
- * espacio.
+ * espacio irrompible (NBSP) para que el símbolo nunca quede huérfano al
+ * final de una línea.
  */
 export function applyCurrencySymbol(
   code: CurrencyCode,
   formattedAmount: string,
 ): string {
   const entry = getCatalogEntry(code);
+  const nbsp = ' ';
 
   return entry.symbolPosition === 'before'
-    ? `${entry.symbol} ${formattedAmount}`
-    : `${formattedAmount} ${entry.symbol}`;
-}
-
-/** Minúsculas y sin diacríticos, para comparar sin importar acentos. */
-function normalizeSearchText(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
+    ? `${entry.symbol}${nbsp}${formattedAmount}`
+    : `${formattedAmount}${nbsp}${entry.symbol}`;
 }
 
 /**

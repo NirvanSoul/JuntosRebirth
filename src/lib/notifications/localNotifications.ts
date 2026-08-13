@@ -102,6 +102,28 @@ export async function scheduleLocalNotification({
   });
 }
 
+export type ScheduledLocalNotification = {
+  data: Record<string, unknown>;
+  id: string;
+  title: string | null;
+};
+
+/**
+ * Expone solo los datos necesarios para que un servicio pueda reconciliar sus
+ * propias notificaciones sin acceder directamente a Expo Notifications.
+ */
+export async function listScheduledLocalNotifications(): Promise<
+  readonly ScheduledLocalNotification[]
+> {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+
+  return scheduled.map((notification) => ({
+    data: notification.content.data,
+    id: notification.identifier,
+    title: notification.content.title,
+  }));
+}
+
 /** Cancela una notificación programada. No falla si ya no existe. */
 export async function cancelLocalNotification(id: string): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(id).catch(

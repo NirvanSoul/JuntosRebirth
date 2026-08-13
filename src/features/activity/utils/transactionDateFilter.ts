@@ -38,7 +38,12 @@ function parseDateKey(dateKey: string): Date {
 }
 
 function addDays(date: Date, days: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days, 12);
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate() + days,
+    12,
+  );
 }
 
 /**
@@ -70,6 +75,10 @@ export function getPreviousDateFilter(
 
   return {
     period: filter.period,
-    selectedDate: shiftTransactionPeriod(filter.period, filter.selectedDate, -1),
+    selectedDate: shiftTransactionPeriod(
+      filter.period,
+      filter.selectedDate,
+      -1,
+    ),
   };
 }

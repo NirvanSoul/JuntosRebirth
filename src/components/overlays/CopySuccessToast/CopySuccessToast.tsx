@@ -12,11 +12,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text/Text';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
-import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 export type CopySuccessNotice = {
   destinationName: string;
@@ -45,6 +47,8 @@ const toastExiting = FadeOutUp.duration(motion.toastTransitionDuration)
 export function CopySuccessToast({ notice, onDismiss }: CopySuccessToastProps) {
   const density = useLayoutDensity();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [isVisible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -115,28 +119,30 @@ export function CopySuccessToast({ notice, onDismiss }: CopySuccessToastProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 200,
-  },
-  card: {
-    position: 'absolute',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minHeight: layout.controlHeight.compact,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: colors.textPrimary,
-    elevation: 24,
-    shadowColor: colors.textPrimary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 18,
-  },
-  message: {
-    flex: 1,
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 200,
+    },
+    card: {
+      position: 'absolute',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      minHeight: layout.controlHeight.compact,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      borderRadius: radii.md,
+      backgroundColor: colors.textPrimary,
+      elevation: 24,
+      shadowColor: colors.textPrimary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.2,
+      shadowRadius: 18,
+    },
+    message: {
+      flex: 1,
+    },
+  });
+}
