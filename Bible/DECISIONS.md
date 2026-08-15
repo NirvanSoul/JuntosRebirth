@@ -276,6 +276,9 @@ La aplicación necesita explicar su valor sin convertirse en un tutorial largo.
 
 Utilizar un onboarding de un máximo de cuatro láminas, además de la captura mínima del nombre.
 
+> **Nota (estado vigente):** esta decisión fue ampliada a nueve pantallas; ver
+> «Ampliación — láminas 6 a 9» más abajo en esta misma ADR.
+
 ## Mensajes principales
 
 - Registrar ingresos y gastos.
