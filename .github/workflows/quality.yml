@@ -27,3 +27,17 @@ jobs:
 
       - name: Validate
         run: npm run validate
+
+      - name: Reject agent work artifacts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            artifacts=$(git diff --name-only --diff-filter=A "$BASE_SHA" HEAD | grep -E 'HANDOFF|IMPLEMENTATION_STATE|CONTEXT_ENGINE' || true)
+            if [ -n "$artifacts" ]; then
+              echo "Se ha añadido un artefacto de trabajo de agente al repositorio:"
+              echo "$artifacts"
+              exit 1
+            fi
+          fi
+          echo "No se detectaron artefactos de trabajo de agentes."

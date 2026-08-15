@@ -40,3 +40,8 @@ yarn-error.*
 .DS_Store
 .idea/
 .vscode/
+
+# Artefactos de trabajo de agentes (nunca se versionan)
+*HANDOFF*.md
+*IMPLEMENTATION_STATE*.md
+*CONTEXT_ENGINE*.md
