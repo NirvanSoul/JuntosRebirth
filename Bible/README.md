@@ -32,6 +32,7 @@ La versión anterior acumuló funcionalidades, duplicación de componentes, resp
 | [`PRODUCT.md`](./PRODUCT.md) | Producto, navegación, pantallas y reglas funcionales. |
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Arquitectura técnica y estructura de carpetas. |
 | [`PROJECT_RULES.md`](./PROJECT_RULES.md) | Reglas obligatorias para modificar el código. |
+| [`WORKFLOW.md`](./WORKFLOW.md) | Jerarquía de trabajo multi-agente y checks obligatorios. |
 | [`DATABASE.md`](./DATABASE.md) | Persistencia local, Supabase, SQL y sincronización. |
 | [`ROADMAP.md`](./ROADMAP.md) | Fases y criterios de finalización. |
 | [`DECISIONS.md`](./DECISIONS.md) | Historial de decisiones técnicas y de producto. |
