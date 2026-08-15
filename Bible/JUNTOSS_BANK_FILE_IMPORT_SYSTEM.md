@@ -1825,7 +1825,7 @@ Añade varios gastos e ingresos desde un archivo de tu banco.
 
 **Elige tu archivo**
 
-Puedes importar PDF, Excel o CSV.
+Puedes importar Excel o CSV.
 
 ### Procesando
 
