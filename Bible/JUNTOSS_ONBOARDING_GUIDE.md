@@ -991,7 +991,7 @@ Microtexto:
 # 24. Checklist para agentes
 
 - [ ] Leer este documento.
-- [ ] Mantener las nueve pantallas actuales (bienvenida, nombre, país y moneda, juntos, calendario, primera categoría, primer ingreso, primer gasto, cierre).
+- [ ] Mantener las nueve pantallas actuales en este orden: nombre, país y moneda, bienvenida, calendario, uso compartido, primera categoría, primer ingreso, primer gasto, cierre.
 - [ ] Mantener una sola idea principal por pantalla.
 - [ ] No pedir registro antes de presentar valor.
 - [ ] Mantener visible la opción de probar sin cuenta.

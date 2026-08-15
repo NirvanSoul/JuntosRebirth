@@ -167,17 +167,21 @@ Objetivo financiero individual o compartido. Su implementación completa no form
 
 ### Objetivo
 
-Explicar el valor en nueve pantallas y permitir comenzar con datos reales en el espacio local.
+Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y completar el flujo con nombre, país, primera categoría, primer ingreso, primer gasto y cierre.
 
 ### Flujo propuesto
 
-1. Captura del nombre y bienvenida personal.
+1. Captura del nombre.
 2. Elección de país y moneda principal.
-3. Lámina de simplicidad y control diario.
-4. Lámina de calendario y mapa financiero.
-5. Lámina de uso personal y compartido.
-6. Entrada como invitado, creación de cuenta o inicio de sesión.
-7. Creación automática de espacio personal local.
+3. Bienvenida: simplicidad y control diario.
+4. Calendario y mapa financiero.
+5. Uso personal y compartido.
+6. Creación de la primera categoría.
+7. Primer ingreso.
+8. Primer gasto.
+9. Cierre y listo para explorar.
+
+Después del onboarding, el usuario entra como invitado o crea su cuenta (ver §8).
 
 ### Mensajes sugeridos
 

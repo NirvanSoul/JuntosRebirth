@@ -160,14 +160,13 @@ El cliente no es la autoridad final de permisos.
 Flujo previsto:
 
 1. El usuario abre la aplicación.
-2. Introduce su nombre y elige país y moneda principal.
-3. Visualiza un onboarding de nueve pantallas, que termina con datos reales en su espacio local (primera categoría, primer ingreso y primer gasto).
-4. Entra como invitado.
-5. Sus datos se almacenan localmente.
-6. Prueba las funciones principales con límites razonables.
-7. Cuando supera un límite o intenta compartir o sincronizar, se le invita a crear una cuenta.
-8. Tras registrarse y verificar su correo, sus datos locales se migran.
-9. Se crea o asigna su espacio personal remoto.
+2. Completa un onboarding de nueve pantallas (nombre, país y moneda, bienvenida, calendario, uso compartido, primera categoría, primer ingreso, primer gasto y cierre).
+3. Entra como invitado.
+4. Sus datos se almacenan localmente.
+5. Prueba las funciones principales con límites razonables.
+6. Cuando supera un límite o intenta compartir o sincronizar, se le invita a crear una cuenta.
+7. Tras registrarse y verificar su correo, sus datos locales se migran.
+8. Se crea o asigna su espacio personal remoto.
 
 El usuario invitado no escribe datos en Supabase.
 
