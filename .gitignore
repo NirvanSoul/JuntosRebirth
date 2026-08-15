@@ -41,7 +41,9 @@ yarn-error.*
 .idea/
 .vscode/
 
-# Artefactos de trabajo de agentes (nunca se versionan)
+# Artefactos de trabajo de agentes (nunca se versionan). Los patrones son
+# amplios a propósito: un documento legítimo con estas subcadenas (p. ej.
+# HANDOFF_POLICY.md) debe forzarse con `git add -f` y revisarse.
 *HANDOFF*.md
 *IMPLEMENTATION_STATE*.md
 *CONTEXT_ENGINE*.md

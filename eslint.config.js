@@ -41,7 +41,7 @@ const internalImportDebt = [
 ];
 
 module.exports = defineConfig([
-  globalIgnores(['coverage/*', 'dist/*', 'android/*', 'ios/*']),
+  globalIgnores(['coverage/*', 'dist/*', 'android/*', 'ios/*', '.expo/*']),
   expoConfig,
   {
     rules: {
@@ -49,8 +49,24 @@ module.exports = defineConfig([
       // Prohibición de «god components»: un archivo fuente nuevo no supera
       // 400 líneas no vacías.
       'max-lines': ['warn', { max: 400, skipBlankLines: true }],
-      // Prohibición de importar desde rutas internas de node_modules.
-      'no-restricted-imports': ['error', { patterns: ['*/src/**'] }],
+      // Prohibición de importar desde rutas internas de node_modules. Se nombran
+      // los paquetes (en vez de un comodín) para no bloquear imports relativos
+      // legítimos del propio src/.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'phosphor-react-native/src/**',
+                'react-native-calendars/src/**',
+              ],
+              message:
+                'Importa desde la entrada pública de la librería, no de su src/ interno.',
+            },
+          ],
+        },
+      ],
     },
   },
   // Los tests no se penalizan por longitud: una suite larga es cobertura, no deuda.
@@ -67,5 +83,11 @@ module.exports = defineConfig([
   {
     files: internalImportDebt,
     rules: { 'no-restricted-imports': 'off' },
+  },
+  // Las Edge Functions de Supabase usan imports URL de Deno (https://esm.sh/...)
+  // que import/no-unresolved no puede resolver.
+  {
+    files: ['supabase/functions/**/*.ts'],
+    rules: { 'import/no-unresolved': 'off' },
   },
 ]);

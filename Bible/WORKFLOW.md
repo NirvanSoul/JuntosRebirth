@@ -168,7 +168,8 @@ Las reglas que puede comprobar una máquina no se recuerdan en prosa:
 - **«God components»** (`max-lines`) y **imports internos de `node_modules`**
   (`no-restricted-imports`): se verifican en `eslint.config.js`.
 - **Artefactos de trabajo de agentes**: se verifican en el workflow de CI y en
-  `.gitignore`.
+  `.gitignore`. El check de CI se ejecuta al publicar (push o PR); mientras se
+  trabaja solo en local, la guarda activa es `.gitignore`.
 
 El resto de prohibiciones vive en `PROJECT_RULES.md` §26.
 

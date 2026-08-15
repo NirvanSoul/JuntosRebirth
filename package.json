@@ -18,7 +18,7 @@
     "ios:dev": "sh scripts/ios-development-build.sh simulator",
     "ios:device": "sh scripts/ios-development-build.sh device",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint --max-warnings=0",
+    "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "jest --runInBand",
