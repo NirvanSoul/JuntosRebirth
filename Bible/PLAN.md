@@ -26,13 +26,13 @@ sin confirmar de punta a punta es la **sincronización Supabase** y la
 
 ### Fase 1 — Limpieza quirúrgica (bajo riesgo, sin cambiar comportamiento)
 
-- Imports de librerías: `phosphor-react-native/src/icons/*` se conserva (API
+- [x] Imports de librerías: `phosphor-react-native/src/icons/*` se conserva (API
   pública declarada en `exports`); los tipos de `react-native-calendars` se
   derivan del contrato público y se encapsulan en `AppCalendar` (ADR-079).
-- Consolidar los helpers de fecha duplicados en `src/lib/date/localDate.ts`
+- [x] Consolidar los helpers de fecha duplicados en `src/lib/date/localDate.ts`
   (`toLocalDateKey` / `getLocalTodayKey`).
-- Limpiar configuración muerta (p. ej. `testPathIgnorePatterns` con `services/`).
-- Optimizar los assets de onboarding (~8,8 MB de PNG): comprimir o vectorizar.
+- [x] Limpiar configuración muerta (p. ej. `testPathIgnorePatterns` con `services/`).
+- [x] Optimizar los assets de onboarding (~8,8 MB de PNG): comprimir o vectorizar.
 
 ### Fase 1b — Auditoría de supresiones de `exhaustive-deps`
 
