@@ -929,7 +929,7 @@ Excel/CSV se implementó primero porque ninguna opción on-device de PDF funcion
 - [x] Centro de importaciones: reanudar, descartar o iniciar un batch pendiente.
 - [x] Esquema comunitario privado en Supabase para candidatos de regla global (revisión manual, nunca automática).
 - [x] Cola local de feedback comunitario conectada a `record_merchant_feedback`.
-- [ ] Commit remoto idempotente por `import_batch` (fase 12 interna, ver `IMPORT_IMPLEMENTATION_STATE.md`).
+- [ ] Commit remoto idempotente por `import_batch` (fase 12 interna, pendiente).
 - PDF (digital y escaneado) se intentó (ADR-071) y se eliminó por completo
   (ADR-073): fuera de alcance, no planeado para retomar.
 - [ ] Categorización fuzzy y perfiles de importación por banco.

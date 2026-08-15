@@ -4416,7 +4416,7 @@ ADR-071 con el flujo de development build que esa decisión requería.
 La implementación on-device de ADR-071 (`expo-pdf-text-extract`) generó
 errores repetidos durante el desarrollo y nunca se validó contra el spike de
 20 layouts reales que pedía el spec §81 (ver "Riesgos" de ADR-071 y "Known
-issues" de `IMPORT_IMPLEMENTATION_STATE.md`, 2026-08-09). El propietario del
+issues" del registro de implementación de la época (retirado del repositorio), 2026-08-09). El propietario del
 producto valora la importación de PDF como una función de uso marginal frente
 al coste de mantenerla — heurística best-effort, dependencia nativa joven,
 requisito de development build, contraseñas de archivo — y pidió eliminarla
