@@ -27,10 +27,11 @@ const frozenLineDebt = {
   'src/features/categories/components/CategoryPreviewCard/CategoryPreviewCard.tsx': 425,
 };
 
-// Deuda de imports internos de node_modules (phosphor-react-native/src/...,
-// react-native-calendars/src/...), congelada el 2026-08-15. Estos archivos ya
-// importan de rutas internas; no pueden añadir más y se retiran de la lista al
-// migrar a imports públicos.
+// Exención (no congelación) de imports internos de node_modules
+// (phosphor-react-native/src/..., react-native-calendars/src/...). Estos 6
+// archivos ya importan de rutas internas y el check está desactivado para
+// ellos: pueden añadir más sin que el lint lo impida. Se retiran de la lista al
+// migrar a imports públicos (tarea pendiente).
 const internalImportDebt = [
   'src/components/navigation/AppTabBar/AppTabBar.tsx',
   'src/features/categories/components/CategoryIcon/CategoryIcon.tsx',
