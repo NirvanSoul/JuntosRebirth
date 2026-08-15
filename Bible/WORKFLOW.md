@@ -132,10 +132,14 @@ Un cambio está terminado **solo** cuando:
 «Compila» o «los tests pasan» **no** es suficiente sin la verificación que
 corresponda.
 
-Una casilla se marca `[x]` solo si existe implementación **y** prueba o
-configuración verificable. Se deja `[ ]` si depende de dispositivo físico, de
-un Supabase real, de pgTAP no ejecutado, de accesibilidad manual, de
-rendimiento o de una decisión humana. Que exista un archivo no cierra nada.
+Una casilla se marca `[x]` solo cuando existe implementación y evidencia
+proporcional a su naturaleza, ya ejecutada y registrada: una prueba
+automática, una configuración verificable, o el resultado anotado de una
+verificación manual, nativa o SQL. Permanece `[ ]` mientras esa evidencia no
+se haya producido — no porque el criterio dependa de un dispositivo, de un
+Supabase real, de pgTAP, de accesibilidad, de rendimiento o de una decisión
+humana, sino porque todavía no se han hecho. Que exista un archivo no cierra
+nada.
 
 ---
 
