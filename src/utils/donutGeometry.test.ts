@@ -1,4 +1,4 @@
-import { distributeDonutSegmentLengths } from '@/features/activity/utils/categoryDonutGeometry';
+import { distributeDonutSegmentLengths } from '@/utils/donutGeometry';
 
 describe('distributeDonutSegmentLengths', () => {
   it('reserva espacio al segmento pequeño y conserva la circunferencia', () => {

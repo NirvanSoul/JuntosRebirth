@@ -1,5 +1,5 @@
 begin;
-select plan(12);
+select plan(17);
 
 select has_function(
   'public',
@@ -87,6 +87,53 @@ select ok(
 select ok(
   (select prosrc from pg_proc where oid = 'public.request_account_deletion()'::regprocedure) ~ 'delete from public.user_merchant_rules',
   'account deletion clears user_merchant_rules before deleting the space/category it references'
+);
+
+-- Las dos tablas añadidas después de la migración 06 repitieron el patrón
+-- `not null references auth.users(id)` sin acción `on delete`, y bloqueaban
+-- `auth.admin.deleteUser()` para cualquiera que hubiera estado en un espacio
+-- compartido (migración 21).
+select ok(
+  (
+    select is_nullable = 'YES'
+      from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'transaction_notification_rules'
+       and column_name = 'created_by'
+  ),
+  'a notification rule survives its author leaving: created_by admits null'
+);
+select ok(
+  (
+    select is_nullable = 'YES'
+      from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'category_budgets'
+       and column_name = 'created_by'
+  ),
+  'a category budget survives its author leaving: created_by admits null'
+);
+select ok(
+  exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.transaction_notification_rules'::regclass
+      and conname = 'transaction_notification_rules_created_by_fkey'
+      and confdeltype = 'n'
+  ),
+  'deleting the author clears created_by on their notification rules instead of blocking the account deletion'
+);
+select ok(
+  exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.category_budgets'::regclass
+      and conname = 'category_budgets_created_by_fkey'
+      and confdeltype = 'n'
+  ),
+  'deleting the author clears created_by on their category budgets instead of blocking the account deletion'
+);
+select ok(
+  (select prosrc from pg_proc where oid = 'public.request_account_deletion()'::regprocedure) ~ 'delete from public.login_attempts',
+  'account deletion clears the login_attempts row, which no foreign key reaches because it is keyed by email'
 );
 
 select * from finish();

@@ -2,7 +2,19 @@ export type Space = {
   id: string;
   name: string;
   type: 'personal' | 'couple' | 'other';
+  /**
+   * Solo en `type: 'couple'`: la invitación sigue pendiente y la otra persona
+   * todavía no ha entrado (`spaces.activated_at is null` en el servidor). Un
+   * espacio juntos de una sola persona no admite movimientos: Inicio muestra
+   * la pantalla de espera en su lugar.
+   */
+  isAwaitingPartner?: boolean;
 };
+
+/** Un espacio juntos donde la otra persona todavía no ha aceptado. */
+export function isAwaitingPartnerSpace(space: Space): boolean {
+  return space.type === 'couple' && space.isAwaitingPartner === true;
+}
 
 export type SpacesState = {
   activeSpaceId: string;

@@ -55,6 +55,7 @@ function createGatewayStub(
     dissolveCoupleSpace: jest.fn(),
     getCurrentUserPendingInvitation: jest.fn(),
     getInvitationPreview: jest.fn(),
+    getOutgoingInvitation: jest.fn(),
     acceptCurrentUserInvitation: jest.fn(),
     ...overrides,
   };
@@ -92,7 +93,46 @@ describe('useSpaces (espacio de pareja)', () => {
       spaces: [personalSpace],
     });
     mockRemoteCoupleSpace({
-      data: { id: 'space-remote', name: 'Juntos', type: 'couple' },
+      data: {
+        id: 'space-remote',
+        name: 'Juntos',
+        type: 'couple',
+        activated_at: '2026-08-01T10:00:00.000Z',
+      },
+      error: null,
+    });
+
+    const remoteCoupleSpace = {
+      id: 'space-remote',
+      name: 'Juntos',
+      type: 'couple',
+      isAwaitingPartner: false,
+    };
+
+    const { result } = await renderHook(() => useSpaces());
+
+    await waitFor(() =>
+      expect(result.current.spaces).toEqual([personalSpace, remoteCoupleSpace]),
+    );
+    expect(saveSpaces).toHaveBeenCalledWith({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace, remoteCoupleSpace],
+    });
+  });
+
+  it('marca el espacio de pareja como pendiente mientras la otra persona no acepta', async () => {
+    mockAuthSession(fakeSession);
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+    mockRemoteCoupleSpace({
+      data: {
+        id: 'space-remote',
+        name: 'Juntos',
+        type: 'couple',
+        activated_at: null,
+      },
       error: null,
     });
 
@@ -101,16 +141,45 @@ describe('useSpaces (espacio de pareja)', () => {
     await waitFor(() =>
       expect(result.current.spaces).toEqual([
         personalSpace,
-        { id: 'space-remote', name: 'Juntos', type: 'couple' },
+        {
+          id: 'space-remote',
+          name: 'Juntos',
+          type: 'couple',
+          isAwaitingPartner: true,
+        },
       ]),
     );
-    expect(saveSpaces).toHaveBeenCalledWith({
-      activeSpaceId: personalSpace.id,
+  });
+
+  it('deja de marcar el espacio como pendiente en cuanto el servidor lo activa', async () => {
+    mockAuthSession(fakeSession);
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: 'space-remote',
       spaces: [
         personalSpace,
-        { id: 'space-remote', name: 'Juntos', type: 'couple' },
+        {
+          id: 'space-remote',
+          name: 'Juntos',
+          type: 'couple' as const,
+          isAwaitingPartner: true,
+        },
       ],
     });
+    mockRemoteCoupleSpace({
+      data: {
+        id: 'space-remote',
+        name: 'Juntos',
+        type: 'couple',
+        activated_at: '2026-08-15T09:00:00.000Z',
+      },
+      error: null,
+    });
+
+    const { result } = await renderHook(() => useSpaces());
+
+    await waitFor(() =>
+      expect(result.current.activeSpace.isAwaitingPartner).toBe(false),
+    );
   });
 
   it('retira una entrada local de pareja obsoleta cuando ya no existe remotamente, y cae a Personal si era la activa', async () => {
@@ -195,10 +264,12 @@ describe('useSpaces (espacio de pareja)', () => {
     });
 
     expect(gateway.createCoupleSpace).toHaveBeenCalledWith('Nuestro espacio');
+    // Nace pendiente: no es un espacio usable hasta que la otra persona entre.
     expect(result.current.activeSpace).toEqual({
       id: 'space-new',
       name: 'Nuestro espacio',
       type: 'couple',
+      isAwaitingPartner: true,
     });
   });
 

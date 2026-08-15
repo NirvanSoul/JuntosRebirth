@@ -49,30 +49,33 @@ const progressCircumference = 2 * Math.PI * progressRadius;
 
 type CategoryPreviewCardVariant = 'compact' | 'row' | 'tile';
 
-type CategoryTileProps = Omit<
-  CategoryPreviewCardProps,
-  'incomeMinor' | 'variant'
->;
+type CategoryTileProps = Omit<CategoryPreviewCardProps, 'variant'>;
 
 function CategoryTile({
   name,
   icon,
   colorToken,
   budgetMinor,
+  incomeMinor,
   expenseMinor,
   onPress,
 }: CategoryTileProps) {
   const categoryColor = categoryColors[colorToken];
   const contentContrast = getCategoryContentContrast(colorToken);
   const gradientColors = createDiagonalGradient(categoryColor);
-  const spent = formatCurrency(expenseMinor, 'EUR', 'es-ES');
+  const isIncomeOnly = incomeMinor > 0 && expenseMinor === 0;
+  const amount = formatCurrency(
+    isIncomeOnly ? incomeMinor : expenseMinor,
+    'EUR',
+    'es-ES',
+  );
   const hasBudget = typeof budgetMinor === 'number' && budgetMinor > 0;
   const progress = hasBudget ? Math.min(expenseMinor / budgetMinor, 1) : 0;
 
   return (
     <Pressable
       accessibilityHint="Abre el detalle de la categoría"
-      accessibilityLabel={`${name}, gastado ${spent}`}
+      accessibilityLabel={`${name}, ${isIncomeOnly ? 'ingresado' : 'gastado'} ${amount}`}
       accessibilityRole="button"
       disabled={!onPress}
       onPress={onPress}
@@ -149,7 +152,7 @@ function CategoryTile({
           variant="footnote"
           weight="medium"
         >
-          {spent}
+          {amount}
         </Text>
       </GradientCard>
     </Pressable>
@@ -207,8 +210,15 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
   }
 
   if (variant === 'tile') {
-    const { budgetMinor, colorToken, expenseMinor, icon, name, onPress } =
-      props;
+    const {
+      budgetMinor,
+      colorToken,
+      expenseMinor,
+      icon,
+      incomeMinor,
+      name,
+      onPress,
+    } = props;
 
     return (
       <CategoryTile
@@ -216,17 +226,31 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
         colorToken={colorToken}
         expenseMinor={expenseMinor}
         icon={icon}
+        incomeMinor={incomeMinor}
         name={name}
         onPress={onPress}
       />
     );
   }
 
-  const { budgetMinor, colorToken, expenseMinor, icon, name, onPress } = props;
-  const hasBudget = typeof budgetMinor === 'number' && budgetMinor > 0;
-  const spent = formatCurrency(expenseMinor, 'EUR', 'es-ES', {
-    omitZeroDecimals: true,
-  });
+  const {
+    budgetMinor,
+    colorToken,
+    expenseMinor,
+    icon,
+    incomeMinor,
+    name,
+    onPress,
+  } = props;
+  const isIncomeOnly = incomeMinor > 0 && expenseMinor === 0;
+  const hasBudget =
+    typeof budgetMinor === 'number' && budgetMinor > 0 && !isIncomeOnly;
+  const spent = formatCurrency(
+    isIncomeOnly ? incomeMinor : expenseMinor,
+    'EUR',
+    'es-ES',
+    { omitZeroDecimals: true },
+  );
   const available = hasBudget
     ? formatCurrency(Math.max(budgetMinor - expenseMinor, 0), 'EUR', 'es-ES', {
         omitZeroDecimals: true,
@@ -240,7 +264,11 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
     <Pressable
       accessibilityHint="Abre el detalle de la categoría"
       accessibilityLabel={
-        available ? `${name}, ${spent} gastado, ${available} disponible` : name
+        available
+          ? `${name}, ${spent} gastado, ${available} disponible`
+          : isIncomeOnly
+            ? `${name}, ${spent} ingresado`
+            : name
       }
       accessibilityRole="button"
       disabled={!onPress}
@@ -268,9 +296,13 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
           style={styles.budgetSummary}
           testID="category-preview-budget-summary"
         >
-          {hasBudget ? (
+          {hasBudget || isIncomeOnly ? (
             <Text
-              style={{ color: categoryColors[colorToken] }}
+              style={{
+                color: isIncomeOnly
+                  ? colors.income
+                  : categoryColors[colorToken],
+              }}
               testID="category-preview-spent-amount"
               variant="caption"
               weight="semibold"
@@ -283,7 +315,9 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
               accessibilityText={
                 hasBudget
                   ? `${Math.round(budgetProgress * 100)}% utilizado, ${spent} gastado`
-                  : 'Sin presupuesto asignado'
+                  : isIncomeOnly
+                    ? `${spent} ingresado`
+                    : 'Sin presupuesto asignado'
               }
               color={categoryColors[colorToken]}
               progress={budgetProgress}

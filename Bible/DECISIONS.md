@@ -4877,6 +4877,12 @@ Sincronizar exclusivamente las entidades financieras de los espacios
 local-first: guarda primero en SQLite, publica categorías/series/movimientos
 en orden de dependencia y marca una fila `synced` solo tras éxito remoto.
 
+La migración 20 conserva, al insertar por primera vez, el UUID que SQLite ya
+asignó a la categoría, serie o movimiento. De este modo el snapshot remoto no
+puede materializar una segunda entidad para quien la creó. Se conserva un UUID
+generado por PostgreSQL como fallback únicamente para datos locales heredados
+que no tengan un identificador UUID válido.
+
 La lectura usa el snapshot remoto existente sin sobrescribir filas locales
 pendientes. La migración 19 publica las tres tablas financieras en Supabase
 Realtime y, mientras Juntos está activo, el cliente se suscribe a sus cambios
@@ -4904,6 +4910,8 @@ antes de ejecutar el lote.
 
 - Pruebas unitarias del lote local cubren serialización, confirmación y el caso
   sin cambios.
+- La prueba SQL comprueba que el RPC conserva esos UUID y mantiene el fallback
+  compatible para datos heredados.
 - Debe ejecutarse una prueba manual con dos cuentas: crear categoría y gasto
   con A, abrir Juntos con B y comprobar que llega; repetir edición y archivado.
 
@@ -4911,6 +4919,216 @@ antes de ejecutar el lote.
 
 La limitación de ADR-068 que mantenía categorías y movimientos de Juntos solo
 en local.
+
+---
+
+# ADR-077 — La eliminación de cuenta falla para quien haya estado en un espacio Juntos
+
+**Estado:** Aceptada
+
+## Contexto
+
+Un usuario real con la Edge Function `delete-account` ya desplegada seguía
+viendo "No pudimos completar la eliminación" en `DataRightsScreen`. Su
+espacio Juntos había sido disuelto por su pareja, dejándolo con la membresía
+en `'removed'` sobre un espacio archivado.
+
+Al revisar el esquema aparecieron tres defectos independientes, todos
+invisibles desde la app porque el mensaje de error se descartaba:
+
+1. La migración 06 hizo `created_by` nulable con `on delete set null` en
+   `spaces`, `categories`, `recurring_transaction_series` y `transactions`,
+   pero dos tablas creadas después repitieron el patrón antiguo
+   (`created_by uuid not null references auth.users(id)`, sin acción
+   `on delete`, es decir `NO ACTION`): `transaction_notification_rules`
+   (migración 04) y `category_budgets` (migración 08). Esas filas solo se
+   borran cuando `request_account_deletion()` arrastra el espacio entero, y
+   eso únicamente ocurre en espacios en solitario. En cuanto el usuario ha
+   pertenecido a un espacio compartido, sobreviven a propósito y
+   `auth.admin.deleteUser()` choca contra la clave foránea: la Edge Function
+   devuelve 500 con los datos ya medio limpiados y la cuenta viva.
+2. El bucle de espacios en solitario de `request_account_deletion()` exigía
+   `status = 'active'` en la membresía de quien llama. Como el primer intento
+   marca todas las membresías como `'removed'` **antes** de fallar, el
+   reintento no encontraba ningún espacio que limpiar y abandonaba para
+   siempre el espacio personal del usuario con todos sus movimientos. Lo
+   mismo ocurre con un espacio Juntos disuelto por
+   `dissolve_couple_space()` (ADR-068), que archiva el espacio y deja ambas
+   membresías en `'removed'`: `useSpaces` lo filtra por `archived_at is null`
+   y las políticas RLS lo ocultan por `is_active_space_member`, así que queda
+   invisible para todos y ninguna baja lo tocaba.
+3. `login_attempts` (migración 15) se indexa por email y no tiene ninguna FK
+   hacia `auth.users`, así que el email en claro sobrevivía a la baja.
+
+## Opciones consideradas
+
+1. Borrar las filas de `transaction_notification_rules` y `category_budgets`
+   del usuario que se da de baja.
+2. Hacer nulable su `created_by` con `on delete set null`, como la
+   migración 06.
+3. Limpiar el espacio archivado completo en cuanto una de las dos personas
+   elimina su cuenta.
+4. Conservar el espacio archivado mientras exista la membresía de la otra
+   persona, aunque esté en `'removed'`.
+
+## Decisión
+
+- **Opción 2** (migración `21_account_deletion_shared_space_fk.sql`): una
+  regla de aviso y un presupuesto son ajustes del espacio, no contenido de
+  autoría, y borrarlos cambiaría el comportamiento del espacio para quien se
+  queda. Se alinean con la decisión ya tomada en ADR-066 para movimientos y
+  categorías: el dato sobrevive y pierde la autoría.
+- **Opción 4:** el bucle pasa a cubrir dos casos: (a) el usuario sigue activo
+  y no queda ninguna otra persona activa, y (b) el usuario ya no está activo
+  y no existe ninguna otra membresía en absoluto. (b) hace el RPC idempotente
+  ante reintentos sin tocar nunca un espacio que fue de dos. Un espacio
+  Juntos disuelto conserva la membresía `'removed'` de la pareja, así que cae
+  fuera de (b) y solo pierde la autoría.
+- `request_account_deletion()` borra además la fila de `login_attempts` del
+  email del usuario, que ninguna FK alcanza.
+- `supabaseAccountDeletionGateway` lee el cuerpo del `FunctionsHttpError`
+  (`error.context.json()`), porque `functions.invoke` resuelve cualquier
+  no-2xx con el mensaje genérico "Edge Function returned a non-2xx status
+  code" y `delete-account` devuelve la causa real en `{ error }`.
+  `DataRightsScreen` la muestra como texto secundario bajo el mensaje amable.
+
+## Consecuencias positivas
+
+- La baja de cuenta funciona para el caso mayoritario a partir de ahora
+  (cualquiera que haya compartido un espacio), no solo para usuarios que
+  nunca salieron de su espacio personal.
+- Un intento fallido deja de convertir la cuenta en un residuo permanente:
+  el reintento termina la limpieza.
+
+## Consecuencias negativas
+
+- Sigue en pie la limitación de ADR-066: si `spaces.created_by` queda en
+  `null`, `spaces_update_owner` deja de admitir cambios sobre ese espacio
+  hasta que se diseñe una transferencia de propiedad.
+- Los espacios Juntos disueltos siguen sin tener a nadie que los limpie
+  mientras ambas membresías `'removed'` existan; son invisibles para la app
+  pero ocupan sitio. Pendiente de una política de retención explícita.
+
+## Riesgos
+
+- La migración 21 debe aplicarse al proyecto Supabase antes de que la baja de
+  cuenta vuelva a funcionar; el arreglo del cliente por sí solo únicamente
+  hace visible el error.
+- Los usuarios que ya intentaron darse de baja y fallaron quedaron con todas
+  sus membresías en `'removed'`: en la app aparecerán sin espacios. Deben
+  reintentar la eliminación después de aplicar la migración.
+
+## Validación
+
+- `npx tsc --noEmit` sin errores.
+- `npx jest src/features/legal` en verde.
+- `supabase/tests/account_deletion.test.sql` amplía a 17 aserciones (FK
+  `confdeltype = 'n'` y nulabilidad de las dos columnas nuevas, más la
+  limpieza de `login_attempts`). Pendiente de ejecutar con `supabase test db`
+  contra una instancia real.
+
+---
+
+# ADR-078 — Un espacio juntos no existe hasta que la otra persona acepta
+
+**Estado:** Aceptada
+
+## Contexto
+
+`create_couple_space()` dejaba el espacio plenamente operativo desde el primer
+segundo, mucho antes de que existiera una segunda persona. Un espacio juntos
+de una sola persona no es un espacio: quien invitaba podía registrar
+movimientos "compartidos" que nadie más veía, el cupo de "un espacio juntos
+activo por usuario" (ADR-068) quedaba consumido por una invitación que quizá
+nunca se aceptaba, y al entrar al espacio se encontraba un Inicio vacío sin
+ninguna explicación de qué faltaba.
+
+## Opciones consideradas
+
+1. No crear ninguna fila en `spaces` hasta la aceptación, guardando la
+   invitación en una tabla aparte sin `space_id`.
+2. Crear el espacio pero marcarlo pendiente con una marca temporal
+   (`spaces.activated_at`), igual que `archived_at` marca el final.
+3. Añadir un `spaces.status` con valores `pending`/`active`/`archived`.
+4. Bloquear solo Inicio, dejando el resto de pestañas operativas sobre el
+   espacio pendiente.
+
+## Decisión
+
+- **Opción 2** (migración `22_couple_space_pending_until_accepted.sql`):
+  `space_invitations.space_id` es `not null` y toda la maquinaria de
+  invitación (RLS por `is_active_space_member`, un pendiente por espacio,
+  `dissolve_couple_space`) cuelga del espacio. La opción 1 obligaba a
+  reescribir esa capa entera para un cambio que es de ciclo de vida, no de
+  modelo. `activated_at` es exactamente el mismo tipo de señal que
+  `archived_at`, así que la opción 3 habría introducido un vocabulario
+  paralelo para algo que el esquema ya sabe expresar.
+- La columna se añade con `default now()`, así que todo espacio existente y
+  todo espacio que creen `ensure_personal_space()` o `migrate_guest_data()`
+  nace activado sin tocar esas funciones. Solo `create_couple_space()` inserta
+  null a propósito.
+- El backfill marca pendientes los espacios juntos con menos de dos miembros
+  activos **y sin ninguna invitación aceptada en su historial**: un espacio
+  donde la pareja sí entró y después se dio de baja tiene historia compartida
+  real y debe seguir activado.
+- **Cancelar es borrar, no archivar:** sobre un espacio pendiente
+  `dissolve_couple_space()` lo elimina entero. No hay nada que preservar, y
+  archivarlo habría creado otro espacio huérfano invisible de los que ADR-077
+  ya dejó pendientes de política de retención.
+- **Contra la opción 4:** `isAwaitingPartnerSpace()` (`features/spaces/types`)
+  es el único predicado, y `MainTabsNavigator` lo usa tanto para cambiar
+  Inicio como para pausar el sondeo de 15 s, la suscripción de Realtime y
+  `publishCoupleSpaceChanges`. Dejar la sincronización viva contra un espacio
+  que nadie más puede leer solo generaba tráfico inútil.
+- **UI:** `AwaitingPartnerScreen` (`features/spaces/screens/`) reutiliza
+  `Screen`, `Text`, `ModalPrimaryAction` y los tokens de tema, con el mismo
+  patrón de panel centrado (icono circular + encabezado + cuerpo) que ya usa
+  el estado de éxito de `InvitePartnerScreen`. Nombra a quien fue invitado
+  leyendo `space_invitations` directamente —la política
+  `space_invitations_select_member` ya permite `invited_by = auth.uid()`, así
+  que no hizo falta un RPC nuevo, solo `getOutgoingInvitation()` en el gateway
+  existente— y ofrece comprobar si ya aceptaron, cambiar la invitación o
+  cancelar el espacio. `SpaceSideMenu` añade "Esperando a que acepten" bajo el
+  nombre del espacio.
+
+## Consecuencias positivas
+
+- Desaparece la categoría entera de "espacio compartido que nunca se
+  compartió": o hay dos personas, o hay una invitación con su propia pantalla
+  que explica qué falta y cómo resolverlo.
+- Cancelar una invitación deja la base de datos exactamente como estaba.
+
+## Consecuencias negativas
+
+- El cupo de un espacio juntos por usuario se consume desde que se envía la
+  invitación, no desde que se acepta. Es deliberado (evita acumular
+  invitaciones abiertas), pero obliga a cancelar el espacio pendiente para
+  invitar a otra persona; por eso la pantalla de espera ofrece "Cambiar
+  invitación" sin cancelar nada.
+- `sync_couple_space_data()` no comprueba `activated_at`: el bloqueo vive solo
+  en el cliente. Un cliente antiguo aún podría subir datos a un espacio
+  pendiente. No es una fuga (esos datos son suyos y los vería la pareja al
+  entrar), y añadir la comprobación obligaba a duplicar las ~200 líneas de esa
+  función en esta migración.
+
+## Riesgos
+
+- La migración 22 debe aplicarse antes de distribuir esta versión. Sin ella la
+  consulta de `useSpaces` devuelve `activated_at` indefinido, que se lee como
+  "no pendiente": la app se comporta exactamente como hasta ahora, que es el
+  modo de fallo correcto.
+
+## Validación
+
+- `npx tsc --noEmit` sin errores; `npx eslint` y `npx prettier --check`
+  limpios sobre lo tocado.
+- `npx jest src/features/spaces src/navigation` en verde (47 pruebas),
+  incluidas las nuevas de `AwaitingPartnerScreen` y las dos de `useSpaces`
+  sobre la transición pendiente → activo.
+- `supabase/tests/space_invitations.test.sql` amplía a 24 aserciones.
+  Pendiente de ejecutar con `supabase test db` contra una instancia real.
+- Pendiente: prueba manual con dos cuentas (invitar, comprobar la pantalla de
+  espera, aceptar desde la otra app y ver Inicio normal).
 
 ---
 

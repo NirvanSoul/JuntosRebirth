@@ -347,8 +347,14 @@ currency            text
 created_by          uuid
 created_at          timestamptz
 updated_at          timestamptz
+activated_at        timestamptz nullable
 archived_at         timestamptz nullable
 ```
+
+`activated_at` marca el momento en que el espacio pasó a ser real. Es null
+solo en un espacio juntos cuya invitación sigue pendiente (§6.4.1); en
+cualquier otro espacio lleva fecha desde su creación, por el `default now()`
+de la columna.
 
 Tipos iniciales:
 
@@ -482,15 +488,52 @@ Al aceptar una invitación, ambas personas quedan con `role = 'owner'`
 (anfitriones simétricos, sin jerarquía dueño/miembro) — no se introdujo un
 nuevo valor de `role` para esto.
 
+Un espacio juntos nace **pendiente**: `create_couple_space()` inserta
+`activated_at = null` y son `accept_space_invitation()` y
+`accept_current_user_space_invitation()` las que lo activan
+(`activated_at = coalesce(activated_at, now())`). Un espacio de una sola
+persona no es un espacio (ADR-078): quien invita es miembro activo para poder
+leerlo y gestionarlo, pero Inicio muestra `AwaitingPartnerScreen` en vez del
+balance y la app no sincroniza nada contra él. El cupo de §6.4.1 se consume
+igualmente mientras la invitación esté viva, para que nadie acumule
+invitaciones abiertas en paralelo.
+
 ### 6.4.2 Eliminar (disolver) un espacio juntos
 
-`dissolve_couple_space(p_space_id)` archiva el espacio
-(`spaces.archived_at`) y desactiva ambas membresías activas
+Sobre un espacio **pendiente** (`activated_at is null`),
+`dissolve_couple_space()` no archiva: borra el espacio entero, porque nadie
+más llegó a entrar y no hay historia compartida que preservar. Así cancelar
+una invitación no deja otro espacio huérfano invisible y libera limpiamente
+el cupo de un espacio juntos por usuario.
+
+Sobre un espacio ya activo, `dissolve_couple_space(p_space_id)` archiva el
+espacio (`spaces.archived_at`) y desactiva ambas membresías activas
 (`space_members.status = 'removed'`), sin tocar movimientos ni categorías:
 se conservan, igual que la rama de espacio compartido de
 `request_account_deletion()`. No se introdujo un nuevo valor de `status`
 para distinguir esta disolución de una salida individual: la señal vive en
 `spaces.archived_at`.
+
+Un espacio disuelto queda invisible para ambas personas (`useSpaces` filtra
+por `archived_at is null` y las políticas RLS exigen
+`is_active_space_member`), pero sus filas siguen ahí. `request_account_deletion()`
+no lo borra mientras exista la membresía `'removed'` de la otra persona: solo
+anula la autoría de quien se da de baja (ADR-077). Falta una política de
+retención para estos espacios huérfanos.
+
+### 6.4.3 Autoría y baja de cuenta
+
+Toda columna que apunte a `auth.users(id)` desde una tabla cuyo contenido
+puede sobrevivir a la baja de su autor **debe** ser nulable y declararse
+`on delete set null`. Una FK `not null` sin acción `on delete` hace fallar
+`auth.admin.deleteUser()` con violación de clave foránea y deja la cuenta a
+medio eliminar. Cumplen la regla `spaces`, `categories`,
+`recurring_transaction_series` y `transactions` (migración 06), y
+`transaction_notification_rules` y `category_budgets` (migración 21).
+
+Las tablas indexadas por algo que no sea `auth.users(id)` no las alcanza
+ninguna FK y hay que borrarlas a mano dentro de `request_account_deletion()`:
+hoy es el caso de `login_attempts`, que guarda el email.
 
 ---
 
@@ -1044,6 +1087,11 @@ ADR-076 habilita una excepción acotada a los espacios `type = 'couple'`:
 - Al crear, editar o archivar una categoría, gasto, ingreso o recurrencia en
   Juntos, SQLite conserva primero la intención local y `sync_couple_space_data`
   la publica después dentro de una única transacción de PostgreSQL.
+- Para categorías, series y movimientos nuevos, el RPC conserva el UUID creado
+  por SQLite como identificador remoto. Así el dispositivo creador y el resto
+  de miembros materializan la misma entidad; los identificadores locales
+  heredados que no sean UUID conservan el fallback remoto generado por
+  PostgreSQL.
 - El RPC exige una membresía activa en ese espacio y resuelve las categorías y
   series antes de sus movimientos; ningún cliente puede escribir en un espacio
   ajeno ni construir una dependencia cruzada por su cuenta.

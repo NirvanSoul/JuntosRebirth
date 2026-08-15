@@ -28,7 +28,12 @@ function isSpace(value: unknown): value is Space {
     candidate.name.trim().length > 0 &&
     (candidate.type === 'personal' ||
       candidate.type === 'couple' ||
-      candidate.type === 'other')
+      candidate.type === 'other') &&
+    // Ausente en los catálogos guardados antes de que existieran los espacios
+    // juntos pendientes: se trata como "no pendiente" hasta que
+    // `refreshCoupleSpace` lo confirme contra el servidor.
+    (candidate.isAwaitingPartner === undefined ||
+      typeof candidate.isAwaitingPartner === 'boolean')
   );
 }
 

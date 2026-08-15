@@ -20,6 +20,12 @@ export type CurrentUserInvitation = {
   spaceName: string;
 };
 
+/** La invitación que sigue pendiente en un espacio propio, vista por quien la envió. */
+export type OutgoingInvitation = {
+  inviteeEmail: string | null;
+  expiresAt: string;
+};
+
 export type AcceptInvitationErrorCode =
   | 'invitation_not_found'
   | 'invitation_already_used'
@@ -63,6 +69,7 @@ export type InvitationGateway = {
     inviteeEmail?: string,
   ): Promise<{ id: string; plaintextToken: string; expiresAt: string }>;
   getCurrentUserPendingInvitation(): Promise<CurrentUserInvitation | null>;
+  getOutgoingInvitation(spaceId: string): Promise<OutgoingInvitation | null>;
   acceptCurrentUserInvitation(
     invitationId: string,
   ): Promise<{ spaceId: string; spaceName: string }>;
@@ -210,6 +217,31 @@ export function createSupabaseInvitationGateway(
         throw new Error('No pudimos comprobar tus invitaciones.');
       }
       return result as CurrentUserInvitation;
+    },
+
+    /**
+     * No necesita RPC: `space_invitations_select_member` ya deja leer las
+     * invitaciones del propio espacio (`invited_by = auth.uid()`), y solo se
+     * exponen el correo destinatario y la caducidad, que quien invita escribió.
+     */
+    async getOutgoingInvitation(spaceId) {
+      const { data, error } = await client
+        .from('space_invitations')
+        .select('invitee_email, expires_at')
+        .eq('space_id', spaceId)
+        .eq('status', 'pending')
+        .gte('expires_at', new Date().toISOString())
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw new Error('No pudimos comprobar tu invitación.');
+      if (!data || typeof data.expires_at !== 'string') return null;
+
+      return {
+        inviteeEmail:
+          typeof data.invitee_email === 'string' ? data.invitee_email : null,
+        expiresAt: data.expires_at,
+      };
     },
 
     async acceptCurrentUserInvitation(invitationId) {

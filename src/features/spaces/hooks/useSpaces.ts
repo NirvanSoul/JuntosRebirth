@@ -40,7 +40,7 @@ async function fetchRemoteCoupleSpace(): Promise<Space | null> {
   const client = getConfiguredSupabaseClient();
   const { data, error } = await client
     .from('spaces')
-    .select('id, name, type')
+    .select('id, name, type, activated_at')
     .eq('type', 'couple')
     .is('archived_at', null)
     .limit(1)
@@ -51,7 +51,15 @@ async function fetchRemoteCoupleSpace(): Promise<Space | null> {
   }
   if (!data) return null;
 
-  return { id: data.id as string, name: data.name as string, type: 'couple' };
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    type: 'couple',
+    // `activated_at` es null mientras la invitación siga sin aceptar; en cuanto
+    // la otra persona entra, esta misma consulta devuelve la fecha y el espacio
+    // se comporta como cualquier otro.
+    isAwaitingPartner: data.activated_at === null,
+  };
 }
 
 /**
@@ -75,7 +83,9 @@ function mergeRemoteCoupleSpace(
     if (
       localCoupleSpace &&
       localCoupleSpace.id === remoteSpace.id &&
-      localCoupleSpace.name === remoteSpace.name
+      localCoupleSpace.name === remoteSpace.name &&
+      (localCoupleSpace.isAwaitingPartner ?? false) ===
+        remoteSpace.isAwaitingPartner
     ) {
       return current;
     }
@@ -262,7 +272,14 @@ export function useSpaces(): SpacesController {
         throw new Error(message);
       }
 
-      const newSpace: Space = { id: spaceId, name, type: 'couple' };
+      // Nace pendiente: `create_couple_space` guarda `activated_at = null` y
+      // el espacio no es utilizable hasta que la otra persona acepte.
+      const newSpace: Space = {
+        id: spaceId,
+        name,
+        type: 'couple',
+        isAwaitingPartner: true,
+      };
       const nextState: SpacesState = {
         activeSpaceId: newSpace.id,
         spaces: [

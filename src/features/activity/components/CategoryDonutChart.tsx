@@ -5,18 +5,18 @@ import Animated, {
   type EntryExitAnimationFunction,
   LinearTransition,
   ReduceMotion,
-  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, type CircleProps } from 'react-native-svg';
+import Svg from 'react-native-svg';
 
+import { AnimatedArcSegment } from '@/components/ui/Charts/AnimatedArcSegment';
+import { chartStrokeWidth } from '@/components/ui/Charts/chartTokens';
 import { MonthNavigator } from '@/components/ui/MonthNavigator/MonthNavigator';
 import { Text } from '@/components/ui/Text/Text';
-import { distributeDonutSegmentLengths } from '@/features/activity/utils/categoryDonutGeometry';
 import type { Category } from '@/features/categories/types';
 import {
   formatMonthKey,
@@ -33,17 +33,19 @@ import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
 import { useThemedStyles } from '@/theme/useThemedStyles';
+import { distributeDonutSegmentLengths } from '@/utils/donutGeometry';
 
 type ChartMode = 'expense' | 'income';
 
 type CategoryDonutChartProps = {
   categories: readonly Category[];
   onOpenCategoryDetail?: (categoryId: string) => void;
+  /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
+  resetKey?: number;
   transactions: readonly SessionTransaction[];
 };
 
 const chartSize = 236;
-const chartStrokeWidth = 24;
 const chartRadius = (chartSize - chartStrokeWidth) / 2;
 const chartCircumference = 2 * Math.PI * chartRadius;
 const segmentVisibleGap = spacing.md;
@@ -56,7 +58,6 @@ const segmentVisualHeight = 32;
 const segmentControlPadding = spacing.xs;
 const segmentIndicatorWidth =
   (segmentedControlWidth - segmentControlPadding * 2) / 2;
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 type MotionDirection = -1 | 1;
 
@@ -143,66 +144,10 @@ const chartLayoutTransition = LinearTransition.springify()
   .stiffness(motion.chartModeSpring.stiffness)
   .reduceMotion(ReduceMotion.System);
 
-type AnimatedDonutSegmentProps = {
-  animationKey: string;
-  color: string;
-  dashLength: number;
-  dashOffset: number;
-  index: number;
-  testID: string;
-};
-
-function AnimatedDonutSegment({
-  animationKey,
-  color,
-  dashLength,
-  dashOffset,
-  index,
-  testID,
-}: AnimatedDonutSegmentProps) {
-  const revealProgress = useSharedValue(0);
-
-  useEffect(() => {
-    revealProgress.value = 0;
-    revealProgress.value = withDelay(
-      index * motion.chartRevealStagger,
-      withTiming(1, {
-        duration: motion.chartRevealDuration,
-        easing: Easing.out(Easing.cubic),
-        reduceMotion: ReduceMotion.System,
-      }),
-      ReduceMotion.System,
-    );
-  }, [animationKey, dashLength, index, revealProgress]);
-
-  const animatedProps = useAnimatedProps<CircleProps>(() => ({
-    strokeDasharray: [
-      Math.max(dashLength * revealProgress.value, 0.01),
-      chartCircumference,
-    ],
-  }));
-
-  return (
-    <AnimatedCircle
-      animatedProps={animatedProps}
-      cx={chartSize / 2}
-      cy={chartSize / 2}
-      fill="none"
-      origin={`${chartSize / 2}, ${chartSize / 2}`}
-      r={chartRadius}
-      rotation="-90"
-      stroke={color}
-      strokeDashoffset={dashOffset}
-      strokeLinecap="round"
-      strokeWidth={chartStrokeWidth}
-      testID={testID}
-    />
-  );
-}
-
 export function CategoryDonutChart({
   categories,
   onOpenCategoryDetail,
+  resetKey,
   transactions,
 }: CategoryDonutChartProps) {
   const styles = useThemedStyles(createStyles);
@@ -354,13 +299,19 @@ export function CategoryDonutChart({
             accumulatedLength += segmentLength;
 
             return (
-              <AnimatedDonutSegment
-                animationKey={`${mode}-${monthKey}`}
+              <AnimatedArcSegment
+                animationKey={`${mode}-${monthKey}-${resetKey ?? 0}`}
+                circumference={chartCircumference}
                 color={categoryColors[category.colorToken]}
+                cx={chartSize / 2}
+                cy={chartSize / 2}
                 dashLength={dashLength}
                 dashOffset={dashOffset}
                 index={index}
                 key={category.id}
+                radius={chartRadius}
+                rotation={-90}
+                strokeWidth={chartStrokeWidth}
                 testID={`category-donut-segment-${category.id}`}
               />
             );

@@ -33,7 +33,7 @@ type DeletionState =
   | { step: 'confirming' }
   | { step: 'deleting' }
   | { step: 'done'; scope: DataDeletionScope }
-  | { step: 'error'; message: string };
+  | { step: 'error'; message: string; detail: string | null };
 
 /**
  * Retraso obligatorio antes de que "Sí, eliminar" quede activo: evita que un
@@ -118,10 +118,13 @@ export function DataRightsScreen({ onClose, visible }: DataRightsScreenProps) {
     setDeletion({ step: 'deleting' });
     void deleteMyAccountOrData()
       .then((result) => setDeletion({ step: 'done', scope: result.scope }))
-      .catch(() =>
+      .catch((error: unknown) =>
         setDeletion({
           step: 'error',
           message: 'No pudimos completar la eliminación. Inténtalo de nuevo.',
+          // Sin la causa concreta, un fallo de red y uno del servidor se ven
+          // igual y no hay forma de diagnosticarlo con el usuario delante.
+          detail: error instanceof Error ? error.message : null,
         }),
       );
   };
@@ -258,6 +261,11 @@ export function DataRightsScreen({ onClose, visible }: DataRightsScreenProps) {
             <Text tone="expense" variant="body">
               {deletion.message}
             </Text>
+            {deletion.detail ? (
+              <Text tone="secondary" variant="label">
+                {deletion.detail}
+              </Text>
+            ) : null}
             <ModalPrimaryAction
               accessibilityLabel="Volver a intentar"
               label="Volver a intentar"

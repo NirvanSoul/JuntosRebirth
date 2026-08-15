@@ -173,8 +173,9 @@ export function InvitePartnerScreen({
         {!coupleSpace ? (
           <View style={styles.body}>
             <Text tone="secondary" variant="body">
-              Solo puedes tener un espacio de pareja activo a la vez. En cuanto
-              lo crees, podrás invitar a alguien por correo o con un enlace.
+              Solo puedes tener un espacio de pareja activo a la vez. El espacio
+              se abrirá cuando la otra persona acepte tu invitación, que podrás
+              enviar por correo o con un enlace.
             </Text>
             <ModalPrimaryAction
               accessibilityLabel="Crear espacio de pareja"

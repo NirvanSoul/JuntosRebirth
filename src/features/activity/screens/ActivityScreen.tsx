@@ -81,6 +81,8 @@ type ActivityScreenProps = {
   categories?: readonly Category[];
   /** Moneda elegida en el encabezado global; nunca se mezclan importes aquí. */
   currency?: CurrencyCode;
+  /** Cambia al reenfocar la pantalla para reiniciar el donut de categorías. */
+  focusResetKey?: number;
   onCreateCategory?: () => void;
   onCreateExpense?: () => void;
   onCreateIncome?: () => void;
@@ -98,6 +100,7 @@ type ActivityScreenProps = {
 export function ActivityScreen({
   categories = [],
   currency = defaultCurrencyCode,
+  focusResetKey,
   onCreateCategory,
   onCreateExpense,
   onCreateIncome,
@@ -315,6 +318,7 @@ export function ActivityScreen({
           <CategoryDonutChart
             categories={categories}
             onOpenCategoryDetail={onOpenCategoryDetail}
+            resetKey={focusResetKey}
             transactions={currencyTransactionsThroughCurrentMonth}
           />
           <Animated.View

@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text/Text';
-import type { Space } from '@/features/spaces/types';
+import { isAwaitingPartnerSpace, type Space } from '@/features/spaces/types';
 import { fontFamily } from '@/theme/fonts';
 import { iconSize, minTouchTarget } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -217,14 +217,16 @@ export function SpaceSideMenu({
                         size={iconSize.sm}
                       />
                     </View>
-                    <Text
-                      numberOfLines={1}
-                      style={styles.spaceName}
-                      variant="label"
-                      weight="semibold"
-                    >
-                      {space.name}
-                    </Text>
+                    <View style={styles.spaceName}>
+                      <Text numberOfLines={1} variant="label" weight="semibold">
+                        {space.name}
+                      </Text>
+                      {isAwaitingPartnerSpace(space) ? (
+                        <Text tone="secondary" variant="footnote">
+                          Esperando a que acepten
+                        </Text>
+                      ) : null}
+                    </View>
                     {isActive ? (
                       <Ionicons
                         color={colors.cta}

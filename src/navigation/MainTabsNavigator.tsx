@@ -60,7 +60,9 @@ import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
 import { PendingInvitationBanner } from '@/features/spaces/components/PendingInvitationBanner';
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
 import { AcceptInvitationScreen } from '@/features/spaces/screens/AcceptInvitationScreen';
+import { AwaitingPartnerScreen } from '@/features/spaces/screens/AwaitingPartnerScreen';
 import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScreen';
+import { isAwaitingPartnerSpace } from '@/features/spaces/types';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
 import { syncCoupleSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
@@ -163,6 +165,10 @@ export function MainTabsNavigator() {
   const [isInvitePartnerVisible, setInvitePartnerVisible] = useState(false);
   const [isSpaceAuthModalVisible, setSpaceAuthModalVisible] = useState(false);
   const coupleSpace = spaces.find((space) => space.type === 'couple') ?? null;
+  // Un espacio juntos sin la otra persona dentro no tiene datos que mostrar ni
+  // que sincronizar: Inicio pasa a la pantalla de espera y toda la maquinaria
+  // compartida (sondeo, realtime, publicación) queda en pausa hasta que acepte.
+  const isAwaitingPartner = isAwaitingPartnerSpace(activeSpace);
   const {
     activeCurrencies,
     preferences: currencyPreferences,
@@ -179,6 +185,10 @@ export function MainTabsNavigator() {
   const [activeMainTab, setActiveMainTab] = useState<
     'Home' | 'Activity' | 'Map'
   >('Home');
+  // Se incrementan en cada foco de su pestaña para reiniciar la animación de
+  // revelado del arco de balance y del donut de categorías.
+  const [homeChartResetKey, setHomeChartResetKey] = useState(0);
+  const [activityChartResetKey, setActivityChartResetKey] = useState(0);
   const [isHomeCurrencyPickerVisible, setHomeCurrencyPickerVisible] =
     useState(false);
   const [isFloatingCreateButtonVisible, setFloatingCreateButtonVisible] =
@@ -331,7 +341,12 @@ export function MainTabsNavigator() {
     (spaceId: string) => {
       if (
         !session ||
-        !spaces.some((space) => space.id === spaceId && space.type === 'couple')
+        !spaces.some(
+          (space) =>
+            space.id === spaceId &&
+            space.type === 'couple' &&
+            !isAwaitingPartnerSpace(space),
+        )
       ) {
         return;
       }
@@ -412,13 +427,19 @@ export function MainTabsNavigator() {
       () => undefined,
     );
     void reconcileDailyReminder({ transactions }).catch(() => undefined);
-    if (activeSpace.type === 'couple') {
+    if (activeSpace.type === 'couple' && !isAwaitingPartner) {
       void refreshSharedCoupleData(activeSpace.id);
     }
   });
 
   useEffect(() => {
-    if (!isFinanceReady || activeSpace.type !== 'couple' || !session) return;
+    if (
+      !isFinanceReady ||
+      activeSpace.type !== 'couple' ||
+      isAwaitingPartner ||
+      !session
+    )
+      return;
     void refreshSharedCoupleData(activeSpace.id);
 
     const refreshTimer = setInterval(() => {
@@ -428,13 +449,20 @@ export function MainTabsNavigator() {
   }, [
     activeSpace.id,
     activeSpace.type,
+    isAwaitingPartner,
     isFinanceReady,
     refreshSharedCoupleData,
     session,
   ]);
 
   useEffect(() => {
-    if (!isFinanceReady || activeSpace.type !== 'couple' || !session) return;
+    if (
+      !isFinanceReady ||
+      activeSpace.type !== 'couple' ||
+      isAwaitingPartner ||
+      !session
+    )
+      return;
 
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     const scheduleRemoteRefresh = () => {
@@ -498,6 +526,7 @@ export function MainTabsNavigator() {
   }, [
     activeSpace.id,
     activeSpace.type,
+    isAwaitingPartner,
     isFinanceReady,
     refreshSharedCoupleData,
     session,
@@ -538,6 +567,25 @@ export function MainTabsNavigator() {
     }
     setInvitePartnerVisible(true);
   }, [session]);
+
+  /**
+   * Descarta un espacio juntos que nunca llegó a tener dos personas.
+   * `dissolve_couple_space` lo borra entero en ese caso (no lo archiva) y
+   * `useSpaces` devuelve la selección al espacio Personal.
+   */
+  const handleCancelPendingCoupleSpace =
+    useCallback(async (): Promise<void> => {
+      try {
+        await dissolveCoupleSpace();
+      } catch (caught) {
+        Alert.alert(
+          'No pudimos cancelar el espacio',
+          caught instanceof Error
+            ? caught.message
+            : 'Inténtalo de nuevo en un momento.',
+        );
+      }
+    }, [dissolveCoupleSpace]);
 
   const handleCreateAction = (action: CreateActionType) => {
     setCreateMenuVisible(false);
@@ -1072,50 +1120,68 @@ export function MainTabsNavigator() {
                 tabBar={(props) => <AppTabBar {...props} />}
               >
                 <Tabs.Screen
-                  listeners={{ focus: () => setActiveMainTab('Home') }}
+                  listeners={{
+                    focus: () => {
+                      setActiveMainTab('Home');
+                      setHomeChartResetKey((key) => key + 1);
+                    },
+                  }}
                   name="Home"
                 >
-                  {({ navigation }) => (
-                    <HomeScreen
-                      categories={activeSpaceCategories}
-                      currency={effectiveHomeCurrency}
-                      onCreateCategory={() => handleCreateAction('category')}
-                      onCreateExpense={() => handleCreateAction('expense')}
-                      onCreateIncome={() => handleCreateAction('income')}
-                      onCreateMovement={() => handleCreateAction('expense')}
-                      onOpenCategoryDetail={setDetailCategoryId}
-                      onOpenTransactionDetail={setDetailTransactionId}
-                      onScrollDirectionChange={handleScrollDirectionChange}
-                      onViewCategories={() => {
-                        activityRequestId.current += 1;
-                        navigation.navigate('Activity', {
-                          requestId: activityRequestId.current,
-                          section: 'categories',
-                        });
-                      }}
-                      onViewMovements={() => {
-                        activityRequestId.current += 1;
-                        navigation.navigate('Activity', {
-                          requestId: activityRequestId.current,
-                          section: 'movements',
-                        });
-                      }}
-                      showComparisonIndicators={showHomeComparisonIndicators}
-                      topContent={
-                        activeSpace.type === 'personal' ? (
-                          <PendingInvitationBanner
-                            onAccepted={refreshCoupleSpaceAndData}
-                          />
-                        ) : null
-                      }
-                      transactions={activeSpaceTransactions}
-                    />
-                  )}
+                  {({ navigation }) =>
+                    isAwaitingPartner ? (
+                      <AwaitingPartnerScreen
+                        onCancelSpace={handleCancelPendingCoupleSpace}
+                        onChangeInvitation={handleInvitePartner}
+                        onRefresh={refreshCoupleSpaceAndData}
+                        space={activeSpace}
+                      />
+                    ) : (
+                      <HomeScreen
+                        categories={activeSpaceCategories}
+                        currency={effectiveHomeCurrency}
+                        focusResetKey={homeChartResetKey}
+                        onCreateCategory={() => handleCreateAction('category')}
+                        onCreateExpense={() => handleCreateAction('expense')}
+                        onCreateIncome={() => handleCreateAction('income')}
+                        onCreateMovement={() => handleCreateAction('expense')}
+                        onOpenCategoryDetail={setDetailCategoryId}
+                        onOpenTransactionDetail={setDetailTransactionId}
+                        onScrollDirectionChange={handleScrollDirectionChange}
+                        onViewCategories={() => {
+                          activityRequestId.current += 1;
+                          navigation.navigate('Activity', {
+                            requestId: activityRequestId.current,
+                            section: 'categories',
+                          });
+                        }}
+                        onViewMovements={() => {
+                          activityRequestId.current += 1;
+                          navigation.navigate('Activity', {
+                            requestId: activityRequestId.current,
+                            section: 'movements',
+                          });
+                        }}
+                        showComparisonIndicators={showHomeComparisonIndicators}
+                        topContent={
+                          activeSpace.type === 'personal' ? (
+                            <PendingInvitationBanner
+                              onAccepted={refreshCoupleSpaceAndData}
+                            />
+                          ) : null
+                        }
+                        transactions={activeSpaceTransactions}
+                      />
+                    )
+                  }
                 </Tabs.Screen>
                 <Tabs.Screen
                   listeners={{
                     blur: () => setActivitySummaryPinned(false),
-                    focus: () => setActiveMainTab('Activity'),
+                    focus: () => {
+                      setActiveMainTab('Activity');
+                      setActivityChartResetKey((key) => key + 1);
+                    },
                   }}
                   name="Activity"
                 >
@@ -1123,6 +1189,7 @@ export function MainTabsNavigator() {
                     <ActivityScreen
                       categories={activeSpaceCategories}
                       currency={effectiveHomeCurrency}
+                      focusResetKey={activityChartResetKey}
                       onCreateCategory={() => handleCreateAction('category')}
                       onCreateExpense={() => handleCreateAction('expense')}
                       onCreateIncome={() => handleCreateAction('income')}

@@ -9,6 +9,7 @@ import { Text } from '@/components/ui/Text/Text';
 import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
+import { IncomeExpenseArc } from '@/features/dashboard/components/IncomeExpenseArc/IncomeExpenseArc';
 import { TransactionPeriodModal } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal';
 import { getPreviousPeriodTransactions } from '@/features/dashboard/utils/transactionPeriod';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
@@ -46,6 +47,8 @@ type HomeScreenProps = {
   onScrollDirectionChange?: (direction: 'down' | 'up') => void;
   onViewCategories?: () => void;
   onViewMovements?: () => void;
+  /** Cambia al reenfocar la pantalla para reiniciar el arco de balance. */
+  focusResetKey?: number;
   topContent?: ReactNode;
   /** Muestra el % de cambio de Ingresos/Gastos frente al mes anterior. */
   showComparisonIndicators?: boolean;
@@ -115,6 +118,7 @@ function TransactionListFooter({ onPress }: TransactionListFooterProps) {
 export function HomeScreen({
   categories = [],
   currency = defaultCurrencyCode,
+  focusResetKey,
   onCreateCategory,
   onCreateExpense,
   onCreateIncome,
@@ -191,28 +195,38 @@ export function HomeScreen({
         testID="home-screen"
       >
         {topContent}
-        <Pressable
-          accessibilityLabel={`Balance disponible: ${balance}`}
-          accessibilityRole="button"
-          onPress={() => setBalanceModalVisible(true)}
-          style={({ pressed }) => [
-            styles.balanceHero,
-            pressed ? styles.balanceHeroPressed : null,
-          ]}
-          testID="home-balance-hero"
+        <IncomeExpenseArc
+          expenseMinor={summary.monthExpenseMinor}
+          incomeMinor={summary.monthIncomeMinor}
+          resetKey={focusResetKey}
+          testID="home-income-expense-arc"
         >
-          <Text align="center" tone="secondary" variant="label">
-            Balance disponible
-          </Text>
-          <Text
-            align="center"
-            style={styles.balanceAmount}
-            testID="home-balance"
-            variant="amountHero"
+          <Pressable
+            accessibilityLabel={`Balance disponible: ${balance}`}
+            accessibilityRole="button"
+            onPress={() => setBalanceModalVisible(true)}
+            style={({ pressed }) => [
+              styles.balanceHero,
+              pressed ? styles.balanceHeroPressed : null,
+            ]}
+            testID="home-balance-hero"
           >
-            {balance}
-          </Text>
-        </Pressable>
+            <Text align="center" tone="secondary" variant="label">
+              Balance disponible
+            </Text>
+            <Text
+              adjustsFontSizeToFit
+              align="center"
+              minimumFontScale={0.6}
+              numberOfLines={1}
+              style={styles.balanceAmount}
+              testID="home-balance"
+              variant="amountHero"
+            >
+              {balance}
+            </Text>
+          </Pressable>
+        </IncomeExpenseArc>
 
         <TransactionSummaryBadges
           accessibilityContext="de este mes"

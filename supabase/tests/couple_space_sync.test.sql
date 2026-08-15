@@ -1,5 +1,5 @@
 begin;
-select plan(5);
+select plan(7);
 
 select has_function(
   'public',
@@ -44,6 +44,28 @@ select ok(
        and tablename = 'transactions'
   ),
   'transaction changes are published to Supabase Realtime'
+);
+
+select is(
+  regexp_count(
+    pg_get_functiondef(
+      'public.sync_couple_space_data(uuid, text, jsonb, jsonb, jsonb)'::regprocedure
+    ),
+    'then item.id::uuid'
+  ),
+  3,
+  'the couple sync RPC preserves the UUID generated locally for categories, series and transactions'
+);
+
+select is(
+  regexp_count(
+    pg_get_functiondef(
+      'public.sync_couple_space_data(uuid, text, jsonb, jsonb, jsonb)'::regprocedure
+    ),
+    'else extensions.gen_random_uuid[(][)] end'
+  ),
+  3,
+  'the couple sync RPC keeps a generated-ID fallback for legacy non-UUID local data'
 );
 
 select * from finish();

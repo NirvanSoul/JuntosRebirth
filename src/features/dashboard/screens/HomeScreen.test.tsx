@@ -99,6 +99,7 @@ describe('HomeScreen', () => {
     );
 
     expect(screen.queryByText('Tu dinero, claro.')).toBeNull();
+    expect(screen.queryByTestId('home-income-expense-arc')).toBeNull();
     expect(screen.getByText('Balance disponible')).toBeTruthy();
     expect(screen.getByTestId('home-balance').props.children).not.toContain(
       ',00',
@@ -175,6 +176,20 @@ describe('HomeScreen', () => {
       '2.000',
     );
     expect(screen.getByLabelText(/Balance disponible:.*2\.000/)).toBeTruthy();
+    expect(screen.getByTestId('home-income-expense-arc')).toBeTruthy();
+    expect(
+      screen.getAllByTestId('home-income-expense-arc-segment-income', {
+        includeHiddenElements: true,
+      }),
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByTestId('home-income-expense-arc-segment-expense', {
+        includeHiddenElements: true,
+      }),
+    ).toHaveLength(1);
+    expect(
+      screen.getByLabelText('Ingresos 83%, gastos 17% de este mes'),
+    ).toBeTruthy();
     expect(
       StyleSheet.flatten(
         screen.getByTestId('home-transaction-preview-list').props.style,
