@@ -81,3 +81,37 @@ techo y solo puede bajar.
 - Cada cambio mantiene `npm run validate` en verde y se commitea atómico.
 - Las pruebas en dispositivo forman parte de la definición de terminado, no son
   opcionales.
+
+---
+
+## 5. Reportes pendientes (recibidos 2026-08-15, sin abordar)
+
+### Fase 2 — entran en el alcance del spike
+
+- [ ] **Las categorías y los movimientos compartidos no funcionan.** Es el
+  síntoma principal del espacio de pareja y el motivo por el que la Fase 2
+  existe. El spike debe reproducirlo con dos cuentas reales antes de que nadie
+  proponga una corrección.
+
+### Fase 3 — producto, pendientes de dimensionar
+
+- [ ] **Un movimiento en otra moneda se sigue percibiendo como euros.** Antes
+  de estimar: averiguar si el movimiento guarda su moneda y solo se muestra mal
+  (bug de formateo, tarea pequeña) o si el importe se guarda sin moneda y se
+  asume euro (hueco del modelo de datos: migración, totales mezclados,
+  presupuestos por categoría — tarea grande). Existe la migración
+  `08_category_budgets_per_currency`, así que el soporte puede estar a medias.
+  Esa pregunta se responde primero y decide el tamaño.
+
+- [ ] **Registrarse con un correo ya usado no avisa de nada** y el usuario
+  espera un código que nunca llega. El silencio puede ser deliberado: responder
+  igual ante correo nuevo y ya registrado evita que cualquiera averigüe qué
+  correos tienen cuenta. La corrección no es «decir que ya existe», sino cerrar
+  la espera sin revelar nada — mensaje neutro y un correo real a esa dirección.
+  Requiere decisión del responsable antes de implementar.
+
+### Sin fase asignada — tarea pequeña
+
+- [ ] **Poder ver la contraseña mientras se escribe.** Aplica a registro,
+  inicio de sesión y recuperación; usar la primitiva de campo existente, no un
+  control nuevo por pantalla.
