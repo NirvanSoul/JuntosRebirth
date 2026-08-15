@@ -321,6 +321,10 @@ categoría, guardar el movimiento), no mediante un botón `Continuar`
 independiente. Ver `Bible/JUNTOSS_ONBOARDING_GUIDE.md` §6.1–§6.4 para el copy
 exacto y el detalle de cada componente.
 
+Esta ampliación supera la consecuencia original de que el onboarding no solicita
+datos financieros: las láminas 7 y 8 piden un primer ingreso y un primer gasto,
+que quedan registrados en el espacio personal local del invitado.
+
 ---
 
 # ADR-013 — El espacio es contexto global

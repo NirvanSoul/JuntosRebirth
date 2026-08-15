@@ -167,7 +167,7 @@ Objetivo financiero individual o compartido. Su implementación completa no form
 
 ### Objetivo
 
-Explicar el valor en dos a cuatro pantallas y permitir comenzar rápidamente.
+Explicar el valor en nueve pantallas y permitir comenzar con datos reales en el espacio local.
 
 ### Flujo propuesto
 
@@ -188,10 +188,10 @@ Explicar el valor en dos a cuatro pantallas y permitir comenzar rápidamente.
 
 ### Reglas
 
-- Máximo cuatro láminas.
+- Nueve pantallas en total (ver `DECISIONS.md` ADR-012, ampliación).
 - No pedir correo ni contraseña antes de probar.
 - No pedir permisos sin explicar por qué.
-- No pedir datos financieros durante el onboarding.
+- Pedir un primer ingreso y un primer gasto al final, para dejar el espacio local con datos reales.
 - Permitir omitir cuando corresponda.
 - No repetirlo sin acción explícita.
 
