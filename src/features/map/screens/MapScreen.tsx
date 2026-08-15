@@ -10,7 +10,6 @@ import {
   useState,
 } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import type { MarkedDates } from 'react-native-calendars/src/types';
 import Animated, {
   Easing,
   FadeIn,
@@ -27,6 +26,7 @@ import { Screen } from '@/components/layout/Screen/Screen';
 import {
   AppCalendar,
   type AppCalendarHandle,
+  type MarkedDates,
 } from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
 import type { Category } from '@/features/categories/types';

@@ -15,7 +15,7 @@ const frozenLineDebt = {
   'src/features/categories/components/CategoryDetailModal/CategoryDetailModal.tsx': 627,
   'src/features/map/screens/MapScreen.tsx': 611,
   'src/features/activity/screens/ActivityScreen.tsx': 573,
-  'src/components/ui/AppCalendar/AppCalendar.tsx': 563,
+  'src/components/ui/AppCalendar/AppCalendar.tsx': 569,
   'src/features/import/repositories/localImportBatchRepository.ts': 556,
   'src/lib/storage/localDatabase.ts': 547,
   'src/features/activity/components/TransactionFiltersModal.tsx': 536,
@@ -27,20 +27,6 @@ const frozenLineDebt = {
   'src/features/categories/components/CategoryPreviewCard/CategoryPreviewCard.tsx': 425,
 };
 
-// Exención (no congelación) de imports internos de node_modules
-// (phosphor-react-native/src/..., react-native-calendars/src/...). Estos 6
-// archivos ya importan de rutas internas y el check está desactivado para
-// ellos: pueden añadir más sin que el lint lo impida. Se retiran de la lista al
-// migrar a imports públicos (tarea pendiente).
-const internalImportDebt = [
-  'src/components/navigation/AppTabBar/AppTabBar.tsx',
-  'src/features/categories/components/CategoryIcon/CategoryIcon.tsx',
-  'src/features/map/screens/MapScreen.tsx',
-  'src/components/ui/AppCalendar/AppCalendar.tsx',
-  'src/features/activity/components/TransactionDateRangePickerModal.tsx',
-  'src/features/transactions/components/CreateTransactionModal/TransactionCustomRecurrenceModal.tsx',
-];
-
 module.exports = defineConfig([
   globalIgnores(['coverage/*', 'dist/*', 'android/*', 'ios/*', '.expo/*']),
   expoConfig,
@@ -50,20 +36,18 @@ module.exports = defineConfig([
       // Prohibición de «god components»: un archivo fuente nuevo no supera
       // 400 líneas no vacías.
       'max-lines': ['warn', { max: 400, skipBlankLines: true }],
-      // Prohibición de importar desde rutas internas de node_modules. Se nombran
-      // los paquetes (en vez de un comodín) para no bloquear imports relativos
-      // legítimos del propio src/.
+      // Prohibición de importar desde rutas internas de react-native-calendars:
+      // los tipos se consumen desde el wrapper AppCalendar (ver DECISIONS.md
+      // ADR-079). phosphor-react-native no se restringe: su subpath src/icons/*
+      // es API pública declarada en el campo exports del paquete.
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: [
-                'phosphor-react-native/src/**',
-                'react-native-calendars/src/**',
-              ],
+              group: ['react-native-calendars/src/**'],
               message:
-                'Importa desde la entrada pública de la librería, no de su src/ interno.',
+                'Consume los tipos desde el wrapper AppCalendar, no de react-native-calendars/src/.',
             },
           ],
         },
@@ -80,11 +64,6 @@ module.exports = defineConfig([
     files: [file],
     rules: { 'max-lines': ['warn', { max: frozen, skipBlankLines: true }] },
   })),
-  // Deuda de imports internos: congelada por archivo.
-  {
-    files: internalImportDebt,
-    rules: { 'no-restricted-imports': 'off' },
-  },
   // Las Edge Functions de Supabase usan imports URL de Deno (https://esm.sh/...)
   // que import/no-unresolved no puede resolver.
   {

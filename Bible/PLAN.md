@@ -26,8 +26,9 @@ sin confirmar de punta a punta es la **sincronización Supabase** y la
 
 ### Fase 1 — Limpieza quirúrgica (bajo riesgo, sin cambiar comportamiento)
 
-- Migrar los 6 archivos con imports internos de `node_modules` a imports
-  públicos y eliminar la exención `internalImportDebt` de `eslint.config.js`.
+- Imports de librerías: `phosphor-react-native/src/icons/*` se conserva (API
+  pública declarada en `exports`); los tipos de `react-native-calendars` se
+  derivan del contrato público y se encapsulan en `AppCalendar` (ADR-079).
 - Consolidar los helpers de fecha duplicados en `src/lib/date/`.
 - Limpiar configuración muerta (p. ej. `testPathIgnorePatterns` con `services/`).
 - Optimizar los assets de onboarding (~8,8 MB de PNG): comprimir o vectorizar.

@@ -16,8 +16,7 @@ import {
   View,
 } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
-import type { DayProps } from 'react-native-calendars/src/calendar/day';
-import type { DateData, MarkedDates } from 'react-native-calendars/src/types';
+import type { CalendarProps, DateData } from 'react-native-calendars';
 import {
   MonthNavigatorArrow,
   MonthNavigatorLabel,
@@ -36,6 +35,11 @@ import type { ColorTokens } from '@/theme/types';
 import { typography } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
+
+/** Tipo de fechas marcadas, derivado del contrato público de
+ * `react-native-calendars` (no de sus rutas internas). Lo consumen las features
+ * que pasan `markedDates` a este wrapper. */
+export type MarkedDates = NonNullable<CalendarProps['markedDates']>;
 
 type AppCalendarProps = {
   currentDate: string;
@@ -99,7 +103,10 @@ function getMonthStartAtOffset(anchorDate: string, offset: number): string {
   return `${year}-${String(month).padStart(2, '0')}-01`;
 }
 
-type ScrollCalendarDayProps = Omit<DayProps, 'date'> & {
+type ScrollCalendarDayProps = Omit<
+  ComponentProps<NonNullable<CalendarProps['dayComponent']>>,
+  'date'
+> & {
   date?: DateData;
 };
 

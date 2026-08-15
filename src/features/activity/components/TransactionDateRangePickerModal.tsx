@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import type { MarkedDates } from 'react-native-calendars/src/types';
-
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
-import { AppCalendar } from '@/components/ui/AppCalendar/AppCalendar';
+import {
+  AppCalendar,
+  type MarkedDates,
+} from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
 import { getLocalDateKey } from '@/features/transactions/utils/transactionSummary';
 import { spacing } from '@/theme/spacing';

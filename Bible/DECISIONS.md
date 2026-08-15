@@ -5139,6 +5139,51 @@ ninguna explicación de qué faltaba.
 
 ---
 
+# ADR-079 — Imports de librerías de calendario: phosphor público, calendars encapsulado
+
+**Estado:** Aceptada
+
+## Contexto
+
+La regla `no-restricted-imports` de `eslint.config.js` bloqueaba las rutas
+`phosphor-react-native/src/**` y `react-native-calendars/src/**` asumiendo que
+eran internas y frágiles. Al revisar los `exports` de ambos paquetes se
+comprobó que la premisa era incorrecta.
+
+## Decisión
+
+- **phosphor-react-native:** `package.json` declara `"./src/icons/*"` en su
+  campo `exports` con condición `react-native`. Es API pública pensada para
+  importar un icono sin arrastrar los ~1500 símbolos del raíz (Metro no los
+  elimina). Los imports `phosphor-react-native/src/icons/*` se conservan y no
+  se restringen.
+- **react-native-calendars:** publica `main: src/index.ts` (envía fuente) y su
+  raíz no reexporta `MarkedDates` ni `DayProps`. Los tipos se derivan del
+  contrato público (`CalendarProps` y `DateData`, importados del raíz) y se
+  encapsulan en el wrapper `AppCalendar`, que exporta `MarkedDates` para las
+  features.
+
+## Consecuencias positivas
+
+- Las features dejan de conocer `react-native-calendars`: consumen `MarkedDates`
+  desde `AppCalendar`.
+- Se conserva una guarda útil: `no-restricted-imports` sigue bloqueando
+  `react-native-calendars/src/**`, forzando el paso por el wrapper.
+
+## Consecuencias negativas
+
+- La derivación traslada la fragilidad, no la elimina: ahora dependemos de que
+  `CalendarProps` siga extendiendo `DayProps` y declare `markedDates`. Igual que
+  antes, cualquier ruptura se detecta en typecheck, nunca en runtime, así que el
+  Gate 1 la caza.
+
+## Validación
+
+- `npm run typecheck` sin errores ni casts (`as`).
+- `npm run lint` sin warnings.
+
+---
+
 ## 5. Principio final
 
 > Una decisión no documentada se convierte con el tiempo en una suposición.
