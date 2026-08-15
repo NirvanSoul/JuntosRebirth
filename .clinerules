@@ -1,0 +1,9 @@
+# Reglas del repositorio (juntoss)
+
+Antes de modificar código, lee:
+
+1. `Bible/README.md` — qué es el proyecto y qué leer.
+2. `Bible/PROJECT_RULES.md` — reglas obligatorias y orden de autoridad.
+3. `Bible/WORKFLOW.md` — jerarquía de trabajo, presupuesto de lectura y checks.
+
+No dupliques esas reglas aquí. Trabaja con commits locales, no hagas push, y ejecuta `npm run validate` antes de cerrar una tarea.

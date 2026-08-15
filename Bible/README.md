@@ -195,114 +195,19 @@ Los espacios no ocupan una pestaña principal. Se seleccionan como contexto glob
 
 ## 7. Clasificación de tareas
 
-### Tarea pequeña
-
-Ejemplos:
-
-- Centrar un elemento.
-- Corregir un texto.
-- Ajustar un espaciado.
-- Cambiar un icono.
-- Resolver un error localizado.
-
-Requisitos:
-
-- Revisar el archivo afectado.
-- Comprobar si existe un token, componente o patrón aplicable.
-- Hacer el cambio mínimo.
-- No investigar externamente salvo necesidad real.
-- No modificar código no relacionado.
-
-### Tarea mediana
-
-Ejemplos:
-
-- Crear una pantalla.
-- Añadir un formulario.
-- Incorporar un filtro.
-- Añadir una variante a un componente.
-- Crear un flujo dentro de una feature existente.
-
-Requisitos:
-
-- Revisar la feature completa.
-- Buscar componentes y hooks reutilizables.
-- Evaluar librerías si la interacción no es trivial.
-- Añadir pruebas proporcionales.
-- Actualizar documentación si cambia el comportamiento.
-
-### Tarea grande
-
-Ejemplos:
-
-- Cambiar navegación.
-- Crear sincronización local-nube.
-- Diseñar espacios compartidos.
-- Modificar el esquema de datos.
-- Introducir una dependencia transversal.
-- Cambiar autenticación o autorización.
-
-Requisitos:
-
-- Revisar todos los documentos relacionados.
-- Investigar alternativas.
-- Comparar enfoques.
-- Documentar la decisión.
-- Definir riesgos y migración.
-- Dividir el trabajo en entregas pequeñas.
-- Actualizar `DECISIONS.md`.
+Vive en [`PROJECT_RULES.md`](./PROJECT_RULES.md) §4.
 
 ---
 
 ## 8. Reglas rápidas
 
-- No duplicar componentes.
-- No crear carpetas sin necesidad demostrable.
-- No hacer refactors no solicitados.
-- No mezclar cambios funcionales con limpieza masiva.
-- No implementar desde cero una interacción compleja sin evaluar soluciones existentes.
-- No instalar una dependencia sin revisar mantenimiento, compatibilidad, licencia y necesidad.
-- No colocar lógica de negocio crítica únicamente en la interfaz.
-- No confiar en validaciones del cliente para proteger datos.
-- No introducir código exclusivo de iOS sin estrategia para Android.
-- No añadir fricción al registro de movimientos sin justificación.
-- No asumir que un usuario tendrá siempre un único espacio.
-- No guardar datos de invitados en la nube.
-- No borrar datos locales hasta confirmar una migración exitosa.
-- No declarar una tarea terminada con documentación desactualizada.
+Las prohibiciones viven en [`PROJECT_RULES.md`](./PROJECT_RULES.md) §26.
 
 ---
 
 ## 9. Flujo de trabajo mínimo
 
-Antes de codificar:
-
-1. Clasificar la tarea.
-2. Leer la documentación aplicable.
-3. Identificar archivos y dominios afectados.
-4. Buscar soluciones internas reutilizables.
-5. Evaluar dependencias externas cuando corresponda.
-6. Definir el cambio mínimo necesario.
-
-Durante:
-
-1. Mantener el alcance.
-2. Evitar refactors laterales.
-3. Reutilizar tokens y componentes.
-4. Mantener tipos explícitos.
-5. Conservar paridad entre plataformas.
-6. Añadir estados de carga, vacío, éxito y error cuando apliquen.
-
-Antes de finalizar:
-
-1. Ejecutar typecheck.
-2. Ejecutar lint.
-3. Ejecutar pruebas.
-4. Verificar iOS y Android cuando corresponda.
-5. Revisar accesibilidad básica.
-6. Confirmar que no existe duplicación evidente.
-7. Actualizar documentación.
-8. Resumir qué cambió y qué no cambió.
+El flujo de trabajo, la jerarquía y los checks viven en [`WORKFLOW.md`](./WORKFLOW.md) §3.
 
 ---
 
@@ -323,18 +228,7 @@ La elección concreta de librerías debe documentarse cuando afecte arquitectura
 
 ## 11. Definición general de terminado
 
-Una tarea está terminada cuando:
-
-- Cumple el comportamiento solicitado.
-- No introduce duplicación innecesaria.
-- Respeta la arquitectura.
-- Funciona en las plataformas afectadas.
-- Incluye manejo de errores relevante.
-- Mantiene privacidad y aislamiento por espacio.
-- Cuenta con pruebas proporcionales al riesgo.
-- No contiene código muerto.
-- Actualiza la documentación afectada.
-- Puede explicarse de forma clara y breve.
+Vive en [`WORKFLOW.md`](./WORKFLOW.md) §4.
 
 ---
 

@@ -44,44 +44,80 @@ Reglas de la jerarquía:
 ### Gate 0 — Alineación (antes de codificar)
 
 - Cline clasifica la tarea: pequeña, mediana o grande (`PROJECT_RULES.md` §4).
-- Cline lee la documentación aplicable de `Bible/`.
-- Cline escribe una **ficha de tarea** (plantilla en §6).
-- El responsable aprueba el alcance y el fuera de alcance.
+- Cline lee la documentación aplicable según el presupuesto de lectura (§3.1).
+- Cline escribe una ficha de tarea (`PROJECT_RULES.md` §27).
 
-### Gate 1 — Checks automáticos (Cline, en verde)
+Aprobación del responsable:
+
+- **Tarea pequeña:** no requiere aprobación previa. La ficha se entrega junto
+  con el resultado. Si durante el trabajo la tarea deja de ser pequeña, Cline
+  para y la reclasifica antes de seguir.
+- **Tarea mediana:** aprobación previa solo del alcance y el fuera de alcance.
+- **Tarea grande:** aprobación previa obligatoria, con enfoques comparados.
+
+La pre-aprobación no es permiso para ampliar alcance: `PROJECT_RULES.md` §5
+sigue aplicando.
+
+### Gate 1 — Checks automáticos
 
 ```sh
 npm run validate   # typecheck + lint + format:check + tests
 ```
 
-No se puede pasar al siguiente gate con estos checks en rojo. Nunca se
-desactivan TypeScript, lint o tests para «hacer que pase».
+No se pasa al siguiente gate con estos checks en rojo. Nunca se desactivan
+TypeScript, lint o tests para «hacer que pase».
 
-### Gate 2 — Auditoría de Claude (verificador)
+### Gate 2 — Verificación
 
-- Cline entrega el **paquete de revisión** (§5).
-- Claude busca: bugs, casos límite, violaciones de arquitectura, duplicación,
-  problemas de seguridad y deriva de documentación.
-- Claude responde con una lista de hallazgos (con severidad) o un visto bueno.
+Cline entrega el paquete de revisión (§5) y lo envía **a la vez** a los
+verificadores que correspondan. No se encadenan: revisar en serie duplica la
+espera sin mejorar el resultado.
 
-### Gate 3 — Revisión cruzada de ChatGPT (segundo verificador)
+Verificadores necesarios según la tarea:
 
-- Revisa el mismo paquete de forma independiente.
-- Prioriza: regresiones, paridad iOS/Android, datos y privacidad, y coherencia
-  con el producto.
+| Tarea | Verificación |
+|---|---|
+| Pequeña | Checks automáticos (Gate 1). Sin verificador humano/IA salvo que toque datos, permisos o dinero. |
+| Mediana | Un verificador. |
+| Grande, o cualquier tarea que toque SQL, permisos, sincronización, migración de invitado o cálculo de importes | Dos verificadores, en paralelo. |
 
-### Gate 4 — Corrección e iteración
+Cada verificador responde una de dos cosas:
+
+- **Visto bueno sin hallazgos.** Es un resultado válido y esperado. Un
+  verificador no debe fabricar hallazgos menores para justificar la revisión.
+- **Lista de hallazgos** clasificados: `bloqueante`, `importante`, `menor`. Un
+  hallazgo sin escenario de fallo concreto no es un hallazgo: es una opinión, y
+  va aparte, en una sección de sugerencias.
+
+Si los verificadores se contradicen, ninguno tiene prioridad sobre el otro: se
+presentan ambas posturas al responsable, que decide. Cline no elige la revisión
+que le resulta más cómoda ni promedia las dos.
+
+### Gate 3 — Corrección e iteración
 
 - Cline corrige los hallazgos aprobados por el responsable.
 - Cline reejecuta el Gate 1.
-- Si los cambios son sustanciales, el paquete vuelve a los gates 2 y 3.
+- Si los cambios son sustanciales, el paquete vuelve al Gate 2.
 
-### Gate 5 — Cierre
+### Gate 4 — Cierre
 
 - `npm run validate` final en verde.
 - Commit atómico con mensaje claro.
 - Documentación (`Bible/`) actualizada si el cambio lo exige.
 - Resumen de cierre (`PROJECT_RULES.md` §25).
+
+### 3.1 Presupuesto de lectura
+
+Leer documentación tiene coste. Antes de codificar se lee lo aplicable, no todo
+lo existente.
+
+| Tarea | Lectura obligatoria |
+|---|---|
+| Pequeña | El archivo afectado y sus vecinos directos. Nada de `Bible/` salvo duda concreta. |
+| Mediana | `PROJECT_RULES.md` §§3-7 y el documento de dominio aplicable (`PRODUCT.md`, `ARCHITECTURE.md` o `DATABASE.md`). |
+| Grande | Documentos de dominio completos + índice de `DECISIONS.md`, y solo las decisiones concretas que el índice señale como relevantes. |
+
+`DECISIONS.md` no se lee entero nunca. Se consulta por índice.
 
 ---
 
@@ -90,91 +126,64 @@ desactivan TypeScript, lint o tests para «hacer que pase».
 Un cambio está terminado **solo** cuando:
 
 1. Pasa el Gate 1 en verde.
-2. Tiene al menos un visto bueno de verificador (para tareas medianas o
-   grandes, idealmente dos).
+2. Tiene la verificación que le corresponde según el Gate 2.
 3. Está commiteado y documentado.
 
-«Compila» o «los tests pasan» **no** es suficiente sin revisión.
+«Compila» o «los tests pasan» **no** es suficiente sin la verificación que
+corresponda.
 
 ---
 
 ## 5. Paquete de revisión
 
-Cline entrega, en un único bloque markdown que se pueda copiar entre
-herramientas:
+El paquete de revisión es el **resumen obligatorio de `PROJECT_RULES.md` §25**,
+entregado en el Gate 2, más:
 
-- Ficha de tarea (objetivo, alcance, fuera de alcance).
 - Lista de archivos tocados.
 - Resumen del diff.
 - Resultado del Gate 1.
-- Qué se reutilizó y qué dependencias se añadieron (si alguna).
 - Riesgos y pendientes conocidos.
 
-Los verificadores responden con hallazgos clasificados por severidad
-(`bloqueante`, `importante`, `menor`) o con un visto bueno.
+Los verificadores responden con lo indicado en el Gate 2 (visto bueno o
+hallazgos).
 
 ---
 
-## 6. Plantilla de ficha de tarea
-
-```md
-### Clasificación
-pequeña | mediana | grande
-
-### Objetivo
-
-### Alcance (archivos o dominios)
-
-### Fuera de alcance
-
-### Reutilización (componentes, hooks, servicios existentes)
-
-### Riesgos (plataforma, datos, migración, regresión)
-
-### Validación (checks a ejecutar)
-```
-
-Para tareas pequeñas, la ficha puede reducirse a una nota breve
-(`PROJECT_RULES.md` §27).
-
----
-
-## 7. Higiene de Git
+## 6. Higiene de Git
 
 - Un cambio lógico = un commit.
 - Mensajes descriptivos.
-- **Prohibido** commitear artefactos de trabajo de agentes: handoffs, estados de
-  implementación («IMPLEMENTATION_STATE»), «CONTEXT_ENGINE», checkpoints o
-  planes locales. Van en un espacio privado, nunca en el repositorio.
 - **Prohibidos** los commits gigantes («montón de cambios»): dividir en entregas
   pequeñas y revisables.
 - Rama por feature cuando el cambio sea grande; merge pequeño.
+- Los artefactos de trabajo de agentes no se commitean: hay un check de CI y
+  patrones en `.gitignore` que lo impiden.
 
 ---
 
-## 8. Prohibiciones específicas (derivadas de la auditoría)
+## 7. Prohibiciones mecánicas
 
-- No commitear artefactos de trabajo de IA en el repo.
-- No crear «god components»: un archivo que supere ~300–400 líneas debe
-  descomponerse o justificarse por escrito.
-- No importar desde rutas internas de `node_modules`
-  (`phosphor-react-native/src/...`, `react-native-calendars/src/...`).
-- No duplicar helpers (fechas, moneda, texto): reutilizar `src/lib/`.
-- No dejar huecos ni churn (versiones que suben y bajan) en migraciones o en la
-  versión de la base de datos local.
-- Mantener `Bible/` sincronizado con el código.
+Las reglas que puede comprobar una máquina no se recuerdan en prosa:
 
----
+- **«God components»** (`max-lines`) y **imports internos de `node_modules`**
+  (`no-restricted-imports`): se verifican en `eslint.config.js`.
+- **Artefactos de trabajo de agentes**: se verifican en el workflow de CI y en
+  `.gitignore`.
 
-## 9. Mejora continua
-
-Si un verificador detecta un patrón de error recurrente, se registra en §8 para
-que no vuelva a ocurrir. El objetivo no es añadir burocracia, sino hacer que el
-cambio correcto sea fácil y el cambio incorrecto resulte evidente.
+El resto de prohibiciones vive en `PROJECT_RULES.md` §26.
 
 ---
 
-## 10. Modo de trabajo actual
+## 8. Mejora continua
+
+Si un verificador detecta un patrón de error recurrente, se registra en
+`PROJECT_RULES.md` §26 o se convierte en un check automático. El objetivo no es
+añadir burocracia, sino hacer que el cambio correcto sea fácil y el cambio
+incorrecto resulte evidente.
+
+---
+
+## 9. Modo de trabajo actual
 
 Hasta nueva orden, el trabajo se registra **solo en commits locales** de Git. No
 se hace push ni se toca el remoto de GitHub: el responsable quiere medir el

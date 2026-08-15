@@ -640,6 +640,8 @@ El resultado debe indicar:
 
 No afirmar que se ejecutaron pruebas o compilaciones si no se ejecutaron.
 
+Este resumen es el paquete de revisión que se entrega en el Gate 2 de `WORKFLOW.md` §5.
+
 ---
 
 ## 26. Prohibiciones explícitas
