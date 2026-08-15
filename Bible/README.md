@@ -35,6 +35,7 @@ La versión anterior acumuló funcionalidades, duplicación de componentes, resp
 | [`WORKFLOW.md`](./WORKFLOW.md) | Jerarquía de trabajo multi-agente y checks obligatorios. |
 | [`DATABASE.md`](./DATABASE.md) | Persistencia local, Supabase, SQL y sincronización. |
 | [`ROADMAP.md`](./ROADMAP.md) | Fases y criterios de finalización. |
+| [`PLAN.md`](./PLAN.md) | Orden de trabajo actual (limpieza → verificación → producto → release). |
 | [`DECISIONS.md`](./DECISIONS.md) | Historial de decisiones técnicas y de producto. |
 
 Si una modificación cambia una regla, flujo, arquitectura o decisión relevante, también debe actualizarse el documento correspondiente.
