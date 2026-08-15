@@ -514,8 +514,9 @@ usan ese indicador ni simulan que la operación se haya completado.
 La tarjeta de perfil permite tocar la foto para elegir una imagen de la
 cámara o la galería; se recomprime en el dispositivo antes de guardarse para
 no acumular imágenes pesadas (`Bible/DATABASE.md` §5.4, versión 9). La fila
-«Iniciar sesión o crear cuenta» ya está preparada en la sección Cuenta, pero
-todavía es pendiente: hoy no existe pantalla de autenticación.
+«Iniciar sesión o crear cuenta» ya no es pendiente: abre las pantallas de
+autenticación existentes (registro, verificación de código, inicio de sesión,
+recuperación de contraseña y migración de los datos de invitado).
 
 La fila «Recordatorios y alertas» ya no es pendiente: abre un modal con una
 regla por tipo de movimiento del espacio activo (gastos e ingresos por
