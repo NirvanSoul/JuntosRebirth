@@ -14,10 +14,10 @@ import type {
 } from '@/features/transactions/types';
 import {
   addDays,
-  getLocalToday,
   parseProjectedTransactionId,
   projectRecurringTransactions,
 } from '@/features/transactions/utils/transactionRecurrence';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
   buildReminderDateTime,
   buildReminderTemplateVariables,
@@ -83,7 +83,7 @@ export async function reconcileNotificationRules({
     categories.map((category) => [category.id, category.name] as const),
   );
 
-  const today = getLocalToday();
+  const today = getLocalTodayKey();
   const windowEnd = addDays(today, notificationRuleWindowDays);
   const occurrences = projectRecurringTransactions({
     endOn: windowEnd,

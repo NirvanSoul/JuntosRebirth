@@ -1,5 +1,5 @@
 import type { SessionTransaction } from '@/features/transactions/types';
-import { getLocalDateKey } from '@/features/transactions/utils/transactionSummary';
+import { toLocalDateKey } from '@/lib/date/localDate';
 import { projectRecurringTransactions } from '@/features/transactions/utils/transactionRecurrence';
 
 export type TransactionPeriod = 'month' | 'week' | 'fortnight' | 'year';
@@ -68,8 +68,8 @@ export function listTransactionsByPeriod(
   selectedDate: Date,
 ): SessionTransaction[] {
   const range = getTransactionPeriodRange(period, selectedDate);
-  const start = getLocalDateKey(range.start);
-  const end = getLocalDateKey(range.end);
+  const start = toLocalDateKey(range.start);
+  const end = toLocalDateKey(range.end);
 
   return projectRecurringTransactions({
     transactions,

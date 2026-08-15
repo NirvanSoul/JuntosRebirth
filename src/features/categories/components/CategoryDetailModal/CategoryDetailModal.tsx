@@ -23,11 +23,9 @@ import type {
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { SessionTransaction } from '@/features/transactions/types';
-import {
-  getLocalDateKey,
-  listTransactionsThroughCurrentMonth,
-} from '@/features/transactions/utils/transactionSummary';
+import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import {
   categoryColors,
@@ -131,7 +129,7 @@ export function CategoryDetailModal({
         : [],
     [category, transactions],
   );
-  const todayKey = getLocalDateKey();
+  const todayKey = getLocalTodayKey();
   const pastCategoryTransactions = useMemo(
     () =>
       categoryTransactions.filter(

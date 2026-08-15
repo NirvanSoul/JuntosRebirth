@@ -1,10 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { NotificationTemplateType } from '@/features/transactions/constants/notificationTemplates';
-import {
-  addDays,
-  getLocalToday,
-} from '@/features/transactions/utils/transactionRecurrence';
+import { addDays } from '@/features/transactions/utils/transactionRecurrence';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 
 const historyStorageKey = '@juntoss/notification-template-history/v1';
 
@@ -79,7 +77,7 @@ export async function recordTemplateUsage(
   usage: NotificationTemplateUsage,
 ): Promise<void> {
   const entries = await loadHistory();
-  const cutoff = addDays(getLocalToday(), -historyRetentionDays);
+  const cutoff = addDays(getLocalTodayKey(), -historyRetentionDays);
   const pruned = entries.filter((entry) => entry.usedOn >= cutoff);
 
   await saveHistory([...pruned, usage]);

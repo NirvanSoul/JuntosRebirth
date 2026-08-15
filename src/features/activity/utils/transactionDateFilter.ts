@@ -3,7 +3,7 @@ import {
   shiftTransactionPeriod,
   type TransactionPeriod,
 } from '@/features/dashboard/utils/transactionPeriod';
-import { getLocalDateKey } from '@/features/transactions/utils/transactionSummary';
+import { toLocalDateKey } from '@/lib/date/localDate';
 
 export type TransactionDateFilter =
   | 'all'
@@ -23,8 +23,8 @@ export function matchesTransactionDateFilter(
   }
 
   const range = getTransactionPeriodRange(filter.period, filter.selectedDate);
-  const start = getLocalDateKey(range.start);
-  const end = getLocalDateKey(range.end);
+  const start = toLocalDateKey(range.start);
+  const end = toLocalDateKey(range.end);
 
   return occurredOn >= start && occurredOn <= end;
 }
@@ -68,8 +68,8 @@ export function getPreviousDateFilter(
 
     return {
       period: 'custom',
-      startDate: getLocalDateKey(previousStart),
-      endDate: getLocalDateKey(previousEnd),
+      startDate: toLocalDateKey(previousStart),
+      endDate: toLocalDateKey(previousEnd),
     };
   }
 

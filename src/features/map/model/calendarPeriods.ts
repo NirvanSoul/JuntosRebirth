@@ -1,4 +1,5 @@
 import { minimumCalendarDate } from '@/lib/date/monthDistance';
+import { toLocalDateKey } from '@/lib/date/localDate';
 
 const millisecondsPerWeek = 7 * 24 * 60 * 60 * 1000;
 
@@ -6,18 +7,10 @@ export function parseCalendarDate(date: string): Date {
   return new Date(`${date}T12:00:00`);
 }
 
-export function formatCalendarDate(date: Date): string {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
 export function addCalendarDays(date: string, days: number): string {
   const result = parseCalendarDate(date);
   result.setDate(result.getDate() + days);
-  return formatCalendarDate(result);
+  return toLocalDateKey(result);
 }
 
 function getUtcTime(date: string): number {
@@ -32,7 +25,7 @@ export function getCalendarWeek(date: string): string[] {
   const current = parseCalendarDate(date);
   const daysSinceMonday = (current.getDay() + 6) % 7;
   current.setDate(current.getDate() - daysSinceMonday);
-  const monday = formatCalendarDate(current);
+  const monday = toLocalDateKey(current);
   return Array.from({ length: 7 }, (_, index) =>
     addCalendarDays(monday, index),
   );

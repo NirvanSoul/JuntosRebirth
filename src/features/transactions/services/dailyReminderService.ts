@@ -9,10 +9,8 @@ import {
 } from '@/features/transactions/repositories/dailyReminderScheduleRepository';
 import { buildNotificationContent } from '@/features/transactions/services/notificationTemplateService';
 import type { SessionTransaction } from '@/features/transactions/types';
-import {
-  addDays,
-  getLocalToday,
-} from '@/features/transactions/utils/transactionRecurrence';
+import { addDays } from '@/features/transactions/utils/transactionRecurrence';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 import { buildReminderDateTime } from '@/features/transactions/utils/transactionReminders';
 import {
   cancelLocalNotification,
@@ -74,7 +72,7 @@ export type ReconcileDailyReminderInput = {
 async function reconcileDailyReminderNow({
   transactions,
 }: ReconcileDailyReminderInput): Promise<void> {
-  const today = getLocalToday();
+  const today = getLocalTodayKey();
   const todayAt = buildReminderDateTime(today, dailyReminderTime);
   const canStillNotifyToday =
     todayAt !== null &&

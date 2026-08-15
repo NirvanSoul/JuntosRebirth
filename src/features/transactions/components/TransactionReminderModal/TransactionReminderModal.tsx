@@ -8,6 +8,7 @@ import { AppCalendar } from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
 import { ReminderTimesEditor } from '@/features/transactions/components/ReminderTimesEditor/ReminderTimesEditor';
 import type { TransactionReminder } from '@/features/transactions/types';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 
@@ -25,14 +26,6 @@ type TransactionReminderModalProps = {
   transactionTitle: string;
   visible: boolean;
 };
-
-function getTodayDateKey(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function capitalize(text: string): string {
   return text.length > 0 ? text[0]!.toUpperCase() + text.slice(1) : text;
@@ -62,7 +55,7 @@ export function TransactionReminderModal({
   transactionTitle,
   visible,
 }: TransactionReminderModalProps) {
-  const today = getTodayDateKey();
+  const today = getLocalTodayKey();
   const [step, setStep] = useState<Step>('date');
   const [draftDate, setDraftDate] = useState(today);
   const [draftTimes, setDraftTimes] = useState<readonly string[]>([]);

@@ -8,6 +8,7 @@ import type {
   TransactionType,
 } from '@/features/transactions/types';
 import { isCurrencyCode } from '@/lib/currency/currencyCatalog';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
   getRecurrenceOccurrenceDate,
   isValidLocalDate,
@@ -72,14 +73,6 @@ const recurrences = new Set<string>([
   'custom',
 ]);
 const automaticRecurrences = new Set<string>(['weekly', 'biweekly', 'monthly']);
-
-function getToday(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function mapTransaction(row: TransactionRow): SessionTransaction {
   if (
@@ -223,7 +216,7 @@ async function materializeRecurringSeriesThroughDate(
 
 export async function materializeDueRecurringTransactions(
   database: SQLiteDatabase,
-  throughDate = getToday(),
+  throughDate = getLocalTodayKey(),
 ): Promise<void> {
   const dueSeries = await database.getAllAsync<RecurringSeriesRow>(
     `SELECT id, space_id, category_id, created_by, type, amount_minor, currency,
@@ -290,7 +283,7 @@ export async function createLocalTransaction(
       input.recurrence as AutomaticTransactionRecurrence,
       occurrenceIndex,
     );
-    const today = getToday();
+    const today = getLocalTodayKey();
     while (nextDate <= today) {
       occurrenceDates.push(nextDate);
       occurrenceIndex += 1;
@@ -593,7 +586,7 @@ export async function updateLocalTransaction(
       recurrence,
       1,
     );
-    const today = getToday();
+    const today = getLocalTodayKey();
     while (nextOccurrenceOn <= today) {
       occurrenceDates.push(nextOccurrenceOn);
       nextOccurrenceOn = getRecurrenceOccurrenceDate(

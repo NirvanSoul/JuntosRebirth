@@ -8,7 +8,7 @@ import {
   type MarkedDates,
 } from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
-import { getLocalDateKey } from '@/features/transactions/utils/transactionSummary';
+import { getLocalTodayKey, toLocalDateKey } from '@/lib/date/localDate';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 
@@ -34,7 +34,7 @@ function dateFromKey(date: string): Date {
 function addDay(date: string): string {
   const next = dateFromKey(date);
   next.setDate(next.getDate() + 1);
-  return getLocalDateKey(next);
+  return toLocalDateKey(next);
 }
 
 export function formatTransactionDateRangeDate(date: string): string {
@@ -54,7 +54,7 @@ export function TransactionDateRangePickerModal({
   visible,
 }: TransactionDateRangePickerModalProps) {
   const { colors } = useTheme();
-  const today = getLocalDateKey(new Date());
+  const today = getLocalTodayKey();
   const [draftRange, setDraftRange] = useState<TransactionDateRange>({
     startDate: today,
     endDate: today,

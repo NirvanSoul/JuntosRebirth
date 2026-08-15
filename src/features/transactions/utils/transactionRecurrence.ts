@@ -2,6 +2,7 @@ import type {
   SessionTransaction,
   TransactionRecurrence,
 } from '@/features/transactions/types';
+import { getLocalTodayKey, toLocalDateKey } from '@/lib/date/localDate';
 
 export type AutomaticTransactionRecurrence = Exclude<
   TransactionRecurrence,
@@ -51,18 +52,11 @@ export function isValidLocalDate(date: string): boolean {
   );
 }
 
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 export function addDays(date: string, days: number): string {
   const [year, month, day] = date.split('-').map(Number);
   const result = new Date(year!, month! - 1, day!);
   result.setDate(result.getDate() + days);
-  return formatLocalDate(result);
+  return toLocalDateKey(result);
 }
 
 function addMonths(date: string, months: number): string {
@@ -74,7 +68,7 @@ function addMonths(date: string, months: number): string {
     0,
   ).getDate();
   firstOfTargetMonth.setDate(Math.min(day!, lastDay));
-  return formatLocalDate(firstOfTargetMonth);
+  return toLocalDateKey(firstOfTargetMonth);
 }
 
 export function getRecurrenceOccurrenceDate(
@@ -108,13 +102,9 @@ type UpcomingTransactionDatesInput = {
   transactions: readonly SessionTransaction[];
 };
 
-export function getLocalToday(): string {
-  return formatLocalDate(new Date());
-}
-
 export function getUpcomingTransactionDates({
   count,
-  today = getLocalToday(),
+  today = getLocalTodayKey(),
   transaction,
   transactions,
 }: UpcomingTransactionDatesInput): string[] {

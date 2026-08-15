@@ -32,6 +32,7 @@ import {
   parseAmountMinor,
 } from '@/features/transactions/utils/transactionAmount';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
   defaultCurrencyCode,
   getCurrencyFlag,
@@ -140,15 +141,6 @@ const typeSelectorWidth = { compact: 216, regular: 240 } as const;
  */
 const operatorColumnRatio = 0.72;
 
-function getToday(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-}
-
 export function CreateTransactionModal({
   activeSpaceId,
   availableCurrencies = defaultAvailableCurrencies,
@@ -177,7 +169,7 @@ export function CreateTransactionModal({
   const [customOccurrenceDates, setCustomOccurrenceDates] = useState<
     readonly string[]
   >([]);
-  const [occurredOn, setOccurredOn] = useState(getToday);
+  const [occurredOn, setOccurredOn] = useState(getLocalTodayKey);
   const [currency, setCurrency] = useState<CurrencyCode>(defaultCurrencyCode);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isRecurrencePickerVisible, setRecurrencePickerVisible] =
@@ -270,7 +262,9 @@ export function CreateTransactionModal({
           )
         : 0,
     );
-    setOccurredOn(initialDraft?.occurredOn ?? initialDate ?? getToday());
+    setOccurredOn(
+      initialDraft?.occurredOn ?? initialDate ?? getLocalTodayKey(),
+    );
     setCustomOccurrenceDates(
       initialDraft?.recurrence === 'custom'
         ? (initialDraft.customOccurrenceDates ?? [initialDraft.occurredOn])

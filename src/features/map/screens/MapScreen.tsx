@@ -46,6 +46,7 @@ import {
   getMonthDistance,
   maximumCalendarDate,
 } from '@/lib/date/monthDistance';
+import { getLocalTodayKey, toLocalDateKey } from '@/lib/date/localDate';
 import { iconSize, layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
@@ -68,23 +69,6 @@ export type MapScreenHandle = {
   resetToToday: () => void;
 };
 
-function getLocalDate(): string {
-  const now = new Date();
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
-function formatLocalDate(date: Date): string {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
 function getProjectionRange(monthKey: string): {
   endOn: string;
   startOn: string;
@@ -93,8 +77,8 @@ function getProjectionRange(monthKey: string): {
   const month = Number(monthKey.slice(5, 7));
 
   return {
-    startOn: formatLocalDate(new Date(year, month - 2, 1, 12)),
-    endOn: formatLocalDate(new Date(year, month + 1, 0, 12)),
+    startOn: toLocalDateKey(new Date(year, month - 2, 1, 12)),
+    endOn: toLocalDateKey(new Date(year, month + 1, 0, 12)),
   };
 }
 
@@ -119,7 +103,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
       categories = [],
       onAddTransaction,
       onOpenTransactionDetail,
-      today = getLocalDate(),
+      today = getLocalTodayKey(),
       transactions = [],
     },
     ref,

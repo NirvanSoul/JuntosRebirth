@@ -2,6 +2,7 @@ import type { SessionTransaction } from '@/features/transactions/types';
 import { groupTransactionsByCurrency } from '@/features/transactions/utils/transactionCurrencyGrouping';
 import { projectRecurringTransactions } from '@/features/transactions/utils/transactionRecurrence';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+import { toLocalDateKey } from '@/lib/date/localDate';
 
 export type TransactionSummary = {
   balanceMinor: number;
@@ -25,16 +26,8 @@ export type TransactionSummaryByCurrency = {
   summary: TransactionSummary;
 };
 
-export function getLocalDateKey(referenceDate = new Date()): string {
-  const year = referenceDate.getFullYear();
-  const month = String(referenceDate.getMonth() + 1).padStart(2, '0');
-  const day = String(referenceDate.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-}
-
 export function getLocalMonthEndKey(referenceDate = new Date()): string {
-  return getLocalDateKey(
+  return toLocalDateKey(
     new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0, 12),
   );
 }
