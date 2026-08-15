@@ -132,6 +132,11 @@ Un cambio está terminado **solo** cuando:
 «Compila» o «los tests pasan» **no** es suficiente sin la verificación que
 corresponda.
 
+Una casilla se marca `[x]` solo si existe implementación **y** prueba o
+configuración verificable. Se deja `[ ]` si depende de dispositivo físico, de
+un Supabase real, de pgTAP no ejecutado, de accesibilidad manual, de
+rendimiento o de una decisión humana. Que exista un archivo no cierra nada.
+
 ---
 
 ## 5. Paquete de revisión
