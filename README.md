@@ -2,7 +2,7 @@
 
 > **Versión alpha.** El proyecto está en desarrollo activo y todavía le faltan funcionalidades del roadmap (ver [`Bible/ROADMAP.md`](./Bible/ROADMAP.md)). No es una versión estable ni lista para producción.
 
-Base de la reconstrucción móvil de `juntoss`, creada con React Native, Expo y TypeScript para iOS y Android. Expo Go sigue disponible para las comprobaciones rápidas, y también hay una development build propia para probar los módulos nativos —incluida la importación de PDF— en un iPhone o desde Xcode.
+Base de la reconstrucción móvil de `juntoss`, creada con React Native, Expo y TypeScript para iOS y Android. Expo Go sigue disponible para las comprobaciones rápidas, y también hay una development build propia para probar los módulos nativos en un iPhone o desde Xcode.
 
 La documentación de producto y arquitectura vive en [`Bible/`](./Bible/README.md) y debe leerse antes de modificar código. No se duplican esas reglas en este archivo.
 
@@ -37,7 +37,7 @@ El túnel gratuito de Expo es compartido y a veces rechaza la conexión con `fai
 
 ## Development build para iPhone y Xcode
 
-La development build incorpora `expo-dev-client` y los módulos nativos del proyecto. Es obligatoria para probar la importación de PDF y cualquier cambio nativo; Expo Go continúa siendo útil para comprobaciones rápidas de JavaScript.
+La development build incorpora `expo-dev-client` y los módulos nativos del proyecto. Es necesaria para validar cambios nativos; Expo Go continúa siendo útil para comprobaciones rápidas de JavaScript.
 
 Conecta el iPhone por USB, actívale el modo de desarrollo y asegúrate de que Xcode pueda firmar `com.juntoss.app` con tu equipo. Después ejecuta:
 
