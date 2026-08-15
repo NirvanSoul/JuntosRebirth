@@ -5147,15 +5147,16 @@ ninguna explicación de qué faltaba.
 
 La regla `no-restricted-imports` de `eslint.config.js` bloqueaba las rutas
 `phosphor-react-native/src/**` y `react-native-calendars/src/**` asumiendo que
-eran internas y frágiles. Al revisar los `exports` de ambos paquetes se
-comprobó que la premisa era incorrecta.
+eran internas y frágiles. Al revisar los manifiestos y puntos de entrada de
+ambos paquetes se comprobó que la premisa era incorrecta.
 
 ## Decisión
 
 - **phosphor-react-native:** `package.json` declara `"./src/icons/*"` en su
   campo `exports` con condición `react-native`. Es API pública pensada para
-  importar un icono sin arrastrar los ~1500 símbolos del raíz (Metro no los
-  elimina). Los imports `phosphor-react-native/src/icons/*` se conservan y no
+  importar un icono sin arrastrar el catálogo completo del raíz, cuya
+  reexportación puede impedir el tree-shaking en Metro (el propio paquete
+  recomienda imports individuales en ese escenario). Los imports `phosphor-react-native/src/icons/*` se conservan y no
   se restringen.
 - **react-native-calendars:** publica `main: src/index.ts` (envía fuente) y su
   raíz no reexporta `MarkedDates` ni `DayProps`. Los tipos se derivan del

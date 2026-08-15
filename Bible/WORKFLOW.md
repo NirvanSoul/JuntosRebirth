@@ -184,6 +184,11 @@ Las reglas que puede comprobar una máquina no se recuerdan en prosa:
 El resto de prohibiciones vive en `PROJECT_RULES.md` §26. El subpath
 `phosphor-react-native/src/icons/*` es API pública y no se restringe (ADR-079).
 
+Regla de `frozenLineDebt`: un umbral solo puede bajar. Si un cambio necesita
+más líneas en un archivo congelado, se compensa extrayendo código de ese mismo
+archivo. Subirlo exige aprobación explícita del responsable, registrada en el
+mensaje del commit. Un umbral que sube en silencio invalida la congelación.
+
 ---
 
 ## 8. Mejora continua

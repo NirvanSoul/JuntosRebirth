@@ -5,6 +5,12 @@ const expoConfig = require('eslint-config-expo/flat');
 // 400 líneas. El número es la cantidad de líneas no vacías medida ese día
 // (equivale a `max-lines` con skipBlankLines: true). Mientras un archivo esté
 // aquí, no puede crecer; se retira de la lista al descomponerlo.
+//
+// Regla: un umbral de `frozenLineDebt` solo puede bajar. Si un cambio necesita
+// más líneas en un archivo congelado, se compensa extrayendo código de ese
+// mismo archivo. Subirlo exige aprobación explícita del responsable, registrada
+// en el mensaje del commit. Un umbral que sube en silencio invalida la
+// congelación.
 const frozenLineDebt = {
   'src/navigation/MainTabsNavigator.tsx': 1372,
   'src/features/import/screens/ImportScreen.tsx': 1209,
@@ -15,7 +21,7 @@ const frozenLineDebt = {
   'src/features/categories/components/CategoryDetailModal/CategoryDetailModal.tsx': 627,
   'src/features/map/screens/MapScreen.tsx': 611,
   'src/features/activity/screens/ActivityScreen.tsx': 573,
-  'src/components/ui/AppCalendar/AppCalendar.tsx': 569,
+  'src/components/ui/AppCalendar/AppCalendar.tsx': 565,
   'src/features/import/repositories/localImportBatchRepository.ts': 556,
   'src/lib/storage/localDatabase.ts': 547,
   'src/features/activity/components/TransactionFiltersModal.tsx': 536,

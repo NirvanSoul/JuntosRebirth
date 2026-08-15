@@ -55,6 +55,12 @@ que una tarea de producto obliga a entrar en él. `frozenLineDebt` marca qué
 archivos no pueden crecer; cada refactor real retira su entrada. Excepción: si
 un componente bloquea producto inminente, se descompone antes, con propósito.
 
+**Candidato prioritario:** `AppCalendar.tsx`. El componente de día del
+calendario (`ScrollCalendarDay` y su tipado derivado, ADR-079) es lo primero que
+debe extraerse la próxima vez que una tarea de producto lo toque. Su umbral
+congelado se elevó a 565 con aprobación explícita del responsable; es el nuevo
+techo y solo puede bajar.
+
 ### Fase 5 — Release
 
 - Prueba real en dispositivo iOS y Android (safe areas, teclado, gestos, modo

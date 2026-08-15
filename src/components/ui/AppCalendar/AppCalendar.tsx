@@ -36,9 +36,7 @@ import { typography } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
-/** Tipo de fechas marcadas, derivado del contrato público de
- * `react-native-calendars` (no de sus rutas internas). Lo consumen las features
- * que pasan `markedDates` a este wrapper. */
+// Tipos derivados del contrato público de react-native-calendars (ADR-079).
 export type MarkedDates = NonNullable<CalendarProps['markedDates']>;
 
 type AppCalendarProps = {
@@ -106,9 +104,7 @@ function getMonthStartAtOffset(anchorDate: string, offset: number): string {
 type ScrollCalendarDayProps = Omit<
   ComponentProps<NonNullable<CalendarProps['dayComponent']>>,
   'date'
-> & {
-  date?: DateData;
-};
+> & { date?: DateData };
 
 function ScrollCalendarDay({
   accessibilityLabel,
