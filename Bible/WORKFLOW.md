@@ -78,7 +78,7 @@ Verificadores necesarios según la tarea:
 
 | Tarea | Verificación |
 |---|---|
-| Pequeña | Checks automáticos (Gate 1). Sin verificador humano/IA salvo que toque datos, permisos o dinero. |
+| Pequeña | Gate 1. Requiere verificador si toca datos, permisos, dinero, acciones destructivas o comportamiento nativo. |
 | Mediana | Dos verificadores durante el régimen reforzado; uno cuando el responsable lo retire. |
 | Grande, o cualquier tarea que toque SQL, permisos, sincronización, migración de invitado o cálculo de importes | Dos verificadores, en paralelo. |
 
@@ -86,10 +86,12 @@ Verificadores necesarios según la tarea:
 actor principal de código, las tareas medianas van a **dos verificadores en
 paralelo** aunque no toquen sincronización. Las pequeñas mantienen solo el
 Gate 1, salvo que toquen datos, dinero, acciones destructivas o
-comportamiento nativo. El régimen se retira cuando **cinco entregas
-consecutivas** se acepten sin que un verificador tenga que devolver el paquete
-por evidencia deficiente o por alcance no declarado. El responsable puede
-retirarlo o prorrogarlo antes, dejando constancia.
+comportamiento nativo. El régimen puede retirarse tras **cinco tareas medianas
+consecutivas** cuyo primer paquete sea aceptado por ambos verificadores sin
+devolución por hallazgo bloqueante o importante, evidencia deficiente ni alcance
+no declarado. Los hallazgos menores no reinician el contador, que empieza con la
+próxima tarea mediana posterior a esta modificación. La decisión final de
+retirarlo o prorrogarlo corresponde al responsable y debe quedar registrada.
 
 Cada verificador responde una de dos cosas:
 
