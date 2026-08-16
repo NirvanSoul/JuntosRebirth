@@ -127,6 +127,6 @@ cuando el responsable confirma el resultado.
 
 | Fecha | Qué se verificó | Plataforma | Quién | Resultado |
 |---|---|---|---|---|
-| 2026-08-15 | Nueve láminas de onboarding tras la optimización lossless | iOS (simulador o dispositivo) | responsable | correctas, sin halos ni transparencias rotas |
-| pendiente | Smoke nativo de «Reducir movimiento» en OnboardingRevealText (3 casos: off / on antes / on durante) | iOS y Android | responsable | pendiente — F1 no cierra hasta anotarlo |
+| 2026-08-15 | Nueve láminas de onboarding tras la optimización lossless | iPhone 17 físico (iOS) | responsable | correctas, sin halos ni transparencias rotas |
+| 2026-08-16 | Smoke de «Reducir movimiento» en OnboardingRevealText (3 casos: off / on antes / on durante) | iPhone 17 físico (iOS) | responsable | correcto en los tres casos; **no verificado en Android** — excepción aceptada por el responsable |
 
