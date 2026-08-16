@@ -145,3 +145,34 @@ cuando el responsable confirma el resultado.
 | 2026-08-15 | Nueve láminas de onboarding tras la optimización lossless | iPhone 17 físico (iOS) | responsable | correctas, sin halos ni transparencias rotas |
 | 2026-08-16 | Smoke de «Reducir movimiento» en OnboardingRevealText (3 casos: off / on antes / on durante) | iPhone 17 físico (iOS) | responsable | correcto en los tres casos; **no verificado en Android** — excepción aceptada por el responsable |
 
+---
+
+## 7. Informe de Fase 2 — Spike de sincronización end-to-end
+
+### Fase 2a — Backend limpio (staging)
+
+#### 1. Proyecto y CLI
+- **Versión de CLI:** Supabase CLI `2.114.0` (vía `npx supabase`).
+- **Vinculación:** Proyecto staging enlazado exitosamente (`supabase link --project-ref blaanqqxtdezsscdkkvz`).
+
+#### 2. Migraciones
+- **Total ejecutadas:** 21 archivos de migración (`01`–`08` y `10`–`22`).
+- **Hueco migración 09:** Conservado intacto.
+- **Dry-run previo:** `supabase db push --dry-run` finalizado con éxito (código de salida 0).
+- **Aplicación real:** `supabase db push` completó las 21 migraciones sin errores (código de salida 0).
+- **Historial verificado (`schema_migrations`):** 21 versiones locales registradas exactamente en remoto (`01`–`08`, `10`–`22`).
+
+#### 3. pgTAP y pruebas de base de datos
+- La CLI requiere Docker daemon local para ejecutar pgTAP sobre el proyecto enlazado (`supabase test db --linked`). Al no disponer de Docker en el host de ejecución, se omiten las suites pgTAP conforme al carril opcional no bloqueante definido en el plan.
+
+#### 4. Edge Functions
+- **Función desplegada:** `login-with-lockout` desplegada a staging vía `supabase functions deploy login-with-lockout` (código de salida 0).
+- **Modo JWT:** Verificación de JWT por defecto preservada (sin `--no-verify-jwt`).
+
+#### 5. Lo que no estaba en el repositorio y requirió configuración manual
+1. **Instalación/Enlace de CLI:** Requirió inicio de sesión interactivo y enlace explícito a `blaanqqxtdezsscdkkvz`.
+2. **Configuración de Autenticación en Dashboard:**
+   - Habilitación de Email/Password y confirmación obligatoria por correo.
+   - Desactivación de CAPTCHA (la app móvil no envía token de captcha).
+   - Ajuste de plantilla de correo «Confirm signup» para usar `{{ .Token }}` (código OTP de 6 dígitos) en lugar de enlace mágico.
+   - Configuración de proveedor SMTP propio con dominio verificado.
