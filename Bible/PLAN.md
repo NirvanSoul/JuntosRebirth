@@ -115,3 +115,18 @@ techo y solo puede bajar.
 - [ ] **Poder ver la contraseña mientras se escribe.** Aplica a registro,
   inicio de sesión y recuperación; usar la primitiva de campo existente, no un
   control nuevo por pantalla.
+
+---
+
+## 6. Verificaciones manuales registradas
+
+Las casillas `[x]` que dependen de una verificación manual (`WORKFLOW.md` §4)
+apuntan aquí: la evidencia debe quedar **anotada** en el repositorio, no solo
+realizada y comunicada por chat. Cada tarea con componente visual añade una fila
+cuando el responsable confirma el resultado.
+
+| Fecha | Qué se verificó | Plataforma | Quién | Resultado |
+|---|---|---|---|---|
+| 2026-08-15 | Nueve láminas de onboarding tras la optimización lossless | iOS (simulador o dispositivo) | responsable | correctas, sin halos ni transparencias rotas |
+| pendiente | Smoke nativo de «Reducir movimiento» en OnboardingRevealText (3 casos: off / on antes / on durante) | iOS y Android | responsable | pendiente — F1 no cierra hasta anotarlo |
+
