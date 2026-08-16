@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -46,9 +46,29 @@ export function OnboardingRevealText({
   const translateY = useSharedValue(
     reduceMotion ? 0 : motion.onboardingTextRevealBlockTravel,
   );
+  const hasRevealedRef = useRef(reduceMotion);
 
+  // `reduceMotion` es una dependencia intencional: la lectura de
+  // AccessibilityInfo es asíncrona, así que el valor real puede llegar después
+  // del montaje. `opacity` y `translateY` son shared values con referencia
+  // estable y `startDelay` es fijo, por lo que el efecto solo se re-ejecuta
+  // cuando cambia `reduceMotion`.
   useEffect(() => {
-    if (reduceMotion) return;
+    if (reduceMotion) {
+      // «Reducir movimiento» activado (ahora o al llegar tarde): saltar al
+      // estado final de inmediato, cancelando cualquier animación en vuelo.
+      // Nunca se re-anima ni se re-revela.
+      opacity.value = 1;
+      translateY.value = 0;
+      hasRevealedRef.current = true;
+      return;
+    }
+
+    // Si el texto ya se reveló (p. ej. la preferencia se desactivó a mitad de
+    // sesión), no volver a animar: se queda visible.
+    if (hasRevealedRef.current) return;
+    hasRevealedRef.current = true;
+
     opacity.value = withDelay(
       startDelay,
       withTiming(1, { duration: motion.onboardingTextRevealBlockDuration }),
@@ -57,10 +77,7 @@ export function OnboardingRevealText({
       startDelay,
       withTiming(0, { duration: motion.onboardingTextRevealBlockDuration }),
     );
-    // Se revela una sola vez al montar: startDelay y reduceMotion son
-    // estables durante la vida de este bloque.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reduceMotion, startDelay, opacity, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
