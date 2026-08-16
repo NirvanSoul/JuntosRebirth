@@ -153,7 +153,7 @@ cuando el responsable confirma el resultado.
 
 #### 1. Proyecto y CLI
 - **Versión de CLI:** Supabase CLI `2.114.0` (vía `npx supabase`).
-- **Vinculación:** Proyecto staging enlazado exitosamente (`supabase link --project-ref blaanqqxtdezsscdkkvz`).
+- **Vinculación:** Proyecto staging enlazado exitosamente (`supabase link --project-ref blaanqqxtdezsscdkkvz` contra PostgreSQL `17.6.1.155`).
 
 #### 2. Migraciones
 - **Total ejecutadas:** 21 archivos de migración (`01`–`08` y `10`–`22`).
@@ -162,21 +162,38 @@ cuando el responsable confirma el resultado.
 - **Aplicación real:** `supabase db push` completó las 21 migraciones sin errores (código de salida 0).
 - **Historial verificado (`schema_migrations`):** 21 versiones locales registradas exactamente en remoto (`01`–`08`, `10`–`22`).
 
-#### 3. pgTAP y pruebas de base de datos
-- **Extensión:** Habilitada explícitamente en staging (`CREATE EXTENSION IF NOT EXISTS pgtap`).
-- **Ejecución (11 suites):** Ejecutadas las 11 suites (133 tests) vía Docker (`supabase test db --linked`).
-- **Resultado:**
-  - Suites completamente en verde: `category_budgets`, `couple_space_constraints`, `finance_schema`, `login_attempts`, `notification_rules`, `rls_policies`.
-  - Hallazgos de prueba en suites restantes:
-    - Desfase en `space_invitations.test.sql`: busca el índice antiguo `space_invitations_one_pending_per_space_idx`, sustituido por `space_invitations_one_pending_per_target_idx` en la migración 16.
-    - Privilegios `has_function_privilege('anon')`: las funciones creadas en Postgres en la nube heredan `EXECUTE` de `PUBLIC` salvo revocación explícita de `PUBLIC`.
-  - Conforme al plan, estas pruebas confirman la presencia de los objetos y no bloquean el spike físico end-to-end.
+#### 3. Conformidad pgTAP y pruebas de base de datos
+- **Estado general:** Backend desplegado y funcional, pero la conformidad pgTAP no se superó: 11 suites, 132 aserciones declaradas, código de salida distinto de cero, con deuda de prueba obsoleta y permisos PUBLIC EXECUTE pendientes.
+- **Extensión:** Habilitada explícitamente en staging (`CREATE EXTENSION IF NOT EXISTS pgtap;`).
+- **Ejecución:** `npx supabase test db --linked supabase/tests/`
+- **Código de salida:** `1`
+- **Resumen literal del ejecutor:**
+  ```text
+  Files=11, Tests=133, 48 wallclock secs ( 0.10 usr  0.04 sys +  0.13 cusr  0.12 csys =  0.39 CPU)
+  Result: FAIL
+  error running container: exit 1
+  ```
+- **Desglose de suites:**
+  - **Aprobadas (6 suites):**
+    - `category_budgets.test.sql`: ok (10 tests)
+    - `couple_space_constraints.test.sql`: ok (7 tests)
+    - `finance_schema.test.sql`: ok (12 tests)
+    - `login_attempts.test.sql`: ok (4 tests)
+    - `notification_rules.test.sql`: ok (6 tests)
+    - `rls_policies.test.sql`: ok (12 tests)
+  - **Con fallos (5 suites):**
+    - `account_deletion.test.sql`: Fallos 2, 4-6, 13-14 (test 2 por `EXECUTE` a `PUBLIC`; 4-6 y 13-14 por comprobación de nulabilidad sobre vistas de esquema).
+    - `couple_space_sync.test.sql`: Fallo 3 (`an anonymous caller cannot invoke the couple-space sync RPC` debido a que Postgres concede `EXECUTE` a `PUBLIC` por defecto y la migración 07/18 revoca de `anon, authenticated` sin revocar de `PUBLIC`, heredando `anon` dicho privilegio).
+    - `import_learning.test.sql`: Fallo 17 (`items preserve their local review selection`).
+    - `legal_acceptances.test.sql`: Fallo 7 (`not even the owner can delete acceptance evidence directly`).
+    - `space_invitations.test.sql`: Fallos 10, 16-17, 22, 25 (fallo 10 por buscar índice antiguo `space_invitations_one_pending_per_space_idx` sustituido en migración 16 por `space_invitations_one_pending_per_target_idx`; 16-17 por permisos `PUBLIC`; fallo de plan por 24 declarados vs 25 ejecutados).
 
 #### 4. Edge Functions
 - **Función desplegada:** `login-with-lockout` desplegada a staging vía `supabase functions deploy login-with-lockout` (código de salida 0).
 - **Modo JWT:** Verificación de JWT por defecto preservada (sin `--no-verify-jwt`).
+- **Autenticación en cliente:** Clave publicable utilizada de clase `sb_publishable_...`.
 - **Smoke test funcional:**
-  - Invocación con clave pública y credencial errónea respondió HTTP 401 `{"error":"invalid_credentials"}`.
+  - Invocación con clave publicable y credencial errónea respondió HTTP 401 `{"error":"invalid_credentials"}`.
   - Tabla `public.login_attempts` incrementó `failed_count = 1` y `last_attempt_at` de forma atómica en Postgres. Fila de prueba eliminada tras verificación.
 
 #### 5. Lo que no estaba en el repositorio y requirió configuración manual
@@ -184,12 +201,15 @@ cuando el responsable confirma el resultado.
 2. **Configuración de Autenticación en Dashboard:**
    - Habilitación de Email/Password y confirmación obligatoria por correo.
    - Desactivación de CAPTCHA (la app móvil no envía token de captcha).
-   - Ajuste de plantilla de correo «Confirm signup» para usar `{{ .Token }}` (código OTP de 6 dígitos) en lugar de enlace mágico.
-   - Configuración de proveedor SMTP propio con dominio verificado.
+   - Ajuste de plantillas de correo «Confirm signup» y «Reset password» para usar `{{ .Token }}` (código OTP de 6 dígitos) en lugar de enlaces.
+   - Configuración de proveedor SMTP propio (contraseña de aplicación de Gmail con remitente verificado).
 
 ---
 
 ### Fase 2b — Protocolo de reproducción y diagnóstico por capas
+
+#### Paquete de commits evaluado
+`5e6bc8b..4499824` en rama local `main`.
 
 #### Ficha de dispositivos
 - **Dispositivo A (Usuario A):** iPhone 17 (iOS) | Commit `49d9e28` | Expo Go.
@@ -202,15 +222,15 @@ cuando el responsable confirma el resultado.
   - Verificación e inicio de sesión exitoso en ambos dispositivos.
 - **Observación por capas en backend:**
   1. `auth.users`: Creados ambos registros con `email_confirmed_at` completado.
-  2. `public.profiles`: Filas generadas automáticamente por el trigger `on_auth_user_created` con sus respectivos `display_name`.
-  3. `public.spaces`: 0 filas remotas. Confirma la Hipótesis H1 (`ensure_personal_space` no es invocada y el espacio personal vive de forma estrictamente local hasta la creación de espacio de pareja o migración).
+  2. `public.profiles`: Fila existente con `display_name` (el trigger `on_auth_user_created` se dispara al insertar en `auth.users`).
+  3. `public.spaces`: 0 filas remotas. Observación: el registro inicial no aprovisiona un espacio personal remoto en Supabase (los datos iniciales viven en SQLite local hasta que se invoque la migración de datos de invitado).
 
 #### Paso 2: Creación, invitación y aceptación de espacio Juntos
 - **Acción UI:**
   - Usuario A crea espacio «Juntos» en Dispositivo A e invita a Usuario B por correo.
   - Usuario B recibe y acepta la invitación en Dispositivo B.
 - **Observación por capas en backend:**
-  1. `public.spaces`: Espacio `couple` creado y activado (`is_activated = true`, `activated_at` poblado con `now()`).
+  1. `public.spaces`: Espacio `couple` activado (`activated_at IS NOT NULL`, poblado con `now()`).
   2. `public.space_invitations`: Invitación actualizada a `status = 'accepted'` con `accepted_by` y `accepted_at`.
   3. `public.space_members`: 2 miembros activos con rol `owner` y `space_type = 'couple'`.
 
@@ -224,6 +244,4 @@ cuando el responsable confirma el resultado.
   3. **Capa 3 (Postgres remoto en Staging):** Correcto. Filas materializadas en servidor:
      - `public.categories`: ID `fa8d0f30-3ef6-4915-b289-a6d7b1ccf8be` («Salario»), `space_id: b69578f8-5269-4162-b36d-636c78638c45`.
      - `public.transactions`: ID `ae79124f-ad2a-4d51-b27e-e64aea0eccdc` (40.00 VES, `income`), `category_id: fa8d0f30...`, `space_id: b69578f8...`.
-  4. **Capa 4 (Supabase Realtime):** No reactivo. La inserción remota no provocó el refresco en caliente en el Dispositivo B a través del canal `couple-space-sync:<space_id>`.
-  5. **Capa 5 (Restauración SQLite Dispositivo B):** En proceso de aislamiento (verificando si se recupera al volver a primer plano o recargar).
-  6. **Capa 6 (Renderizado UI Dispositivo B):** Síntoma reproducido (la interfaz de Usuario B permanece sin el movimiento).
+  4. **Capas 4-6:** Todavía no aisladas. No hubo actualización visible en caliente. No existe evidencia directa del estado de la suscripción, de la recepción del evento ni del resultado de la restauración. (Nota: `MainTabsNavigator.tsx:445-447` incluye además un sondeo periódico cada 15 segundos que tampoco actualizó la vista).
