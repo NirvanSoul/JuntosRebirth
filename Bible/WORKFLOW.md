@@ -21,19 +21,19 @@ Orden de autoridad en el trabajo diario:
 
 1. **Responsable del proyecto (humano).** Aprueba prioridades, alcance y
    decisiones. Es la voz final.
-2. **Cline — actor principal de código.** Implementa, ejecuta los checks
-   automáticos y corrige los hallazgos.
-3. **Claude — verificador / supervisor de auditorías.** Revisa el trabajo de
-   Cline y busca errores, bugs y desviaciones de las reglas.
+2. **Actor principal de código — actualmente Gemini.** Implementa, ejecuta
+   los checks automáticos y corrige los hallazgos.
+3. **Claude — verificador / supervisor de auditorías.** Revisa el trabajo del
+   actor principal de código y busca errores, bugs y desviaciones de las reglas.
 4. **ChatGPT — segundo verificador.** Revisión cruzada e independiente.
 
 Reglas de la jerarquía:
 
 - El responsable decide **qué** se construye y **qué** se acepta.
-- Cline **no declara su propio trabajo «terminado»** sin la revisión de al menos
-  un verificador.
-- Los verificadores **no editan código**: señalan problemas; Cline implementa
-  las correcciones.
+- El actor principal de código **no declara su propio trabajo «terminado»** sin
+  la revisión de al menos un verificador.
+- Los verificadores **no editan código**: señalan problemas; el actor principal
+  de código implementa las correcciones.
 - Un hallazgo de un verificador no es una orden automática de cambio: el
   responsable lo prioriza.
 
@@ -43,15 +43,15 @@ Reglas de la jerarquía:
 
 ### Gate 0 — Alineación (antes de codificar)
 
-- Cline clasifica la tarea: pequeña, mediana o grande (`PROJECT_RULES.md` §4).
-- Cline lee la documentación aplicable según el presupuesto de lectura (§3.1).
-- Cline escribe una ficha de tarea (`PROJECT_RULES.md` §27).
+- El actor principal de código clasifica la tarea: pequeña, mediana o grande (`PROJECT_RULES.md` §4).
+- El actor principal de código lee la documentación aplicable según el presupuesto de lectura (§3.1).
+- El actor principal de código escribe una ficha de tarea (`PROJECT_RULES.md` §27).
 
 Aprobación del responsable:
 
 - **Tarea pequeña:** no requiere aprobación previa. La ficha se entrega junto
-  con el resultado. Si durante el trabajo la tarea deja de ser pequeña, Cline
-  para y la reclasifica antes de seguir.
+  con el resultado. Si durante el trabajo la tarea deja de ser pequeña, el
+  actor principal de código para y la reclasifica antes de seguir.
 - **Tarea mediana:** aprobación previa solo del alcance y el fuera de alcance.
 - **Tarea grande:** aprobación previa obligatoria, con enfoques comparados.
 
@@ -69,9 +69,9 @@ TypeScript, lint o tests para «hacer que pase».
 
 ### Gate 2 — Verificación
 
-Cline entrega el paquete de revisión (§5) y lo envía **a la vez** a los
-verificadores que correspondan. No se encadenan: revisar en serie duplica la
-espera sin mejorar el resultado.
+El actor principal de código entrega el paquete de revisión (§5) y lo envía
+**a la vez** a los verificadores que correspondan. No se encadenan: revisar en
+serie duplica la espera sin mejorar el resultado.
 
 Verificadores necesarios según la tarea:
 
@@ -80,6 +80,13 @@ Verificadores necesarios según la tarea:
 | Pequeña | Checks automáticos (Gate 1). Sin verificador humano/IA salvo que toque datos, permisos o dinero. |
 | Mediana | Un verificador. |
 | Grande, o cualquier tarea que toque SQL, permisos, sincronización, migración de invitado o cálculo de importes | Dos verificadores, en paralelo. |
+
+**Régimen reforzado (desde 2026-08-16).** Mientras se consolida el cambio de
+actor principal de código, las tareas medianas van a **dos verificadores en
+paralelo** aunque no toquen sincronización. Las pequeñas mantienen solo el
+Gate 1, salvo que toquen datos, dinero, acciones destructivas o
+comportamiento nativo. Este régimen se revisa cuando el responsable lo
+decida.
 
 Cada verificador responde una de dos cosas:
 
@@ -90,13 +97,14 @@ Cada verificador responde una de dos cosas:
   va aparte, en una sección de sugerencias.
 
 Si los verificadores se contradicen, ninguno tiene prioridad sobre el otro: se
-presentan ambas posturas al responsable, que decide. Cline no elige la revisión
-que le resulta más cómoda ni promedia las dos.
+presentan ambas posturas al responsable, que decide. El actor principal de
+código no elige la revisión que le resulta más cómoda ni promedia las dos.
 
 ### Gate 3 — Corrección e iteración
 
-- Cline corrige los hallazgos aprobados por el responsable.
-- Cline reejecuta el Gate 1.
+- El actor principal de código corrige los hallazgos aprobados por el
+  responsable.
+- El actor principal de código reejecuta el Gate 1.
 - Si los cambios son sustanciales, el paquete vuelve al Gate 2.
 
 ### Gate 4 — Cierre
@@ -156,6 +164,19 @@ entregado en el Gate 2, más:
 Los verificadores responden con lo indicado en el Gate 2 (visto bueno o
 hallazgos).
 
+El paquete no se acepta sin:
+
+- La **salida real** de los checks, con su código de salida. Describir el
+  resultado no es evidencia.
+- Una cita `archivo:línea` por cada afirmación sobre el repositorio.
+- Para correcciones de bug, la ejecución de la prueba **fallando antes** del
+  arreglo.
+- `git show --stat` contrastado con la lista de archivos declarada en la
+  ficha.
+
+Un verificador puede devolver el paquete sin revisarlo si falta cualquiera
+de esos cuatro elementos.
+
 ---
 
 ## 6. Higiene de Git
@@ -206,7 +227,8 @@ incorrecto resulte evidente.
 
 ## 9. Modo de trabajo actual
 
-Hasta nueva orden, el trabajo se registra **solo en commits locales** de Git. No
-se hace push ni se toca el remoto de GitHub: el responsable quiere medir el
-avance localmente. Cuando se decida publicar, se revisará este apartado y se
-definirá el mecanismo de sincronización.
+El trabajo se registra en commits locales. Cuando el responsable lo indica,
+se publica una **rama de revisión** en `upstream` para que el autor original
+revise; nunca se empuja a `main`. La URL de push del remoto sigue
+deshabilitada y los envíos se hacen pasando la URL explícitamente. Queda
+pendiente decidir si se reactiva de forma permanente.
