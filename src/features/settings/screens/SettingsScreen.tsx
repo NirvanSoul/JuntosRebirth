@@ -178,8 +178,7 @@ export function SettingsScreen({
     }, 1000);
 
     return () => clearInterval(intervalId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coupleDissolution.step]);
+  }, [coupleDissolution.step, coupleDissolutionProgress]);
 
   const handlePickAvatar = async (source: AvatarPickSource) => {
     try {
