@@ -204,3 +204,12 @@ cuando el responsable confirma el resultado.
   1. `auth.users`: Creados ambos registros con `email_confirmed_at` completado.
   2. `public.profiles`: Filas generadas automáticamente por el trigger `on_auth_user_created` con sus respectivos `display_name`.
   3. `public.spaces`: 0 filas remotas. Confirma la Hipótesis H1 (`ensure_personal_space` no es invocada y el espacio personal vive de forma estrictamente local hasta la creación de espacio de pareja o migración).
+
+#### Paso 2: Creación, invitación y aceptación de espacio Juntos
+- **Acción UI:**
+  - Usuario A crea espacio «Juntos» en Dispositivo A e invita a Usuario B por correo.
+  - Usuario B recibe y acepta la invitación en Dispositivo B.
+- **Observación por capas en backend:**
+  1. `public.spaces`: Espacio `couple` creado y activado (`is_activated = true`, `activated_at` poblado con `now()`).
+  2. `public.space_invitations`: Invitación actualizada a `status = 'accepted'` con `accepted_by` y `accepted_at`.
+  3. `public.space_members`: 2 miembros activos con rol `owner` y `space_type = 'couple'`.
