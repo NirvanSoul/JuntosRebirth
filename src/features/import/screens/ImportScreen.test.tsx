@@ -414,4 +414,54 @@ describe('ImportScreen', () => {
       expect(DocumentPicker.getDocumentAsync).toHaveBeenCalled(),
     );
   });
+
+  it('reinicia el flujo cuando el modal vuelve a abrirse', async () => {
+    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    await waitFor(() =>
+      expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(1),
+    );
+
+    await screen.rerender(<ImportScreen {...baseProps({ visible: false })} />);
+    await screen.rerender(<ImportScreen {...baseProps({ visible: true })} />);
+
+    await waitFor(() =>
+      expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(2),
+    );
+  });
+
+  it('reinicia el flujo al cambiar de espacio', async () => {
+    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    await waitFor(() =>
+      expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(1),
+    );
+
+    await screen.rerender(
+      <ImportScreen {...baseProps({ activeSpaceId: 'couple' })} />,
+    );
+
+    await waitFor(() =>
+      expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(2),
+    );
+    expect(listResumableLocalImportBatches).toHaveBeenLastCalledWith('couple');
+  });
+
+  it('no reinicia el flujo cuando cambian las categorías (snapshot)', async () => {
+    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    await waitFor(() =>
+      expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(1),
+    );
+
+    const anotherCategory = {
+      ...groceriesCategory,
+      id: 'other-category',
+      name: 'Otra categoría',
+    };
+    await screen.rerender(
+      <ImportScreen
+        {...baseProps({ categories: [groceriesCategory, anotherCategory] })}
+      />,
+    );
+
+    expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(1);
+  });
 });

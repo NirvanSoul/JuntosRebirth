@@ -508,8 +508,8 @@ export function ImportScreen({
     [activeSpaceId, handlePickFile],
   );
 
-  // Solo debe repetirse cuando el modal vuelve a abrirse o se cambia de
-  // espacio, no en cada cambio de `categories`/`handlePickFile`.
+  // Snapshot: se repite solo al reabrir el modal o cambiar de espacio, no ante
+  // cambios de `categories`/`handlePickFile` (borrarían el progreso). Supresión intencional.
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
