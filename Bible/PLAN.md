@@ -186,3 +186,21 @@ cuando el responsable confirma el resultado.
    - Desactivación de CAPTCHA (la app móvil no envía token de captcha).
    - Ajuste de plantilla de correo «Confirm signup» para usar `{{ .Token }}` (código OTP de 6 dígitos) en lugar de enlace mágico.
    - Configuración de proveedor SMTP propio con dominio verificado.
+
+---
+
+### Fase 2b — Protocolo de reproducción y diagnóstico por capas
+
+#### Ficha de dispositivos
+- **Dispositivo A (Usuario A):** iPhone 17 (iOS) | Commit `49d9e28` | Expo Go.
+- **Dispositivo B (Usuario B):** Honor (Android) | Commit `49d9e28` | Expo Go.
+
+#### Paso 1: Autenticación y verificación de correo
+- **Acción UI:**
+  - Registro de Usuario A en Dispositivo A y Usuario B en Dispositivo B con correos reales.
+  - Recepción de correos con código OTP de 6 dígitos vía SMTP propio.
+  - Verificación e inicio de sesión exitoso en ambos dispositivos.
+- **Observación por capas en backend:**
+  1. `auth.users`: Creados ambos registros con `email_confirmed_at` completado.
+  2. `public.profiles`: Filas generadas automáticamente por el trigger `on_auth_user_created` con sus respectivos `display_name`.
+  3. `public.spaces`: 0 filas remotas. Confirma la Hipótesis H1 (`ensure_personal_space` no es invocada y el espacio personal vive de forma estrictamente local hasta la creación de espacio de pareja o migración).
