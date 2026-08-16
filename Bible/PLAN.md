@@ -46,7 +46,8 @@ reales encontrados y corregidos: accesibilidad en F1 (`OnboardingRevealText`) y
 catálogo obsoleto en la importación en F4 (`ImportScreen`). Check de línea base
 anclado en `scripts/check-exhaustive-deps-suppressions.mjs`, integrado en
 `npm run lint` y `validate`. Commits: `83ce86f`/`680f38b` (F1), `ef8e858` (F2),
-`fe069e1` (F3), `e9cd5d5`/`5c19b3b` (F4), `3e83bd7` (check).
+`fe069e1` (F3), `e9cd5d5`/`5c19b3b` (F4), `9c4ca15` (helper y umbral),
+`3e83bd7`/`f62d566` (check).
 
 ### Fase 2 — Spike: sincronización end-to-end + verificación de correo
 

@@ -13,7 +13,7 @@ import { join, relative, resolve } from 'node:path';
 const baseline = {
   allowedFile: 'src/features/import/screens/ImportScreen.tsx',
   maxOccurrences: 1,
-  anchor: /\[visible, activeSpaceId\]/,
+  anchor: /^}, \[visible, activeSpaceId\]\);$/,
 };
 
 const suppressionPattern =
