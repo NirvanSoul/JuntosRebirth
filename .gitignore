@@ -35,6 +35,7 @@ coverage/
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+.git-commit-*.txt
 
 # Editors and operating systems
 .DS_Store
