@@ -1,17 +1,19 @@
 // Bloquea nuevas supresiones de `exhaustive-deps` más allá de la línea base.
 //
 // Línea base: UNA supresión, únicamente en
-// `src/features/import/screens/ImportScreen.tsx`. Esa supresión es intencional
-// (semántica de snapshot del efecto de reinicio, documentada en el propio
-// archivo) y está cubierta por las pruebas de ciclo de vida de
-// `ImportScreen.test.tsx`. Cualquier otra supresión, o una segunda aparición,
-// hace fallar este check.
+// `src/features/import/screens/ImportScreen.tsx`, y anclada al efecto que
+// cierra con `}, [visible, activeSpaceId]);`. Esa supresión es intencional
+// (semántica de snapshot, documentada en el propio archivo) y está cubierta por
+// las pruebas de ciclo de vida de `ImportScreen.test.tsx`. Cualquier otra
+// supresión, una segunda aparición, o una supresión trasladada a otro efecto,
+// hace fallar este check: reaudita la excepción.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const baseline = {
   allowedFile: 'src/features/import/screens/ImportScreen.tsx',
   maxOccurrences: 1,
+  anchor: /\[visible, activeSpaceId\]/,
 };
 
 const suppressionPattern =
@@ -23,7 +25,7 @@ function collectSourceFiles(dir) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
       files.push(...collectSourceFiles(fullPath));
-    } else if (/\.tsx?$/.test(entry.name)) {
+    } else if (/\.(js|jsx|ts|tsx)$/.test(entry.name)) {
       files.push(fullPath);
     }
   }
@@ -38,27 +40,48 @@ for (const file of collectSourceFiles(join(root, 'src'))) {
   const lines = readFileSync(file, 'utf8').split('\n');
   lines.forEach((line, index) => {
     if (suppressionPattern.test(line)) {
-      matches.push(`${rel}:${index + 1}`);
+      matches.push({
+        rel,
+        lineNumber: index + 1,
+        nextLine: (lines[index + 1] ?? '').trim(),
+      });
     }
   });
 }
 
 const outsideAllowed = matches.filter(
-  (match) => !match.startsWith(`${baseline.allowedFile}:`),
+  (match) => match.rel !== baseline.allowedFile,
+);
+const unanchored = matches.filter(
+  (match) =>
+    match.rel === baseline.allowedFile && !baseline.anchor.test(match.nextLine),
 );
 
-if (outsideAllowed.length > 0 || matches.length > baseline.maxOccurrences) {
+if (
+  outsideAllowed.length > 0 ||
+  matches.length > baseline.maxOccurrences ||
+  unanchored.length > 0
+) {
   console.error('✖ check-exhaustive-deps-suppressions:');
   for (const match of outsideAllowed) {
-    console.error(`  - supresión fuera de ${baseline.allowedFile}: ${match}`);
+    console.error(
+      `  - supresión fuera de ${baseline.allowedFile}: ${match.rel}:${match.lineNumber}`,
+    );
   }
   if (matches.length > baseline.maxOccurrences) {
     console.error(
       `  - demasiadas supresiones (${matches.length}); máximo ${baseline.maxOccurrences}`,
     );
   }
+  for (const match of unanchored) {
+    console.error(
+      `  - supresión no anclada al efecto [visible, activeSpaceId]: ${match.rel}:${match.lineNumber}`,
+    );
+  }
   console.error(
-    'La única supresión permitida es la de ImportScreen.tsx (snapshot intencional, cubierta por tests).',
+    'La única supresión permitida es la de ImportScreen.tsx, anclada al efecto ' +
+      'que cierra con `}, [visible, activeSpaceId]);`. Si esas dependencias ' +
+      'cambiaron, reaudita la excepción.',
   );
   process.exit(1);
 }
