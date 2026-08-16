@@ -211,6 +211,11 @@ export function ImportScreen({
   const [localCategories, setLocalCategories] =
     useState<readonly Category[]>(categories);
   const localCategoriesRef = useRef(localCategories);
+
+  const updateLocalCategories = (next: readonly Category[]) => {
+    localCategoriesRef.current = next;
+    setLocalCategories(next);
+  };
   const [isCategoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [isCreateCategoryVisible, setCreateCategoryVisible] = useState(false);
   const [batchPendingDeletion, setBatchPendingDeletion] =
@@ -520,8 +525,7 @@ export function ImportScreen({
     setCandidates([]);
     reviewCandidatesRef.current = [];
     activeBatchIdRef.current = null;
-    localCategoriesRef.current = categories;
-    setLocalCategories(categories);
+    updateLocalCategories(categories);
     setDocumentCurrency(fallbackCurrency);
     void listResumableLocalImportBatches(activeSpaceId)
       .then((batches) => {
@@ -733,8 +737,7 @@ export function ImportScreen({
       isDefault: false,
     })
       .then((created) => {
-        localCategoriesRef.current = [...localCategoriesRef.current, created];
-        setLocalCategories(localCategoriesRef.current);
+        updateLocalCategories([...localCategoriesRef.current, created]);
         onCategoriesCreated([created]);
         setCreateCategoryVisible(false);
         if (categoryPickerTargetGroupId) {
@@ -761,11 +764,7 @@ export function ImportScreen({
       ),
     )
       .then((created) => {
-        localCategoriesRef.current = [
-          ...localCategoriesRef.current,
-          ...created,
-        ];
-        setLocalCategories(localCategoriesRef.current);
+        updateLocalCategories([...localCategoriesRef.current, ...created]);
         onCategoriesCreated(created);
         if (categoryPickerTargetGroupId && created[0]) {
           handleAssignCategory(categoryPickerTargetGroupId, created[0].id);

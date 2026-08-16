@@ -13,7 +13,11 @@ const expoConfig = require('eslint-config-expo/flat');
 // congelación.
 const frozenLineDebt = {
   'src/navigation/MainTabsNavigator.tsx': 1372,
-  'src/features/import/screens/ImportScreen.tsx': 1216,
+  // Umbral elevado de 1209 (techo 1216) el 2026-08-16 por la corrección del
+  // stale closure del catálogo (F4, commit 5c19b3b), con aprobación explícita
+  // del responsable. La encapsulación en `updateLocalCategories` lo dejó en
+  // 1214. Candidato prioritario a extracción (PLAN.md §3 Fase 4).
+  'src/features/import/screens/ImportScreen.tsx': 1214,
   'src/features/transactions/components/CreateTransactionModal/CreateTransactionModal.tsx': 1163,
   'src/features/transactions/repositories/localTransactionRepository.ts': 895,
   'src/features/transactions/components/TransactionDetailModal/TransactionDetailModal.tsx': 701,
