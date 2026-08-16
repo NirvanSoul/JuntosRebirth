@@ -213,3 +213,17 @@ cuando el responsable confirma el resultado.
   1. `public.spaces`: Espacio `couple` creado y activado (`is_activated = true`, `activated_at` poblado con `now()`).
   2. `public.space_invitations`: Invitación actualizada a `status = 'accepted'` con `accepted_by` y `accepted_at`.
   3. `public.space_members`: 2 miembros activos con rol `owner` y `space_type = 'couple'`.
+
+#### Paso 3: Sincronización de categorías y movimientos (diagnóstico por capas)
+- **Acción UI:**
+  - Usuario A registra en Dispositivo A (iPhone) la categoría «Salario» y un ingreso de 40.00 VES en el espacio «Juntos».
+  - Usuario B en Dispositivo B (Honor) observa que el ingreso no aparece automáticamente en la pantalla.
+- **Trazabilidad estricta por capas:**
+  1. **Capa 1 (SQLite local Dispositivo A):** Correcto. Entidades creadas en base de datos local.
+  2. **Capa 2 (Invocación RPC `sync_couple_space_data`):** Correcto. Subida completada sin excepciones y con preservación de identificadores.
+  3. **Capa 3 (Postgres remoto en Staging):** Correcto. Filas materializadas en servidor:
+     - `public.categories`: ID `fa8d0f30-3ef6-4915-b289-a6d7b1ccf8be` («Salario»), `space_id: b69578f8-5269-4162-b36d-636c78638c45`.
+     - `public.transactions`: ID `ae79124f-ad2a-4d51-b27e-e64aea0eccdc` (40.00 VES, `income`), `category_id: fa8d0f30...`, `space_id: b69578f8...`.
+  4. **Capa 4 (Supabase Realtime):** No reactivo. La inserción remota no provocó el refresco en caliente en el Dispositivo B a través del canal `couple-space-sync:<space_id>`.
+  5. **Capa 5 (Restauración SQLite Dispositivo B):** En proceso de aislamiento (verificando si se recupera al volver a primer plano o recargar).
+  6. **Capa 6 (Renderizado UI Dispositivo B):** Síntoma reproducido (la interfaz de Usuario B permanece sin el movimiento).
