@@ -34,11 +34,19 @@ sin confirmar de punta a punta es la **sincronización Supabase** y la
 - [x] Limpiar configuración muerta (p. ej. `testPathIgnorePatterns` con `services/`).
 - [x] Optimizar los assets de onboarding (~8,8 MB de PNG): comprimir o vectorizar.
 
-### Fase 1b — Auditoría de supresiones de `exhaustive-deps`
+### Fase 1b — Auditoría de supresiones de `exhaustive-deps` — [x] cerrada
 
 Las 5 supresiones pueden esconder *closures* obsoletos (bugs reales). Es **caza
 de bugs**, no limpieza: se auditan, se corrigen los defectos y se activa un check
 con línea base para impedir nuevas supresiones.
+
+**Resultado:** cinco supresiones auditadas, cuatro eliminadas, una documentada
+y cubierta por tests (la de `ImportScreen.tsx`, snapshot intencional). Dos bugs
+reales encontrados y corregidos: accesibilidad en F1 (`OnboardingRevealText`) y
+catálogo obsoleto en la importación en F4 (`ImportScreen`). Check de línea base
+anclado en `scripts/check-exhaustive-deps-suppressions.mjs`, integrado en
+`npm run lint` y `validate`. Commits: `83ce86f`/`680f38b` (F1), `ef8e858` (F2),
+`fe069e1` (F3), `e9cd5d5`/`5c19b3b` (F4), `3e83bd7` (check).
 
 ### Fase 2 — Spike: sincronización end-to-end + verificación de correo
 
@@ -61,6 +69,12 @@ calendario (`ScrollCalendarDay` y su tipado derivado, ADR-079) es lo primero que
 debe extraerse la próxima vez que una tarea de producto lo toque. Su umbral
 congelado se elevó a 565 con aprobación explícita del responsable; es el nuevo
 techo y solo puede bajar.
+
+**Candidato prioritario:** `ImportScreen.tsx`. Dos excepciones sobre el mismo
+archivo dejan de ser casualidad: su umbral congelado se elevó (fix del stale
+closure del catálogo, F4) y alberga la única supresión de `exhaustive-deps` que
+permite el check de línea base. Es el siguiente candidato a extracción cuando
+una tarea de producto lo toque.
 
 ### Fase 5 — Release
 

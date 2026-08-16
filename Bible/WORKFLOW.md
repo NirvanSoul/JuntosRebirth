@@ -180,6 +180,10 @@ Las reglas que puede comprobar una máquina no se recuerdan en prosa:
 - **Artefactos de trabajo de agentes**: se verifican en el workflow de CI y en
   `.gitignore`. El check de CI se ejecuta al publicar (push o PR); mientras se
   trabaja solo en local, la guarda activa es `.gitignore`.
+- **Supresiones de `exhaustive-deps`**: línea base de una sola excepción,
+  anclada al efecto `[visible, activeSpaceId]` de `ImportScreen.tsx`, verificada
+  en `scripts/check-exhaustive-deps-suppressions.mjs` (integrado en
+  `npm run lint`).
 
 El resto de prohibiciones vive en `PROJECT_RULES.md` §26. El subpath
 `phosphor-react-native/src/icons/*` es API pública y no se restringe (ADR-079).
