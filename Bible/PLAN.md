@@ -163,7 +163,14 @@ cuando el responsable confirma el resultado.
 - **Historial verificado (`schema_migrations`):** 21 versiones locales registradas exactamente en remoto (`01`–`08`, `10`–`22`).
 
 #### 3. pgTAP y pruebas de base de datos
-- La CLI requiere Docker daemon local para ejecutar pgTAP sobre el proyecto enlazado (`supabase test db --linked`). Al no disponer de Docker en el host de ejecución, se omiten las suites pgTAP conforme al carril opcional no bloqueante definido en el plan.
+- **Extensión:** Habilitada explícitamente en staging (`CREATE EXTENSION IF NOT EXISTS pgtap`).
+- **Ejecución (11 suites):** Ejecutadas las 11 suites (133 tests) vía Docker (`supabase test db --linked`).
+- **Resultado:**
+  - Suites completamente en verde: `category_budgets`, `couple_space_constraints`, `finance_schema`, `login_attempts`, `notification_rules`, `rls_policies`.
+  - Hallazgos de prueba en suites restantes:
+    - Desfase en `space_invitations.test.sql`: busca el índice antiguo `space_invitations_one_pending_per_space_idx`, sustituido por `space_invitations_one_pending_per_target_idx` en la migración 16.
+    - Privilegios `has_function_privilege('anon')`: las funciones creadas en Postgres en la nube heredan `EXECUTE` de `PUBLIC` salvo revocación explícita de `PUBLIC`.
+  - Conforme al plan, estas pruebas confirman la presencia de los objetos y no bloquean el spike físico end-to-end.
 
 #### 4. Edge Functions
 - **Función desplegada:** `login-with-lockout` desplegada a staging vía `supabase functions deploy login-with-lockout` (código de salida 0).
