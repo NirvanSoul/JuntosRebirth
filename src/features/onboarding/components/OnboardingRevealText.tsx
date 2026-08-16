@@ -51,8 +51,10 @@ export function OnboardingRevealText({
   // `reduceMotion` es una dependencia intencional: la lectura de
   // AccessibilityInfo es asíncrona, así que el valor real puede llegar después
   // del montaje. `opacity` y `translateY` son shared values con referencia
-  // estable y `startDelay` es fijo, por lo que el efecto solo se re-ejecuta
-  // cuando cambia `reduceMotion`.
+  // estable. El efecto se re-ejecuta si cambia `reduceMotion` o `startDelay`;
+  // la garantía de que no se vuelve a animar es `hasRevealedRef`, no la
+  // estabilidad de `startDelay`: aunque cambie, el texto ya revelado se queda
+  // visible y nunca se re-revela.
   useEffect(() => {
     if (reduceMotion) {
       // «Reducir movimiento» activado (ahora o al llegar tarde): saltar al
