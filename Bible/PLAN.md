@@ -175,6 +175,9 @@ cuando el responsable confirma el resultado.
 #### 4. Edge Functions
 - **Función desplegada:** `login-with-lockout` desplegada a staging vía `supabase functions deploy login-with-lockout` (código de salida 0).
 - **Modo JWT:** Verificación de JWT por defecto preservada (sin `--no-verify-jwt`).
+- **Smoke test funcional:**
+  - Invocación con clave pública y credencial errónea respondió HTTP 401 `{"error":"invalid_credentials"}`.
+  - Tabla `public.login_attempts` incrementó `failed_count = 1` y `last_attempt_at` de forma atómica en Postgres. Fila de prueba eliminada tras verificación.
 
 #### 5. Lo que no estaba en el repositorio y requirió configuración manual
 1. **Instalación/Enlace de CLI:** Requirió inicio de sesión interactivo y enlace explícito a `blaanqqxtdezsscdkkvz`.
