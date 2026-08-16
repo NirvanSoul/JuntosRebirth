@@ -22,6 +22,10 @@ const fakeSession = {
   user: { id: 'user-1', email: 'a@b.com' },
 } as unknown as Session;
 
+function sessionFor(userId: string): Session {
+  return { user: { id: userId, email: 'a@b.com' } } as unknown as Session;
+}
+
 function mockAuthSession(session: Session | null) {
   jest.mocked(useAuthSession).mockReturnValue({
     isReady: true,
@@ -302,5 +306,60 @@ describe('useSpaces (espacio de pareja)', () => {
     expect(gateway.dissolveCoupleSpace).toHaveBeenCalledWith('space-remote');
     expect(result.current.spaces).toEqual([personalSpace]);
     expect(result.current.activeSpace.id).toBe(personalSpace.id);
+  });
+
+  it('no repite la consulta remota cuando cambia la sesión pero no el usuario', async () => {
+    mockAuthSession(sessionFor('user-1'));
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+    const builder = mockRemoteCoupleSpace({ data: null, error: null });
+
+    const { rerender } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(builder.maybeSingle).toHaveBeenCalledTimes(1));
+
+    // Mismo usuario con un token nuevo (objeto de sesión distinto): no debe
+    // volver a consultar el espacio de pareja.
+    mockAuthSession(sessionFor('user-1'));
+    await rerender(undefined);
+
+    expect(builder.maybeSingle).toHaveBeenCalledTimes(1);
+  });
+
+  it('vuelve a consultar el espacio de pareja cuando cambia el usuario', async () => {
+    mockAuthSession(sessionFor('user-1'));
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+    const builder = mockRemoteCoupleSpace({ data: null, error: null });
+
+    const { rerender } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(builder.maybeSingle).toHaveBeenCalledTimes(1));
+
+    mockAuthSession(sessionFor('user-2'));
+    await rerender(undefined);
+
+    await waitFor(() => expect(builder.maybeSingle).toHaveBeenCalledTimes(2));
+  });
+
+  it('conserva la referencia de refreshCoupleSpace cuando cambia la sesión pero no el usuario', async () => {
+    mockAuthSession(sessionFor('user-1'));
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+    mockRemoteCoupleSpace({ data: null, error: null });
+
+    const { result, rerender } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+    const firstReference = result.current.refreshCoupleSpace;
+
+    // Mismo usuario, nuevo objeto de sesión: la referencia no debe cambiar.
+    mockAuthSession(sessionFor('user-1'));
+    await rerender(undefined);
+
+    expect(result.current.refreshCoupleSpace).toBe(firstReference);
   });
 });

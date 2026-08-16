@@ -125,6 +125,7 @@ export function useSpaces(): SpacesController {
   const [isReady, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isReady: isAuthReady, session } = useAuthSession();
+  const userId = session?.user.id ?? null;
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -154,7 +155,7 @@ export function useSpaces(): SpacesController {
   }, []);
 
   const refreshCoupleSpace = useCallback(async (): Promise<void> => {
-    if (!session) return;
+    if (!userId) return;
 
     let remoteSpace: Space | null;
     try {
@@ -175,13 +176,12 @@ export function useSpaces(): SpacesController {
       return;
     }
     setState(merged);
-  }, [session]);
+  }, [userId]);
 
   useEffect(() => {
     if (!isReady || !isAuthReady) return;
     void refreshCoupleSpace();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, isAuthReady, session?.user.id]);
+  }, [isReady, isAuthReady, refreshCoupleSpace]);
 
   const activeSpace = useMemo(
     () =>
