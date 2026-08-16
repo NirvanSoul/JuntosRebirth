@@ -31,7 +31,8 @@ Reglas de la jerarquía:
 
 - El responsable decide **qué** se construye y **qué** se acepta.
 - El actor principal de código **no declara su propio trabajo «terminado»** sin
-  la revisión de al menos un verificador.
+  la revisión de al menos un verificador en las tareas que requieren Gate 2. Las
+  tareas pequeñas no sensibles se cierran con el Gate 1 en verde.
 - Los verificadores **no editan código**: señalan problemas; el actor principal
   de código implementa las correcciones.
 - Un hallazgo de un verificador no es una orden automática de cambio: el
@@ -78,15 +79,17 @@ Verificadores necesarios según la tarea:
 | Tarea | Verificación |
 |---|---|
 | Pequeña | Checks automáticos (Gate 1). Sin verificador humano/IA salvo que toque datos, permisos o dinero. |
-| Mediana | Un verificador. |
+| Mediana | Dos verificadores durante el régimen reforzado; uno cuando el responsable lo retire. |
 | Grande, o cualquier tarea que toque SQL, permisos, sincronización, migración de invitado o cálculo de importes | Dos verificadores, en paralelo. |
 
 **Régimen reforzado (desde 2026-08-16).** Mientras se consolida el cambio de
 actor principal de código, las tareas medianas van a **dos verificadores en
 paralelo** aunque no toquen sincronización. Las pequeñas mantienen solo el
 Gate 1, salvo que toquen datos, dinero, acciones destructivas o
-comportamiento nativo. Este régimen se revisa cuando el responsable lo
-decida.
+comportamiento nativo. El régimen se retira cuando **cinco entregas
+consecutivas** se acepten sin que un verificador tenga que devolver el paquete
+por evidencia deficiente o por alcance no declarado. El responsable puede
+retirarlo o prorrogarlo antes, dejando constancia.
 
 Cada verificador responde una de dos cosas:
 
@@ -166,11 +169,19 @@ hallazgos).
 
 El paquete no se acepta sin:
 
-- La **salida real** de los checks, con su código de salida. Describir el
+- La **salida real** de los checks, con su código de salida. Se aceptan
+  **fragmentos literales mínimos** de la salida —comando, código de salida y
+  resumen—, pero **nunca** una reconstrucción de memoria. Describir el
   resultado no es evidencia.
-- Una cita `archivo:línea` por cada afirmación sobre el repositorio.
-- Para correcciones de bug, la ejecución de la prueba **fallando antes** del
-  arreglo.
+- Citas del repositorio por cada afirmación:
+  - Estado actual: `archivo:línea`.
+  - Estado histórico o código eliminado: `commit:ruta`, el diff, o la salida
+    exacta del comando.
+- Para correcciones de bug:
+  - Cuando el defecto sea automatizable: prueba que **falla antes** del arreglo
+    y pasa después, con ambas ejecuciones.
+  - Cuando no lo sea: reproducción manual, nativa, SQL o externa antes y
+    después, proporcional al defecto, indicando **por qué no se automatizó**.
 - `git show --stat` contrastado con la lista de archivos declarada en la
   ficha.
 
@@ -229,6 +240,6 @@ incorrecto resulte evidente.
 
 El trabajo se registra en commits locales. Cuando el responsable lo indica,
 se publica una **rama de revisión** en `upstream` para que el autor original
-revise; nunca se empuja a `main`. La URL de push del remoto sigue
+revise; nunca se empuja a `upstream/main`. La URL de push del remoto sigue
 deshabilitada y los envíos se hacen pasando la URL explícitamente. Queda
 pendiente decidir si se reactiva de forma permanente.
