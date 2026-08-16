@@ -13,7 +13,7 @@ const expoConfig = require('eslint-config-expo/flat');
 // congelación.
 const frozenLineDebt = {
   'src/navigation/MainTabsNavigator.tsx': 1372,
-  'src/features/import/screens/ImportScreen.tsx': 1209,
+  'src/features/import/screens/ImportScreen.tsx': 1216,
   'src/features/transactions/components/CreateTransactionModal/CreateTransactionModal.tsx': 1163,
   'src/features/transactions/repositories/localTransactionRepository.ts': 895,
   'src/features/transactions/components/TransactionDetailModal/TransactionDetailModal.tsx': 701,

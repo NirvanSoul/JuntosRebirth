@@ -464,4 +464,69 @@ describe('ImportScreen', () => {
 
     expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(1);
   });
+
+  it('re-captura las categorías y la moneda al reabrir el modal', async () => {
+    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(1));
+
+    await screen.rerender(<ImportScreen {...baseProps({ visible: false })} />);
+
+    const anotherCategory = {
+      ...groceriesCategory,
+      id: 'other-category',
+      name: 'Otra categoría',
+    };
+    await screen.rerender(
+      <ImportScreen
+        {...baseProps({
+          visible: true,
+          categories: [groceriesCategory, anotherCategory],
+          fallbackCurrency: 'USD',
+        })}
+      />,
+    );
+
+    await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(2));
+    expect(buildImportCandidates).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        categories: [groceriesCategory, anotherCategory],
+        fallbackCurrency: 'USD',
+      }),
+    );
+  });
+
+  it('usa el catálogo del espacio nuevo al cambiar de espacio', async () => {
+    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(1));
+
+    const coupleCategory = {
+      ...groceriesCategory,
+      id: 'couple-category',
+      name: 'Categoría pareja',
+      spaceId: 'couple',
+    };
+    await screen.rerender(
+      <ImportScreen
+        {...baseProps({
+          activeSpaceId: 'couple',
+          activeSpaceName: 'Juntos',
+          categories: [coupleCategory],
+        })}
+      />,
+    );
+
+    await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(2));
+    expect(buildImportCandidates).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        spaceId: 'couple',
+        categories: [coupleCategory],
+      }),
+    );
+  });
 });

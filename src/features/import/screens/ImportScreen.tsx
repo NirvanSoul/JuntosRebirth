@@ -210,6 +210,7 @@ export function ImportScreen({
   );
   const [localCategories, setLocalCategories] =
     useState<readonly Category[]>(categories);
+  const localCategoriesRef = useRef(localCategories);
   const [isCategoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [isCreateCategoryVisible, setCreateCategoryVisible] = useState(false);
   const [batchPendingDeletion, setBatchPendingDeletion] =
@@ -262,7 +263,7 @@ export function ImportScreen({
     ) => {
       const built = buildImportCandidates(rows, mapping, {
         spaceId: activeSpaceId,
-        categories: localCategories,
+        categories: localCategoriesRef.current,
         existingTransactions,
         fallbackCurrency: currency,
         dayMonthPreference,
@@ -304,7 +305,7 @@ export function ImportScreen({
           });
         });
     },
-    [activeSpaceId, localCategories, existingTransactions],
+    [activeSpaceId, existingTransactions],
   );
 
   const proceedAfterMapping = useCallback(
@@ -509,7 +510,7 @@ export function ImportScreen({
   );
 
   // Snapshot: se repite solo al reabrir el modal o cambiar de espacio, no ante
-  // cambios de `categories`/`handlePickFile` (borrarían el progreso). Supresión intencional.
+  // cambios de `categories`/`fallbackCurrency`/`handlePickFile` (borrarían el progreso); supresión intencional.
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
@@ -519,6 +520,7 @@ export function ImportScreen({
     setCandidates([]);
     reviewCandidatesRef.current = [];
     activeBatchIdRef.current = null;
+    localCategoriesRef.current = categories;
     setLocalCategories(categories);
     setDocumentCurrency(fallbackCurrency);
     void listResumableLocalImportBatches(activeSpaceId)
@@ -731,7 +733,8 @@ export function ImportScreen({
       isDefault: false,
     })
       .then((created) => {
-        setLocalCategories((current) => [...current, created]);
+        localCategoriesRef.current = [...localCategoriesRef.current, created];
+        setLocalCategories(localCategoriesRef.current);
         onCategoriesCreated([created]);
         setCreateCategoryVisible(false);
         if (categoryPickerTargetGroupId) {
@@ -758,7 +761,11 @@ export function ImportScreen({
       ),
     )
       .then((created) => {
-        setLocalCategories((current) => [...current, ...created]);
+        localCategoriesRef.current = [
+          ...localCategoriesRef.current,
+          ...created,
+        ];
+        setLocalCategories(localCategoriesRef.current);
         onCategoriesCreated(created);
         if (categoryPickerTargetGroupId && created[0]) {
           handleAssignCategory(categoryPickerTargetGroupId, created[0].id);
