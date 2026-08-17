@@ -388,5 +388,19 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
 6. **Permisos `PUBLIC EXECUTE`:** Migración **nueva**, jamás reescribir una aplicada (pequeña).
 7. **Actualizar `space_invitations.test.sql`** al nombre de índice vigente `space_invitations_one_pending_per_target_idx` (pequeña).
 8. **Higiene de tests:** Resolver avisos de `act(...)` en la suite de onboarding `AddFirstTransactionStep.test.tsx` (pequeña).
+9. **Escala y decimales monetarios (tarea grande):**
+   - `CurrencyCatalogEntry` no declara el número de decimales monetarios, y la entrada, `amountMinorToInput`, `parseAmountMinor` y `formatCurrency` asumen siempre escala 100.
+   - En el catálogo actual, **JPY, CLP y PYG tienen cero decimales**; COP conserva oficialmente dos (los centavos en efectivo son una decisión de presentación, no de almacenamiento).
+   - El formato ya omite `,00` en importes enteros (`omitZeroDecimals` por defecto), por lo que no es un problema visual sino **semántico**: se permiten fracciones que no existen y lo guardado en `amountMinor` no representa unidades menores oficiales.
+   - Antes de implementar debe decidirse entre:
+     - Mantener escala interna 100 para todas y separar los decimales de entrada y presentación.
+     - Usar la escala real de cada moneda y **migrar los importes locales y remotos existentes**.
+   - Regla obligatoria: Comprobar previamente si existen datos en esas monedas consultando staging y los dispositivos antes de darla por trivial.
+10. **Internacionalización (tarea grande, anterior al lanzamiento):**
+    - Meta inicial español e inglés, con arquitectura extensible.
+    - Incluye interfaz, onboarding, categorías predeterminadas, errores, notificaciones, plantillas de correo y textos del backend.
+    - Se completa **antes** de publicar en tiendas para evitar retrabajo transversal y lanzar una experiencia lingüísticamente coherente. Es la tarea más grande restante en el plan.
+11. **El `locale` fijo `'es-ES'`:**
+    - Forma parte de la internacionalización y no se corrige por separado: la selección del locale debe derivar de la arquitectura de idiomas, no al revés.
 
 *Pendiente aparte, por contacto:* Extracción de `ImportScreen.tsx` y `AppCalendar.tsx` (§4).
