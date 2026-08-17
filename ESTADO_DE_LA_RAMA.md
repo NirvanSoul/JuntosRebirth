@@ -6,11 +6,11 @@
 
 ## Por dónde empezar
 
-| Documento | Qué cuenta |
-|---|---|
-| [`Bible/PLAN.md`](./Bible/PLAN.md) | Qué se ha hecho, qué falta y por qué. Las secciones §7 y §8 tienen la historia completa con evidencia. |
-| [`Bible/WORKFLOW.md`](./Bible/WORKFLOW.md) | Cómo se trabaja: qué revisiones exige cada cambio y qué evidencia hay que aportar. |
-| [`Bible/DECISIONS.md`](./Bible/DECISIONS.md) | Historial de decisiones técnicas. Se consulta por índice, no se lee entero. |
+| Documento                                    | Qué cuenta                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [`Bible/PLAN.md`](./Bible/PLAN.md)           | Qué se ha hecho, qué falta y por qué. Las secciones §7 y §8 tienen la historia completa con evidencia. |
+| [`Bible/WORKFLOW.md`](./Bible/WORKFLOW.md)   | Cómo se trabaja: qué revisiones exige cada cambio y qué evidencia hay que aportar.                     |
+| [`Bible/DECISIONS.md`](./Bible/DECISIONS.md) | Historial de decisiones técnicas. Se consulta por índice, no se lee entero.                            |
 
 ## Tres bugs reales encontrados y corregidos
 
