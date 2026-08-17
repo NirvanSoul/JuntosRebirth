@@ -56,6 +56,7 @@ import {
 import { AuthModal } from '@/features/settings/components/AuthModal';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
 import { useSpaceMemberAvatars } from '@/features/profile/hooks/useSpaceMemberAvatars';
+import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
 import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
 import { PendingInvitationBanner } from '@/features/spaces/components/PendingInvitationBanner';
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
@@ -1052,7 +1053,7 @@ export function MainTabsNavigator() {
   }
 
   return (
-    <>
+    <SpaceMembershipProvider space={activeSpace}>
       <Drawer.Navigator
         drawerContent={({ navigation }) => (
           <SpaceSideMenu
@@ -1428,6 +1429,6 @@ export function MainTabsNavigator() {
         onClose={() => setSpaceAuthModalVisible(false)}
         visible={isSpaceAuthModalVisible}
       />
-    </>
+    </SpaceMembershipProvider>
   );
 }

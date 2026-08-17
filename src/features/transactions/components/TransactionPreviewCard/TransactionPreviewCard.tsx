@@ -6,10 +6,13 @@ import {
   View,
 } from 'react-native';
 
+import { Avatar } from '@/components/ui/Avatar/Avatar';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { useTransactionAuthor } from '@/features/transactions/hooks/useTransactionAuthor';
+import { formatAuthorName } from '@/features/transactions/utils/transactionAuthor';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
@@ -32,6 +35,7 @@ type TransactionPreviewCardProps = {
 const directionGlyphSize = iconSize.xs;
 const stackLayerOffset = spacing.xs;
 const stackLayerInset = spacing.sm;
+const authorAvatarSize = 16;
 
 export function TransactionPreviewCard({
   category,
@@ -44,6 +48,8 @@ export function TransactionPreviewCard({
 }: TransactionPreviewCardProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  // `undefined` en un espacio personal: allí el círculo del autor sería ruido.
+  const author = useTransactionAuthor(transaction.createdBy);
   const isExpandable = expandable ?? stacked;
   const isIncome = transaction.type === 'income';
   const amount = formatCurrency(
@@ -57,6 +63,9 @@ export function TransactionPreviewCard({
     year: 'numeric',
   }).format(new Date(`${transaction.occurredOn}T12:00:00`));
   const title = transaction.title.trim() || category?.name || 'Sin categoría';
+  // El círculo del autor es puramente visual: sin esto, quien use un lector de
+  // pantalla no tendría forma de saber quién creó el movimiento.
+  const authorLabel = author ? `. Autor: ${formatAuthorName(author)}` : '';
 
   const handleToggleExpanded = (event: GestureResponderEvent) => {
     event.stopPropagation();
@@ -83,7 +92,7 @@ export function TransactionPreviewCard({
         accessibilityHint={
           onPress ? 'Abre el detalle del movimiento' : undefined
         }
-        accessibilityLabel={`${isIncome ? 'Ingreso' : 'Gasto'}: ${title}, ${amount}, ${date}`}
+        accessibilityLabel={`${isIncome ? 'Ingreso' : 'Gasto'}: ${title}, ${amount}, ${date}${authorLabel}`}
         accessibilityRole={onPress ? 'button' : undefined}
         disabled={!onPress && !stacked}
         onPress={onPress}
@@ -118,14 +127,18 @@ export function TransactionPreviewCard({
           <Text numberOfLines={1} variant="label" weight="semibold">
             {title}
           </Text>
-          <Text
-            numberOfLines={1}
-            style={styles.metadata}
-            tone="secondary"
-            variant="footnote"
-          >
-            {date}
-          </Text>
+          <View style={styles.metadata}>
+            {author ? (
+              <Avatar
+                size={authorAvatarSize}
+                testID="transaction-author-avatar"
+                uri={author.profile?.avatarUrl}
+              />
+            ) : null}
+            <Text numberOfLines={1} tone="secondary" variant="footnote">
+              {date}
+            </Text>
+          </View>
         </View>
         <View
           style={styles.trailingContent}
@@ -230,6 +243,9 @@ function createStyles(colors: ColorTokens) {
       minWidth: 0,
     },
     metadata: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
       marginTop: previewCardLayout.metadataGap,
     },
     trailingContent: {

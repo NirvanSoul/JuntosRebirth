@@ -29,6 +29,18 @@ export type TransactionAuthorContext = {
  * que el censo todavía no se ha descargado. Ante la duda devuelve un autor sin
  * perfil y sin propiedad, que la interfaz muestra como desconocido.
  */
+/**
+ * Nombre con el que se presenta un autor en la interfaz.
+ *
+ * Se prefiere el nombre real incluso para lo propio: en un espacio compartido,
+ * ver el nombre de cada uno lee mejor que un «Tú» que rompe la simetría de la
+ * lista. «Tú» queda como respaldo para cuando el perfil aún no ha bajado.
+ */
+export function formatAuthorName(author: TransactionAuthor): string {
+  if (author.profile?.displayName) return author.profile.displayName;
+  return author.isOwn ? 'Tú' : 'Desconocido';
+}
+
 export function resolveTransactionAuthor(
   createdBy: string,
   { profilesByUserId, ownUserId, installationId }: TransactionAuthorContext,
