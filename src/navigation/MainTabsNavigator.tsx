@@ -1310,7 +1310,6 @@ export function MainTabsNavigator() {
               />
               <CategoryDetailModal
                 category={detailCategory}
-                currency={effectiveHomeCurrency}
                 onAddTransaction={(categoryId) => {
                   setDetailCategoryId(null);
                   setTransactionInitialDate(undefined);

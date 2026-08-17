@@ -65,14 +65,17 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 const categoryGroupBorderWidth = 2;
 const categorySeparatorThickness = 1;
 
-const getComparisonPeriodLabel = (
+function getComparisonPeriodLabel(
   filter: TransactionDateFilter,
-): string | undefined =>
-  filter === 'all'
-    ? undefined
-    : filter.period === 'custom'
-      ? 'vs. periodo anterior'
-      : describePreviousPeriod(filter.period);
+): string | undefined {
+  if (filter === 'all') {
+    return undefined;
+  }
+
+  return filter.period === 'custom'
+    ? 'vs. periodo anterior'
+    : describePreviousPeriod(filter.period);
+}
 
 type ActivityScreenProps = {
   categories?: readonly Category[];
@@ -314,7 +317,6 @@ export function ActivityScreen({
         >
           <CategoryDonutChart
             categories={categories}
-            currency={effectiveCurrency}
             onOpenCategoryDetail={onOpenCategoryDetail}
             resetKey={focusResetKey}
             transactions={currencyTransactionsThroughCurrentMonth}
@@ -343,7 +345,6 @@ export function ActivityScreen({
                     <View key={id}>
                       <CategoryPreviewCard
                         {...category}
-                        currency={effectiveCurrency}
                         onPress={() => onOpenCategoryDetail?.(id)}
                       />
                       {index < categorySummaries.length - 1 ? (

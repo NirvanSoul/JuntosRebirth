@@ -70,24 +70,4 @@ describe('CategoryPreviewCard', () => {
     expect(screen.getByText(/50/)).toBeTruthy();
     expect(card.props.accessibilityLabel).toBe('Nómina, ingresado 50 €');
   });
-
-  it('formatea importes usando la moneda especificada (VES) en vez de EUR', async () => {
-    const screen = await render(
-      <ThemeProvider initialAppearance="light">
-        <CategoryPreviewCard
-          budgetMinor={10000}
-          colorToken="slate"
-          currency="VES"
-          expenseMinor={4000}
-          icon="fork-knife"
-          incomeMinor={0}
-          name="Alimentación"
-        />
-      </ThemeProvider>,
-    );
-
-    const card = screen.getByTestId('category-preview-card');
-    expect(card.props.accessibilityLabel).toContain('Bs.');
-    expect(card.props.accessibilityLabel).not.toContain('€');
-  });
 });

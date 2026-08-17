@@ -147,8 +147,8 @@ cuando el responsable confirma el resultado.
 |---|---|---|---|---|
 | 2026-08-15 | Nueve láminas de onboarding tras la optimización lossless | iPhone 17 físico (iOS) | responsable | correctas, sin halos ni transparencias rotas |
 | 2026-08-16 | Smoke de «Reducir movimiento» en OnboardingRevealText (3 casos: off / on antes / on durante) | iPhone 17 físico (iOS) | responsable | correcto en los tres casos; **no verificado en Android** — excepción aceptada por el responsable |
-| 2026-08-16 | Sincronización en caliente (iPhone 17 → Honor) en espacio «Juntos» tras corrección de restoreRemoteAccount | iPhone 17 físico (iOS) y Honor Android | responsable | correcto (~2 s vía Realtime, sin duplicación tras ciclo de sondeo y recarga) |
-| 2026-08-16 | Sincronización en caliente (Honor → iPhone 17) en espacio «Juntos» tras corrección de restoreRemoteAccount | Honor Android y iPhone 17 físico (iOS) | responsable | correcto (~2 s vía Realtime, sin duplicación tras ciclo de sondeo y recarga) |
+| 2026-08-16 | Sincronización en caliente (iPhone 17 → Honor) en espacio «Juntos» tras corrección de restoreRemoteAccount | iPhone 17 físico (iOS) y Honor Android | responsable | correcto (~2 s, inferido por latencia incompatible con sondeo de 15 s; sin duplicación tras ciclo de sondeo y recarga) |
+| 2026-08-16 | Sincronización en caliente (Honor → iPhone 17) en espacio «Juntos» tras corrección de restoreRemoteAccount | Honor Android y iPhone 17 físico (iOS) | responsable | correcto (~2 s, inferido por latencia incompatible con sondeo de 15 s; sin duplicación tras ciclo de sondeo y recarga) |
 | 2026-08-16 | Sincronización tras cambio de espacio (personal → «Juntos») con movimiento pendiente | iPhone 17 físico (iOS) y Honor Android | responsable | correcto (~2 s al cambiar de espacio, sin pérdida de información) |
 
 ---
@@ -304,29 +304,55 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
 - **Fuera de alcance:**
   - Todo lo demás. En particular, no dejar de silenciar los errores de restauración en `src/navigation/MainTabsNavigator.tsx:333`; es un cambio de comportamiento distinto y va en tarea separada.
 
-### 2. Cola de Fase 3 (orden de ejecución)
+### 2. Tarea 1 de Fase 3 — Des-silenciamiento en `MainTabsNavigator.tsx:325, 336` (Cerrada)
+- **Objetivo cumplido:** Se reemplazaron los bloques `catch {}` vacíos de `syncCoupleSpaceDataForCurrentSession` (línea 325) y `restoreRemoteAccountForCurrentSession` (línea 336) por `console.error` estructurado.
+- **Alcance acotado:** La línea 352 (`publishCoupleSpaceChanges(...).catch(() => undefined)`) permanece intacta y se registra como tarea independiente en la cola para no ampliar el alcance sin autorización explícita.
 
-1. Dejar de silenciar los errores de restauración (`MainTabsNavigator:333`).
-   Primera, sin discusión: este defecto vivió meses invisible por ese
-   `catch {}`.
-2. Los ocho literales `'EUR'` con locale fijo en componentes de actividad y
-   categorías (pequeña).
-3. Exponer y propagar `spaces.currency` y `profiles.default_currency` en el
-   cliente, y agregar por moneda. El backend ya tiene los campos: no se
-   añade ninguno. Decisión de producto tomada: el espacio tiene moneda
-   principal definida al crearlo.
-4. **Indicador de novedades en el selector de espacio (mediana).** Un punto
-   cuando hay algo nuevo en un espacio que no estás mirando, calculado con
-   una consulta ligera al abrir la app y al volver a primer plano. **No
-   requiere suscripciones nuevas ni notificaciones**: el dato ya llega solo
-   al entrar al espacio, así que el hueco es de aviso. Sin avisos flotantes
-   por ahora — `JUNTOSS_NOTIFICATIONS.md` §19 pide informar, no reclamar
-   atención, y una importación de extracto generaría cientos de eventos.
-   Si tras usarlo la inmediatez se echa de menos, se evalúa entonces un
-   aviso agrupado, sin importes ni nombres.
-5. Permisos `PUBLIC EXECUTE`: migración **nueva**, jamás reescribir una
-   aplicada.
-6. Actualizar `space_invitations.test.sql` al nombre de índice vigente.
+### 3. Inventario técnico para la replanificación de Tareas 2 y 3 (Monedas y Presupuestos)
 
-Pendiente aparte, por contacto: extracción de `ImportScreen.tsx` y
-`AppCalendar.tsx`, ambos marcados como candidatos prioritarios en §4.
+#### 1. Creación y restauración de espacios
+- **Backend:**
+  - `spaces` (`01_initial_finance_schema.sql:17`): columna `currency text not null check (currency ~ '^[A-Z]{3}$') default 'EUR'`.
+  - RPC `ensure_personal_space(p_name text default 'Personal', p_currency text default 'EUR')` (`01_initial_finance_schema.sql:191`).
+  - RPC `create_couple_space(p_name text default 'Juntos', p_currency text default 'EUR')` (`22_couple_space_pending_until_accepted.sql:47`).
+- **Cliente:**
+  - Tipo `Space` (`src/features/spaces/types.ts:1-12`): contiene `{ id, name, type, isAwaitingPartner? }`. **No expone `currency`**.
+  - `RemoteAccountSpace` (`src/features/sync/gateways/supabaseRemoteAccountGateway.ts:5-9`): contiene `{ remoteId, name, type }`. **No incluye `currency`**.
+  - `fetchRemoteAccountSnapshot` (`supabaseRemoteAccountGateway.ts:41`): ejecuta `.select('id, name, type')` sobre `spaces`, omitiendo `currency`.
+  - `localSpaceRepository.ts` / tabla SQLite `spaces`: almacena `id, name, type, created_at, updated_at, archived_at, sync_status` sin columna de moneda.
+
+#### 2. Precedencia entre `profiles.default_currency` y `spaces.currency`
+- **Backend:**
+  - `profiles.default_currency` (`01_initial_finance_schema.sql:8`): default `'EUR'`. Define la moneda por defecto del usuario.
+  - `spaces.currency` (`01_initial_finance_schema.sql:17`): default `'EUR'`. Define la moneda principal del espacio.
+- **Cliente:**
+  - `LocalProfile` (`src/features/profile/types.ts`): `{ avatarUri, displayName }`. No expone `defaultCurrency`.
+  - `useCurrencyPreferences()` (`src/state/appPreferences/useCurrencyPreferences.ts`): Persiste en `AsyncStorage` (`@juntoss/currency-preferences/v1`) como `currencies: string[]`. La primera divisa opera como moneda activa local.
+  - **Decisión de producto:** El espacio tiene moneda principal fijada al crearlo (`spaces.currency`), inicializada desde las preferencias locales (`useCurrencyPreferences`) del creador. Los agregados y presupuestos del espacio rigen bajo `spaces.currency`.
+
+#### 3. Presupuestos locales
+- **SQLite:** Tabla `categories` (`src/lib/storage/localDatabase.ts:70`) tiene columna `budget_minor INTEGER` (número único sin divisa).
+- **TypeScript:** `Category.budgetMinor?: number` (`src/features/categories/types.ts:32`).
+- **Repositorio:** `localCategoryRepository.ts:updateCategoryBudget(id, budgetMinor)` guarda un entero sin divisa.
+- **UI:** `CategoryBudgetModal.tsx` captura y almacena un número plano (`budgetMinor`). No asocia divisa.
+
+#### 4. Sincronización de presupuestos
+- **Backend:**
+  - Migración `08_category_budgets_per_currency.sql` creó la tabla `public.category_budgets(category_id, currency, budget_amount_minor, ...)` con funciones `set_category_budget` y `remove_category_budget`.
+  - Sin embargo, `sync_couple_space_data` (`20_preserve_couple_space_local_ids.sql:63, 69, 78`) escribe directamente en `public.categories.budget_amount_minor` y **no interactúa con `public.category_budgets`**.
+  - `fetchRemoteAccountSnapshot` (`supabaseRemoteAccountGateway.ts:58`) lee `categories.budget_amount_minor` y **no consulta `public.category_budgets`**.
+- **Cliente:**
+  - Toda la persistencia y sincronización local/remota de categorías en el cliente se apoya en `Category.budgetMinor` único.
+
+---
+
+### 4. Cola de Fase 3 actualizada (orden de ejecución)
+
+1. **Tarea 1 (Cerrada):** Dejar de silenciar los errores de restauración y subida en `MainTabsNavigator.tsx:325, 336`.
+2. **Tareas 2 y 3 (Replanteadas juntas):** Exponer y propagar `spaces.currency` y `profiles.default_currency`, definir el modelo monetario de presupuestos y eliminar literales `'EUR'` fijos. *(Pendiente de clasificación formal tras evaluación del inventario §8.3).*
+3. **Des-silenciar subida en segundo plano (`MainTabsNavigator.tsx:352`):** Registrar fallo estructurado en `publishCoupleSpaceChanges({ spaceId }).catch(...)` (pequeña).
+4. **Indicador de novedades en el selector de espacio (mediana):** Un punto cuando hay algo nuevo en un espacio que no estás mirando, calculado con una consulta ligera al abrir la app y al volver a primer plano. Sin suscripciones ni notificaciones flotantes (`JUNTOSS_NOTIFICATIONS.md` §19).
+5. **Permisos `PUBLIC EXECUTE`:** Migración **nueva**, jamás reescribir una aplicada (pequeña).
+6. **Actualizar `space_invitations.test.sql`** al nombre de índice vigente `space_invitations_one_pending_per_target_idx` (pequeña).
+
+*Pendiente aparte, por contacto:* Extracción de `ImportScreen.tsx` y `AppCalendar.tsx` (§4).

@@ -141,9 +141,9 @@ export function HomeScreen({
     () => listTransactionsThroughCurrentMonth(transactions),
     [transactions],
   );
-  // El balance y los indicadores de ingresos/gastos son la única parte de
-  // Inicio que reacciona a la moneda elegida en el encabezado; categorías y
-  // movimientos recientes conservan todas las monedas, como hasta ahora.
+  // El balance, los indicadores de ingresos/gastos y el desglose de categorías
+  // reaccionan a la moneda elegida en el encabezado; los movimientos recientes
+  // conservan todas las monedas.
   const currencyTransactions = useMemo(
     () =>
       transactions.filter((transaction) => transaction.currency === currency),
@@ -258,7 +258,6 @@ export function HomeScreen({
               <CategoryPreviewCard
                 key={id}
                 {...category}
-                currency={currency}
                 onPress={() => onOpenCategoryDetail?.(id)}
                 variant="tile"
               />
