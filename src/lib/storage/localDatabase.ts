@@ -1,38 +1,11 @@
 import * as SQLite from 'expo-sqlite';
 
+import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabaseSchemaRepair';
+
 export const localDatabaseName = 'juntoss.db';
-export const localDatabaseVersion = 16;
+export const localDatabaseVersion = 17;
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
-
-/**
- * Salvaguarda puntual para `local_profile.display_name`: durante el
- * desarrollo de esta sesión, un dispositivo llegó a quedar con
- * `user_version = 16` (por haber corrido una build intermedia que ya subía
- * la versión) sin que la columna se hubiera creado todavía, porque el
- * bloque `currentVersion < 16` de abajo solo corre una vez por dispositivo.
- * Como `currentVersion === localDatabaseVersion` corta la función antes de
- * llegar a ese bloque, cualquier drift entre el número de versión y el
- * esquema real queda sin forma de repararse. Esta comprobación es barata
- * (una `PRAGMA table_info`) y corre siempre que el atajo de versión igual
- * se toma, así un dispositivo con ese drift se autorepara en el próximo
- * arranque en vez de fallar para siempre al guardar el nombre.
- */
-async function ensureLocalProfileDisplayNameColumn(
-  database: SQLite.SQLiteDatabase,
-): Promise<void> {
-  const columns = await database.getAllAsync<{ name: string }>(
-    'PRAGMA table_info(local_profile)',
-  );
-  const hasDisplayName = columns.some(
-    (column) => column.name === 'display_name',
-  );
-  if (!hasDisplayName) {
-    await database.execAsync(
-      'ALTER TABLE local_profile ADD COLUMN display_name TEXT',
-    );
-  }
-}
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -532,6 +505,23 @@ export async function migrateLocalDatabase(
     if (currentVersion < 16) {
       await transaction.execAsync(`
         ALTER TABLE local_profile ADD COLUMN display_name TEXT;
+      `);
+    }
+
+    // La versión 17 guarda el perfil de las demás personas de un espacio
+    // compartido. `local_profile` no vale: es una fila única y describe a quien
+    // usa el móvil. Sin esta tabla la interfaz solo puede atribuir un
+    // movimiento a un uuid.
+    if (currentVersion < 17) {
+      await transaction.execAsync(`
+        CREATE TABLE space_member_profiles (
+          space_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          display_name TEXT,
+          avatar_url TEXT,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (space_id, user_id)
+        );
       `);
     }
 

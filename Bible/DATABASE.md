@@ -285,6 +285,15 @@ durante el onboarding en la misma fila local que el avatar, sin sustituirlo;
 se conserva para personalizar el modo invitado y estará disponible para una
 migración posterior a una cuenta autenticada.
 
+La versión 17 añade `space_member_profiles`, con clave primaria
+`(space_id, user_id)`. Guarda el censo de un espacio compartido —nombre y, en
+el futuro, foto de cada miembro activo— para poder atribuir un movimiento a su
+autor sin mostrar un uuid. Es una caché de lectura de `public.profiles`, no una
+fuente de verdad: se reemplaza entera por espacio en cada sincronización, de
+modo que quien abandona el espacio también desaparece en local. `avatar_url`
+existe en la tabla pero se llena siempre con `null` mientras la foto de perfil
+no viaje a Supabase Storage (ver 5.4, versión 9).
+
 ### 5.5 Identificadores
 
 Los datos locales deben usar identificadores globalmente únicos desde su creación.
@@ -881,6 +890,22 @@ Un usuario puede acceder a una fila de un espacio únicamente si tiene una membr
 - Leer y editar el perfil propio.
 - Lectura limitada de perfiles de miembros compartidos solo si la interfaz la necesita.
 - No exponer campos innecesarios.
+
+Implementado en la migración 24. `profiles_select_own` sigue vigente y la
+política nueva, `profiles_select_space_member`, se suma con OR: autoriza leer
+el perfil de quien tenga una membresía **activa** en un espacio donde el lector
+también la tenga. Una membresía pendiente no abre nada, así que una invitación
+sin aceptar no filtra el nombre de quien la recibió.
+
+Se apoya en `public.shares_active_space_with(uuid)`, que es `security definer`
+por necesidad y no por rendimiento: sin ese modo, la subconsulta sobre
+`space_members` volvería a evaluar `members_select_member`, que consulta esa
+misma tabla. Es el mismo recurso que ya usa `is_active_space_member`.
+
+Límite conocido: RLS es por fila, no por columna, así que la otra persona ve
+también `locale` y `default_currency`. Son preferencias, no credenciales, y
+ambos miembros ya comparten los importes del espacio. Restringir columnas
+exigiría una vista aparte.
 
 ### 9.3 Espacios
 
