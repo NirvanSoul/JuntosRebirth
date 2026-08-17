@@ -122,6 +122,15 @@ describe('CategoryPreviewCard', () => {
     // Progreso accesible
     expect(card.props.accessibilityLabel).toContain('10 € gastado');
     expect(card.props.accessibilityLabel).toContain('Bs. 60 disponible');
+
+    // La etiqueta del progreso vive solo en el dominio del presupuesto
+    // (spaceCurrency): no mezcla el porcentaje con el gasto visible en
+    // displayCurrency, que anunciaría una comparación heterogénea.
+    const progress = screen.getByLabelText('Progreso del presupuesto');
+    expect(progress.props.accessibilityValue).toMatchObject({
+      now: 40,
+      text: '40% del presupuesto utilizado',
+    });
   });
 
   it('multidivisa tile: anillo de progreso calcula budgetExpenseMinor / budgetMinor', async () => {

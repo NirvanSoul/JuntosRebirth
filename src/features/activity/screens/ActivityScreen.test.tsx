@@ -148,7 +148,9 @@ describe('ActivityScreen', () => {
       min: 0,
       max: 100,
       now: 25,
-      text: expect.stringContaining('12,50'),
+      // Etiqueta en el dominio del presupuesto: sin mezcla con el gasto
+      // visible, que puede estar en otra moneda.
+      text: '25% del presupuesto utilizado',
     });
     expect(
       StyleSheet.flatten(

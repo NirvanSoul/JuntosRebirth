@@ -214,7 +214,10 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
             <CategoryBudgetProgress
               accessibilityText={
                 hasBudget
-                  ? `${Math.round(budgetProgress * 100)}% utilizado, ${spent} gastado`
+                  ? // El progreso vive en spaceCurrency y `spent` en
+                    // displayCurrency: anunciarlos juntos compararía dos
+                    // dominios distintos (Bible §64, hallazgo de revisión).
+                    `${Math.round(budgetProgress * 100)}% del presupuesto utilizado`
                   : isIncomeOnly
                     ? `${spent} ingresado`
                     : 'Sin presupuesto asignado'
