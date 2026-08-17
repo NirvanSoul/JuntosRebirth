@@ -27,12 +27,14 @@ describe('supabaseInvitationGateway', () => {
         createFakeClient({ rpc }),
       );
 
-      await expect(gateway.createCoupleSpace('Juntos')).resolves.toEqual({
-        spaceId: 'space-1',
-      });
+      await expect(gateway.createCoupleSpace('Juntos', 'VES')).resolves.toEqual(
+        {
+          spaceId: 'space-1',
+        },
+      );
       expect(rpc).toHaveBeenCalledWith('create_couple_space', {
         p_name: 'Juntos',
-        p_currency: undefined,
+        p_currency: 'VES',
       });
     });
 
@@ -48,7 +50,7 @@ describe('supabaseInvitationGateway', () => {
         createFakeClient({ rpc }),
       );
 
-      await expect(gateway.createCoupleSpace()).rejects.toThrow(
+      await expect(gateway.createCoupleSpace('Juntos', 'EUR')).rejects.toThrow(
         'ya perteneces a un espacio juntos activo',
       );
     });

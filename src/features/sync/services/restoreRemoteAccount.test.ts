@@ -59,6 +59,7 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
             remoteId: 'space-remote-1',
             name: 'Juntos',
             type: 'couple',
+            currency: 'VES',
           },
         ],
         categories: [

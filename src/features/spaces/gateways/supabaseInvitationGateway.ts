@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 
 export type InvitationPreview =
@@ -61,8 +62,8 @@ export class AcceptInvitationError extends Error {
 
 export type InvitationGateway = {
   createCoupleSpace(
-    name?: string,
-    currency?: string,
+    name: string | undefined,
+    currency: CurrencyCode,
   ): Promise<{ spaceId: string }>;
   createInvitation(
     spaceId: string,

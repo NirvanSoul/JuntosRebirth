@@ -12,7 +12,9 @@ const payload: GuestMigrationPayload = {
   batchId: 'batch-id',
   installationId: 'installation-id',
   userId: 'user-id',
-  spaces: [{ id: 'personal', name: 'Personal', type: 'personal' }],
+  spaces: [
+    { id: 'personal', name: 'Personal', type: 'personal', currency: 'EUR' },
+  ],
   categories: [],
   recurringSeries: [],
   transactions: [],

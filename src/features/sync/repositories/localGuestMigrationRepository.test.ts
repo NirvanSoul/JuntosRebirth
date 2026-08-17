@@ -31,7 +31,7 @@ describe('localGuestMigrationRepository', () => {
     withExclusiveTransactionAsync: jest.fn(async (task) => task(database)),
   } as unknown as SQLiteDatabase;
   const spaces = [
-    { id: 'personal', name: 'Personal', type: 'personal' },
+    { id: 'personal', name: 'Personal', type: 'personal', currency: 'EUR' },
   ] as const;
 
   beforeEach(() => {

@@ -1,7 +1,13 @@
+import {
+  defaultCurrencyCode,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
+
 export type Space = {
   id: string;
   name: string;
   type: 'personal' | 'couple' | 'other';
+  currency: CurrencyCode;
   /**
    * Solo en `type: 'couple'`: la invitación sigue pendiente y la otra persona
    * todavía no ha entrado (`spaces.activated_at is null` en el servidor). Un
@@ -25,6 +31,7 @@ export const personalSpace: Space = {
   id: 'personal',
   name: 'Personal',
   type: 'personal',
+  currency: defaultCurrencyCode,
 };
 
 /**

@@ -14,6 +14,7 @@ const pendingSpace: Space = {
   id: 'space-juntos',
   name: 'Juntos',
   type: 'couple',
+  currency: 'EUR',
   isAwaitingPartner: true,
 };
 

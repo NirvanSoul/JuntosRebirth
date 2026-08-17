@@ -10,13 +10,15 @@ import {
   loadSpaces,
   saveSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
-import { personalSpace } from '@/features/spaces/types';
+import { personalSpace, type Space } from '@/features/spaces/types';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
+import { loadCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 
 jest.mock('@/features/auth/hooks/useAuthSession');
 jest.mock('@/features/spaces/gateways/supabaseInvitationGateway');
 jest.mock('@/features/spaces/repositories/localSpaceRepository');
 jest.mock('@/lib/supabase/supabaseClient');
+jest.mock('@/state/appPreferences/currencyPreferencesRepository');
 
 const fakeSession = {
   user: { id: 'user-1', email: 'a@b.com' },
@@ -65,7 +67,7 @@ function createGatewayStub(
   };
 }
 
-describe('useSpaces (espacio de pareja)', () => {
+describe('useSpaces (espacio de pareja y multidivisa)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(saveSpaces).mockResolvedValue(undefined);
@@ -73,6 +75,9 @@ describe('useSpaces (espacio de pareja)', () => {
     jest
       .mocked(createSupabaseInvitationGateway)
       .mockReturnValue(createGatewayStub());
+    jest.mocked(loadCurrencyPreferences).mockResolvedValue({
+      currencies: ['EUR'],
+    });
   });
 
   it('no comprueba el espacio de pareja remoto sin sesión activa', async () => {
@@ -101,15 +106,17 @@ describe('useSpaces (espacio de pareja)', () => {
         id: 'space-remote',
         name: 'Juntos',
         type: 'couple',
+        currency: 'EUR',
         activated_at: '2026-08-01T10:00:00.000Z',
       },
       error: null,
     });
 
-    const remoteCoupleSpace = {
+    const remoteCoupleSpace: Space = {
       id: 'space-remote',
       name: 'Juntos',
       type: 'couple',
+      currency: 'EUR',
       isAwaitingPartner: false,
     };
 
@@ -135,6 +142,7 @@ describe('useSpaces (espacio de pareja)', () => {
         id: 'space-remote',
         name: 'Juntos',
         type: 'couple',
+        currency: 'EUR',
         activated_at: null,
       },
       error: null,
@@ -149,6 +157,7 @@ describe('useSpaces (espacio de pareja)', () => {
           id: 'space-remote',
           name: 'Juntos',
           type: 'couple',
+          currency: 'EUR',
           isAwaitingPartner: true,
         },
       ]),
@@ -165,6 +174,7 @@ describe('useSpaces (espacio de pareja)', () => {
           id: 'space-remote',
           name: 'Juntos',
           type: 'couple' as const,
+          currency: 'EUR',
           isAwaitingPartner: true,
         },
       ],
@@ -174,6 +184,7 @@ describe('useSpaces (espacio de pareja)', () => {
         id: 'space-remote',
         name: 'Juntos',
         type: 'couple',
+        currency: 'EUR',
         activated_at: '2026-08-15T09:00:00.000Z',
       },
       error: null,
@@ -188,10 +199,11 @@ describe('useSpaces (espacio de pareja)', () => {
 
   it('retira una entrada local de pareja obsoleta cuando ya no existe remotamente, y cae a Personal si era la activa', async () => {
     mockAuthSession(fakeSession);
-    const staleCoupleSpace = {
+    const staleCoupleSpace: Space = {
       id: 'space-stale',
       name: 'Juntos',
       type: 'couple' as const,
+      currency: 'EUR',
     };
     jest.mocked(loadSpaces).mockResolvedValue({
       activeSpaceId: staleCoupleSpace.id,
@@ -211,10 +223,11 @@ describe('useSpaces (espacio de pareja)', () => {
 
   it('no vuelve a guardar cuando el espacio de pareja remoto ya coincide con el local', async () => {
     mockAuthSession(fakeSession);
-    const coupleSpace = {
+    const coupleSpace: Space = {
       id: 'space-remote',
       name: 'Juntos',
       type: 'couple' as const,
+      currency: 'EUR',
     };
     jest.mocked(loadSpaces).mockResolvedValue({
       activeSpaceId: coupleSpace.id,
@@ -248,11 +261,14 @@ describe('useSpaces (espacio de pareja)', () => {
     expect(gateway.createCoupleSpace).not.toHaveBeenCalled();
   });
 
-  it('createCoupleSpace añade el espacio devuelto por el gateway y lo marca activo', async () => {
+  it('createCoupleSpace añade el espacio devuelto por el gateway enviando la moneda de preferencias', async () => {
     mockAuthSession(fakeSession);
+    jest.mocked(loadCurrencyPreferences).mockResolvedValue({
+      currencies: ['VES'],
+    });
     jest.mocked(loadSpaces).mockResolvedValue({
       activeSpaceId: personalSpace.id,
-      spaces: [personalSpace],
+      spaces: [{ ...personalSpace, currency: 'VES' }],
     });
     mockRemoteCoupleSpace({ data: null, error: null });
     const gateway = createGatewayStub({
@@ -267,22 +283,133 @@ describe('useSpaces (espacio de pareja)', () => {
       await result.current.createCoupleSpace('Nuestro espacio');
     });
 
-    expect(gateway.createCoupleSpace).toHaveBeenCalledWith('Nuestro espacio');
+    expect(gateway.createCoupleSpace).toHaveBeenCalledWith(
+      'Nuestro espacio',
+      'VES',
+    );
     // Nace pendiente: no es un espacio usable hasta que la otra persona entre.
     expect(result.current.activeSpace).toEqual({
       id: 'space-new',
       name: 'Nuestro espacio',
       type: 'couple',
+      currency: 'VES',
       isAwaitingPartner: true,
     });
   });
 
+  it('createSpace crea un espacio local con la moneda de preferencias', async () => {
+    mockAuthSession(fakeSession);
+    jest.mocked(loadCurrencyPreferences).mockResolvedValue({
+      currencies: ['USD'],
+    });
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+
+    const { result } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+
+    let created: Space | undefined;
+    await act(async () => {
+      created = await result.current.createSpace('Viaje');
+    });
+
+    expect(created).toEqual({
+      id: 'space-generated',
+      name: 'Viaje',
+      type: 'other',
+      currency: 'USD',
+    });
+  });
+
+  it('persiste el espacio como VES al recibir una invitación a un espacio VES aunque el receptor tenga preferencias en EUR', async () => {
+    mockAuthSession(fakeSession);
+    // Receptor tiene preferencias EUR
+    jest.mocked(loadCurrencyPreferences).mockResolvedValue({
+      currencies: ['EUR'],
+    });
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+    // Servidor devuelve espacio de pareja en VES (creado por la pareja en Venezuela)
+    mockRemoteCoupleSpace({
+      data: {
+        id: 'space-ves',
+        name: 'Juntos VES',
+        type: 'couple',
+        currency: 'VES',
+        activated_at: '2026-08-16T12:00:00.000Z',
+      },
+      error: null,
+    });
+
+    const { result } = await renderHook(() => useSpaces());
+
+    await waitFor(() => {
+      const couple = result.current.spaces.find((s) => s.id === 'space-ves');
+      expect(couple).toBeDefined();
+      expect(couple?.currency).toBe('VES');
+    });
+
+    expect(saveSpaces).toHaveBeenCalledWith({
+      activeSpaceId: personalSpace.id,
+      spaces: [
+        personalSpace,
+        {
+          id: 'space-ves',
+          name: 'Juntos VES',
+          type: 'couple',
+          currency: 'VES',
+          isAwaitingPartner: false,
+        },
+      ],
+    });
+  });
+
+  it('registra error estructurado en console.error y fija el estado de error cuando el espacio remoto devuelve una moneda corrupta', async () => {
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    mockAuthSession(fakeSession);
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+    mockRemoteCoupleSpace({
+      data: {
+        id: 'space-corrupted',
+        name: 'Juntos Corrupto',
+        type: 'couple',
+        currency: 'NOT_A_CURRENCY',
+        activated_at: null,
+      },
+      error: null,
+    });
+
+    const { result } = await renderHook(() => useSpaces());
+
+    await waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[useSpaces] Error de integridad en espacio remoto:',
+        expect.any(Error),
+      );
+      expect(result.current.error).toBe(
+        'No pudimos comprobar tu espacio de pareja por un error de integridad.',
+      );
+    });
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it('dissolveCoupleSpace elimina la entrada local y cae a Personal si era la activa', async () => {
     mockAuthSession(fakeSession);
-    const coupleSpace = {
+    const coupleSpace: Space = {
       id: 'space-remote',
       name: 'Juntos',
       type: 'couple' as const,
+      currency: 'EUR',
     };
     jest.mocked(loadSpaces).mockResolvedValue({
       activeSpaceId: coupleSpace.id,

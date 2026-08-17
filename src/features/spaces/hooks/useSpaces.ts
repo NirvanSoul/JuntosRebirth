@@ -13,7 +13,13 @@ import {
   type Space,
   type SpacesState,
 } from '@/features/spaces/types';
+import {
+  defaultCurrencyCode,
+  isCurrencyCode,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
+import { loadCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 
 const maxSpaceNameLength = 40;
 const defaultCoupleSpaceName = 'Juntos';
@@ -40,7 +46,7 @@ async function fetchRemoteCoupleSpace(): Promise<Space | null> {
   const client = getConfiguredSupabaseClient();
   const { data, error } = await client
     .from('spaces')
-    .select('id, name, type, activated_at')
+    .select('id, name, type, activated_at, currency')
     .eq('type', 'couple')
     .is('archived_at', null)
     .limit(1)
@@ -51,10 +57,17 @@ async function fetchRemoteCoupleSpace(): Promise<Space | null> {
   }
   if (!data) return null;
 
+  if (typeof data.currency !== 'string' || !isCurrencyCode(data.currency)) {
+    throw new Error(
+      `[useSpaces] Moneda no reconocida en espacio de pareja remoto: ${data.currency}`,
+    );
+  }
+
   return {
     id: data.id as string,
     name: data.name as string,
     type: 'couple',
+    currency: data.currency as CurrencyCode,
     // `activated_at` es null mientras la invitación siga sin aceptar; en cuanto
     // la otra persona entra, esta misma consulta devuelve la fecha y el espacio
     // se comporta como cualquier otro.
@@ -84,6 +97,7 @@ function mergeRemoteCoupleSpace(
       localCoupleSpace &&
       localCoupleSpace.id === remoteSpace.id &&
       localCoupleSpace.name === remoteSpace.name &&
+      localCoupleSpace.currency === remoteSpace.currency &&
       (localCoupleSpace.isAwaitingPartner ?? false) ===
         remoteSpace.isAwaitingPartner
     ) {
@@ -160,8 +174,19 @@ export function useSpaces(): SpacesController {
     let remoteSpace: Space | null;
     try {
       remoteSpace = await fetchRemoteCoupleSpace();
-    } catch {
-      // Un hipo de red al comprobar el espacio de pareja no debe bloquear
+    } catch (caught) {
+      // Si es un error de integridad (moneda no reconocida), se registra y se fija el error
+      if (caught instanceof Error && caught.message.includes('[useSpaces]')) {
+        console.error(
+          '[useSpaces] Error de integridad en espacio remoto:',
+          caught,
+        );
+        setError(
+          'No pudimos comprobar tu espacio de pareja por un error de integridad.',
+        );
+        return;
+      }
+      // Un hipo de red transitorio al comprobar el espacio de pareja no debe bloquear
       // el resto de la app: se reintenta en la siguiente sincronización.
       return;
     }
@@ -211,7 +236,18 @@ export function useSpaces(): SpacesController {
         throw new Error('Ya existe un espacio con ese nombre.');
       }
 
-      const space: Space = { id: createSpaceId(), name, type: 'other' };
+      const preferences = await loadCurrencyPreferences();
+      const spaceCurrency =
+        preferences.currencies[0] && isCurrencyCode(preferences.currencies[0])
+          ? preferences.currencies[0]
+          : defaultCurrencyCode;
+
+      const space: Space = {
+        id: createSpaceId(),
+        name,
+        type: 'other',
+        currency: spaceCurrency,
+      };
       const nextState: SpacesState = {
         activeSpaceId: space.id,
         spaces: [...state.spaces, space],
@@ -259,10 +295,16 @@ export function useSpaces(): SpacesController {
       }
 
       const name = rawName?.trim() || defaultCoupleSpaceName;
+      const preferences = await loadCurrencyPreferences();
+      const spaceCurrency =
+        preferences.currencies[0] && isCurrencyCode(preferences.currencies[0])
+          ? preferences.currencies[0]
+          : defaultCurrencyCode;
+
       const gateway = createSupabaseInvitationGateway();
       let spaceId: string;
       try {
-        ({ spaceId } = await gateway.createCoupleSpace(name));
+        ({ spaceId } = await gateway.createCoupleSpace(name, spaceCurrency));
       } catch (caught) {
         const message =
           caught instanceof Error
@@ -278,6 +320,7 @@ export function useSpaces(): SpacesController {
         id: spaceId,
         name,
         type: 'couple',
+        currency: spaceCurrency,
         isAwaitingPartner: true,
       };
       const nextState: SpacesState = {

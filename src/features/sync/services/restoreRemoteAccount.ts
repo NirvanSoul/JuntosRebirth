@@ -62,6 +62,7 @@ export async function restoreRemoteAccount(input: {
       id: localId,
       name: remoteSpace.name,
       type: remoteSpace.type,
+      currency: remoteSpace.currency,
     });
   }
 

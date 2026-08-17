@@ -97,7 +97,7 @@ describe('loginService', () => {
       activeSpaceId: 'personal',
       spaces: [
         ...initialSpacesState.spaces,
-        { id: 'extra', name: 'Otro', type: 'other' },
+        { id: 'extra', name: 'Otro', type: 'other', currency: 'EUR' },
       ],
     };
     jest.mocked(loadSpaces).mockResolvedValue(state);

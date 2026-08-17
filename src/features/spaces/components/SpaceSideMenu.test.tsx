@@ -10,9 +10,9 @@ import { colors, darkColors, lightColors } from '@/theme/colors';
 import type { AppearancePreference } from '@/theme/types';
 
 const spaces: Space[] = [
-  { id: 'personal', name: 'Personal', type: 'personal' },
-  { id: 'juntos', name: 'Juntos', type: 'couple' },
-  { id: 'home', name: 'Casa', type: 'other' },
+  { id: 'personal', name: 'Personal', type: 'personal', currency: 'EUR' },
+  { id: 'juntos', name: 'Juntos', type: 'couple', currency: 'EUR' },
+  { id: 'home', name: 'Casa', type: 'other', currency: 'EUR' },
 ];
 
 async function renderMenu(
@@ -70,7 +70,9 @@ describe('SpaceSideMenu', () => {
 
   it('muestra "Espacio de pareja" debajo del espacio personal y dispara onInvitePartner al tocarlo', async () => {
     const { props, screen } = await renderMenu({
-      spaces: [{ id: 'personal', name: 'Personal', type: 'personal' }],
+      spaces: [
+        { id: 'personal', name: 'Personal', type: 'personal', currency: 'EUR' },
+      ],
     });
 
     const button = screen.getByLabelText('Espacio de pareja');
@@ -82,7 +84,16 @@ describe('SpaceSideMenu', () => {
 
   it('el botón "Espacio de pareja" se ve como un botón real, con borde propio del tema claro y oscuro', async () => {
     const lightRender = await renderMenu(
-      { spaces: [{ id: 'personal', name: 'Personal', type: 'personal' }] },
+      {
+        spaces: [
+          {
+            id: 'personal',
+            name: 'Personal',
+            type: 'personal',
+            currency: 'EUR',
+          },
+        ],
+      },
       'light',
     );
     expect(
@@ -92,7 +103,16 @@ describe('SpaceSideMenu', () => {
     ).toBe(lightColors.border);
 
     const darkRender = await renderMenu(
-      { spaces: [{ id: 'personal', name: 'Personal', type: 'personal' }] },
+      {
+        spaces: [
+          {
+            id: 'personal',
+            name: 'Personal',
+            type: 'personal',
+            currency: 'EUR',
+          },
+        ],
+      },
       'dark',
     );
     expect(

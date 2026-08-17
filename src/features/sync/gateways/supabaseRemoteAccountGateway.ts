@@ -1,11 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import {
+  isCurrencyCode,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 
 export type RemoteAccountSpace = {
   remoteId: string;
   name: string;
   type: 'personal' | 'couple' | 'other';
+  currency: CurrencyCode;
 };
 
 export type RemoteAccountCategory = {
@@ -38,7 +43,7 @@ export async function fetchRemoteAccountSnapshot(
   }
   const { data: spaces, error: spacesError } = await client
     .from('spaces')
-    .select('id, name, type')
+    .select('id, name, type, currency')
     .is('archived_at', null);
   if (spacesError || !spaces) {
     throw new Error('No pudimos recuperar tus espacios');
@@ -52,6 +57,21 @@ export async function fetchRemoteAccountSnapshot(
       transactions: [],
     };
   }
+
+  const mappedSpaces: RemoteAccountSpace[] = spaces.map((space) => {
+    if (typeof space.currency !== 'string' || !isCurrencyCode(space.currency)) {
+      throw new Error(
+        `[sync] Moneda no reconocida en espacio remoto ${space.id}: ${space.currency}`,
+      );
+    }
+    return {
+      remoteId: space.id as string,
+      name: space.name as string,
+      type: space.type as RemoteAccountSpace['type'],
+      currency: space.currency as CurrencyCode,
+    };
+  });
+
   const { data: categories, error: categoriesError } = await client
     .from('categories')
     .select(
@@ -82,11 +102,7 @@ export async function fetchRemoteAccountSnapshot(
     throw new Error('No pudimos recuperar tus movimientos');
   }
   return {
-    spaces: spaces.map((space) => ({
-      remoteId: space.id as string,
-      name: space.name as string,
-      type: space.type as RemoteAccountSpace['type'],
-    })),
+    spaces: mappedSpaces,
     categories: categories.map((category) => ({
       remoteId: category.id as string,
       spaceRemoteId: category.space_id as string,
