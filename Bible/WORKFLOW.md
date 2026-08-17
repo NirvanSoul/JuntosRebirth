@@ -94,8 +94,9 @@ contador, y solo cuando su primer paquete sea aceptado por ambos verificadores
 sin los defectos indicados. Las reentregas, subtareas y entregas parciales de una
 tarea grande no cuentan como unidades independientes. Los hallazgos menores no
 reinician el contador, que empieza con la próxima tarea mediana posterior a esta
-modificación. La decisión final de retirarlo o prorrogarlo corresponde al
-responsable y debe quedar registrada.
+modificación. Un cambio de actor principal de código **no** reinicia el contador
+(decisión del responsable, 2026-08-17). La decisión final de retirarlo o
+prorrogarlo corresponde al responsable y debe quedar registrada.
 
 Cada verificador responde una de dos cosas:
 
