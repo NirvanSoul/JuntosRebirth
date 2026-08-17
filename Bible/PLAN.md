@@ -282,7 +282,11 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
   - `linkRemoteEntity` y `findLocalIdForRemoteEntity` (`src/features/sync/repositories/localRemoteEntityLinkRepository.ts`) deben poder recibir el executor transaccional, y `linkRemoteEntity` no puede reconsultar por la conexión global al final.
 - **Llamadas de las líneas 43 y 51 (`restoreRemoteAccount.ts`):** Conservan su comportamiento fuera del bloque exclusivo. Se permiten los ajustes mecánicos de firma que exija hacer obligatorio el executor, pero **no se trasladan dentro del bloque exclusivo** ni cambia su semántica.
 - **Estrategia de pruebas automáticas:**
-  - **Prueba estructural:** Se escribirá una prueba estructural que verifique que dentro de la restauración todos los accesos a `remote_entity_links`, categorías y movimientos usen estrictamente el mismo handle/executor `transaction`. Esta prueba fallará contra el código actual y pasará tras el cambio (los tests unitarios estándar mockean SQLite y no reproducen el interbloqueo nativo).
+  - **Prueba estructural (`src/features/sync/services/restoreRemoteAccount.test.ts`):** Verifica que dentro de la restauración todos los accesos a `remote_entity_links`, categorías y movimientos usen estrictamente el mismo handle `transaction`.
+  - **Ejecución previa (TDD Red):** Falló contra el código original demostrando el defecto (2 llamadas de `INSERT INTO remote_entity_links` para categorías y transacciones cayeron indebidamente en la conexión global `database`).
+  - **Ejecución posterior (TDD Green):** Pasa al 100% tras hacer obligatorio `LocalSqlExecutor` y propagar `transaction`.
+  - **Validación global (`npm run validate`):** 117 suites de Jest pasadas (673 tests), typecheck y linters en verde.
+- **Commit:** `5909098` (`fix(sync): propagar executor transaccional obligatorio en restoreRemoteAccount`).
 - **Verificación real en dispositivos:**
   - Tras el arreglo, repetir el protocolo en los dos teléfonos (A → B y B → A) comprobando:
     1. Llegada inmediata (Realtime).
