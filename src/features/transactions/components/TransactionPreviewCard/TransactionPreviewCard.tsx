@@ -132,7 +132,7 @@ export function TransactionPreviewCard({
               <Avatar
                 size={authorAvatarSize}
                 testID="transaction-author-avatar"
-                uri={author.profile?.avatarUrl}
+                uri={author.profile?.avatarUri}
               />
             ) : null}
             <Text numberOfLines={1} tone="secondary" variant="footnote">

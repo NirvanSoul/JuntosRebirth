@@ -14,8 +14,20 @@ jest.mock(
   '@/features/profile/repositories/localSpaceMemberProfileRepository',
   () => ({
     listSpaceMemberProfiles: jest.fn(async () => [
-      { userId: 'uuid-ana', displayName: 'Ana', avatarUrl: null },
-      { userId: 'uuid-beto', displayName: 'Beto', avatarUrl: null },
+      {
+        userId: 'uuid-ana',
+        displayName: 'Ana',
+        avatarPath: null,
+        avatarUpdatedAt: null,
+        avatarUri: null,
+      },
+      {
+        userId: 'uuid-beto',
+        displayName: 'Beto',
+        avatarPath: null,
+        avatarUpdatedAt: null,
+        avatarUri: null,
+      },
     ]),
   }),
 );

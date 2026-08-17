@@ -32,19 +32,23 @@ export async function fetchSpaceMemberProfiles(
 
   const { data: profiles, error: profilesError } = await client
     .from('profiles')
-    .select('id, display_name, avatar_url')
+    .select('id, display_name')
     .in('id', userIds);
   if (profilesError || !profiles) {
     throw new Error('No pudimos recuperar los perfiles del espacio');
   }
 
+  // Los campos de avatar se rellenan cuando exista la migración 25: hasta
+  // entonces `profiles` no tiene ni `avatar_path` ni `avatar_updated_at`, y
+  // pedirlos haría fallar la consulta entera, también la del nombre.
   return profiles.map((profile) => ({
     userId: profile.id as string,
     displayName:
       typeof profile.display_name === 'string' && profile.display_name.trim()
         ? profile.display_name
         : null,
-    avatarUrl:
-      typeof profile.avatar_url === 'string' ? profile.avatar_url : null,
+    avatarPath: null,
+    avatarUpdatedAt: null,
+    avatarUri: null,
   }));
 }

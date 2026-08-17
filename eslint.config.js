@@ -27,7 +27,7 @@ const frozenLineDebt = {
   'src/features/activity/screens/ActivityScreen.tsx': 573,
   'src/components/ui/AppCalendar/AppCalendar.tsx': 565,
   'src/features/import/repositories/localImportBatchRepository.ts': 556,
-  'src/lib/storage/localDatabase.ts': 536,
+  'src/lib/storage/localDatabase.ts': 427,
   'src/features/activity/components/TransactionFiltersModal.tsx': 536,
   'src/features/categories/components/CategoryPickerModal/CategoryPickerModal.tsx': 485,
   'src/features/activity/components/CategoryDonutChart.tsx': 462,

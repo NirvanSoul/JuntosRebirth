@@ -4,14 +4,22 @@ import { getLocalDatabase } from '@/lib/storage/localDatabase';
 type SpaceMemberProfileRow = {
   user_id: string;
   display_name: string | null;
-  avatar_url: string | null;
+  avatar_path: string | null;
+  avatar_updated_at: string | null;
+  avatar_cached_uri: string | null;
 };
 
 function mapProfile(row: SpaceMemberProfileRow): SpaceMemberProfile {
   return {
     userId: row.user_id,
     displayName: row.display_name?.trim() ? row.display_name : null,
-    avatarUrl: row.avatar_url,
+    avatarPath: row.avatar_path,
+    avatarUpdatedAt: row.avatar_updated_at,
+    // El sello viaja en la uri para invalidar la caché de imagen de React
+    // Native cuando la otra persona cambia su foto sin cambiar de ruta.
+    avatarUri: row.avatar_cached_uri
+      ? `${row.avatar_cached_uri}?v=${row.avatar_updated_at ?? ''}`
+      : null,
   };
 }
 
@@ -20,7 +28,8 @@ export async function listSpaceMemberProfiles(
 ): Promise<SpaceMemberProfile[]> {
   const database = await getLocalDatabase();
   const rows = await database.getAllAsync<SpaceMemberProfileRow>(
-    `SELECT user_id, display_name, avatar_url
+    `SELECT user_id, display_name, avatar_path, avatar_updated_at,
+            avatar_cached_uri
        FROM space_member_profiles
       WHERE space_id = ?
       ORDER BY user_id ASC`,
@@ -35,6 +44,10 @@ export async function listSpaceMemberProfiles(
  * Borra y reinserta dentro de una transacción en vez de hacer `upsert` fila a
  * fila: así una persona que sale del espacio desaparece también en local. El
  * volumen es de dos filas por espacio, de modo que no compensa un diff.
+ *
+ * `avatar_cached_uri` se conserva de la fila anterior en lugar de tomarse del
+ * censo entrante: el archivo descargado sigue en disco y volver a ponerlo a
+ * null obligaría a redescargarlo en cada sincronización.
  */
 export async function replaceSpaceMemberProfiles(
   spaceId: string,
@@ -44,6 +57,17 @@ export async function replaceSpaceMemberProfiles(
   const now = new Date().toISOString();
 
   await database.withExclusiveTransactionAsync(async (transaction) => {
+    const cachedRows = await transaction.getAllAsync<{
+      user_id: string;
+      avatar_cached_uri: string | null;
+    }>(
+      'SELECT user_id, avatar_cached_uri FROM space_member_profiles WHERE space_id = ?',
+      spaceId,
+    );
+    const cachedByUserId = new Map(
+      cachedRows.map((row) => [row.user_id, row.avatar_cached_uri]),
+    );
+
     await transaction.runAsync(
       'DELETE FROM space_member_profiles WHERE space_id = ?',
       spaceId,
@@ -51,12 +75,15 @@ export async function replaceSpaceMemberProfiles(
     for (const profile of profiles) {
       await transaction.runAsync(
         `INSERT INTO space_member_profiles
-           (space_id, user_id, display_name, avatar_url, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
+           (space_id, user_id, display_name, avatar_path, avatar_updated_at,
+            avatar_cached_uri, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         spaceId,
         profile.userId,
         profile.displayName,
-        profile.avatarUrl,
+        profile.avatarPath,
+        profile.avatarUpdatedAt,
+        cachedByUserId.get(profile.userId) ?? null,
         now,
       );
     }

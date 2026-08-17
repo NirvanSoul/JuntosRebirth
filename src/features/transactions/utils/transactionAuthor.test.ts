@@ -7,12 +7,16 @@ import {
 const ana: SpaceMemberProfile = {
   userId: 'uuid-ana',
   displayName: 'Ana',
-  avatarUrl: null,
+  avatarPath: null,
+  avatarUpdatedAt: null,
+  avatarUri: null,
 };
 const beto: SpaceMemberProfile = {
   userId: 'uuid-beto',
   displayName: 'Beto',
-  avatarUrl: null,
+  avatarPath: null,
+  avatarUpdatedAt: null,
+  avatarUri: null,
 };
 
 const context: TransactionAuthorContext = {

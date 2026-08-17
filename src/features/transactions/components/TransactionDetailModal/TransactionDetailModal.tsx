@@ -394,7 +394,7 @@ export function TransactionDetailModal({
                   >
                     <Avatar
                       size={iconSize.sm}
-                      uri={author.profile?.avatarUrl}
+                      uri={author.profile?.avatarUri}
                     />
                     <View style={styles.detailCopy}>
                       <Text tone="secondary" variant="caption">
