@@ -244,4 +244,15 @@ cuando el responsable confirma el resultado.
   3. **Capa 3 (Postgres remoto en Staging):** Correcto. Filas materializadas en servidor:
      - `public.categories`: ID `fa8d0f30-3ef6-4915-b289-a6d7b1ccf8be` («Salario»), `space_id: b69578f8-5269-4162-b36d-636c78638c45`.
      - `public.transactions`: ID `ae79124f-ad2a-4d51-b27e-e64aea0eccdc` (40.00 VES, `income`), `category_id: fa8d0f30...`, `space_id: b69578f8...`.
-  4. **Capas 4-6:** Todavía no aisladas. No hubo actualización visible en caliente. No existe evidencia directa del estado de la suscripción, de la recepción del evento ni del resultado de la restauración. (Nota: `MainTabsNavigator.tsx:445-447` incluye además un sondeo periódico cada 15 segundos que tampoco actualizó la vista).
+
+#### Paso 4: Aislamiento en el segundo dispositivo (Honor)
+- **Pruebas de interacción manual ejecutadas en el Honor:**
+  1. App en primer plano en espacio Juntos durante >20s: el ingreso no aparece (descarta fallo exclusivo de Realtime, ya que el intervalo de 15s en `MainTabsNavigator.tsx:445-447` tampoco lo trajo).
+  2. Pase a segundo plano y retorno (evento foreground): el ingreso no aparece.
+  3. Cambio de espacio a Personal y regreso a Juntos: el ingreso no aparece.
+  4. Recarga completa de la app en Expo Go (Reload): el ingreso no aparece.
+- **Aislamiento en Capa 5 (Servicio `restoreRemoteAccount`):**
+  - Al inspeccionar el código de [`src/features/sync/services/restoreRemoteAccount.ts:81`](file:///c:/Projects/JuntosApp/src/features/sync/services/restoreRemoteAccount.ts#L81), se inicia una transacción exclusiva SQLite (`database.withExclusiveTransactionAsync(async (transaction) => { ... })`).
+  - Dentro de esa transacción, las líneas 85, 90 y 173 invocan `findLocalIdForRemoteEntity` y `linkRemoteEntity` ([`src/features/sync/repositories/localRemoteEntityLinkRepository.ts:38`](file:///c:/Projects/JuntosApp/src/features/sync/repositories/localRemoteEntityLinkRepository.ts#L38)), las cuales ejecutan consultas sobre la instancia global `database` en lugar del handle `transaction` activo.
+  - Esto provoca un conflicto de concurrencia y bloqueo en SQLite (`database is locked` / `SQLITE_BUSY`), abortando la transacción exclusiva.
+  - El error es capturado y silenciado en [`src/navigation/MainTabsNavigator.tsx:333`](file:///c:/Projects/JuntosApp/src/navigation/MainTabsNavigator.tsx#L333) (`catch { ... }`), impidiendo que `reloadLocalFinance` se ejecute y dejando SQLite sin las categorías ni los movimientos remotos.
