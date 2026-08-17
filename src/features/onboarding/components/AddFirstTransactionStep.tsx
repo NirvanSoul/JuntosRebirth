@@ -63,7 +63,7 @@ export function AddFirstTransactionStep({
   title,
   type,
 }: AddFirstTransactionStepProps) {
-  const { activeCurrencies } = useCurrencyPreferences();
+  const { activeCurrencies, isReady } = useCurrencyPreferences();
   const [categories, setCategories] = useState<readonly Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
@@ -156,7 +156,11 @@ export function AddFirstTransactionStep({
     <>
       <OnboardingScreenLayout
         actionLabel={actionLabel}
-        onAction={() => setModalVisible(true)}
+        onAction={() => {
+          if (isReady) {
+            setModalVisible(true);
+          }
+        }}
         onBack={onBack}
         currentStep={currentStep}
         illustrationAspectRatio={illustrationAspectRatio}

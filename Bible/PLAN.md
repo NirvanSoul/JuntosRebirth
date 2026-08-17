@@ -299,14 +299,15 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
 - **Commit:** `5909098` (`fix(sync): propagar executor transaccional obligatorio en restoreRemoteAccount`).
 - **Verificación real en dispositivos:**
   - Tras el arreglo, se repitió el protocolo en los dos teléfonos (A → B y B → A):
-    - Movimientos y categorías recibidos en caliente en ~2 segundos vía Supabase Realtime (`couple-space-sync:<space_id>`).
+    - Movimientos y categorías recibidos en caliente en ~2 segundos (inferido por latencia incompatible con el sondeo de 15 s; sin duplicación tras ciclo de sondeo y recarga).
     - Verificada la no duplicación tras recarga (registrado en §6, commit `b34c30b`).
 - **Fuera de alcance:**
   - Todo lo demás. En particular, no dejar de silenciar los errores de restauración en `src/navigation/MainTabsNavigator.tsx:333`; es un cambio de comportamiento distinto y va en tarea separada.
 
-### 2. Tarea 1 de Fase 3 — Des-silenciamiento en `MainTabsNavigator.tsx:325, 336` (Cerrada)
-- **Objetivo cumplido:** Se reemplazaron los bloques `catch {}` vacíos de `syncCoupleSpaceDataForCurrentSession` (línea 325) y `restoreRemoteAccountForCurrentSession` (línea 336) por `console.error` estructurado.
+### 2. Tarea 1 de Fase 3 — Des-silenciamiento en `MainTabsNavigator.tsx:325, 333` (Cerrada)
+- **Objetivo cumplido:** Se reemplazaron los bloques `catch {}` vacíos de `syncCoupleSpaceDataForCurrentSession` (línea 325) y `restoreRemoteAccountForCurrentSession` (línea 333) por `console.error` estructurado.
 - **Alcance acotado:** La línea 352 (`publishCoupleSpaceChanges(...).catch(() => undefined)`) permanece intacta y se registra como tarea independiente en la cola para no ampliar el alcance sin autorización explícita.
+- **Evidencia automatizada:** Verificado en suite de pruebas unitarias (`src/navigation/MainTabsNavigator.test.tsx`), comprobando que se registra el error tanto en fallo de subida como de restauración, que el error no se propaga al usuario y que los datos locales continúan accesibles.
 
 ### 3. Inventario técnico para la replanificación de Tareas 2 y 3 (Monedas y Presupuestos)
 
@@ -319,7 +320,7 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
   - Tipo `Space` (`src/features/spaces/types.ts:1-12`): contiene `{ id, name, type, isAwaitingPartner? }`. **No expone `currency`**.
   - `RemoteAccountSpace` (`src/features/sync/gateways/supabaseRemoteAccountGateway.ts:5-9`): contiene `{ remoteId, name, type }`. **No incluye `currency`**.
   - `fetchRemoteAccountSnapshot` (`supabaseRemoteAccountGateway.ts:41`): ejecuta `.select('id, name, type')` sobre `spaces`, omitiendo `currency`.
-  - `localSpaceRepository.ts` / tabla SQLite `spaces`: almacena `id, name, type, created_at, updated_at, archived_at, sync_status` sin columna de moneda.
+  - **Persistencia local de espacios:** `src/features/spaces/repositories/localSpaceRepository.ts` persiste exclusivamente en **AsyncStorage** bajo la clave `@juntoss/spaces/v1` (`StoredSpacesState { version: 1, activeSpaceId, spaces: Space[] }`). **No existe tabla SQLite `spaces`**. Añadir moneda a los espacios implica **versionar el payload de AsyncStorage**, no escribir migraciones SQL.
 
 #### 2. Precedencia entre `profiles.default_currency` y `spaces.currency`
 - **Backend:**
@@ -331,10 +332,11 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
   - **Decisión de producto:** El espacio tiene moneda principal fijada al crearlo (`spaces.currency`), inicializada desde las preferencias locales (`useCurrencyPreferences`) del creador. Los agregados y presupuestos del espacio rigen bajo `spaces.currency`.
 
 #### 3. Presupuestos locales
-- **SQLite:** Tabla `categories` (`src/lib/storage/localDatabase.ts:70`) tiene columna `budget_minor INTEGER` (número único sin divisa).
+- **SQLite:** Ya contiene la tabla `category_budgets` (`src/lib/storage/localDatabase.ts:373-392`) con `currency TEXT NOT NULL`, restricción `UNIQUE (category_id, currency)` y backfill en `'EUR'`. No tiene repositorio consumidor aún en el cliente, pero la tabla existe en SQLite local.
+- **Columna histórica en SQLite:** `categories.budget_minor INTEGER` (`localDatabase.ts:70`) almacena un único número sin divisa.
 - **TypeScript:** `Category.budgetMinor?: number` (`src/features/categories/types.ts:32`).
-- **Repositorio:** `localCategoryRepository.ts:updateCategoryBudget(id, budgetMinor)` guarda un entero sin divisa.
-- **UI:** `CategoryBudgetModal.tsx` captura y almacena un número plano (`budgetMinor`). No asocia divisa.
+- **Repositorio:** `localCategoryRepository.ts:updateCategoryBudget(id, budgetMinor)` guarda un entero sin divisa en `categories.budget_minor`.
+- **UI:** `CategoryBudgetModal.tsx` captura y almacena un número plano (`budgetMinor`).
 
 #### 4. Sincronización de presupuestos
 - **Backend:**
@@ -342,17 +344,25 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
   - Sin embargo, `sync_couple_space_data` (`20_preserve_couple_space_local_ids.sql:63, 69, 78`) escribe directamente en `public.categories.budget_amount_minor` y **no interactúa con `public.category_budgets`**.
   - `fetchRemoteAccountSnapshot` (`supabaseRemoteAccountGateway.ts:58`) lee `categories.budget_amount_minor` y **no consulta `public.category_budgets`**.
 - **Cliente:**
-  - Toda la persistencia y sincronización local/remota de categorías en el cliente se apoya en `Category.budgetMinor` único.
+  - Toda la persistencia y sincronización actual de categorías en el cliente se apoya en `Category.budgetMinor`.
+
+#### 5. Precisión sobre dimensionamiento y migraciones
+- **Opción A (Presupuesto único atado a `spaces.currency`):** Exige versionar el payload de AsyncStorage de espacios y propagar los campos existentes en el cliente.
+- **Opción B (Presupuestos multidivisa en `category_budgets`):** Exige además una **migración nueva** en PostgreSQL para actualizar los RPCs de sincronización en lote (`sync_couple_space_data`), ya que la migración 20 está aplicada y jamás se reescribe.
+- **Resolución explícita de deuda:** Ambos caminos requieren resolver qué se hace con `categories.budget_amount_minor`, declarada histórica en la migración 08 pero retomada en las migraciones 18 y 20.
 
 ---
 
 ### 4. Cola de Fase 3 actualizada (orden de ejecución)
 
-1. **Tarea 1 (Cerrada):** Dejar de silenciar los errores de restauración y subida en `MainTabsNavigator.tsx:325, 336`.
-2. **Tareas 2 y 3 (Replanteadas juntas):** Exponer y propagar `spaces.currency` y `profiles.default_currency`, definir el modelo monetario de presupuestos y eliminar literales `'EUR'` fijos. *(Pendiente de clasificación formal tras evaluación del inventario §8.3).*
-3. **Des-silenciar subida en segundo plano (`MainTabsNavigator.tsx:352`):** Registrar fallo estructurado en `publishCoupleSpaceChanges({ spaceId }).catch(...)` (pequeña).
-4. **Indicador de novedades en el selector de espacio (mediana):** Un punto cuando hay algo nuevo en un espacio que no estás mirando, calculado con una consulta ligera al abrir la app y al volver a primer plano. Sin suscripciones ni notificaciones flotantes (`JUNTOSS_NOTIFICATIONS.md` §19).
-5. **Permisos `PUBLIC EXECUTE`:** Migración **nueva**, jamás reescribir una aplicada (pequeña).
-6. **Actualizar `space_invitations.test.sql`** al nombre de índice vigente `space_invitations_one_pending_per_target_idx` (pequeña).
+1. **Tarea 1 (Cerrada):** Dejar de silenciar los errores de restauración y subida en `MainTabsNavigator.tsx:325, 333`.
+2. **Implementación parcial vigente (mantenida y probada):**
+   - `HomeScreen.tsx:182`: Aislamiento por moneda en `categorySummaries` para no sumar importes entre divisas distintas.
+   - `AddFirstTransactionStep.tsx:63, 177`: Conexión de preferencias en onboarding protegida con `isReady` para prevenir la carrera de reinicio de draft.
+3. **Tareas 2 y 3 (Replanteadas juntas):** Exponer y propagar `spaces.currency` y `profiles.default_currency`, definir el modelo monetario de presupuestos y eliminar literales `'EUR'` fijos. *(Pendiente de clasificación formal tras evaluación del inventario §8.3).*
+4. **Des-silenciar subida en segundo plano (`MainTabsNavigator.tsx:352`):** Registrar fallo estructurado en `publishCoupleSpaceChanges({ spaceId }).catch(...)` (pequeña).
+5. **Indicador de novedades en el selector de espacio (mediana):** Un punto cuando hay algo nuevo en un espacio que no estás mirando, calculado con una consulta ligera al abrir la app y al volver a primer plano. Sin suscripciones ni notificaciones flotantes (`JUNTOSS_NOTIFICATIONS.md` §19).
+6. **Permisos `PUBLIC EXECUTE`:** Migración **nueva**, jamás reescribir una aplicada (pequeña).
+7. **Actualizar `space_invitations.test.sql`** al nombre de índice vigente `space_invitations_one_pending_per_target_idx` (pequeña).
 
 *Pendiente aparte, por contacto:* Extracción de `ImportScreen.tsx` y `AppCalendar.tsx` (§4).

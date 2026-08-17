@@ -16,9 +16,34 @@ import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
 
 const mockUseSpaces = jest.fn();
+let mockSession: {
+  user: { id: string; email: string };
+  access_token: string;
+} | null = null;
+const mockSyncCoupleSpaceData = jest.fn(
+  async (_options?: { spaceId: string }) => undefined,
+);
+const mockRestoreRemoteAccount = jest.fn(async () => undefined);
 
 jest.mock('@/features/spaces/hooks/useSpaces', () => ({
   useSpaces: () => mockUseSpaces(),
+}));
+
+jest.mock('@/features/auth/hooks/useAuthSession', () => ({
+  useAuthSession: () => ({
+    session: mockSession,
+    userId: mockSession?.user?.id ?? null,
+    isReady: true,
+  }),
+}));
+
+jest.mock('@/features/sync/services/syncCoupleSpaceData', () => ({
+  syncCoupleSpaceDataForCurrentSession: (options?: { spaceId: string }) =>
+    mockSyncCoupleSpaceData(options),
+}));
+
+jest.mock('@/features/sync/services/restoreRemoteAccount', () => ({
+  restoreRemoteAccountForCurrentSession: () => mockRestoreRemoteAccount(),
 }));
 
 jest.mock('@/features/categories/repositories/localCategoryRepository', () => {
@@ -926,5 +951,97 @@ describe('MainTabsNavigator', () => {
     );
 
     expect(await screen.findByText('Aún no hay movimientos')).toBeTruthy();
+  });
+
+  describe('sincronización y registro de errores (Tarea 1)', () => {
+    it('registra error estructurado en console.error cuando la subida de datos falla, sin lanzar excepción ni bloquear', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const uploadError = new Error('Fallo de red en subida');
+      mockSyncCoupleSpaceData.mockRejectedValueOnce(uploadError);
+      mockRestoreRemoteAccount.mockResolvedValueOnce(undefined);
+      mockSession = {
+        user: { id: 'user-1', email: 'test@example.com' },
+        access_token: 'fake-token',
+      };
+      mockUseSpaces.mockReturnValue({
+        activeSpace: { id: 'couple-space-1', name: 'Juntos', type: 'couple' },
+        createSpace: jest.fn(),
+        error: null,
+        isReady: true,
+        selectSpace: jest.fn(),
+        spaces: [{ id: 'couple-space-1', name: 'Juntos', type: 'couple' }],
+      });
+
+      await render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <NavigationContainer>
+              <MainTabsNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      await waitFor(() => {
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '[sync] Subida de espacio compartido falló:',
+          uploadError,
+        );
+      });
+      consoleErrorSpy.mockRestore();
+      mockSession = null;
+    });
+
+    it('registra error estructurado en console.error cuando la restauración remota falla, sin romper la interfaz', async () => {
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const restoreError = new Error('Bloqueo SQLite en restauración');
+      mockSyncCoupleSpaceData.mockResolvedValueOnce(undefined);
+      mockRestoreRemoteAccount.mockRejectedValueOnce(restoreError);
+      mockSession = {
+        user: { id: 'user-1', email: 'test@example.com' },
+        access_token: 'fake-token',
+      };
+      mockUseSpaces.mockReturnValue({
+        activeSpace: { id: 'couple-space-1', name: 'Juntos', type: 'couple' },
+        createSpace: jest.fn(),
+        error: null,
+        isReady: true,
+        selectSpace: jest.fn(),
+        spaces: [{ id: 'couple-space-1', name: 'Juntos', type: 'couple' }],
+      });
+
+      await render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <NavigationContainer>
+              <MainTabsNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      await waitFor(() => {
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '[sync] Restauración remota falló:',
+          restoreError,
+        );
+      });
+      consoleErrorSpy.mockRestore();
+      mockSession = null;
+    });
   });
 });

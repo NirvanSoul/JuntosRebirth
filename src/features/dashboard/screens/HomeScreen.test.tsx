@@ -726,4 +726,61 @@ describe('HomeScreen', () => {
 
     expect(onOpenCategoryDetail).toHaveBeenCalledWith('salary');
   });
+
+  it('aísla los resúmenes de categoría por la moneda activa del encabezado (no mezcla EUR y VES)', async () => {
+    const multiCurrencyTransactions: SessionTransaction[] = [
+      {
+        id: 'tx-eur',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 1000,
+        currency: 'EUR',
+        title: 'Supermercado EUR',
+        categoryId: 'housing',
+        occurredOn: dateInCurrentMonth(1),
+        recurrence: 'once',
+        updatedAt: '2026-07-01T12:00:00.000Z',
+      },
+      {
+        id: 'tx-ves',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 4000,
+        currency: 'VES',
+        title: 'Supermercado VES',
+        categoryId: 'housing',
+        occurredOn: dateInCurrentMonth(2),
+        recurrence: 'once',
+        updatedAt: '2026-07-02T12:00:00.000Z',
+      },
+    ];
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={categories.filter((c) => c.id === 'housing')}
+            currency="EUR"
+            transactions={multiCurrencyTransactions}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: /Vivienda, gastado 10/,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('button', {
+        name: /50/,
+      }),
+    ).toBeNull();
+  });
 });
