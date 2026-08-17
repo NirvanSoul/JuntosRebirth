@@ -358,7 +358,7 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
 1. **Tarea 1 (Cerrada):** Dejar de silenciar los errores de restauración y subida en `MainTabsNavigator.tsx:325, 333`.
 2. **Implementación parcial vigente (mantenida y probada):**
    - `HomeScreen.tsx:182`: Aislamiento por moneda en `categorySummaries` para no sumar importes entre divisas distintas.
-   - `AddFirstTransactionStep.tsx:63, 177`: Conexión de preferencias en onboarding protegida con `isReady` para prevenir la carrera de reinicio de draft.
+   - `AddFirstTransactionStep.tsx:66, 158-164, 182-184`: Conexión de preferencias en onboarding blindada con `actionDisabled={!isReady}` y guard en `onAction` para prevenir la carrera de reinicio de draft.
 3. **Tareas 2 y 3 (Replanteadas juntas):** Exponer y propagar `spaces.currency` y `profiles.default_currency`, definir el modelo monetario de presupuestos y eliminar literales `'EUR'` fijos. *(Pendiente de clasificación formal tras evaluación del inventario §8.3).*
 4. **Des-silenciar subida en segundo plano (`MainTabsNavigator.tsx:352`):** Registrar fallo estructurado en `publishCoupleSpaceChanges({ spaceId }).catch(...)` (pequeña).
 5. **Indicador de novedades en el selector de espacio (mediana):** Un punto cuando hay algo nuevo en un espacio que no estás mirando, calculado con una consulta ligera al abrir la app y al volver a primer plano. Sin suscripciones ni notificaciones flotantes (`JUNTOSS_NOTIFICATIONS.md` §19).

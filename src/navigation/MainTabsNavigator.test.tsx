@@ -9,6 +9,8 @@ import {
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { listLocalCategories } from '@/features/categories/repositories/localCategoryRepository';
+import { listLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
@@ -24,6 +26,13 @@ const mockSyncCoupleSpaceData = jest.fn(
   async (_options?: { spaceId: string }) => undefined,
 );
 const mockRestoreRemoteAccount = jest.fn(async () => undefined);
+
+function dateInCurrentMonth(day: number): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}-${String(day).padStart(2, '0')}`;
+}
 
 jest.mock('@/features/spaces/hooks/useSpaces', () => ({
   useSpaces: () => mockUseSpaces(),
@@ -954,13 +963,51 @@ describe('MainTabsNavigator', () => {
   });
 
   describe('sincronización y registro de errores (Tarea 1)', () => {
-    it('registra error estructurado en console.error cuando la subida de datos falla, sin lanzar excepción ni bloquear', async () => {
-      const consoleErrorSpy = jest
+    let consoleErrorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      consoleErrorSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
+      mockSession = null;
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+      mockSession = null;
+      (listLocalCategories as jest.Mock).mockResolvedValue([]);
+      (listLocalTransactions as jest.Mock).mockResolvedValue([]);
+    });
+
+    it('registra error estructurado en console.error cuando la subida de datos falla, sin lanzar excepción y manteniendo visibles los datos locales', async () => {
       const uploadError = new Error('Fallo de red en subida');
       mockSyncCoupleSpaceData.mockRejectedValueOnce(uploadError);
       mockRestoreRemoteAccount.mockResolvedValueOnce(undefined);
+      (listLocalCategories as jest.Mock).mockResolvedValue([
+        {
+          id: 'category-local-1',
+          spaceId: 'couple-space-1',
+          name: 'Alimentación',
+          icon: 'fork-knife',
+          colorToken: 'orange',
+          isDefault: true,
+          isArchived: false,
+        },
+      ]);
+      (listLocalTransactions as jest.Mock).mockResolvedValue([
+        {
+          id: 'tx-local-1',
+          spaceId: 'couple-space-1',
+          type: 'expense',
+          amountMinor: 2500,
+          currency: 'EUR',
+          title: 'Compra semanal',
+          categoryId: 'category-local-1',
+          occurredOn: dateInCurrentMonth(1),
+          recurrence: 'once',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+        },
+      ]);
       mockSession = {
         user: { id: 'user-1', email: 'test@example.com' },
         access_token: 'fake-token',
@@ -974,7 +1021,7 @@ describe('MainTabsNavigator', () => {
         spaces: [{ id: 'couple-space-1', name: 'Juntos', type: 'couple' }],
       });
 
-      await render(
+      const screen = await render(
         <SafeAreaProvider
           initialMetrics={{
             frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -995,17 +1042,40 @@ describe('MainTabsNavigator', () => {
           uploadError,
         );
       });
-      consoleErrorSpy.mockRestore();
-      mockSession = null;
+
+      expect(await screen.findByText('Compra semanal')).toBeTruthy();
+      expect(screen.getByText('Alimentación')).toBeTruthy();
     });
 
-    it('registra error estructurado en console.error cuando la restauración remota falla, sin romper la interfaz', async () => {
-      const consoleErrorSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
+    it('registra error estructurado en console.error cuando la restauración remota falla, sin romper la interfaz y conservando los datos locales', async () => {
       const restoreError = new Error('Bloqueo SQLite en restauración');
       mockSyncCoupleSpaceData.mockResolvedValueOnce(undefined);
       mockRestoreRemoteAccount.mockRejectedValueOnce(restoreError);
+      (listLocalCategories as jest.Mock).mockResolvedValue([
+        {
+          id: 'category-local-1',
+          spaceId: 'couple-space-1',
+          name: 'Alimentación',
+          icon: 'fork-knife',
+          colorToken: 'orange',
+          isDefault: true,
+          isArchived: false,
+        },
+      ]);
+      (listLocalTransactions as jest.Mock).mockResolvedValue([
+        {
+          id: 'tx-local-1',
+          spaceId: 'couple-space-1',
+          type: 'expense',
+          amountMinor: 2500,
+          currency: 'EUR',
+          title: 'Compra semanal',
+          categoryId: 'category-local-1',
+          occurredOn: dateInCurrentMonth(1),
+          recurrence: 'once',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+        },
+      ]);
       mockSession = {
         user: { id: 'user-1', email: 'test@example.com' },
         access_token: 'fake-token',
@@ -1019,7 +1089,7 @@ describe('MainTabsNavigator', () => {
         spaces: [{ id: 'couple-space-1', name: 'Juntos', type: 'couple' }],
       });
 
-      await render(
+      const screen = await render(
         <SafeAreaProvider
           initialMetrics={{
             frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -1040,8 +1110,9 @@ describe('MainTabsNavigator', () => {
           restoreError,
         );
       });
-      consoleErrorSpy.mockRestore();
-      mockSession = null;
+
+      expect(await screen.findByText('Compra semanal')).toBeTruthy();
+      expect(screen.getByText('Alimentación')).toBeTruthy();
     });
   });
 });

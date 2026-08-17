@@ -155,6 +155,7 @@ export function AddFirstTransactionStep({
   return (
     <>
       <OnboardingScreenLayout
+        actionDisabled={!isReady}
         actionLabel={actionLabel}
         onAction={() => {
           if (isReady) {
