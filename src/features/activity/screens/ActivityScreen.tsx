@@ -26,6 +26,7 @@ import {
   type TransactionTypeFilter,
 } from '@/features/activity/components/TransactionFiltersModal';
 import {
+  getComparisonPeriodLabel,
   getPreviousDateFilter,
   matchesTransactionDateFilter,
   type TransactionDateFilter,
@@ -37,7 +38,6 @@ import {
   TransactionPeriodModal,
   type TransactionPeriodModalType,
 } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal';
-import { describePreviousPeriod } from '@/features/dashboard/utils/transactionPeriod';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import { TransactionSummaryBadges } from '@/features/transactions/components/TransactionSummaryBadges/TransactionSummaryBadges';
 import type { SessionTransaction } from '@/features/transactions/types';
@@ -62,32 +62,19 @@ import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
-const categoryGroupBorderWidth = 2;
-const categorySeparatorThickness = 1;
-
-function getComparisonPeriodLabel(
-  filter: TransactionDateFilter,
-): string | undefined {
-  if (filter === 'all') {
-    return undefined;
-  }
-
-  return filter.period === 'custom'
-    ? 'vs. periodo anterior'
-    : describePreviousPeriod(filter.period);
-}
-
 type ActivityScreenProps = {
   categories?: readonly Category[];
   /** Moneda elegida en el encabezado global; nunca se mezclan importes aquí. */
   currency?: CurrencyCode;
+  /** Moneda del espacio activo para presupuestos. */
+  spaceCurrency?: CurrencyCode;
   /** Cambia al reenfocar la pantalla para reiniciar el donut de categorías. */
   focusResetKey?: number;
   onCreateCategory?: () => void;
   onCreateExpense?: () => void;
   onCreateIncome?: () => void;
   onCreateMovement?: () => void;
-  onOpenCategoryDetail?: (categoryId: string) => void;
+  onOpenCategoryDetail?: (categoryId: string, currency?: CurrencyCode) => void;
   onOpenTransactionDetail?: (transactionId: string) => void;
   onScrollDirectionChange?: (direction: 'down' | 'up') => void;
   onSummaryPinnedChange?: (pinned: boolean) => void;
@@ -109,6 +96,7 @@ export function ActivityScreen({
   onOpenTransactionDetail,
   onScrollDirectionChange,
   onSummaryPinnedChange,
+  spaceCurrency = defaultCurrencyCode,
   summaryPinned = false,
   targetRequestId,
   targetSection,
@@ -153,14 +141,39 @@ export function ActivityScreen({
   const currencyTransactionsThroughCurrentMonth = useMemo(
     () =>
       transactionsThroughCurrentMonth.filter(
-        (transaction) => transaction.currency === effectiveCurrency,
+        (t) => t.currency === effectiveCurrency,
       ),
     [effectiveCurrency, transactionsThroughCurrentMonth],
   );
   const categorySummaries = useMemo(
     () =>
-      summarizeCategories(categories, currencyTransactionsThroughCurrentMonth),
-    [categories, currencyTransactionsThroughCurrentMonth],
+      summarizeCategories(
+        categories,
+        transactionsThroughCurrentMonth,
+        effectiveCurrency,
+      ),
+    [categories, effectiveCurrency, transactionsThroughCurrentMonth],
+  );
+  const budgetSummaries = useMemo(
+    () =>
+      effectiveCurrency === spaceCurrency
+        ? categorySummaries
+        : summarizeCategories(
+            categories,
+            transactionsThroughCurrentMonth,
+            spaceCurrency,
+          ),
+    [
+      categories,
+      categorySummaries,
+      effectiveCurrency,
+      spaceCurrency,
+      transactionsThroughCurrentMonth,
+    ],
+  );
+  const budgetExpenseByCategoryId = useMemo(
+    () => new Map(budgetSummaries.map((item) => [item.id, item.expenseMinor])),
+    [budgetSummaries],
   );
   const matchesNonDateFilters = useCallback(
     (transaction: SessionTransaction) =>
@@ -200,10 +213,7 @@ export function ActivityScreen({
     [dateFilter],
   );
   const previousFilteredSummary = useMemo(() => {
-    if (!previousDateFilter) {
-      return null;
-    }
-
+    if (!previousDateFilter) return null;
     const previousTransactions = transactionsThroughCurrentMonth.filter(
       (transaction) =>
         transaction.currency === effectiveCurrency &&
@@ -213,7 +223,6 @@ export function ActivityScreen({
           previousDateFilter,
         ),
     );
-
     return summarizeTransactionTotals(previousTransactions);
   }, [
     effectiveCurrency,
@@ -317,7 +326,10 @@ export function ActivityScreen({
         >
           <CategoryDonutChart
             categories={categories}
-            onOpenCategoryDetail={onOpenCategoryDetail}
+            currency={effectiveCurrency}
+            onOpenCategoryDetail={(categoryId) =>
+              onOpenCategoryDetail?.(categoryId, effectiveCurrency)
+            }
             resetKey={focusResetKey}
             transactions={currencyTransactionsThroughCurrentMonth}
           />
@@ -345,7 +357,14 @@ export function ActivityScreen({
                     <View key={id}>
                       <CategoryPreviewCard
                         {...category}
-                        onPress={() => onOpenCategoryDetail?.(id)}
+                        budgetExpenseMinor={
+                          budgetExpenseByCategoryId.get(id) ?? 0
+                        }
+                        displayCurrency={effectiveCurrency}
+                        onPress={() =>
+                          onOpenCategoryDetail?.(id, effectiveCurrency)
+                        }
+                        spaceCurrency={spaceCurrency}
                       />
                       {index < categorySummaries.length - 1 ? (
                         <View
@@ -497,51 +516,26 @@ export function ActivityScreen({
         onClose={() => setFiltersModalVisible(false)}
         visible={isFiltersModalVisible}
       />
-      <TransactionPeriodModal
-        categories={categories}
-        onAdd={() => {
-          setPeriodModalType(null);
-          onCreateIncome?.();
-        }}
-        onClose={() => setPeriodModalType(null)}
-        onOpenTransactionDetail={(transactionId) => {
-          setPeriodModalType(null);
-          onOpenTransactionDetail?.(transactionId);
-        }}
-        transactions={transactions}
-        type="income"
-        visible={periodModalType === 'income'}
-      />
-      <TransactionPeriodModal
-        categories={categories}
-        onAdd={() => {
-          setPeriodModalType(null);
-          onCreateExpense?.();
-        }}
-        onClose={() => setPeriodModalType(null)}
-        onOpenTransactionDetail={(transactionId) => {
-          setPeriodModalType(null);
-          onOpenTransactionDetail?.(transactionId);
-        }}
-        transactions={transactions}
-        type="expense"
-        visible={periodModalType === 'expense'}
-      />
-      <TransactionPeriodModal
-        categories={categories}
-        onAdd={() => {
-          setPeriodModalType(null);
-          onCreateMovement?.();
-        }}
-        onClose={() => setPeriodModalType(null)}
-        onOpenTransactionDetail={(transactionId) => {
-          setPeriodModalType(null);
-          onOpenTransactionDetail?.(transactionId);
-        }}
-        transactions={transactions}
-        type="balance"
-        visible={periodModalType === 'balance'}
-      />
+      {periodModalType ? (
+        <TransactionPeriodModal
+          categories={categories}
+          onAdd={() => {
+            const currentType = periodModalType;
+            setPeriodModalType(null);
+            if (currentType === 'income') onCreateIncome?.();
+            else if (currentType === 'expense') onCreateExpense?.();
+            else onCreateMovement?.();
+          }}
+          onClose={() => setPeriodModalType(null)}
+          onOpenTransactionDetail={(transactionId) => {
+            setPeriodModalType(null);
+            onOpenTransactionDetail?.(transactionId);
+          }}
+          transactions={transactions}
+          type={periodModalType}
+          visible
+        />
+      ) : null}
     </>
   );
 }
@@ -579,10 +573,10 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       backgroundColor: colors.surface,
       borderColor: colors.categoryPreviewBorder,
       borderRadius: previewCardLayout.borderRadius,
-      borderWidth: categoryGroupBorderWidth,
+      borderWidth: 2,
     },
     categorySeparator: {
-      height: categorySeparatorThickness,
+      height: 1,
       backgroundColor: colors.categoryPreviewBorder,
     },
     categoryDetailTitle: {

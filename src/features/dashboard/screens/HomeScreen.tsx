@@ -38,6 +38,8 @@ type HomeScreenProps = {
   categories?: readonly Category[];
   /** Moneda del resumen superior (balance, ingresos y gastos del mes). */
   currency?: CurrencyCode;
+  /** Moneda del espacio activo para cálculo de presupuestos. */
+  spaceCurrency?: CurrencyCode;
   onCreateCategory?: () => void;
   onCreateExpense?: () => void;
   onCreateIncome?: () => void;
@@ -73,7 +75,7 @@ function SectionHeader({ onViewMore, title }: SectionHeaderProps) {
         onPress={onViewMore}
         style={({ pressed }) => [
           styles.sectionLink,
-          pressed ? styles.sectionLinkPressed : null,
+          pressed && styles.sectionLinkPressed,
         ]}
       >
         <Text tone="secondary" variant="footnote" weight="light">
@@ -129,6 +131,7 @@ export function HomeScreen({
   onViewCategories,
   onViewMovements,
   showComparisonIndicators = false,
+  spaceCurrency = defaultCurrencyCode,
   topContent,
   transactions = [],
 }: HomeScreenProps) {
@@ -179,8 +182,19 @@ export function HomeScreen({
       ) ?? undefined)
     : undefined;
   const categorySummaries = useMemo(
-    () => summarizeCategories(categories, currencyTransactions),
-    [categories, currencyTransactions],
+    () => summarizeCategories(categories, transactions, currency),
+    [categories, currency, transactions],
+  );
+  const budgetSummaries = useMemo(
+    () =>
+      currency === spaceCurrency
+        ? categorySummaries
+        : summarizeCategories(categories, transactions, spaceCurrency),
+    [categories, categorySummaries, currency, spaceCurrency, transactions],
+  );
+  const budgetExpenseByCategoryId = useMemo(
+    () => new Map(budgetSummaries.map((item) => [item.id, item.expenseMinor])),
+    [budgetSummaries],
   );
   const recentTransactions = useMemo(
     () => sortTransactionsByRecentActivity(transactionsThroughCurrentMonth),
@@ -258,7 +272,10 @@ export function HomeScreen({
               <CategoryPreviewCard
                 key={id}
                 {...category}
+                budgetExpenseMinor={budgetExpenseByCategoryId.get(id) ?? 0}
+                displayCurrency={currency}
                 onPress={() => onOpenCategoryDetail?.(id)}
+                spaceCurrency={spaceCurrency}
                 variant="tile"
               />
             ))}

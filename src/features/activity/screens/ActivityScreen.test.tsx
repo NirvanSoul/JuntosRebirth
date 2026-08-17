@@ -370,7 +370,7 @@ describe('ActivityScreen', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: /^General,/ }));
 
-    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general');
+    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR');
   });
 
   it('abre el detalle al tocar el badge de una categoría en la gráfica', async () => {
@@ -399,7 +399,7 @@ describe('ActivityScreen', () => {
       }),
     );
 
-    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general');
+    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR');
   });
 
   it('mantiene el mismo tratamiento superior de Inicio y compensa dentro del sticky', async () => {
@@ -1221,5 +1221,80 @@ describe('ActivityScreen', () => {
     expect(
       screen.getByRole('button', { name: 'Filtros, 1 activos' }),
     ).toBeTruthy();
+  });
+
+  it('calcula presupuesto en spaceCurrency (VES) mientras muestra gastos en displayCurrency (EUR) y propaga divisa a onOpenCategoryDetail', async () => {
+    const onOpenCategoryDetail = jest.fn();
+    const multiTransactions: SessionTransaction[] = [
+      {
+        id: 'tx-eur',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 1000, // 10 EUR
+        currency: 'EUR',
+        title: 'Café EUR',
+        categoryId: 'general',
+        occurredOn: '2026-07-30',
+        recurrence: 'once',
+        updatedAt: '2026-07-30T12:00:00.000Z',
+      },
+      {
+        id: 'tx-ves',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 4000, // 40 VES
+        currency: 'VES',
+        title: 'Mercado VES',
+        categoryId: 'general',
+        occurredOn: '2026-07-30',
+        recurrence: 'once',
+        updatedAt: '2026-07-30T12:00:00.000Z',
+      },
+    ];
+
+    const categoryWithBudget: Category = {
+      id: 'general',
+      spaceId: 'personal',
+      name: 'General',
+      icon: 'dots-three-circle',
+      colorToken: 'slate',
+      budgetMinor: 10000, // 100 VES
+      isDefault: false,
+      isArchived: false,
+    };
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={[categoryWithBudget]}
+            currency="EUR"
+            onOpenCategoryDetail={onOpenCategoryDetail}
+            spaceCurrency="VES"
+            transactions={multiTransactions}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    // Tarjeta muestra gastado 10 € y disponible Bs. 60
+    expect(
+      screen.getByRole('button', {
+        name: /General, 10.*gastado,.*60.*disponible/,
+      }),
+    ).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByRole('button', {
+        name: /General, 10.*gastado,.*60.*disponible/,
+      }),
+    );
+
+    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR');
   });
 });

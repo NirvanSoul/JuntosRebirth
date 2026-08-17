@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
-  Easing,
-  type EntryExitAnimationFunction,
   LinearTransition,
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 import Svg from 'react-native-svg';
 
@@ -17,6 +13,11 @@ import { AnimatedArcSegment } from '@/components/ui/Charts/AnimatedArcSegment';
 import { chartStrokeWidth } from '@/components/ui/Charts/chartTokens';
 import { MonthNavigator } from '@/components/ui/MonthNavigator/MonthNavigator';
 import { Text } from '@/components/ui/Text/Text';
+import {
+  getChartContentEntering,
+  getChartContentExiting,
+  type MotionDirection,
+} from '@/features/activity/utils/categoryDonutAnimations';
 import type { Category } from '@/features/categories/types';
 import {
   formatMonthKey,
@@ -26,6 +27,7 @@ import {
   summarizeCategories,
 } from '@/features/categories/utils/categorySummary';
 import type { SessionTransaction } from '@/features/transactions/types';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { categoryColors } from '@/theme/categoryColors';
 import { motion } from '@/theme/motion';
@@ -39,6 +41,7 @@ type ChartMode = 'expense' | 'income';
 
 type CategoryDonutChartProps = {
   categories: readonly Category[];
+  currency: CurrencyCode;
   onOpenCategoryDetail?: (categoryId: string) => void;
   /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
   resetKey?: number;
@@ -59,85 +62,6 @@ const segmentControlPadding = spacing.xs;
 const segmentIndicatorWidth =
   (segmentedControlWidth - segmentControlPadding * 2) / 2;
 
-type MotionDirection = -1 | 1;
-
-export function getChartContentEntering(
-  direction: MotionDirection,
-  delay: number = motion.chartContentEnterDelay,
-): EntryExitAnimationFunction {
-  return () => {
-    'worklet';
-
-    const springConfig = {
-      damping: motion.chartModeSpring.damping,
-      mass: motion.chartModeSpring.mass,
-      stiffness: motion.chartModeSpring.stiffness,
-      reduceMotion: ReduceMotion.System,
-    };
-    const delayedSpring = (value: number) =>
-      withDelay(delay, withSpring(value, springConfig), ReduceMotion.System);
-    const delayedOpacity = withDelay(
-      delay,
-      withTiming(1, {
-        duration: motion.chartContentFadeDuration,
-        easing: Easing.out(Easing.cubic),
-        reduceMotion: ReduceMotion.System,
-      }),
-      ReduceMotion.System,
-    );
-
-    return {
-      initialValues: {
-        opacity: 0,
-        transform: [
-          { translateX: direction * motion.chartContentTravel },
-          { translateY: spacing.md },
-        ],
-      },
-      animations: {
-        opacity: delayedOpacity,
-        transform: [
-          { translateX: delayedSpring(0) },
-          { translateY: delayedSpring(0) },
-        ],
-      },
-    };
-  };
-}
-
-export function getChartContentExiting(
-  direction: MotionDirection,
-): EntryExitAnimationFunction {
-  return () => {
-    'worklet';
-
-    const timingConfig = {
-      duration: motion.chartContentExitDuration,
-      easing: Easing.inOut(Easing.cubic),
-      reduceMotion: ReduceMotion.System,
-    };
-
-    return {
-      initialValues: {
-        opacity: 1,
-        transform: [{ translateX: 0 }, { translateY: 0 }],
-      },
-      animations: {
-        opacity: withTiming(0, timingConfig),
-        transform: [
-          {
-            translateX: withTiming(
-              direction * motion.chartContentTravel,
-              timingConfig,
-            ),
-          },
-          { translateY: withTiming(-spacing.sm, timingConfig) },
-        ],
-      },
-    };
-  };
-}
-
 const chartLayoutTransition = LinearTransition.springify()
   .damping(motion.chartModeSpring.damping)
   .mass(motion.chartModeSpring.mass)
@@ -146,6 +70,7 @@ const chartLayoutTransition = LinearTransition.springify()
 
 export function CategoryDonutChart({
   categories,
+  currency,
   onOpenCategoryDetail,
   resetKey,
   transactions,
@@ -159,8 +84,9 @@ export function CategoryDonutChart({
       summarizeCategories(
         categories,
         listTransactionsByMonth(transactions, monthKey),
+        currency,
       ),
-    [categories, monthKey, transactions],
+    [categories, currency, monthKey, transactions],
   );
   const data = useMemo(() => {
     const valueKey = mode === 'expense' ? 'expenseMinor' : 'incomeMinor';
@@ -178,7 +104,7 @@ export function CategoryDonutChart({
 
     return { items, totalMinor };
   }, [mode, monthCategories]);
-  const formattedTotal = formatCurrency(data.totalMinor, 'EUR', 'es-ES');
+  const formattedTotal = formatCurrency(data.totalMinor, currency, 'es-ES');
   const segmentLengths = useMemo(
     () =>
       distributeDonutSegmentLengths(

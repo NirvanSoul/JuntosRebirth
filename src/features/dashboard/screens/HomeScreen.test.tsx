@@ -783,4 +783,72 @@ describe('HomeScreen', () => {
       }),
     ).toBeNull();
   });
+
+  it('calcula el presupuesto con spaceCurrency (VES) mientras muestra el gasto en displayCurrency (EUR)', async () => {
+    const multiCurrencyTransactions: SessionTransaction[] = [
+      {
+        id: 'tx-eur',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 1000, // 10 EUR
+        currency: 'EUR',
+        title: 'Café EUR',
+        categoryId: 'housing',
+        occurredOn: dateInCurrentMonth(1),
+        recurrence: 'once',
+        updatedAt: '2026-07-01T12:00:00.000Z',
+      },
+      {
+        id: 'tx-ves',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 4000, // 40 VES
+        currency: 'VES',
+        title: 'Mercado VES',
+        categoryId: 'housing',
+        occurredOn: dateInCurrentMonth(2),
+        recurrence: 'once',
+        updatedAt: '2026-07-02T12:00:00.000Z',
+      },
+    ];
+
+    const categoryWithBudget: Category = {
+      id: 'housing',
+      spaceId: 'personal',
+      name: 'Vivienda',
+      icon: 'house',
+      colorToken: 'blue',
+      budgetMinor: 10000, // 100 VES de presupuesto
+      isDefault: true,
+      isArchived: false,
+    };
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={[categoryWithBudget]}
+            currency="EUR"
+            spaceCurrency="VES"
+            transactions={multiCurrencyTransactions}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    // Gasto visible en EUR: 10 € en la tarjeta
+    expect(
+      screen.getByRole('button', {
+        name: /Vivienda, gastado 10/,
+      }),
+    ).toBeTruthy();
+
+    // Anillo de progreso de presupuesto calculado en VES (40 VES / 100 VES = 40%)
+    expect(screen.getByLabelText('Presupuesto utilizado 40%')).toBeTruthy();
+  });
 });

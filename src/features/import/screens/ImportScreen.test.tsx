@@ -529,4 +529,38 @@ describe('ImportScreen', () => {
       }),
     );
   });
+
+  it('al cambiar de espacio, reinicia la moneda documental al fallbackCurrency del nuevo espacio', async () => {
+    const screen = await renderWithTheme(
+      <ImportScreen
+        {...baseProps({
+          activeSpaceId: 'space-eur',
+          availableCurrencies: ['EUR'],
+          fallbackCurrency: 'EUR',
+        })}
+      />,
+    );
+    await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(1));
+
+    await screen.rerender(
+      <ImportScreen
+        {...baseProps({
+          activeSpaceId: 'space-ves',
+          availableCurrencies: ['VES'],
+          fallbackCurrency: 'VES',
+        })}
+      />,
+    );
+
+    await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(2));
+    expect(buildImportCandidates).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        spaceId: 'space-ves',
+        fallbackCurrency: 'VES',
+      }),
+    );
+  });
 });

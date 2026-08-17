@@ -1,6 +1,7 @@
 import type { Category, CategoryIconName } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import type { CategoryColorToken } from '@/theme/categoryColors';
 
 export type CategorySummary = {
@@ -61,6 +62,7 @@ export function listTransactionsByMonth(
 export function summarizeCategories(
   categories: readonly Category[],
   transactions: readonly SessionTransaction[],
+  currency: CurrencyCode,
   referenceDate = new Date(),
 ): CategorySummary[] {
   const summaries = new Map<string, CategorySummary>(
@@ -81,6 +83,10 @@ export function summarizeCategories(
 
   listTransactionsThroughCurrentMonth(transactions, referenceDate).forEach(
     (transaction) => {
+      if (transaction.currency !== currency) {
+        return;
+      }
+
       const current = summaries.get(transaction.categoryId);
       if (!current) {
         return;

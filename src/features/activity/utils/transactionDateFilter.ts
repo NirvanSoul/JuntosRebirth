@@ -1,4 +1,5 @@
 import {
+  describePreviousPeriod,
   getTransactionPeriodRange,
   shiftTransactionPeriod,
   type TransactionPeriod,
@@ -9,6 +10,15 @@ export type TransactionDateFilter =
   | 'all'
   | { period: TransactionPeriod; selectedDate: Date }
   | { endDate: string; period: 'custom'; startDate: string };
+
+export function getComparisonPeriodLabel(
+  filter: TransactionDateFilter,
+): string | undefined {
+  if (filter === 'all') return undefined;
+  return filter.period === 'custom'
+    ? 'vs. periodo anterior'
+    : describePreviousPeriod(filter.period);
+}
 
 export function matchesTransactionDateFilter(
   occurredOn: string,

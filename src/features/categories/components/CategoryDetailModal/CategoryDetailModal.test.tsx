@@ -53,6 +53,7 @@ describe('CategoryDetailModal', () => {
         <ThemeProvider initialAppearance="light">
           <CategoryDetailModal
             category={category}
+            displayCurrency="EUR"
             onAddTransaction={jest.fn()}
             onClose={jest.fn()}
             onDelete={onDelete}
@@ -62,6 +63,7 @@ describe('CategoryDetailModal', () => {
             onSaveNote={onSaveNote}
             onShare={onShare}
             shareTargets={[{ id: 'couple', name: 'Pareja' }]}
+            spaceCurrency="EUR"
             transactions={[transaction]}
             visible
           />
@@ -235,6 +237,7 @@ describe('CategoryDetailModal', () => {
         <ThemeProvider initialAppearance="light">
           <CategoryDetailModal
             category={{ ...category, budgetMinor: 5000 }}
+            displayCurrency="EUR"
             onAddTransaction={jest.fn()}
             onClose={jest.fn()}
             onDelete={jest.fn()}
@@ -244,6 +247,7 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
+            spaceCurrency="EUR"
             transactions={[transaction]}
             visible
           />
@@ -291,6 +295,95 @@ describe('CategoryDetailModal', () => {
     expect(onSaveBudget).toHaveBeenCalledWith('food', undefined);
   });
 
+  it('multidivisa: separa totales en displayCurrency (USD) y presupuesto en spaceCurrency (VES)', async () => {
+    const mixedTransactions: SessionTransaction[] = [
+      {
+        id: 'tx-eur',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 1000,
+        currency: 'EUR',
+        title: 'Almuerzo EUR',
+        categoryId: 'food',
+        occurredOn: '2026-07-30',
+        recurrence: 'once',
+        updatedAt: '2026-07-30T12:00:00.000Z',
+      },
+      {
+        id: 'tx-usd',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 2000,
+        currency: 'USD',
+        title: 'Almuerzo USD',
+        categoryId: 'food',
+        occurredOn: '2026-07-30',
+        recurrence: 'once',
+        updatedAt: '2026-07-30T12:00:00.000Z',
+      },
+      {
+        id: 'tx-ves',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 4000,
+        currency: 'VES',
+        title: 'Almuerzo VES',
+        categoryId: 'food',
+        occurredOn: '2026-07-30',
+        recurrence: 'once',
+        updatedAt: '2026-07-30T12:00:00.000Z',
+      },
+    ];
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={{ ...category, budgetMinor: 10000 }} // 100 VES
+            displayCurrency="USD"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={jest.fn()}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            spaceCurrency="VES"
+            transactions={mixedTransactions}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const detail = screen.getByTestId('category-detail-modal');
+
+    // Movimientos listados solo incluyen el de USD
+    expect(within(detail).getByText('Almuerzo USD')).toBeTruthy();
+    expect(within(detail).queryByText('Almuerzo EUR')).toBeNull();
+    expect(within(detail).queryByText('Almuerzo VES')).toBeNull();
+
+    // Métrica de gasto visible en USD ($ 20)
+    const expenseMetric = within(detail).getByTestId('category-expense-metric');
+    expect(within(expenseMetric).getByText(/20/)).toBeTruthy();
+    expect(within(expenseMetric).getByText(/\$/)).toBeTruthy();
+
+    // Presupuesto en VES (100 VES total, 40 VES gastado -> 60 VES disponible)
+    const budgetSummary = within(detail).getByTestId('category-budget-summary');
+    expect(within(budgetSummary).getByText(/60/)).toBeTruthy();
+    expect(
+      within(budgetSummary).getAllByText(/Bs\./).length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(within(budgetSummary).getByText(/100/)).toBeTruthy();
+  });
+
   it('abre el editor de nota desde el botón del detalle y guarda al confirmar', async () => {
     const onSaveNote = jest.fn();
     const screen = await render(
@@ -303,6 +396,7 @@ describe('CategoryDetailModal', () => {
         <ThemeProvider initialAppearance="light">
           <CategoryDetailModal
             category={{ ...category, note: 'Nota previa' }}
+            displayCurrency="EUR"
             onAddTransaction={jest.fn()}
             onClose={jest.fn()}
             onDelete={jest.fn()}
@@ -312,6 +406,7 @@ describe('CategoryDetailModal', () => {
             onSaveNote={onSaveNote}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
+            spaceCurrency="EUR"
             transactions={[transaction]}
             visible
           />
@@ -348,6 +443,7 @@ describe('CategoryDetailModal', () => {
         <ThemeProvider initialAppearance="light">
           <CategoryDetailModal
             category={category}
+            displayCurrency="EUR"
             onAddTransaction={jest.fn()}
             onClose={jest.fn()}
             onDelete={jest.fn()}
@@ -357,6 +453,7 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
+            spaceCurrency="EUR"
             transactions={[transaction]}
             visible
           />
@@ -387,6 +484,7 @@ describe('CategoryDetailModal', () => {
         <ThemeProvider initialAppearance="light">
           <CategoryDetailModal
             category={category}
+            displayCurrency="EUR"
             onAddTransaction={jest.fn()}
             onClose={jest.fn()}
             onDelete={jest.fn()}
@@ -396,6 +494,7 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
+            spaceCurrency="EUR"
             transactions={[incomeTransaction]}
             visible
           />
@@ -425,6 +524,7 @@ describe('CategoryDetailModal', () => {
         <ThemeProvider initialAppearance="light">
           <CategoryDetailModal
             category={category}
+            displayCurrency="EUR"
             onAddTransaction={jest.fn()}
             onClose={jest.fn()}
             onDelete={jest.fn()}
@@ -434,6 +534,7 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
+            spaceCurrency="EUR"
             transactions={[transaction, futureTransaction]}
             visible
           />

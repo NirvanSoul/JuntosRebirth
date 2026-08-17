@@ -25,6 +25,7 @@ import type {
   CreateTransactionDraft,
   TransactionType,
 } from '@/features/transactions/types';
+import { defaultCurrencyCode } from '@/lib/currency/currencyCatalog';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
 
 type AddFirstTransactionStepProps = {
@@ -181,12 +182,12 @@ export function AddFirstTransactionStep({
         activeSpaceId={spaceId}
         availableCurrencies={activeCurrencies}
         hideTypeToggle
-        lastUsedCurrency={activeCurrencies[0]}
         onClose={() => setModalVisible(false)}
         onOpenCategoryPicker={() => setPickerVisible(true)}
         onSubmit={(draft) => void handleSubmit(draft)}
         onTypeChange={() => undefined}
         selectedCategory={selectedCategory}
+        spaceCurrency={activeCurrencies[0] ?? defaultCurrencyCode}
         type={type}
         visible={isModalVisible}
       />

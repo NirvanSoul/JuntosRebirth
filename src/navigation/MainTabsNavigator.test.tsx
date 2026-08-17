@@ -153,12 +153,24 @@ jest.mock(
 describe('MainTabsNavigator', () => {
   beforeEach(() => {
     mockUseSpaces.mockReturnValue({
-      activeSpace: { id: 'personal', name: 'Personal', type: 'personal' },
+      activeSpace: {
+        currency: 'EUR',
+        id: 'personal',
+        name: 'Personal',
+        type: 'personal',
+      },
       createSpace: jest.fn(),
       error: null,
       isReady: true,
       selectSpace: jest.fn(),
-      spaces: [{ id: 'personal', name: 'Personal', type: 'personal' }],
+      spaces: [
+        {
+          currency: 'EUR',
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+        },
+      ],
     });
   });
 
@@ -834,14 +846,29 @@ describe('MainTabsNavigator', () => {
 
   it('confirma una categoría copiada con su nombre y espacio de destino', async () => {
     mockUseSpaces.mockReturnValue({
-      activeSpace: { id: 'personal', name: 'Personal', type: 'personal' },
+      activeSpace: {
+        currency: 'EUR',
+        id: 'personal',
+        name: 'Personal',
+        type: 'personal',
+      },
       createSpace: jest.fn(),
       error: null,
       isReady: true,
       selectSpace: jest.fn(),
       spaces: [
-        { id: 'personal', name: 'Personal', type: 'personal' },
-        { id: 'couple', name: 'Pareja', type: 'couple' },
+        {
+          currency: 'EUR',
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+        },
+        {
+          currency: 'EUR',
+          id: 'couple',
+          name: 'Pareja',
+          type: 'couple',
+        },
       ],
     });
     const screen = await render(
@@ -879,14 +906,29 @@ describe('MainTabsNavigator', () => {
 
   it('abre los detalles desde Inicio y confirma la copia de un movimiento', async () => {
     mockUseSpaces.mockReturnValue({
-      activeSpace: { id: 'personal', name: 'Personal', type: 'personal' },
+      activeSpace: {
+        currency: 'EUR',
+        id: 'personal',
+        name: 'Personal',
+        type: 'personal',
+      },
       createSpace: jest.fn(),
       error: null,
       isReady: true,
       selectSpace: jest.fn(),
       spaces: [
-        { id: 'personal', name: 'Personal', type: 'personal' },
-        { id: 'couple', name: 'Pareja', type: 'other' },
+        {
+          currency: 'EUR',
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+        },
+        {
+          currency: 'EUR',
+          id: 'couple',
+          name: 'Pareja',
+          type: 'other',
+        },
       ],
     });
     const screen = await render(
@@ -1013,12 +1055,24 @@ describe('MainTabsNavigator', () => {
         access_token: 'fake-token',
       };
       mockUseSpaces.mockReturnValue({
-        activeSpace: { id: 'couple-space-1', name: 'Juntos', type: 'couple' },
+        activeSpace: {
+          currency: 'EUR',
+          id: 'couple-space-1',
+          name: 'Juntos',
+          type: 'couple',
+        },
         createSpace: jest.fn(),
         error: null,
         isReady: true,
         selectSpace: jest.fn(),
-        spaces: [{ id: 'couple-space-1', name: 'Juntos', type: 'couple' }],
+        spaces: [
+          {
+            currency: 'EUR',
+            id: 'couple-space-1',
+            name: 'Juntos',
+            type: 'couple',
+          },
+        ],
       });
 
       const screen = await render(
@@ -1081,12 +1135,24 @@ describe('MainTabsNavigator', () => {
         access_token: 'fake-token',
       };
       mockUseSpaces.mockReturnValue({
-        activeSpace: { id: 'couple-space-1', name: 'Juntos', type: 'couple' },
+        activeSpace: {
+          currency: 'EUR',
+          id: 'couple-space-1',
+          name: 'Juntos',
+          type: 'couple',
+        },
         createSpace: jest.fn(),
         error: null,
         isReady: true,
         selectSpace: jest.fn(),
-        spaces: [{ id: 'couple-space-1', name: 'Juntos', type: 'couple' }],
+        spaces: [
+          {
+            currency: 'EUR',
+            id: 'couple-space-1',
+            name: 'Juntos',
+            type: 'couple',
+          },
+        ],
       });
 
       const screen = await render(

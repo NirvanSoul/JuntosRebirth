@@ -2,7 +2,7 @@ import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
@@ -65,10 +65,15 @@ import type {
   ImportedTransactionCandidate,
   ImportMerchantRule,
   ImportSourceExtension,
-  ImportSummaryCounts,
 } from '@/features/import/types';
 import { computeImportFileHash } from '@/features/import/utils/computeImportFileHash';
 import { groupImportCandidates } from '@/features/import/utils/groupImportCandidates';
+import {
+  computeSummaryCounts,
+  formatSavedBatchDate,
+  isCandidateReady,
+  mappingHasCurrencyColumn,
+} from '@/features/import/utils/importScreenUtils';
 import {
   validateImportFile,
   validateImportRowCount,
@@ -131,51 +136,6 @@ type Phase =
 /** Fecha por defecto para desambiguar formatos: el público principal de juntoss usa DD/MM. */
 const dayMonthPreference = 'DMY';
 
-function formatSavedBatchDate(value: string): string {
-  return new Intl.DateTimeFormat('es-ES', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
-}
-
-function mappingHasCurrencyColumn(mapping: ColumnMapping): boolean {
-  for (const role of mapping.values()) {
-    if (role === 'currency') return true;
-  }
-  return false;
-}
-
-function isCandidateReady(candidate: ImportedTransactionCandidate): boolean {
-  return (
-    candidate.occurredOn !== null &&
-    candidate.amountMinor !== null &&
-    candidate.type !== 'unknown' &&
-    candidate.categoryId !== null
-  );
-}
-
-function computeSummaryCounts(
-  candidates: readonly ImportedTransactionCandidate[],
-): ImportSummaryCounts {
-  let duplicates = 0;
-  let needsReview = 0;
-
-  for (const candidate of candidates) {
-    if (candidate.duplicateStatus === 'exact') {
-      duplicates += 1;
-    } else if (candidate.issues.length > 0 || !isCandidateReady(candidate)) {
-      needsReview += 1;
-    }
-  }
-
-  return {
-    detected: candidates.length,
-    duplicates,
-    needsReview,
-    ready: candidates.length - duplicates - needsReview,
-  };
-}
-
 /**
  * Anfitrión de la importación de movimientos (Excel/XLS/CSV, Bible Fase 1;
  * PDF fue eliminado por ADR-073). Sigue
@@ -203,8 +163,18 @@ export function ImportScreen({
   const [remainingImportNotice, setRemainingImportNotice] = useState<
     string | null
   >(null);
+  const effectiveAvailableCurrencies = useMemo(() => {
+    return availableCurrencies.includes(fallbackCurrency)
+      ? availableCurrencies
+      : [fallbackCurrency, ...availableCurrencies];
+  }, [availableCurrencies, fallbackCurrency]);
   const [documentCurrency, setDocumentCurrency] =
     useState<CurrencyCode>(fallbackCurrency);
+
+  useEffect(() => {
+    setDocumentCurrency(fallbackCurrency);
+  }, [activeSpaceId, fallbackCurrency]);
+
   const [candidates, setCandidates] = useState<ImportedTransactionCandidate[]>(
     [],
   );
@@ -320,11 +290,8 @@ export function ImportScreen({
       merchantRules: readonly ImportMerchantRule[],
       sourceType: ImportSourceExtension,
     ) => {
-      // Solo pedimos la moneda del documento cuando la hoja no trae su propia
-      // columna de moneda por fila y el espacio maneja más de una (si no,
-      // no hay nada que decidir).
       if (
-        availableCurrencies.length > 1 &&
+        effectiveAvailableCurrencies.length > 1 &&
         !mappingHasCurrencyColumn(mapping)
       ) {
         setPhase({
@@ -338,7 +305,7 @@ export function ImportScreen({
       }
       finishParsing(rows, mapping, merchantRules, sourceType, fallbackCurrency);
     },
-    [availableCurrencies, fallbackCurrency, finishParsing],
+    [effectiveAvailableCurrencies.length, fallbackCurrency, finishParsing],
   );
 
   const handlePickFile = useCallback(async () => {
@@ -945,7 +912,7 @@ export function ImportScreen({
               están los movimientos de este documento?
             </Text>
             <View accessibilityRole="radiogroup" style={styles.rows}>
-              {availableCurrencies.map((code) => (
+              {effectiveAvailableCurrencies.map((code) => (
                 <SelectableOption
                   accessibilityLabel={`${getCurrencyFlag(code)} ${getCurrencyName(code)} (${code})`}
                   indicatorTestID={`import-currency-${code}-check`}

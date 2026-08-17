@@ -15,6 +15,7 @@ import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
+import { CategoryDetailActionButton as ActionButton } from '@/features/categories/components/CategoryDetailModal/CategoryDetailActionButton';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type {
   Category,
@@ -24,6 +25,7 @@ import { summarizeCategories } from '@/features/categories/utils/categorySummary
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import { triggerHaptic } from '@/lib/haptics/haptics';
@@ -42,6 +44,7 @@ type DetailPanel = 'delete' | null;
 
 type CategoryDetailModalProps = {
   category: Category | null;
+  displayCurrency: CurrencyCode;
   onAddTransaction: (categoryId: string) => void;
   onClose: () => void;
   onDelete: (categoryId: string) => void;
@@ -54,44 +57,16 @@ type CategoryDetailModalProps = {
     targetSpaceId: string,
   ) => boolean | Promise<boolean>;
   shareTargets: readonly CategoryShareTarget[];
+  spaceCurrency: CurrencyCode;
   transactions: readonly SessionTransaction[];
   visible: boolean;
 };
 
 const heroIconSize = 76;
 
-type ActionButtonProps = {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-};
-
-function ActionButton({ icon, label, onPress }: ActionButtonProps) {
-  const { colors, shadows } = useTheme();
-  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
-
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
-    >
-      <Ionicons
-        color={colors.textMuted}
-        name={icon}
-        size={iconSize.md}
-        testID={`category-action-icon-${icon}`}
-      />
-      <Text align="center" variant="footnote" weight="semibold">
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 export function CategoryDetailModal({
   category,
+  displayCurrency,
   onAddTransaction,
   onClose,
   onDelete,
@@ -101,6 +76,7 @@ export function CategoryDetailModal({
   onSaveNote,
   onShare,
   shareTargets,
+  spaceCurrency,
   transactions,
   visible,
 }: CategoryDetailModalProps) {
@@ -115,43 +91,39 @@ export function CategoryDetailModal({
     () =>
       category
         ? listTransactionsThroughCurrentMonth(transactions).filter(
-            (transaction) => transaction.categoryId === category.id,
+            (t) =>
+              t.categoryId === category.id && t.currency === displayCurrency,
           )
         : [],
-    [category, transactions],
+    [category, displayCurrency, transactions],
   );
   const allCategoryTransactions = useMemo(
     () =>
       category
         ? transactions.filter(
-            (transaction) => transaction.categoryId === category.id,
+            (t) =>
+              t.categoryId === category.id && t.currency === displayCurrency,
           )
         : [],
-    [category, transactions],
+    [category, displayCurrency, transactions],
   );
   const todayKey = getLocalTodayKey();
   const pastCategoryTransactions = useMemo(
-    () =>
-      categoryTransactions.filter(
-        (transaction) => transaction.occurredOn <= todayKey,
-      ),
+    () => categoryTransactions.filter((t) => t.occurredOn <= todayKey),
     [categoryTransactions, todayKey],
   );
   const upcomingCategoryTransactions = useMemo(() => {
     const seenIds = new Set<string>();
     const upcoming: SessionTransaction[] = [];
-
     for (const transaction of [
       ...allCategoryTransactions,
       ...categoryTransactions,
     ]) {
-      if (transaction.occurredOn <= todayKey || seenIds.has(transaction.id)) {
+      if (transaction.occurredOn <= todayKey || seenIds.has(transaction.id))
         continue;
-      }
       seenIds.add(transaction.id);
       upcoming.push(transaction);
     }
-
     return upcoming.sort((left, right) =>
       left.occurredOn.localeCompare(right.occurredOn),
     );
@@ -159,10 +131,21 @@ export function CategoryDetailModal({
   const summary = useMemo(
     () =>
       category
-        ? summarizeCategories([category], categoryTransactions)[0]
+        ? summarizeCategories([category], transactions, displayCurrency)[0]
         : undefined,
-    [category, categoryTransactions],
+    [category, displayCurrency, transactions],
   );
+  const budgetExpenseMinor = useMemo(() => {
+    if (!category) return 0;
+    return listTransactionsThroughCurrentMonth(transactions)
+      .filter(
+        (t) =>
+          t.categoryId === category.id &&
+          t.currency === spaceCurrency &&
+          t.type === 'expense',
+      )
+      .reduce((total, t) => total + t.amountMinor, 0);
+  }, [category, spaceCurrency, transactions]);
 
   useEffect(() => {
     if (!visible) return;
@@ -181,20 +164,24 @@ export function CategoryDetailModal({
 
   if (!category || !summary) return null;
 
-  const expense = formatCurrency(summary.expenseMinor, 'EUR', 'es-ES');
-  const income = formatCurrency(summary.incomeMinor, 'EUR', 'es-ES');
+  const expense = formatCurrency(
+    summary.expenseMinor,
+    displayCurrency,
+    'es-ES',
+  );
+  const income = formatCurrency(summary.incomeMinor, displayCurrency, 'es-ES');
   const budget = category.budgetMinor
-    ? formatCurrency(category.budgetMinor, 'EUR', 'es-ES')
+    ? formatCurrency(category.budgetMinor, spaceCurrency, 'es-ES')
     : null;
   const availableBudgetMinor = category.budgetMinor
-    ? Math.max(category.budgetMinor - summary.expenseMinor, 0)
+    ? Math.max(category.budgetMinor - budgetExpenseMinor, 0)
     : null;
   const availableBudget =
     availableBudgetMinor === null
       ? null
-      : formatCurrency(availableBudgetMinor, 'EUR', 'es-ES');
+      : formatCurrency(availableBudgetMinor, spaceCurrency, 'es-ES');
   const budgetProgress = category.budgetMinor
-    ? Math.min(summary.expenseMinor / category.budgetMinor, 1)
+    ? Math.min(budgetExpenseMinor / category.budgetMinor, 1)
     : 0;
   const openDeletePanel = () => {
     setPanel('delete');
@@ -361,13 +348,13 @@ export function CategoryDetailModal({
                 <View style={styles.budgetHeader}>
                   <View>
                     <Text tone="secondary" variant="caption">
-                      Disponible
+                      Disponible ({spaceCurrency})
                     </Text>
                     <Text variant="subheading">{availableBudget}</Text>
                   </View>
                   <View style={styles.budgetTotal}>
                     <Text align="right" tone="secondary" variant="caption">
-                      Presupuesto
+                      Presupuesto ({spaceCurrency})
                     </Text>
                     <Text align="right" variant="label" weight="semibold">
                       {budget}
@@ -473,6 +460,7 @@ export function CategoryDetailModal({
           onSaveBudget(category.id, budgetMinor);
           setBudgetModalVisible(false);
         }}
+        spaceCurrency={spaceCurrency}
         visible={isBudgetModalVisible}
       />
       <NoteEditorModal
@@ -586,20 +574,6 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     },
     budgetTotal: { flexShrink: 1 },
     actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-    actionButton: {
-      ...shadows.subtle,
-      minWidth: 0,
-      minHeight: 96,
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.xs,
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderRadius: radii.md,
-      borderWidth: 1,
-      padding: spacing.xs,
-    },
     dangerPanel: {
       gap: spacing.md,
       backgroundColor: colors.surface,

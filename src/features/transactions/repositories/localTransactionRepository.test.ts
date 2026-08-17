@@ -53,9 +53,14 @@ describe('localTransactionRepository', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-04T08:00:00'));
     mockGetLocalDatabase.mockResolvedValue(database);
     mockRandomUUID.mockReturnValue('00000000-0000-4000-8000-000000000002');
     getFirstAsync.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('crea y restaura un movimiento con un identificador estable', async () => {

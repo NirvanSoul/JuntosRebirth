@@ -1,4 +1,4 @@
-import { fireEvent } from '@testing-library/react-native';
+import { act, fireEvent } from '@testing-library/react-native';
 import { type ComponentProps, useState } from 'react';
 import { Keyboard, StyleSheet } from 'react-native';
 
@@ -10,6 +10,8 @@ import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { minTouchTarget } from '@/theme/layout';
 import { shadows } from '@/theme/shadows';
+
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
 const category: Category = {
   id: 'personal-category-1',
@@ -23,13 +25,15 @@ const category: Category = {
 
 type CreateTransactionModalProps = Omit<
   ComponentProps<typeof ControlledCreateTransactionModal>,
-  'onTypeChange' | 'type'
+  'onTypeChange' | 'spaceCurrency' | 'type'
 > & {
   initialType: TransactionType;
+  spaceCurrency?: CurrencyCode;
 };
 
 function CreateTransactionModal({
   initialType,
+  spaceCurrency = 'EUR',
   ...props
 }: CreateTransactionModalProps) {
   const [type, setType] = useState(initialType);
@@ -38,6 +42,7 @@ function CreateTransactionModal({
     <ControlledCreateTransactionModal
       {...props}
       onTypeChange={setType}
+      spaceCurrency={spaceCurrency}
       type={type}
     />
   );
@@ -880,16 +885,133 @@ describe('CreateTransactionModal', () => {
     );
 
     dismissSpy.mockClear();
-    fireEvent(
-      screen.getByTestId('create-transaction-form'),
-      'startShouldSetResponderCapture',
-    );
+    await act(async () => {
+      fireEvent(
+        screen.getByTestId('create-transaction-form'),
+        'startShouldSetResponderCapture',
+      );
+    });
     expect(dismissSpy).toHaveBeenCalledTimes(1);
 
     dismissSpy.mockClear();
-    fireEvent(screen.getByLabelText('5'), 'startShouldSetResponderCapture');
+    await act(async () => {
+      fireEvent(screen.getByLabelText('5'), 'startShouldSetResponderCapture');
+    });
     expect(dismissSpy).toHaveBeenCalledTimes(1);
 
     dismissSpy.mockRestore();
+  });
+
+  it('en nuevo movimiento, preselecciona spaceCurrency (VES) por encima de otras divisas', async () => {
+    const onSubmit = jest.fn();
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="space-ves"
+        availableCurrencies={['EUR', 'USD']}
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={onSubmit}
+        selectedCategory={category}
+        spaceCurrency="VES"
+        visible
+      />,
+    );
+
+    const currencyButton = screen.getByTestId('transaction-currency-button');
+    expect(currencyButton.props.accessibilityLabel).toBe('Moneda: VES');
+
+    await fireEvent.press(screen.getByLabelText('5'));
+    await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: 'VES' }),
+    );
+  });
+
+  it('en edición, respeta initialDraft.currency aunque spaceCurrency sea distinta', async () => {
+    const onSubmit = jest.fn();
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="space-ves"
+        availableCurrencies={['EUR', 'VES']}
+        initialDraft={{
+          amountMinor: 2500,
+          categoryId: category.id,
+          currency: 'USD',
+          occurredOn: '2026-08-15',
+          recurrence: 'once',
+          spaceId: 'space-ves',
+          title: 'Gasto en USD',
+          type: 'expense',
+        }}
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={onSubmit}
+        selectedCategory={category}
+        spaceCurrency="VES"
+        visible
+      />,
+    );
+
+    // En edición con initialDraft en USD, muestra USD
+    const currencyButton = screen.getByTestId('transaction-currency-button');
+    expect(currencyButton.props.accessibilityLabel).toBe('Moneda: USD');
+
+    await fireEvent.press(screen.getByLabelText('Guardar cambios'));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: 'USD' }),
+    );
+  });
+
+  it('al cambiar de espacio con el modal abierto, reinicia la divisa a la del nuevo espacio', async () => {
+    const onSubmit = jest.fn();
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="space-eur"
+        availableCurrencies={['EUR', 'USD']}
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={onSubmit}
+        selectedCategory={category}
+        spaceCurrency="EUR"
+        visible
+      />,
+    );
+
+    expect(
+      screen.getByTestId('transaction-currency-button').props
+        .accessibilityLabel,
+    ).toBe('Moneda: EUR');
+
+    // Cambiamos el espacio activo a uno en VES con el modal abierto
+    await act(async () => {
+      screen.rerender(
+        <CreateTransactionModal
+          activeSpaceId="space-ves"
+          availableCurrencies={['EUR', 'USD']}
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={onSubmit}
+          selectedCategory={category}
+          spaceCurrency="VES"
+          visible
+        />,
+      );
+    });
+
+    expect(
+      screen.getByTestId('transaction-currency-button').props
+        .accessibilityLabel,
+    ).toBe('Moneda: VES');
+
+    await fireEvent.press(screen.getByLabelText('5'));
+    await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: 'VES' }),
+    );
   });
 });

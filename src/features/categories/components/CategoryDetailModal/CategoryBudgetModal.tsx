@@ -7,6 +7,8 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { GradientCard } from '@/components/ui/GradientCard/GradientCard';
 import { Text } from '@/components/ui/Text/Text';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+import { getCurrencySymbol } from '@/lib/currency/currencyCatalog';
 import {
   amountMinorToInput,
   appendAmountKey,
@@ -28,6 +30,7 @@ type CategoryBudgetModalProps = {
   onClose: () => void;
   onRemove: () => void;
   onSave: (budgetMinor: number) => void;
+  spaceCurrency: CurrencyCode;
   visible: boolean;
 };
 
@@ -46,6 +49,7 @@ export function CategoryBudgetModal({
   onClose,
   onRemove,
   onSave,
+  spaceCurrency,
   visible,
 }: CategoryBudgetModalProps) {
   const density = useLayoutDensity();
@@ -54,6 +58,7 @@ export function CategoryBudgetModal({
   const [amountInput, setAmountInput] = useState('0');
   const budgetMinor = parseAmountMinor(amountInput);
   const displayAmount = formatAmountInputForDisplay(amountInput);
+  const currencySymbol = getCurrencySymbol(spaceCurrency);
   const contentHeight = useMemo(
     () =>
       layout.minTouchTarget +
@@ -98,20 +103,20 @@ export function CategoryBudgetModal({
               Presupuesto
             </Text>
             <Text numberOfLines={1} tone="secondary" variant="footnote">
-              {categoryName}
+              {categoryName} ({spaceCurrency})
             </Text>
           </View>
           <ModalCloseButton onPress={onClose} />
         </View>
 
         <View
-          accessibilityLabel={`${displayAmount} euros de presupuesto`}
+          accessibilityLabel={`${displayAmount} ${spaceCurrency} de presupuesto`}
           accessibilityLiveRegion="polite"
           style={styles.amountArea}
           testID="category-budget-amount"
         >
           <Text adjustsFontSizeToFit numberOfLines={1} variant="amountHero">
-            {displayAmount} €
+            {displayAmount} {currencySymbol}
           </Text>
         </View>
 

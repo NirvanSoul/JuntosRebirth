@@ -63,9 +63,7 @@ type CreateTransactionModalProps = {
   availableCurrencies?: readonly CurrencyCode[];
   initialDate?: string;
   initialDraft?: CreateTransactionDraft;
-  /** Moneda del movimiento más reciente del espacio activo. Se preselecciona
-   * al crear un movimiento nuevo, para no obligar a elegirla cada vez. */
-  lastUsedCurrency?: CurrencyCode;
+  spaceCurrency: CurrencyCode;
   /**
    * Oculta el selector interactivo de tipo (muestra `type` como una
    * insignia fija) y tiñe el botón de guardar de verde o rojo según `type`
@@ -147,18 +145,22 @@ export function CreateTransactionModal({
   hideTypeToggle = false,
   initialDate,
   initialDraft,
-  lastUsedCurrency,
-  type,
-  selectedCategory,
-  visible,
   onClose,
   onOpenCategoryPicker,
   onSubmit,
   onTypeChange,
+  selectedCategory,
+  spaceCurrency,
+  type,
+  visible,
 }: CreateTransactionModalProps) {
   const density = useLayoutDensity();
   const { colors } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, density));
+  const effectiveAvailableCurrencies = useMemo(() => {
+    const list = availableCurrencies ?? defaultAvailableCurrencies;
+    return list.includes(spaceCurrency) ? list : [spaceCurrency, ...list];
+  }, [availableCurrencies, spaceCurrency]);
   const [title, setTitle] = useState('');
   const [amountInput, setAmountInput] = useState('0');
   const [pendingOperations, setPendingOperations] = useState<
@@ -170,7 +172,7 @@ export function CreateTransactionModal({
     readonly string[]
   >([]);
   const [occurredOn, setOccurredOn] = useState(getLocalTodayKey);
-  const [currency, setCurrency] = useState<CurrencyCode>(defaultCurrencyCode);
+  const [currency, setCurrency] = useState<CurrencyCode>(spaceCurrency);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isRecurrencePickerVisible, setRecurrencePickerVisible] =
     useState(false);
@@ -270,21 +272,16 @@ export function CreateTransactionModal({
         ? (initialDraft.customOccurrenceDates ?? [initialDraft.occurredOn])
         : [],
     );
-    setCurrency(
-      initialDraft?.currency ??
-        (lastUsedCurrency && availableCurrencies.includes(lastUsedCurrency)
-          ? lastUsedCurrency
-          : availableCurrencies[0]) ??
-        defaultCurrencyCode,
-    );
+    setCurrency(initialDraft?.currency ?? spaceCurrency);
     setDatePickerVisible(false);
     setRecurrencePickerVisible(false);
     setCurrencyPickerVisible(false);
   }, [
-    availableCurrencies,
+    activeSpaceId,
+    effectiveAvailableCurrencies,
     initialDate,
     initialDraft,
-    lastUsedCurrency,
+    spaceCurrency,
     visible,
   ]);
 
@@ -680,7 +677,7 @@ export function CreateTransactionModal({
                 {recurrence.label}
               </Text>
             </Pressable>
-            {availableCurrencies.length > 1 ? (
+            {effectiveAvailableCurrencies.length > 1 ? (
               <Pressable
                 accessibilityHint="Abre las opciones de moneda"
                 accessibilityLabel={`Moneda: ${currency}`}
@@ -869,7 +866,7 @@ export function CreateTransactionModal({
       />
 
       <TransactionCurrencyPickerModal
-        availableCurrencies={availableCurrencies}
+        availableCurrencies={effectiveAvailableCurrencies}
         currency={currency}
         onClose={() => setCurrencyPickerVisible(false)}
         onSelectCurrency={(code) => {

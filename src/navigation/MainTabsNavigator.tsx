@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -96,60 +95,36 @@ import {
   getTransactionReminder,
   scheduleTransactionReminder,
 } from '@/features/transactions/services/transactionReminderService';
-import {
-  parseProjectedTransactionId,
-  projectRecurringTransactions,
-} from '@/features/transactions/utils/transactionRecurrence';
-import { sortTransactionsByRecentActivity } from '@/features/transactions/utils/transactionSummary';
+import { resolveTransactionForDetail } from '@/features/transactions/utils/transactionDetailResolution';
+import { parseProjectedTransactionId } from '@/features/transactions/utils/transactionRecurrence';
 import { useAppForeground } from '@/hooks/useAppForeground';
 import {
   defaultCurrencyCode,
   getCurrencyFlag,
+  type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 import type { CreateActionType } from '@/navigation/createActions';
 import type { MainTabParamList, RootDrawerParamList } from '@/navigation/types';
 import { layout } from '@/theme/layout';
-import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
-import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const Tabs = createBottomTabNavigator<MainTabParamList>();
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
-const drawerWidthRatio = 0.88;
-const drawerMaxWidth = 380;
+const drawerWidthRatio = 0.88,
+  drawerMaxWidth = 380;
 
 type CategoryCreationContext = 'quick' | 'transaction';
-
-function resolveTransactionForDetail(
-  transactions: readonly SessionTransaction[],
-  transactionId: string | null,
-): SessionTransaction | null {
-  if (!transactionId) return null;
-
-  const persisted = transactions.find(
-    (transaction) => transaction.id === transactionId,
-  );
-  if (persisted) return persisted;
-
-  const projectedIdentity = parseProjectedTransactionId(transactionId);
-  if (!projectedIdentity) return null;
-
-  return (
-    projectRecurringTransactions({
-      transactions,
-      startOn: projectedIdentity.occurredOn,
-      endOn: projectedIdentity.occurredOn,
-    }).find((transaction) => transaction.id === transactionId) ?? null
-  );
-}
+type CategoryDetailRequest = {
+  categoryId: string;
+  displayCurrency: CurrencyCode;
+};
 
 export function MainTabsNavigator() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
-  const styles = useThemedStyles(createStyles);
   const {
     activeSpace,
     createCoupleSpace,
@@ -219,7 +194,8 @@ export function MainTabsNavigator() {
   );
   const [copySuccessNotice, setCopySuccessNotice] =
     useState<CopySuccessNotice | null>(null);
-  const [detailCategoryId, setDetailCategoryId] = useState<string | null>(null);
+  const [detailRequest, setDetailRequest] =
+    useState<CategoryDetailRequest | null>(null);
   const [detailTransactionId, setDetailTransactionId] = useState<string | null>(
     null,
   );
@@ -258,11 +234,6 @@ export function MainTabsNavigator() {
     () => notificationRules.filter((rule) => rule.spaceId === activeSpace.id),
     [activeSpace.id, notificationRules],
   );
-  const lastUsedCurrency = useMemo(
-    () =>
-      sortTransactionsByRecentActivity(activeSpaceTransactions)[0]?.currency,
-    [activeSpaceTransactions],
-  );
   const hasMultipleHomeCurrencies = activeCurrencies.length > 1;
   const effectiveHomeCurrency =
     (selectedHomeCurrency && activeCurrencies.includes(selectedHomeCurrency)
@@ -275,10 +246,11 @@ export function MainTabsNavigator() {
     activeSpaceCategories.find(
       (category) => category.id === editingCategoryId,
     ) ?? null;
-  const detailCategory =
-    activeSpaceCategories.find(
-      (category) => category.id === detailCategoryId,
-    ) ?? null;
+  const detailCategory = detailRequest
+    ? (activeSpaceCategories.find(
+        (category) => category.id === detailRequest.categoryId,
+      ) ?? null)
+    : null;
   const detailTransaction = resolveTransactionForDetail(
     activeSpaceTransactions,
     detailTransactionId,
@@ -1063,7 +1035,15 @@ export function MainTabsNavigator() {
 
   if (!isReady || !isFinanceReady) {
     return (
-      <View style={styles.loading} testID="spaces-loading">
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.background,
+        }}
+        testID="spaces-loading"
+      >
         <ActivityIndicator color={colors.brand} />
       </View>
     );
@@ -1095,12 +1075,12 @@ export function MainTabsNavigator() {
           drawerType: 'front',
           headerShown: false,
           overlayColor: colors.overlay,
-          sceneStyle: styles.scene,
+          sceneStyle: { backgroundColor: 'transparent' },
         }}
       >
         <Drawer.Screen name="Main">
           {({ navigation }) => (
-            <View style={styles.container}>
+            <View style={{ flex: 1, backgroundColor: 'transparent' }}>
               <ActiveSpaceHeader
                 currencyFlag={
                   (activeMainTab === 'Home' || activeMainTab === 'Activity') &&
@@ -1144,7 +1124,12 @@ export function MainTabsNavigator() {
                         onCreateExpense={() => handleCreateAction('expense')}
                         onCreateIncome={() => handleCreateAction('income')}
                         onCreateMovement={() => handleCreateAction('expense')}
-                        onOpenCategoryDetail={setDetailCategoryId}
+                        onOpenCategoryDetail={(categoryId) =>
+                          setDetailRequest({
+                            categoryId,
+                            displayCurrency: effectiveHomeCurrency,
+                          })
+                        }
                         onOpenTransactionDetail={setDetailTransactionId}
                         onScrollDirectionChange={handleScrollDirectionChange}
                         onViewCategories={() => {
@@ -1162,6 +1147,7 @@ export function MainTabsNavigator() {
                           });
                         }}
                         showComparisonIndicators={showHomeComparisonIndicators}
+                        spaceCurrency={activeSpace.currency}
                         topContent={
                           activeSpace.type === 'personal' ? (
                             <PendingInvitationBanner
@@ -1193,10 +1179,16 @@ export function MainTabsNavigator() {
                       onCreateExpense={() => handleCreateAction('expense')}
                       onCreateIncome={() => handleCreateAction('income')}
                       onCreateMovement={() => handleCreateAction('expense')}
-                      onOpenCategoryDetail={setDetailCategoryId}
+                      onOpenCategoryDetail={(categoryId, currency) =>
+                        setDetailRequest({
+                          categoryId,
+                          displayCurrency: currency ?? effectiveHomeCurrency,
+                        })
+                      }
                       onOpenTransactionDetail={setDetailTransactionId}
                       onScrollDirectionChange={handleScrollDirectionChange}
                       onSummaryPinnedChange={setActivitySummaryPinned}
+                      spaceCurrency={activeSpace.currency}
                       summaryPinned={isActivitySummaryPinned}
                       targetRequestId={route.params?.requestId}
                       targetSection={route.params?.section}
@@ -1246,7 +1238,6 @@ export function MainTabsNavigator() {
                 availableCurrencies={activeCurrencies}
                 initialDate={transactionInitialDate}
                 initialDraft={editingTransaction ?? undefined}
-                lastUsedCurrency={lastUsedCurrency}
                 onClose={() => {
                   setEditingTransactionId(null);
                   setTransactionInitialDate(undefined);
@@ -1259,6 +1250,7 @@ export function MainTabsNavigator() {
                 onSubmit={handleTransactionSubmit}
                 onTypeChange={setTransactionType}
                 selectedCategory={selectedCategory}
+                spaceCurrency={activeSpace.currency}
                 type={transactionType}
                 visible={isTransactionModalVisible}
               />
@@ -1268,7 +1260,7 @@ export function MainTabsNavigator() {
                 availableCurrencies={activeCurrencies}
                 categories={categories}
                 existingTransactions={activeSpaceTransactions}
-                fallbackCurrency={effectiveHomeCurrency}
+                fallbackCurrency={activeSpace.currency}
                 onCategoriesCreated={(created) =>
                   setCategories((current) => [...current, ...created])
                 }
@@ -1310,20 +1302,23 @@ export function MainTabsNavigator() {
               />
               <CategoryDetailModal
                 category={detailCategory}
+                displayCurrency={
+                  detailRequest?.displayCurrency ?? effectiveHomeCurrency
+                }
                 onAddTransaction={(categoryId) => {
-                  setDetailCategoryId(null);
+                  setDetailRequest(null);
                   setTransactionInitialDate(undefined);
                   setSelectedCategoryId(categoryId);
                   setTransactionType('expense');
                   setTransactionModalVisible(true);
                 }}
-                onClose={() => setDetailCategoryId(null)}
+                onClose={() => setDetailRequest(null)}
                 onDelete={(categoryId) => {
-                  setDetailCategoryId(null);
+                  setDetailRequest(null);
                   handleArchiveCategory(categoryId);
                 }}
                 onEdit={(categoryId) => {
-                  setDetailCategoryId(null);
+                  setDetailRequest(null);
                   setEditingCategoryId(categoryId);
                   setCustomCategoryVisible(true);
                 }}
@@ -1332,6 +1327,7 @@ export function MainTabsNavigator() {
                 onSaveNote={handleSaveCategoryNote}
                 onShare={handleShareCategory}
                 shareTargets={shareTargets}
+                spaceCurrency={activeSpace.currency}
                 transactions={activeSpaceTransactions}
                 visible={detailCategory !== null}
               />
@@ -1346,7 +1342,6 @@ export function MainTabsNavigator() {
                     transactionId,
                   );
                   if (!transaction) return;
-
                   setDetailTransactionId(null);
                   setEditingTransactionId(transaction.id);
                   setTransactionInitialDate(undefined);
@@ -1354,7 +1349,13 @@ export function MainTabsNavigator() {
                   setTransactionType(transaction.type);
                   setTransactionModalVisible(true);
                 }}
-                onOpenCategoryDetail={setDetailCategoryId}
+                onOpenCategoryDetail={(categoryId) =>
+                  setDetailRequest({
+                    categoryId,
+                    displayCurrency:
+                      detailTransaction?.currency ?? effectiveHomeCurrency,
+                  })
+                }
                 onRemoveReminder={handleRemoveTransactionReminder}
                 onSaveNote={handleSaveTransactionNote}
                 onSaveReminder={handleSaveTransactionReminder}
@@ -1426,22 +1427,4 @@ export function MainTabsNavigator() {
       />
     </>
   );
-}
-
-function createStyles(colors: ColorTokens) {
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: 'transparent',
-    },
-    scene: {
-      backgroundColor: 'transparent',
-    },
-    loading: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.background,
-    },
-  });
 }

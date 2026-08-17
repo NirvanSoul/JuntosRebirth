@@ -57,8 +57,8 @@ const transactions: SessionTransaction[] = [
 ];
 
 describe('summarizeCategories', () => {
-  it('incluye categorías sin movimientos y agrega las que sí tienen', () => {
-    expect(summarizeCategories(categories, transactions)).toEqual([
+  it('incluye categorías sin movimientos y agrega las que sí tienen en la moneda solicitada', () => {
+    expect(summarizeCategories(categories, transactions, 'EUR')).toEqual([
       expect.objectContaining({
         id: 'food',
         transactionCount: 1,
@@ -75,8 +75,55 @@ describe('summarizeCategories', () => {
     ]);
   });
 
+  it('aislamiento: filtra por la moneda solicitada e ignora movimientos en otras divisas', () => {
+    const mixedTransactions: SessionTransaction[] = [
+      {
+        id: 'tx-eur',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 1000,
+        currency: 'EUR',
+        title: 'Almuerzo EUR',
+        categoryId: 'food',
+        occurredOn: '2026-07-31',
+        recurrence: 'once',
+        updatedAt: '2026-07-31T12:00:00.000Z',
+      },
+      {
+        id: 'tx-ves',
+        spaceId: 'personal',
+        type: 'expense',
+        amountMinor: 4000,
+        currency: 'VES',
+        title: 'Almuerzo VES',
+        categoryId: 'food',
+        occurredOn: '2026-07-31',
+        recurrence: 'once',
+        updatedAt: '2026-07-31T12:00:00.000Z',
+      },
+    ];
+
+    const vesSummary = summarizeCategories(
+      categories,
+      mixedTransactions,
+      'VES',
+    );
+    const foodVes = vesSummary.find((s) => s.id === 'food')!;
+    expect(foodVes.expenseMinor).toBe(4000);
+    expect(foodVes.transactionCount).toBe(1);
+
+    const eurSummary = summarizeCategories(
+      categories,
+      mixedTransactions,
+      'EUR',
+    );
+    const foodEur = eurSummary.find((s) => s.id === 'food')!;
+    expect(foodEur.expenseMinor).toBe(1000);
+    expect(foodEur.transactionCount).toBe(1);
+  });
+
   it('ignora movimientos cuya categoría no forma parte del catálogo recibido', () => {
-    expect(summarizeCategories([], transactions)).toEqual([]);
+    expect(summarizeCategories([], transactions, 'EUR')).toEqual([]);
   });
 });
 
