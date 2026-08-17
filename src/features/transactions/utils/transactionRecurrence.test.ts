@@ -40,6 +40,7 @@ describe('transactionRecurrence', () => {
   it('proyecta una serie mensual desde su fecha original sin degradar el día', () => {
     const transaction: SessionTransaction = {
       id: 'monthly',
+      createdBy: 'install-test',
       spaceId: 'personal',
       categoryId: 'home',
       type: 'expense',
@@ -74,6 +75,7 @@ describe('transactionRecurrence', () => {
     const transactions = ['2026-07-01', '2026-09-03', '2026-10-08'].map(
       (occurredOn, index): SessionTransaction => ({
         id: `custom-${index}`,
+        createdBy: 'install-test',
         spaceId: 'personal',
         categoryId: 'home',
         type: 'expense',
@@ -100,6 +102,7 @@ describe('transactionRecurrence', () => {
   it('proyecta una serie abierta solo dentro del rango solicitado', () => {
     const transaction: SessionTransaction = {
       id: 'salary-source',
+      createdBy: 'install-test',
       spaceId: 'personal',
       categoryId: 'salary',
       type: 'income',

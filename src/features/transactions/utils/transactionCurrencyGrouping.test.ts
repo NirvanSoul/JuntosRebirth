@@ -10,6 +10,7 @@ function buildTransaction(
 ): SessionTransaction {
   return {
     spaceId: 'personal',
+    createdBy: 'install-test',
     type: 'expense',
     amountMinor: 1_000,
     currency: 'EUR',

@@ -25,6 +25,7 @@ function transaction(
 ): SessionTransaction {
   return {
     id,
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'expense',
     amountMinor: 1000,

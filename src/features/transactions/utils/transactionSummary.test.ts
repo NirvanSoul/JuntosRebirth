@@ -10,6 +10,7 @@ import {
 const transactions: SessionTransaction[] = [
   {
     id: 'income-current-month',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'income',
     amountMinor: 200_000,
@@ -22,6 +23,7 @@ const transactions: SessionTransaction[] = [
   },
   {
     id: 'expense-current-month',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'expense',
     amountMinor: 35_000,
@@ -34,6 +36,7 @@ const transactions: SessionTransaction[] = [
   },
   {
     id: 'expense-previous-month',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'expense',
     amountMinor: 5_000,
@@ -50,6 +53,7 @@ const futureTransactions: SessionTransaction[] = [
   ...transactions,
   {
     id: 'future-income',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'income',
     amountMinor: 50_000,
@@ -62,6 +66,7 @@ const futureTransactions: SessionTransaction[] = [
   },
   {
     id: 'future-expense',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'expense',
     amountMinor: 10_000,

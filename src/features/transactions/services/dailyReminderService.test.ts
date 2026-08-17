@@ -52,6 +52,7 @@ function buildTransaction(
 ): SessionTransaction {
   return {
     id: 'tx-1',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'expense',
     amountMinor: 1000,

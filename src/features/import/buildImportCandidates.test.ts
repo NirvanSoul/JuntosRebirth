@@ -85,6 +85,7 @@ describe('buildImportCandidates', () => {
     const existingTransactions: SessionTransaction[] = [
       {
         id: 'existing-1',
+        createdBy: 'install-test',
         spaceId: 'personal',
         categoryId: 'supermercado',
         type: 'expense',
@@ -112,6 +113,7 @@ describe('buildImportCandidates', () => {
     const existingTransactions: SessionTransaction[] = [
       {
         id: 'existing-1',
+        createdBy: 'install-test',
         spaceId: 'couple',
         categoryId: 'supermercado',
         type: 'expense',

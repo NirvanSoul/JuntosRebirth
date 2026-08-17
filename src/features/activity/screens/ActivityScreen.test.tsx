@@ -22,6 +22,7 @@ import { spacing } from '@/theme/spacing';
 const transactions: SessionTransaction[] = [
   {
     id: 'session-1',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'expense',
     amountMinor: 1250,
@@ -34,6 +35,7 @@ const transactions: SessionTransaction[] = [
   },
   {
     id: 'session-2',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'income',
     amountMinor: 2000,
@@ -661,6 +663,7 @@ describe('ActivityScreen', () => {
     };
     const recurringTransaction: SessionTransaction = {
       id: 'session-3',
+      createdBy: 'install-test',
       spaceId: 'personal',
       type: 'expense',
       amountMinor: 999,
@@ -1228,6 +1231,7 @@ describe('ActivityScreen', () => {
     const multiTransactions: SessionTransaction[] = [
       {
         id: 'tx-eur',
+        createdBy: 'install-test',
         spaceId: 'personal',
         type: 'expense',
         amountMinor: 1000, // 10 EUR
@@ -1240,6 +1244,7 @@ describe('ActivityScreen', () => {
       },
       {
         id: 'tx-ves',
+        createdBy: 'install-test',
         spaceId: 'personal',
         type: 'expense',
         amountMinor: 4000, // 40 VES

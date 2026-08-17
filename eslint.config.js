@@ -19,7 +19,7 @@ const frozenLineDebt = {
   // 1214. Candidato prioritario a extracción (PLAN.md §3 Fase 4).
   'src/features/import/screens/ImportScreen.tsx': 1214,
   'src/features/transactions/components/CreateTransactionModal/CreateTransactionModal.tsx': 1163,
-  'src/features/transactions/repositories/localTransactionRepository.ts': 895,
+  'src/features/transactions/repositories/localTransactionRepository.ts': 873,
   'src/features/transactions/components/TransactionDetailModal/TransactionDetailModal.tsx': 701,
   'src/features/settings/screens/SettingsScreen.tsx': 660,
   'src/features/categories/components/CategoryDetailModal/CategoryDetailModal.tsx': 627,

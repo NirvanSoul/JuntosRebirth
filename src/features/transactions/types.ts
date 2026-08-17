@@ -19,6 +19,17 @@ export type CreateTransactionDraft = {
 
 export type SessionTransaction = CreateTransactionDraft & {
   id: string;
+  /**
+   * Quién creó el movimiento.
+   *
+   * Guarda el uuid de usuario cuando había sesión al crearlo, y el id de
+   * instalación cuando no la había (modo invitado) o cuando la fila es anterior
+   * a esta distinción. Ese segundo caso solo puede haberse originado en este
+   * mismo dispositivo: cualquier fila que venga del servidor trae uuid. Por eso
+   * `resolveTransactionAuthor` puede atribuir con seguridad a la persona del
+   * móvil todo id que no reconozca.
+   */
+  createdBy: string;
   /** Instante de creación o de última modificación, para ordenar por actividad reciente. */
   updatedAt: string;
   nextOccurrenceOn?: string;

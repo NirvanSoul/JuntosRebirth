@@ -25,6 +25,7 @@ const category: Category = {
 
 const transaction: SessionTransaction = {
   id: 'lunch',
+  createdBy: 'install-test',
   spaceId: 'personal',
   type: 'expense',
   amountMinor: 1890,

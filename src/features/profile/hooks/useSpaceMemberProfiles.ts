@@ -5,17 +5,26 @@ import { listSpaceMemberProfiles } from '@/features/profile/repositories/localSp
 import { syncSpaceMemberProfiles } from '@/features/profile/services/syncSpaceMemberProfiles';
 import type { SpaceMemberProfile } from '@/features/profile/types';
 import type { Space } from '@/features/spaces/types';
+import { getLocalDatabase } from '@/lib/storage/localDatabase';
+import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
+
+async function getInstallationId(): Promise<string> {
+  return getOrCreateInstallationId(await getLocalDatabase());
+}
 
 export type SpaceMembership = {
   /** Perfiles indexados por uuid de usuario, para resolver el autor de una fila. */
   profilesByUserId: Readonly<Record<string, SpaceMemberProfile>>;
   /** Uuid de quien usa el móvil, o `null` en modo invitado. */
   ownUserId: string | null;
+  /** Id de instalación, con el que van firmadas las filas creadas sin sesión. */
+  installationId: string | null;
 };
 
 const emptyMembership: SpaceMembership = {
   profilesByUserId: {},
   ownUserId: null,
+  installationId: null,
 };
 
 /**
@@ -34,30 +43,32 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
   const spaceId = space.id;
   const isShared = space.type !== 'personal';
 
-  const load = useCallback(async () => {
-    const ownUserId = await getAuthenticatedUserId();
-    const toRecord = (profiles: readonly SpaceMemberProfile[]) =>
-      Object.fromEntries(profiles.map((profile) => [profile.userId, profile]));
+  const load = useCallback(async (): Promise<SpaceMembership> => {
+    const [ownUserId, installationId, cached] = await Promise.all([
+      getAuthenticatedUserId(),
+      getInstallationId(),
+      listSpaceMemberProfiles(spaceId),
+    ]);
 
-    const cached = await listSpaceMemberProfiles(spaceId);
-    return { profilesByUserId: toRecord(cached), ownUserId };
+    return {
+      profilesByUserId: Object.fromEntries(
+        cached.map((profile) => [profile.userId, profile]),
+      ),
+      ownUserId,
+      installationId,
+    };
   }, [spaceId]);
 
   useEffect(() => {
     let isMounted = true;
 
-    if (!isShared) {
-      void getAuthenticatedUserId().then((ownUserId) => {
-        if (isMounted) setMembership({ profilesByUserId: {}, ownUserId });
-      });
-      return () => {
-        isMounted = false;
-      };
-    }
-
     void (async () => {
       try {
         if (isMounted) setMembership(await load());
+        // Un espacio personal no tiene a nadie más: la identidad propia que
+        // acaba de cargarse ya basta para atribuir sus movimientos.
+        if (!isShared) return;
+
         await syncSpaceMemberProfiles(spaceId);
         if (isMounted) setMembership(await load());
       } catch (error) {

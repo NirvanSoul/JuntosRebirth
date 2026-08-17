@@ -20,6 +20,14 @@ jest.mock('@/lib/storage/localIdentity', () => ({
   getOrCreateInstallationId: jest.fn(async () => 'installation-id'),
 }));
 
+jest.mock('@/features/legal/services/authenticatedUser', () => ({
+  getAuthenticatedUserId: jest.fn(async () => null),
+}));
+
+const mockGetAuthenticatedUserId = jest.requireMock(
+  '@/features/legal/services/authenticatedUser',
+).getAuthenticatedUserId as jest.Mock;
+
 jest.mock('expo-crypto', () => ({
   randomUUID: jest.fn(),
 }));
@@ -27,7 +35,12 @@ jest.mock('expo-crypto', () => ({
 const mockRandomUUID = jest.requireMock('expo-crypto').randomUUID as jest.Mock;
 
 describe('localTransactionRepository', () => {
-  const runAsync = jest.fn(async () => ({ changes: 1, lastInsertRowId: 0 }));
+  // Tipado con `...args` para poder inspeccionar los parámetros del INSERT, no
+  // solo cuántas veces se llamó.
+  const runAsync = jest.fn(async (..._args: unknown[]) => ({
+    changes: 1,
+    lastInsertRowId: 0,
+  }));
   const getFirstAsync = jest.fn();
   const getAllAsync = jest.fn();
   const withExclusiveTransactionAsync = jest.fn(
@@ -69,6 +82,9 @@ describe('localTransactionRepository', () => {
     expect(created).toEqual({
       ...draft,
       id: '00000000-0000-4000-8000-000000000002',
+      // Sin sesión de Supabase en el entorno de prueba, la autoría cae al id
+      // de instalación, que es el comportamiento esperado en modo invitado.
+      createdBy: 'installation-id',
       nextOccurrenceOn: undefined,
       recurrenceGroupId: undefined,
       recurrenceSeriesId: undefined,
@@ -100,6 +116,7 @@ describe('localTransactionRepository', () => {
         id: created.id,
         space_id: 'personal',
         category_id: 'category-id',
+        created_by: 'installation-id',
         type: 'expense',
         amount_minor: 1250,
         currency: 'EUR',
@@ -116,6 +133,22 @@ describe('localTransactionRepository', () => {
     await expect(listLocalTransactions()).resolves.toEqual([created]);
   });
 
+  it('firma el movimiento con el uuid de la sesión cuando la hay', async () => {
+    mockGetAuthenticatedUserId.mockResolvedValueOnce('uuid-ana');
+
+    const [created] = await createLocalTransaction(draft);
+
+    // Es lo que distingue esta columna de un id de dispositivo: sin el uuid, la
+    // otra persona del espacio no puede saber quién creó el movimiento.
+    expect(created!.createdBy).toBe('uuid-ana');
+
+    const insertCall = runAsync.mock.calls.find((call) =>
+      String(call[0]).includes('INSERT INTO transactions'),
+    );
+    expect(insertCall).toContain('uuid-ana');
+    expect(insertCall).not.toContain('installation-id');
+  });
+
   it('acepta y restaura un movimiento en una moneda distinta a EUR', async () => {
     const usdDraft = { ...draft, currency: 'USD' as const };
     const createdTransactions = await createLocalTransaction(usdDraft);
@@ -128,6 +161,7 @@ describe('localTransactionRepository', () => {
         id: created.id,
         space_id: 'personal',
         category_id: 'category-id',
+        created_by: 'installation-id',
         type: 'expense',
         amount_minor: 1250,
         currency: 'USD',

@@ -9,6 +9,7 @@ import type { SessionTransaction } from '@/features/transactions/types';
 function transaction(id: string, occurredOn: string): SessionTransaction {
   return {
     id,
+    createdBy: 'install-test',
     spaceId: 'personal',
     categoryId: 'salary',
     type: 'income',

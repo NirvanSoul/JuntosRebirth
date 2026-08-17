@@ -33,6 +33,7 @@ const occurredOn = `${currentMonthKey}-10`;
 const testTransactions: SessionTransaction[] = [
   {
     id: 'tx-1',
+    createdBy: 'install-test',
     spaceId: 'space-1',
     type: 'expense',
     amountMinor: 5000,
@@ -45,6 +46,7 @@ const testTransactions: SessionTransaction[] = [
   },
   {
     id: 'tx-2',
+    createdBy: 'install-test',
     spaceId: 'space-1',
     type: 'expense',
     amountMinor: 8000,

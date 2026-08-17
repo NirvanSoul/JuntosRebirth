@@ -51,6 +51,7 @@ const categories: Category[] = [
 const transactions: SessionTransaction[] = [
   {
     id: 'current-month',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'expense',
     amountMinor: 1250,
@@ -63,6 +64,7 @@ const transactions: SessionTransaction[] = [
   },
   {
     id: 'previous-month',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'expense',
     amountMinor: 4200,

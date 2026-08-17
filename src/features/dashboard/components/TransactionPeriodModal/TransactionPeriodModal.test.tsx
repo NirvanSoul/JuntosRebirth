@@ -10,6 +10,7 @@ function transaction(
 ): SessionTransaction {
   return {
     id,
+    createdBy: 'install-test',
     spaceId: 'personal',
     categoryId: 'general',
     type,

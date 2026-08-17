@@ -185,6 +185,7 @@ const category: Category = {
 
 const transaction: SessionTransaction = {
   id: 'expense-1',
+  createdBy: 'install-test',
   spaceId: 'personal',
   type: 'expense',
   amountMinor: 1299,

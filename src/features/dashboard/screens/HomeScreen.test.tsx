@@ -34,6 +34,7 @@ function dateInNextMonth(day: number): string {
 const transactions: SessionTransaction[] = [
   {
     id: 'income-current-month',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'income',
     amountMinor: 250_000,
@@ -49,6 +50,7 @@ const transactions: SessionTransaction[] = [
   },
   {
     id: 'expense-current-month',
+    createdBy: 'install-test',
     spaceId: 'personal',
     type: 'expense',
     amountMinor: 50_000,
@@ -731,6 +733,7 @@ describe('HomeScreen', () => {
     const multiCurrencyTransactions: SessionTransaction[] = [
       {
         id: 'tx-eur',
+        createdBy: 'install-test',
         spaceId: 'personal',
         type: 'expense',
         amountMinor: 1000,
@@ -743,6 +746,7 @@ describe('HomeScreen', () => {
       },
       {
         id: 'tx-ves',
+        createdBy: 'install-test',
         spaceId: 'personal',
         type: 'expense',
         amountMinor: 4000,
@@ -788,6 +792,7 @@ describe('HomeScreen', () => {
     const multiCurrencyTransactions: SessionTransaction[] = [
       {
         id: 'tx-eur',
+        createdBy: 'install-test',
         spaceId: 'personal',
         type: 'expense',
         amountMinor: 1000, // 10 EUR
@@ -800,6 +805,7 @@ describe('HomeScreen', () => {
       },
       {
         id: 'tx-ves',
+        createdBy: 'install-test',
         spaceId: 'personal',
         type: 'expense',
         amountMinor: 4000, // 40 VES

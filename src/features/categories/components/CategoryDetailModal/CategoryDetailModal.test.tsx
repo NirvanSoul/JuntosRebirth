@@ -24,6 +24,7 @@ const category: Category = {
 
 const transaction: SessionTransaction = {
   id: 'lunch',
+  createdBy: 'install-test',
   spaceId: 'personal',
   type: 'expense',
   amountMinor: 1890,
@@ -299,6 +300,7 @@ describe('CategoryDetailModal', () => {
     const mixedTransactions: SessionTransaction[] = [
       {
         id: 'tx-eur',
+        createdBy: 'install-test',
         spaceId: 'personal',
         type: 'expense',
         amountMinor: 1000,
@@ -311,6 +313,7 @@ describe('CategoryDetailModal', () => {
       },
       {
         id: 'tx-usd',
+        createdBy: 'install-test',
         spaceId: 'personal',
         type: 'expense',
         amountMinor: 2000,
@@ -323,6 +326,7 @@ describe('CategoryDetailModal', () => {
       },
       {
         id: 'tx-ves',
+        createdBy: 'install-test',
         spaceId: 'personal',
         type: 'expense',
         amountMinor: 4000,
