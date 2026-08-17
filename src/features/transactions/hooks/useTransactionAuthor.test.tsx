@@ -32,6 +32,10 @@ jest.mock(
   }),
 );
 
+jest.mock('@/features/profile/services/syncOwnAvatar', () => ({
+  syncOwnAvatar: jest.fn(async () => false),
+}));
+
 jest.mock('@/features/profile/services/syncSpaceMemberProfiles', () => ({
   syncSpaceMemberProfiles: jest.fn(async () => true),
 }));

@@ -37,11 +37,8 @@ import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScree
 import { PermissionsScreen } from '@/features/legal/screens/PermissionsScreen';
 import { PrivacyChoicesScreen } from '@/features/legal/screens/PrivacyChoicesScreen';
 import { PrivacyLegalScreen } from '@/features/legal/screens/PrivacyLegalScreen';
-import {
-  getLocalProfile,
-  saveLocalProfileAvatar,
-} from '@/features/profile/repositories/localProfileRepository';
-import { pickAndStoreAvatar } from '@/features/profile/services/avatarImageService';
+import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
+import { updateProfileAvatar } from '@/features/profile/services/updateProfileAvatar';
 import type { AvatarPickSource } from '@/features/profile/types';
 import { AuthModal } from '@/features/settings/components/AuthModal';
 import { CurrencyPreferencesModal } from '@/features/settings/components/CurrencyPreferencesModal/CurrencyPreferencesModal';
@@ -182,10 +179,8 @@ export function SettingsScreen({
 
   const handlePickAvatar = async (source: AvatarPickSource) => {
     try {
-      const avatarPath = await pickAndStoreAvatar(source);
-      if (!avatarPath) return;
-      const profile = await saveLocalProfileAvatar(avatarPath);
-      setAvatarUri(profile.avatarUri);
+      const profile = await updateProfileAvatar(source);
+      if (profile) setAvatarUri(profile.avatarUri);
     } catch {
       Alert.alert(
         'No se pudo actualizar tu foto',

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { listSpaceMemberProfiles } from '@/features/profile/repositories/localSpaceMemberProfileRepository';
+import { syncOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { syncSpaceMemberProfiles } from '@/features/profile/services/syncSpaceMemberProfiles';
 import type { SpaceMemberProfile } from '@/features/profile/types';
 import type { Space } from '@/features/spaces/types';
@@ -65,6 +66,11 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
     void (async () => {
       try {
         if (isMounted) setMembership(await load());
+        // Reintento de la subida pendiente. Va fuera del `if (isShared)` a
+        // propósito: en un espacio personal también hay que subir la foto, y
+        // este es el único punto que corre siempre. No lanza ni bloquea.
+        void syncOwnAvatar();
+
         // Un espacio personal no tiene a nadie más: la identidad propia que
         // acaba de cargarse ya basta para atribuir sus movimientos.
         if (!isShared) return;

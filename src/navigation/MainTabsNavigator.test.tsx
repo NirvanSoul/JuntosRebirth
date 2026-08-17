@@ -34,6 +34,10 @@ function dateInCurrentMonth(day: number): string {
   return `${year}-${month}-${String(day).padStart(2, '0')}`;
 }
 
+jest.mock('@/features/profile/services/syncOwnAvatar', () => ({
+  syncOwnAvatar: jest.fn(async () => false),
+}));
+
 jest.mock('@/features/spaces/hooks/useSpaces', () => ({
   useSpaces: () => mockUseSpaces(),
 }));
@@ -97,6 +101,18 @@ jest.mock(
       updateLocalTransaction: jest.fn(async (id, draft) => [{ ...draft, id }]),
     };
   },
+);
+
+// El censo del espacio se lee al montar el proveedor de membresía. Sin este
+// mock consultaría SQLite real y el fallo acabaría en `console.error`, que es
+// justo lo que afirman las pruebas de sincronización de más abajo.
+jest.mock(
+  '@/features/profile/repositories/localSpaceMemberProfileRepository',
+  () => ({
+    listSpaceMemberProfiles: jest.fn(async () => []),
+    replaceSpaceMemberProfiles: jest.fn(async () => {}),
+    saveSpaceMemberAvatarCache: jest.fn(async () => {}),
+  }),
 );
 
 // `SettingsScreen` vive en el mismo drawer que la pantalla principal y

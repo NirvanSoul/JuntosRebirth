@@ -240,11 +240,15 @@ invitado: `avatar_path` apunta a un archivo JPEG dentro de
 imágenes pesadas en el dispositivo. `avatar_updated_at` solo se usa para
 invalidar la caché de imagen de React Native al cambiar la foto (se añade
 como parámetro `?v=` a la uri leída), no como estado de sincronización. Esta
-tabla es exclusivamente local: al no existir todavía inicio de sesión, la
-foto de perfil no viaja a `public.profiles.avatar_url` (columna remota ya
-prevista en la sección 6.1); cuando se implemente la autenticación real, la
-migración de invitado a cuenta deberá decidir explícitamente si sube este
-archivo a Supabase Storage.
+tabla es exclusivamente local.
+
+Desde la migración 25, la foto sí viaja: se sube al bucket privado `avatars`
+con la ruta `{user_id}/avatar.jpg` y su ubicación se publica en
+`public.profiles.avatar_path`. La decisión que esta sección dejaba pendiente
+—si el archivo debía subirse a Supabase Storage— queda resuelta que sí. La
+miniatura se recomprime a 320×320 y calidad 0,7 antes de salir del dispositivo,
+de modo que pesa entre 25 y 40 KB: el sitio donde se muestra más grande son los
+56 px de Ajustes, que en una pantalla @3x son 168 px reales.
 
 La versión 10 sustituye el presupuesto local implícitamente asociado a EUR
 por `category_budgets`, una tabla por categoría y moneda. La columna histórica
@@ -286,13 +290,25 @@ se conserva para personalizar el modo invitado y estará disponible para una
 migración posterior a una cuenta autenticada.
 
 La versión 17 añade `space_member_profiles`, con clave primaria
-`(space_id, user_id)`. Guarda el censo de un espacio compartido —nombre y, en
-el futuro, foto de cada miembro activo— para poder atribuir un movimiento a su
-autor sin mostrar un uuid. Es una caché de lectura de `public.profiles`, no una
-fuente de verdad: se reemplaza entera por espacio en cada sincronización, de
-modo que quien abandona el espacio también desaparece en local. `avatar_url`
-existe en la tabla pero se llena siempre con `null` mientras la foto de perfil
-no viaje a Supabase Storage (ver 5.4, versión 9).
+`(space_id, user_id)`. Guarda el censo de un espacio compartido —nombre y foto
+de cada miembro activo— para poder atribuir un movimiento a su autor sin
+mostrar un uuid. Es una caché de lectura de `public.profiles`, no una fuente de
+verdad: se reemplaza entera por espacio en cada sincronización, de modo que
+quien abandona el espacio también desaparece en local.
+
+La versión 18 cierra el circuito de la foto de perfil, que hasta entonces no
+salía del dispositivo. `local_profile` gana `avatar_sync_status` —con el mismo
+juego de valores que el resto de tablas— y `avatar_remote_path`.
+`space_member_profiles` se recrea con `avatar_path` (la ruta del objeto en
+Storage), `avatar_updated_at` (el sello con el que se decide si redescargar) y
+`avatar_cached_uri` (la copia local ya descargada), en lugar de la antigua
+`avatar_url`, que prometía una url que nunca existió.
+
+El archivo cacheado se guarda en `Paths.document/avatars/members/` con el sello
+incrustado en el nombre (`{userId}__{selloSinSeparadores}.jpg`). Esa convención
+evita una columna extra para recordar a qué versión corresponde la copia: el
+propio nombre lo dice, así que basta compararlo con el sello que llega del
+censo para saber si hay que volver a bajar la foto.
 
 ### 5.5 Identificadores
 
@@ -906,6 +922,15 @@ Límite conocido: RLS es por fila, no por columna, así que la otra persona ve
 también `locale` y `default_currency`. Son preferencias, no credenciales, y
 ambos miembros ya comparten los importes del espacio. Restringir columnas
 exigiría una vista aparte.
+
+La foto de perfil sigue exactamente la misma regla. El bucket `avatars`
+(migración 25) es privado y sus políticas sobre `storage.objects` son
+`avatars_write_own`, que limita la escritura a la carpeta cuyo nombre coincide
+con el uuid de quien escribe, y `avatars_select_space_member`, que reutiliza
+`shares_active_space_with`. Una invitación sin aceptar no da acceso a la foto,
+igual que no lo da al nombre. El bucket rechaza además cualquier objeto de más
+de 256 KiB o que no sea `image/jpeg`, como cinturón de seguridad frente a un
+cliente defectuoso.
 
 ### 9.3 Espacios
 
