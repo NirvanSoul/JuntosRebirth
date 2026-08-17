@@ -147,7 +147,9 @@ cuando el responsable confirma el resultado.
 |---|---|---|---|---|
 | 2026-08-15 | Nueve láminas de onboarding tras la optimización lossless | iPhone 17 físico (iOS) | responsable | correctas, sin halos ni transparencias rotas |
 | 2026-08-16 | Smoke de «Reducir movimiento» en OnboardingRevealText (3 casos: off / on antes / on durante) | iPhone 17 físico (iOS) | responsable | correcto en los tres casos; **no verificado en Android** — excepción aceptada por el responsable |
-| 2026-08-16 | Sincronización bidireccional en caliente (iPhone ↔ Honor) tras corrección de restoreRemoteAccount | iPhone 17 (iOS) + Honor (Android) | responsable | correcto en ambos sentidos (~2s por Realtime, sin duplicaciones tras recarga) |
+| 2026-08-16 | Sincronización en caliente (iPhone 17 → Honor) en espacio «Juntos» tras corrección de restoreRemoteAccount | iPhone 17 físico (iOS) y Honor Android | responsable | correcto (~2 s vía Realtime, sin duplicación tras ciclo de sondeo y recarga) |
+| 2026-08-16 | Sincronización en caliente (Honor → iPhone 17) en espacio «Juntos» tras corrección de restoreRemoteAccount | Honor Android y iPhone 17 físico (iOS) | responsable | correcto (~2 s vía Realtime, sin duplicación tras ciclo de sondeo y recarga) |
+| 2026-08-16 | Sincronización tras cambio de espacio (personal → «Juntos») con movimiento pendiente | iPhone 17 físico (iOS) y Honor Android | responsable | correcto (~2 s al cambiar de espacio, sin pérdida de información) |
 
 ---
 
@@ -272,6 +274,13 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
   - La subida (`sync_couple_space_data`) opera correctamente de forma bidireccional (iOS → Postgres y Android → Postgres).
   - La sincronización descendente (`restoreRemoteAccount`) falla de forma simétrica en ambos dispositivos debido al bloqueo de concurrencia SQLite dentro de `withExclusiveTransactionAsync`.
 
+### Verificación tras la corrección de `restoreRemoteAccount`
+
+- **Ambos sentidos correctos.** Un movimiento creado en un dispositivo aparece en el otro en ~2 segundos, con el espacio «Juntos» activo en el receptor.
+- **Sin duplicación** tras esperar otro ciclo de sondeo y reiniciar la app.
+- La latencia observada (~2 s) es incompatible con el sondeo de 15 segundos, por lo que se infiere que la entrega ocurrió por Realtime. **Es una inferencia por tiempos, no observación directa del canal.** Realtime no presenta un segundo defecto.
+- **Cierre de la hipótesis 4 de la Fase 2:** Con el receptor situado en su espacio personal, un movimiento creado en el otro dispositivo aparece ~2 segundos después de cambiar al espacio «Juntos». La restauración al cambiar de espacio funciona y **no se pierde información**. La suscripción Realtime está acotada al espacio activo por diseño (`space_id=eq.${activeSpace.id}`); el hueco restante es de **aviso**, no de datos.
+
 ---
 
 ## 8. Ficha de Fase 3 — Corrección de `restoreRemoteAccount`
@@ -295,18 +304,29 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
 - **Fuera de alcance:**
   - Todo lo demás. En particular, no dejar de silenciar los errores de restauración en `src/navigation/MainTabsNavigator.tsx:333`; es un cambio de comportamiento distinto y va en tarea separada.
 
-### 2. Tareas completadas de Fase 3
-- **Tarea 1 (No silenciar errores en `MainTabsNavigator.tsx`):**
-  - Se sustituyeron los bloques `catch {}` vacíos de `syncCoupleSpaceDataForCurrentSession` y `restoreRemoteAccountForCurrentSession` por registro explícito con `console.error` estructurado.
-- **Tarea 2 (Eliminar literales `'EUR'` fijos):**
-  - Se reemplazaron los 8 literales fijos en `CategoryPreviewCard.tsx` (3), `CategoryDonutChart.tsx` (1), `CategoryDetailModal.tsx` (4) y `CategoryBudgetModal.tsx` por la propiedad `currency?: CurrencyCode` (default `defaultCurrencyCode`), usando `formatCurrency` y los helpers de `currencyCatalog.ts`.
-- **Tarea 3 (Propagar moneda en Onboarding, HomeScreen y aislamiento de totales):**
-  - `AddFirstTransactionStep.tsx`: Se conectó con `useCurrencyPreferences()` pasando `availableCurrencies` y `lastUsedCurrency` a `CreateTransactionModal`, garantizando que el usuario cree su primer ingreso/gasto en la moneda que seleccionó (p. ej. `VES` / `Bs.`).
-  - `HomeScreen.tsx`: `categorySummaries` ahora se calcula pasando `currencyTransactions` (en vez del histórico multidivisa `transactionsThroughCurrentMonth`), evitando la suma ciega de céntimos de monedas distintas.
-  - Propagación de `currency` a `CategoryPreviewCard` (Home/Activity), `CategoryDonutChart` (Activity) y `CategoryDetailModal` (MainTabs).
-  - **Pruebas y validación:** Pruebas unitarias de `CategoryPreviewCard` y `CategoryDetailModal` ampliadas para validar renderizado de `VES` y ausencia de `€`. Gate 1 (`npm run validate`) pasando 100% (117 suites / 675 tests, typecheck, eslint sin warnings, prettier).
-  - **Commit:** `a7c0f08` (`fix(finance): no silenciar errores de sync y propagar moneda dinamica en vistas y onboarding`).
+### 2. Cola de Fase 3 (orden de ejecución)
 
-### 3. Cola pendiente de Fase 3 (orden de ejecución)
-1. Permisos `PUBLIC EXECUTE`: migración nueva en backend, jamás reescribir una aplicada (pequeña).
-2. Actualizar `space_invitations.test.sql` al nombre de índice vigente (`space_invitations_one_pending_per_target_idx`) (pequeña).
+1. Dejar de silenciar los errores de restauración (`MainTabsNavigator:333`).
+   Primera, sin discusión: este defecto vivió meses invisible por ese
+   `catch {}`.
+2. Los ocho literales `'EUR'` con locale fijo en componentes de actividad y
+   categorías (pequeña).
+3. Exponer y propagar `spaces.currency` y `profiles.default_currency` en el
+   cliente, y agregar por moneda. El backend ya tiene los campos: no se
+   añade ninguno. Decisión de producto tomada: el espacio tiene moneda
+   principal definida al crearlo.
+4. **Indicador de novedades en el selector de espacio (mediana).** Un punto
+   cuando hay algo nuevo en un espacio que no estás mirando, calculado con
+   una consulta ligera al abrir la app y al volver a primer plano. **No
+   requiere suscripciones nuevas ni notificaciones**: el dato ya llega solo
+   al entrar al espacio, así que el hueco es de aviso. Sin avisos flotantes
+   por ahora — `JUNTOSS_NOTIFICATIONS.md` §19 pide informar, no reclamar
+   atención, y una importación de extracto generaría cientos de eventos.
+   Si tras usarlo la inmediatez se echa de menos, se evalúa entonces un
+   aviso agrupado, sin importes ni nombres.
+5. Permisos `PUBLIC EXECUTE`: migración **nueva**, jamás reescribir una
+   aplicada.
+6. Actualizar `space_invitations.test.sql` al nombre de índice vigente.
+
+Pendiente aparte, por contacto: extracción de `ImportScreen.tsx` y
+`AppCalendar.tsx`, ambos marcados como candidatos prioritarios en §4.
