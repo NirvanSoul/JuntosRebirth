@@ -91,8 +91,9 @@ export function CategoryDetailModal({
     () =>
       category
         ? listTransactionsThroughCurrentMonth(transactions).filter(
-            (t) =>
-              t.categoryId === category.id && t.currency === displayCurrency,
+            (transaction) =>
+              transaction.categoryId === category.id &&
+              transaction.currency === displayCurrency,
           )
         : [],
     [category, displayCurrency, transactions],
@@ -101,29 +102,36 @@ export function CategoryDetailModal({
     () =>
       category
         ? transactions.filter(
-            (t) =>
-              t.categoryId === category.id && t.currency === displayCurrency,
+            (transaction) =>
+              transaction.categoryId === category.id &&
+              transaction.currency === displayCurrency,
           )
         : [],
     [category, displayCurrency, transactions],
   );
   const todayKey = getLocalTodayKey();
   const pastCategoryTransactions = useMemo(
-    () => categoryTransactions.filter((t) => t.occurredOn <= todayKey),
+    () =>
+      categoryTransactions.filter(
+        (transaction) => transaction.occurredOn <= todayKey,
+      ),
     [categoryTransactions, todayKey],
   );
   const upcomingCategoryTransactions = useMemo(() => {
     const seenIds = new Set<string>();
     const upcoming: SessionTransaction[] = [];
+
     for (const transaction of [
       ...allCategoryTransactions,
       ...categoryTransactions,
     ]) {
-      if (transaction.occurredOn <= todayKey || seenIds.has(transaction.id))
+      if (transaction.occurredOn <= todayKey || seenIds.has(transaction.id)) {
         continue;
+      }
       seenIds.add(transaction.id);
       upcoming.push(transaction);
     }
+
     return upcoming.sort((left, right) =>
       left.occurredOn.localeCompare(right.occurredOn),
     );
@@ -139,12 +147,12 @@ export function CategoryDetailModal({
     if (!category) return 0;
     return listTransactionsThroughCurrentMonth(transactions)
       .filter(
-        (t) =>
-          t.categoryId === category.id &&
-          t.currency === spaceCurrency &&
-          t.type === 'expense',
+        (transaction) =>
+          transaction.categoryId === category.id &&
+          transaction.currency === spaceCurrency &&
+          transaction.type === 'expense',
       )
-      .reduce((total, t) => total + t.amountMinor, 0);
+      .reduce((total, transaction) => total + transaction.amountMinor, 0);
   }, [category, spaceCurrency, transactions]);
 
   useEffect(() => {

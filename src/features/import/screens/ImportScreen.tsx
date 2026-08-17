@@ -290,6 +290,9 @@ export function ImportScreen({
       merchantRules: readonly ImportMerchantRule[],
       sourceType: ImportSourceExtension,
     ) => {
+      // Solo pedimos la moneda del documento cuando la hoja no trae su propia
+      // columna de moneda por fila y el espacio maneja más de una (si no,
+      // no hay nada que decidir).
       if (
         effectiveAvailableCurrencies.length > 1 &&
         !mappingHasCurrencyColumn(mapping)
