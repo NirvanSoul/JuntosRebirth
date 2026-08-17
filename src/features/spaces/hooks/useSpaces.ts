@@ -63,16 +63,26 @@ async function fetchRemoteCoupleSpace(): Promise<Space | null> {
   }
   if (!data) return null;
 
+  const rawId = data.id;
+  const rawName = data.name;
   const rawCurrency = data.currency;
-  if (typeof rawCurrency !== 'string' || !isCurrencyCode(rawCurrency)) {
+
+  if (
+    typeof rawId !== 'string' ||
+    rawId.trim().length === 0 ||
+    typeof rawName !== 'string' ||
+    rawName.trim().length === 0 ||
+    typeof rawCurrency !== 'string' ||
+    !isCurrencyCode(rawCurrency)
+  ) {
     throw new RemoteSpaceIntegrityError(
-      `Moneda no reconocida en espacio de pareja remoto: ${String(rawCurrency)}`,
+      `Datos de espacio de pareja remoto inválidos (id: ${String(rawId)}, name: ${String(rawName)}, currency: ${String(rawCurrency)})`,
     );
   }
 
   return {
-    id: String(data.id),
-    name: String(data.name),
+    id: rawId,
+    name: rawName,
     type: 'couple',
     currency: rawCurrency,
     // `activated_at` es null mientras la invitación siga sin aceptar; en cuanto

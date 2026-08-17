@@ -120,7 +120,7 @@ describe('supabaseRemoteAccountGateway', () => {
     ]);
   });
 
-  it('lanza un error estructurado explícito ante un espacio remoto con moneda no reconocida (sin cast silencioso)', async () => {
+  it('lanza un error explícito ante un espacio remoto con moneda no reconocida (sin cast ni fallback silencioso)', async () => {
     const client = createMockSupabaseClient({
       spacesData: [
         {
@@ -133,7 +133,24 @@ describe('supabaseRemoteAccountGateway', () => {
     });
 
     await expect(fetchRemoteAccountSnapshot(client)).rejects.toThrow(
-      '[sync] Moneda no reconocida en espacio remoto space-1: INVALID_CURRENCY_XYZ',
+      '[sync] Integridad comprometida en espacio remoto space-1: type=personal, currency=INVALID_CURRENCY_XYZ',
+    );
+  });
+
+  it('lanza un error explícito ante un espacio remoto con type no reconocido (sin coerción a other)', async () => {
+    const client = createMockSupabaseClient({
+      spacesData: [
+        {
+          id: 'space-1',
+          name: 'Espacio Desconocido',
+          type: 'custom_type_hack',
+          currency: 'EUR',
+        },
+      ],
+    });
+
+    await expect(fetchRemoteAccountSnapshot(client)).rejects.toThrow(
+      '[sync] Integridad comprometida en espacio remoto space-1: type=custom_type_hack, currency=EUR',
     );
   });
 });

@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(17);
 
 -- 1. Existencia de la función y permisos
 select has_function(
@@ -69,6 +69,7 @@ declare
   batch_4 uuid := '22222222-2222-4222-8222-222222222224'::uuid;
   batch_5 uuid := '22222222-2222-4222-8222-222222222225'::uuid;
   batch_6 uuid := '22222222-2222-4222-8222-222222222226'::uuid;
+  batch_idempotent uuid := '22222222-2222-4222-8222-222222222299'::uuid;
   res jsonb;
 begin
   -- Configurar auth.uid() para la sesión de prueba
@@ -140,6 +141,31 @@ begin
     'install-test-1',
     jsonb_build_array(
       jsonb_build_object('id', 'sp-couple-guest-1', 'name', 'Pareja Falsa', 'type', 'couple', 'currency', 'USD')
+    ),
+    '[]'::jsonb,
+    '[]'::jsonb,
+    '[]'::jsonb
+  );
+
+  -- Caso 7: Primera ejecución del lote de prueba de idempotencia
+  res := public.migrate_guest_data(
+    batch_idempotent,
+    'install-test-1',
+    jsonb_build_array(
+      jsonb_build_object('id', 'sp-idempotent-1', 'name', 'Nombre Original Inmutable', 'type', 'other', 'currency', 'VES')
+    ),
+    '[]'::jsonb,
+    '[]'::jsonb,
+    '[]'::jsonb
+  );
+
+  -- Caso 8: Segunda ejecución con el MISMO batch_id pero payload DELIBERADAMENTE DIFERENTE
+  -- Si la rama de idempotencia funciona (retorno temprano), este payload modificado no se aplicará.
+  res := public.migrate_guest_data(
+    batch_idempotent,
+    'install-test-1',
+    jsonb_build_array(
+      jsonb_build_object('id', 'sp-idempotent-1', 'name', 'NOMBRE MUTADO FRAUDULENTO', 'type', 'other', 'currency', 'USD')
     ),
     '[]'::jsonb,
     '[]'::jsonb,
@@ -219,37 +245,33 @@ select is(
   'downgraded space preserves USD currency'
 );
 
--- 6. Idempotencia: re-ejecutar batch_1 devuelve el lote completado y no crea filas duplicadas
-do $$
-declare
-  test_user_id uuid := '11111111-1111-4111-8111-111111111111'::uuid;
-  batch_1 uuid := '22222222-2222-4222-8222-222222222221'::uuid;
-  res jsonb;
-begin
-  perform set_config('request.jwt.claim.sub', test_user_id::text, true);
-  res := public.migrate_guest_data(
-    batch_1,
-    'install-test-1',
-    jsonb_build_array(
-      jsonb_build_object('id', 'sp-ves-1', 'name', 'Viajes', 'type', 'other', 'currency', 'VES')
-    ),
-    '[]'::jsonb,
-    '[]'::jsonb,
-    '[]'::jsonb
-  );
-end;
-$$;
-
+-- 6. Verificación discriminante de idempotencia
 select is(
-  (select count(*) from public.space_local_sources where local_id = 'sp-ves-1' and installation_id = 'install-test-1'),
-  1::bigint,
-  're-executing existing batch is idempotent and does not duplicate local source links'
+  (select s.name from public.spaces s
+    join public.space_local_sources sls on sls.space_id = s.id
+   where sls.local_id = 'sp-idempotent-1' and sls.installation_id = 'install-test-1'),
+  'Nombre Original Inmutable',
+  'idempotent replay with different payload does not overwrite space name'
 );
 
 select is(
-  (select status from public.guest_migration_batches where id = '22222222-2222-4222-8222-222222222221'::uuid),
+  (select s.currency from public.spaces s
+    join public.space_local_sources sls on sls.space_id = s.id
+   where sls.local_id = 'sp-idempotent-1' and sls.installation_id = 'install-test-1'),
+  'VES',
+  'idempotent replay with different payload does not overwrite space currency'
+);
+
+select is(
+  (select count(*) from public.space_local_sources where local_id = 'sp-idempotent-1' and installation_id = 'install-test-1'),
+  1::bigint,
+  'idempotent batch execution does not create duplicate links'
+);
+
+select is(
+  (select status from public.guest_migration_batches where id = '22222222-2222-4222-8222-222222222299'::uuid),
   'completed',
-  'idempotent batch remains completed'
+  'idempotent batch record remains completed'
 );
 
 select * from finish();

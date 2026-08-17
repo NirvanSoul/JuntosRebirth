@@ -403,6 +403,41 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it('registra error de integridad si el espacio remoto contiene un nombre vacío (sin coerción silenciosa)', async () => {
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    mockAuthSession(fakeSession);
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+    mockRemoteCoupleSpace({
+      data: {
+        id: 'space-blank-name',
+        name: '   ',
+        type: 'couple',
+        currency: 'EUR',
+        activated_at: null,
+      },
+      error: null,
+    });
+
+    const { result } = await renderHook(() => useSpaces());
+
+    await waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[useSpaces] Error de integridad en espacio remoto:',
+        expect.any(Error),
+      );
+      expect(result.current.error).toBe(
+        'No pudimos comprobar tu espacio de pareja por un error de integridad.',
+      );
+    });
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it('transición: limpia el error de integridad cuando una sincronización posterior devuelve datos válidos', async () => {
     const consoleErrorSpy = jest
       .spyOn(console, 'error')
