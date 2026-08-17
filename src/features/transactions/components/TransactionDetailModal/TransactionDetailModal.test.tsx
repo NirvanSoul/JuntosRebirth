@@ -390,6 +390,42 @@ describe('TransactionDetailModal', () => {
     expect(onSaveNote).toHaveBeenCalledWith('lunch', null);
   });
 
+  it('da etiqueta accesible a una nota heredada vacía', async () => {
+    const emptyNoteTransaction = { ...transaction, note: '' };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={emptyNoteTransaction}
+            transactions={[emptyNoteTransaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    // La nota vacía se ve como «Escribir Nota» y su etiqueta accesible no
+    // puede quedar vacía: se anuncia la misma acción.
+    const noteButton = screen.getByTestId('transaction-detail-note');
+    expect(noteButton.props.accessibilityLabel).toBe('Escribir nota');
+    expect(within(noteButton).getByText('Escribir Nota')).toBeTruthy();
+  });
+
   it('oculta la nota en ocurrencias proyectadas sin materializar', async () => {
     const projectedId = createProjectedTransactionId(
       'monthly-series',

@@ -183,6 +183,67 @@ jest.mock('@/features/import/repositories/localMerchantRuleRepository', () => ({
   saveLocalMerchantRule: jest.fn(),
 }));
 
+// Realtime del espacio de pareja: espía las suscripciones del canal
+// `couple-space-sync:<spaceId>` sin tocar la red. En el resto de las suites
+// el cliente queda inerte, porque el efecto envuelve su creación en try/catch.
+const mockRealtimeChannel = {
+  channelName: null as string | null,
+  subscribeCalls: 0,
+  subscriptions: [] as {
+    callback: () => void;
+    changeEvent: string;
+    channelType: string;
+    filter: string;
+    schema: string;
+    table: string;
+  }[],
+};
+
+jest.mock('@/lib/supabase/supabaseClient', () => {
+  type MockRealtimeChannel = {
+    on: (
+      channelType: string,
+      options: {
+        event: string;
+        filter: string;
+        schema: string;
+        table: string;
+      },
+      callback: () => void,
+    ) => MockRealtimeChannel;
+    subscribe: () => MockRealtimeChannel;
+  };
+
+  return {
+    getConfiguredSupabaseClient: () => {
+      const channel: MockRealtimeChannel = {
+        on: jest.fn((channelType, options, callback) => {
+          mockRealtimeChannel.subscriptions.push({
+            callback,
+            changeEvent: options.event,
+            channelType,
+            filter: options.filter,
+            schema: options.schema,
+            table: options.table,
+          });
+          return channel;
+        }),
+        subscribe: jest.fn(() => {
+          mockRealtimeChannel.subscribeCalls += 1;
+          return channel;
+        }),
+      };
+      return {
+        channel: jest.fn((name: string) => {
+          mockRealtimeChannel.channelName = name;
+          return channel;
+        }),
+        removeChannel: jest.fn(),
+      };
+    },
+  };
+});
+
 describe('MainTabsNavigator', () => {
   beforeEach(() => {
     mockUseSpaces.mockReturnValue({
@@ -387,14 +448,14 @@ describe('MainTabsNavigator', () => {
       (listLocalTransactions as jest.Mock).mockResolvedValue([]);
     });
 
-    it('Actividad en USD abre el detalle de categoría con USD, sin caer en otra moneda', async () => {
+    it('Actividad: la selección local de USD en el filtro abre el detalle en USD, sin EUR', async () => {
       await AsyncStorage.setItem(
         '@juntoss/currency-preferences/v1',
         JSON.stringify({ currencies: ['EUR', 'USD'], version: 1 }),
       );
       await AsyncStorage.setItem(
         '@juntoss/home-currency-selection/v1',
-        JSON.stringify({ currency: 'USD', version: 1 }),
+        JSON.stringify({ currency: 'EUR', version: 1 }),
       );
       (listLocalCategories as jest.Mock).mockResolvedValue([
         {
@@ -449,10 +510,18 @@ describe('MainTabsNavigator', () => {
         </SafeAreaProvider>,
       );
 
+      // Inicio arranca en EUR (selección guardada del encabezado).
       await waitFor(() =>
-        expect(screen.getByLabelText('Moneda seleccionada: 🇺🇸')).toBeTruthy(),
+        expect(screen.getByLabelText('Moneda seleccionada: 🇪🇺')).toBeTruthy(),
       );
       await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+
+      // En Actividad se cambia a USD por el filtro local de moneda, sin tocar
+      // la selección de Inicio.
+      await fireEvent.press(screen.getByLabelText('Filtros'));
+      await fireEvent.press(screen.getByLabelText('Moneda'));
+      await fireEvent.press(screen.getByTestId('currency-filter-USD'));
+      await fireEvent.press(screen.getByLabelText('Aplicar filtros'));
 
       const card = await screen.findByTestId('category-preview-card');
       await fireEvent.press(card);
@@ -1414,6 +1483,91 @@ describe('MainTabsNavigator', () => {
 
       expect(await screen.findByText('Compra semanal')).toBeTruthy();
       expect(screen.getByText('Alimentación')).toBeTruthy();
+    });
+  });
+
+  describe('suscripción Realtime del espacio de pareja (reentrega)', () => {
+    beforeEach(() => {
+      mockRealtimeChannel.channelName = null;
+      mockRealtimeChannel.subscribeCalls = 0;
+      mockRealtimeChannel.subscriptions = [];
+      mockSession = {
+        user: { id: 'user-1', email: 'test@example.com' },
+        access_token: 'fake-token',
+      };
+      mockUseSpaces.mockReturnValue({
+        activeSpace: {
+          currency: 'EUR',
+          id: 'couple-space-1',
+          name: 'Juntos',
+          type: 'couple',
+        },
+        createSpace: jest.fn(),
+        error: null,
+        isReady: true,
+        selectSpace: jest.fn(),
+        spaces: [
+          {
+            currency: 'EUR',
+            id: 'couple-space-1',
+            name: 'Juntos',
+            type: 'couple',
+          },
+        ],
+      });
+    });
+
+    afterEach(() => {
+      mockSession = null;
+    });
+
+    it('suscribe exactamente categories, recurring_transaction_series y transactions del espacio activo con un único callback', async () => {
+      await render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <NavigationContainer>
+              <MainTabsNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      await waitFor(() => {
+        expect(
+          mockRealtimeChannel.subscriptions
+            .slice(0, 3)
+            .map((subscription) => subscription.table),
+        ).toEqual([
+          'categories',
+          'recurring_transaction_series',
+          'transactions',
+        ]);
+      });
+
+      expect(mockRealtimeChannel.channelName).toBe(
+        'couple-space-sync:couple-space-1',
+      );
+      expect(mockRealtimeChannel.subscribeCalls).toBeGreaterThanOrEqual(1);
+
+      const primerasSuscripciones = mockRealtimeChannel.subscriptions.slice(
+        0,
+        3,
+      );
+      for (const subscription of primerasSuscripciones) {
+        expect(subscription.channelType).toBe('postgres_changes');
+        expect(subscription.changeEvent).toBe('*');
+        expect(subscription.schema).toBe('public');
+        expect(subscription.filter).toBe('space_id=eq.couple-space-1');
+      }
+      const callbacks = new Set(
+        primerasSuscripciones.map((subscription) => subscription.callback),
+      );
+      expect(callbacks.size).toBe(1);
     });
   });
 });

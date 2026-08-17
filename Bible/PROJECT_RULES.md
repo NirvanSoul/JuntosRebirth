@@ -665,6 +665,8 @@ Este resumen es el paquete de revisión que se entrega en el Gate 2 de `WORKFLOW
 - No asumir que el espacio activo autoriza una consulta.
 - No implementar únicamente para iOS.
 - No declarar una tarea terminada con documentación obsoleta.
+- Toda callback que propague una divisa la recibe obligatoria por tipo.
+- En rutas que presentan datos financieros está prohibido sustituir una divisa ausente mediante `??` hacia la moneda de Inicio o `defaultCurrencyCode`.
 
 ---
 

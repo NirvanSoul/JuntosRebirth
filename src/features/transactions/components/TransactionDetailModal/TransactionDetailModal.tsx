@@ -30,6 +30,7 @@ import {
 } from '@/features/transactions/utils/transactionRecurrence';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { formatLongSpanishDate } from '@/lib/date/localDate';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import {
   categoryColors,
@@ -76,14 +77,6 @@ const recurrenceLabels: Record<TransactionRecurrence, string> = {
   monthly: 'Mensual',
   custom: 'Personalizada',
 };
-
-function formatTransactionDate(occurredOn: string): string {
-  return new Intl.DateTimeFormat('es-ES', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(`${occurredOn}T12:00:00`));
-}
 
 export function TransactionDetailModal({
   category,
@@ -206,7 +199,7 @@ export function TransactionDetailModal({
       ? nextOccurrenceOn !== undefined
       : upcomingDates.length > visibleRecurrenceCount;
   const nextRecurrenceValue = nextOccurrenceOn
-    ? formatTransactionDate(nextOccurrenceOn)
+    ? formatLongSpanishDate(nextOccurrenceOn)
     : transaction.recurrence === 'once'
       ? 'No se repetirá'
       : transaction.recurrence === 'custom'
@@ -397,7 +390,7 @@ export function TransactionDetailModal({
               {renderDetailRow(
                 'Fecha',
                 'calendar-outline',
-                formatTransactionDate(transaction.occurredOn),
+                formatLongSpanishDate(transaction.occurredOn),
               )}
               <View style={styles.divider} />
               {renderDetailRow(
@@ -464,7 +457,7 @@ export function TransactionDetailModal({
                       <Text tone="secondary" variant="footnote">
                         {index + 1}.
                       </Text>
-                      <Text variant="label">{formatTransactionDate(date)}</Text>
+                      <Text variant="label">{formatLongSpanishDate(date)}</Text>
                     </View>
                   ))}
                   {hasMoreRecurrences ? (
@@ -491,7 +484,9 @@ export function TransactionDetailModal({
 
             {!isProjected ? (
               <Pressable
-                accessibilityLabel={transaction.note ?? 'Escribir nota'}
+                accessibilityLabel={
+                  transaction.note ? transaction.note : 'Escribir nota'
+                }
                 accessibilityRole="button"
                 onPress={() => setNoteModalVisible(true)}
                 style={({ pressed }) => [

@@ -1281,39 +1281,37 @@ export function MainTabsNavigator() {
                 spaceName={activeSpace.name}
                 visible={isCustomCategoryVisible}
               />
-              <CategoryDetailModal
-                category={detailCategory}
-                displayCurrency={
-                  // `detailRequest` solo es nulo con el modal oculto, así que
-                  // este valor de reserva nunca llega a mostrarse.
-                  detailRequest?.displayCurrency ?? effectiveHomeCurrency
-                }
-                onAddTransaction={(categoryId) => {
-                  setDetailRequest(null);
-                  setTransactionInitialDate(undefined);
-                  setSelectedCategoryId(categoryId);
-                  setTransactionType('expense');
-                  setTransactionModalVisible(true);
-                }}
-                onClose={() => setDetailRequest(null)}
-                onDelete={(categoryId) => {
-                  setDetailRequest(null);
-                  handleArchiveCategory(categoryId);
-                }}
-                onEdit={(categoryId) => {
-                  setDetailRequest(null);
-                  setEditingCategoryId(categoryId);
-                  setCustomCategoryVisible(true);
-                }}
-                onOpenTransactionDetail={setDetailTransactionId}
-                onSaveBudget={handleSaveCategoryBudget}
-                onSaveNote={handleSaveCategoryNote}
-                onShare={handleShareCategory}
-                shareTargets={shareTargets}
-                spaceCurrency={activeSpace.currency}
-                transactions={activeSpaceTransactions}
-                visible={detailCategory !== null}
-              />
+              {detailRequest ? (
+                <CategoryDetailModal
+                  category={detailCategory}
+                  displayCurrency={detailRequest.displayCurrency}
+                  onAddTransaction={(categoryId) => {
+                    setDetailRequest(null);
+                    setTransactionInitialDate(undefined);
+                    setSelectedCategoryId(categoryId);
+                    setTransactionType('expense');
+                    setTransactionModalVisible(true);
+                  }}
+                  onClose={() => setDetailRequest(null)}
+                  onDelete={(categoryId) => {
+                    setDetailRequest(null);
+                    handleArchiveCategory(categoryId);
+                  }}
+                  onEdit={(categoryId) => {
+                    setDetailRequest(null);
+                    setEditingCategoryId(categoryId);
+                    setCustomCategoryVisible(true);
+                  }}
+                  onOpenTransactionDetail={setDetailTransactionId}
+                  onSaveBudget={handleSaveCategoryBudget}
+                  onSaveNote={handleSaveCategoryNote}
+                  onShare={handleShareCategory}
+                  shareTargets={shareTargets}
+                  spaceCurrency={activeSpace.currency}
+                  transactions={activeSpaceTransactions}
+                  visible={detailCategory !== null}
+                />
+              ) : null}
               <TransactionDetailModal
                 category={detailTransactionCategory}
                 onClose={() => setDetailTransactionId(null)}
