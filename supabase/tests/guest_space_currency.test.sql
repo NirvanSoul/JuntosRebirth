@@ -51,10 +51,10 @@ select is(
   'migrate_guest_data configures search_path to empty string'
 );
 
--- 3. Preparación de datos y ejecución de casos de prueba
+-- 3. Preparación de datos y ejecución de casos de prueba con usuario sintético dedicado
 do $$
 declare
-  test_user_id uuid;
+  test_user_id uuid := '11111111-1111-4111-8111-111111111111'::uuid;
   batch_1 uuid := '22222222-2222-4222-8222-222222222221'::uuid;
   batch_2 uuid := '22222222-2222-4222-8222-222222222222'::uuid;
   batch_3 uuid := '22222222-2222-4222-8222-222222222223'::uuid;
@@ -64,24 +64,14 @@ declare
   batch_idempotent uuid := '22222222-2222-4222-8222-222222222299'::uuid;
   res jsonb;
 begin
-  -- En entorno local creamos el usuario en auth.users; en staging obtenemos el usuario existente de profiles
-  select id into test_user_id from public.profiles limit 1;
-  if test_user_id is null then
-    begin
-      insert into auth.users (id, aud, role, email, created_at, updated_at)
-      values ('11111111-1111-4111-8111-111111111111'::uuid, 'authenticated', 'authenticated', 'test_user@example.com', now(), now())
-      on conflict (id) do nothing;
-      test_user_id := '11111111-1111-4111-8111-111111111111'::uuid;
-    exception when others then
-      null;
-    end;
-  end if;
+  -- Crear usuario sintético aislado para garantizar el hermetismo de la prueba
+  insert into auth.users (id, aud, role, email, created_at, updated_at)
+  values (test_user_id, 'authenticated', 'authenticated', 'test_synthetic_guest@example.com', now(), now())
+  on conflict (id) do nothing;
 
-  if test_user_id is not null then
-    insert into public.profiles (id, display_name, default_currency)
-    values (test_user_id, 'Usuario Prueba', 'EUR')
-    on conflict (id) do nothing;
-  end if;
+  insert into public.profiles (id, display_name, default_currency)
+  values (test_user_id, 'Usuario Sintetico Prueba', 'EUR')
+  on conflict (id) do nothing;
 
   -- Configurar auth.uid() para la sesión de prueba
   perform set_config('request.jwt.claim.sub', test_user_id::text, true);
