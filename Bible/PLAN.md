@@ -147,6 +147,7 @@ cuando el responsable confirma el resultado.
 |---|---|---|---|---|
 | 2026-08-15 | Nueve láminas de onboarding tras la optimización lossless | iPhone 17 físico (iOS) | responsable | correctas, sin halos ni transparencias rotas |
 | 2026-08-16 | Smoke de «Reducir movimiento» en OnboardingRevealText (3 casos: off / on antes / on durante) | iPhone 17 físico (iOS) | responsable | correcto en los tres casos; **no verificado en Android** — excepción aceptada por el responsable |
+| 2026-08-16 | Sincronización bidireccional en caliente (iPhone ↔ Honor) tras corrección de restoreRemoteAccount | iPhone 17 (iOS) + Honor (Android) | responsable | correcto en ambos sentidos (~2s por Realtime, sin duplicaciones tras recarga) |
 
 ---
 
