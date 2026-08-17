@@ -324,6 +324,12 @@ demás miembros. El tope de `maxActiveCurrencies` no se aplica aquí: limita
 cuántas monedas gestiona una persona, no cuántas puede tener un espacio
 compartido entre dos.
 
+Al iniciar una sesión autenticada o cambiar las preferencias, la primera
+moneda activa se replica en `profiles.default_currency`. Es la moneda
+principal visible para los demás miembros y la que se usa al crear un espacio
+compartido; las preferencias adicionales permanecen locales y se incorporan a
+la lista del espacio por quien las haya activado.
+
 ### 5.5 Identificadores
 
 Los datos locales deben usar identificadores globalmente únicos desde su creación.

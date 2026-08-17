@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { syncOwnDefaultCurrency } from '@/features/profile/services/syncOwnDefaultCurrency';
 import {
   loadCurrencyPreferences,
   saveCurrencyPreferences,
@@ -30,7 +31,10 @@ export function useCurrencyPreferences(): CurrencyPreferencesController {
 
     void loadCurrencyPreferences()
       .then((stored) => {
-        if (isMounted) setPreferences(stored);
+        if (!isMounted) return;
+        setPreferences(stored);
+        const defaultCurrency = stored.currencies[0];
+        if (defaultCurrency) void syncOwnDefaultCurrency(defaultCurrency);
       })
       .finally(() => {
         if (isMounted) setReady(true);
@@ -51,6 +55,8 @@ export function useCurrencyPreferences(): CurrencyPreferencesController {
         throw new Error(message);
       }
       setPreferences(next);
+      const defaultCurrency = next.currencies[0];
+      if (defaultCurrency) void syncOwnDefaultCurrency(defaultCurrency);
       setError(null);
     },
     [],
