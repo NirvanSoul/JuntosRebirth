@@ -10,12 +10,17 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ModalCloseButtonProps = {
   onPress: () => void;
+  /** Muestra la superficie gris habitual también en un botón de volver. */
+  showBackground?: boolean;
+  size?: number;
   testID?: string;
   variant?: 'back' | 'close';
 };
 
 export function ModalCloseButton({
   onPress,
+  showBackground = false,
+  size = layout.minTouchTarget,
   testID,
   variant = 'close',
 }: ModalCloseButtonProps) {
@@ -31,7 +36,8 @@ export function ModalCloseButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        isBack && styles.backButton,
+        { width: size, height: size },
+        isBack && !showBackground && styles.backButton,
         pressed && styles.pressed,
       ]}
       testID={testID}

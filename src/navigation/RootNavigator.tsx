@@ -1,5 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { linking } from '@/navigation/linking';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
@@ -7,11 +8,14 @@ import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import { OnboardingNavigator } from '@/features/onboarding/OnboardingNavigator';
 import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
+import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 import { fontFamily } from '@/theme/fonts';
 
 export function RootNavigator() {
   const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { isReady: isAuthReady, session } = useAuthSession();
   const { isReady: isOnboardingReady, status } = useOnboardingStatus();
 
@@ -37,7 +41,7 @@ export function RootNavigator() {
   );
 
   if (!isAuthReady || !isOnboardingReady) {
-    return null;
+    return <View style={styles.root} testID="root-navigator-backdrop" />;
   }
 
   const content = !status.completed ? (
@@ -48,9 +52,24 @@ export function RootNavigator() {
     <MainTabsNavigator />
   );
 
+  // El fondo del root nativo es blanco. Las escenas del drawer y de las pestañas
+  // son transparentes y las pestañas se cruzan con `animation: 'fade'`, así que
+  // sin esta capa opaca el blanco del root asoma como un destello durante la
+  // transición: imperceptible en claro, evidente en oscuro.
   return (
-    <NavigationContainer linking={linking} theme={navigationTheme}>
-      {content}
-    </NavigationContainer>
+    <View style={styles.root} testID="root-navigator-backdrop">
+      <NavigationContainer linking={linking} theme={navigationTheme}>
+        {content}
+      </NavigationContainer>
+    </View>
   );
+}
+
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+  });
 }

@@ -19,7 +19,9 @@ import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type FloatingCreateButtonProps = {
-  bottom: number;
+  bottom?: number;
+  /** En onboarding conserva el mismo control, pero participa en la fila inferior. */
+  placement?: 'floating' | 'inline';
   visible?: boolean;
   onPress: () => void;
 };
@@ -31,7 +33,8 @@ const plusStrokeWidth = 3.5;
 const hiddenTranslateX = buttonSize + spacing.xl;
 
 export function FloatingCreateButton({
-  bottom,
+  bottom = 0,
+  placement = 'floating',
   visible = true,
   onPress,
 }: FloatingCreateButtonProps) {
@@ -60,7 +63,11 @@ export function FloatingCreateButton({
       collapsable={false}
       importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
       pointerEvents={visible ? 'auto' : 'none'}
-      style={[styles.position, { bottom }, visibilityStyle]}
+      style={[
+        placement === 'floating' ? styles.position : styles.inline,
+        placement === 'floating' ? { bottom } : null,
+        visibilityStyle,
+      ]}
       testID="floating-create-button-container"
     >
       <Pressable
@@ -116,6 +123,12 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       right: spacing.xl,
       zIndex: 10,
       elevation: 20,
+      width: buttonSize,
+      height: buttonSize,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    inline: {
       width: buttonSize,
       height: buttonSize,
       alignItems: 'center',

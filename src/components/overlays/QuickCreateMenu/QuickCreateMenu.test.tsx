@@ -26,7 +26,11 @@ describe('QuickCreateMenu', () => {
     expect(await screen.findByLabelText('Crear ingreso')).toBeTruthy();
     expect(await screen.findByLabelText('Crear gasto')).toBeTruthy();
     expect(await screen.findByLabelText('Crear categoría')).toBeTruthy();
-    expect(await screen.findByLabelText('Importar movimientos')).toBeTruthy();
+    expect(
+      await screen.findByLabelText('Importar movimientos (beta)'),
+    ).toBeTruthy();
+    expect(screen.getByTestId('quick-create-import-badge')).toBeTruthy();
+    expect(screen.getByText('BETA')).toBeTruthy();
     expect(
       screen.getByTestId('quick-create-category-icon').props.children,
     ).toContain(
@@ -46,5 +50,31 @@ describe('QuickCreateMenu', () => {
     fireEvent.press(screen.getByLabelText('Crear gasto'));
 
     expect(onSelect).toHaveBeenCalledWith('expense');
+  });
+
+  it('puede mostrar acciones deshabilitadas sin ocultarlas', async () => {
+    const onSelect = jest.fn();
+    const screen = await renderWithTheme(
+      <QuickCreateMenu
+        disabledActionTypes={['expense', 'category', 'import']}
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        visible
+      />,
+    );
+
+    const expense = screen.getByLabelText('Crear gasto');
+    const category = screen.getByLabelText('Crear categoría');
+
+    expect(expense.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(category.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(
+      screen.getByLabelText('Crear ingreso').props.accessibilityState,
+    ).toMatchObject({
+      disabled: false,
+    });
+
+    fireEvent.press(expense);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

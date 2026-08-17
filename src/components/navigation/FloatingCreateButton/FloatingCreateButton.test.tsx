@@ -44,4 +44,16 @@ describe('FloatingCreateButton', () => {
       ),
     ).toMatchObject(darkShadows.floatingAction);
   });
+
+  it('puede participar en una fila sin posicionarse sobre el contenido', async () => {
+    const screen = await renderWithTheme(
+      <FloatingCreateButton onPress={jest.fn()} placement="inline" />,
+    );
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('floating-create-button-container').props.style,
+      ).position,
+    ).toBeUndefined();
+  });
 });
