@@ -18,6 +18,7 @@ import {
   ActivityCollapsibleSection,
   getActivityLayoutTransition,
 } from '@/features/activity/components/ActivityCollapsibleSection';
+import { ActivityCategoryDetailSection } from '@/features/activity/components/ActivityCategoryDetailSection';
 import { CategoryDonutChart } from '@/features/activity/components/CategoryDonutChart';
 import {
   type CategoryFilter,
@@ -31,7 +32,6 @@ import {
   matchesTransactionDateFilter,
   type TransactionDateFilter,
 } from '@/features/activity/utils/transactionDateFilter';
-import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
 import {
@@ -56,9 +56,8 @@ import {
 } from '@/lib/currency/currencyCatalog';
 import { iconSize, minTouchTarget } from '@/theme/layout';
 import { motion } from '@/theme/motion';
-import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
-import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
@@ -74,7 +73,11 @@ type ActivityScreenProps = {
   onCreateExpense?: () => void;
   onCreateIncome?: () => void;
   onCreateMovement?: () => void;
-  onOpenCategoryDetail?: (categoryId: string, currency?: CurrencyCode) => void;
+  /**
+   * Abre el detalle de una categoría en la moneda visible de esta pantalla.
+   * La divisa es obligatoria: un origen que la omita no compila.
+   */
+  onOpenCategoryDetail?: (categoryId: string, currency: CurrencyCode) => void;
   onOpenTransactionDetail?: (transactionId: string) => void;
   onScrollDirectionChange?: (direction: 'down' | 'up') => void;
   onSummaryPinnedChange?: (pinned: boolean) => void;
@@ -102,8 +105,8 @@ export function ActivityScreen({
   targetSection,
   transactions = [],
 }: ActivityScreenProps) {
-  const { colors, shadows } = useTheme();
-  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const handledTargetKeyRef = useRef<string | null>(null);
@@ -141,7 +144,7 @@ export function ActivityScreen({
   const currencyTransactionsThroughCurrentMonth = useMemo(
     () =>
       transactionsThroughCurrentMonth.filter(
-        (t) => t.currency === effectiveCurrency,
+        (transaction) => transaction.currency === effectiveCurrency,
       ),
     [effectiveCurrency, transactionsThroughCurrentMonth],
   );
@@ -333,63 +336,14 @@ export function ActivityScreen({
             resetKey={focusResetKey}
             transactions={currencyTransactionsThroughCurrentMonth}
           />
-          <Animated.View
-            layout={getActivityLayoutTransition()}
-            testID="activity-category-detail"
-          >
-            <Text
-              accessibilityRole="header"
-              style={styles.categoryDetailTitle}
-              variant="label"
-            >
-              Detalle por categoría
-            </Text>
-            {categorySummaries.length > 0 ? (
-              <View
-                style={styles.categoryGroupShadow}
-                testID="activity-category-preview-group"
-              >
-                <View
-                  style={styles.categoryGroup}
-                  testID="activity-category-preview-list"
-                >
-                  {categorySummaries.map(({ id, ...category }, index) => (
-                    <View key={id}>
-                      <CategoryPreviewCard
-                        {...category}
-                        budgetExpenseMinor={
-                          budgetExpenseByCategoryId.get(id) ?? 0
-                        }
-                        displayCurrency={effectiveCurrency}
-                        onPress={() =>
-                          onOpenCategoryDetail?.(id, effectiveCurrency)
-                        }
-                        spaceCurrency={spaceCurrency}
-                      />
-                      {index < categorySummaries.length - 1 ? (
-                        <View
-                          accessibilityElementsHidden
-                          importantForAccessibility="no"
-                          style={styles.categorySeparator}
-                          testID="activity-category-separator"
-                        />
-                      ) : null}
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : (
-              <EmptyState
-                accessibilityLabel="Crear primera categoría"
-                description="Crea una categoría para organizar tus movimientos."
-                icon="pie-chart-outline"
-                iconBackgroundColor={colors.categoryAction}
-                onPress={onCreateCategory}
-                testID="activity-empty-categories"
-                title="Aún no hay categorías"
-              />
-            )}
-          </Animated.View>
+          <ActivityCategoryDetailSection
+            budgetExpenseByCategoryId={budgetExpenseByCategoryId}
+            displayCurrency={effectiveCurrency}
+            onCreateCategory={onCreateCategory}
+            onOpenCategoryDetail={onOpenCategoryDetail}
+            spaceCurrency={spaceCurrency}
+            summaries={categorySummaries}
+          />
         </ActivityCollapsibleSection>
 
         <Animated.View
@@ -516,31 +470,56 @@ export function ActivityScreen({
         onClose={() => setFiltersModalVisible(false)}
         visible={isFiltersModalVisible}
       />
-      {periodModalType ? (
-        <TransactionPeriodModal
-          categories={categories}
-          onAdd={() => {
-            const currentType = periodModalType;
-            setPeriodModalType(null);
-            if (currentType === 'income') onCreateIncome?.();
-            else if (currentType === 'expense') onCreateExpense?.();
-            else onCreateMovement?.();
-          }}
-          onClose={() => setPeriodModalType(null)}
-          onOpenTransactionDetail={(transactionId) => {
-            setPeriodModalType(null);
-            onOpenTransactionDetail?.(transactionId);
-          }}
-          transactions={transactions}
-          type={periodModalType}
-          visible
-        />
-      ) : null}
+      <TransactionPeriodModal
+        categories={categories}
+        onAdd={() => {
+          setPeriodModalType(null);
+          onCreateIncome?.();
+        }}
+        onClose={() => setPeriodModalType(null)}
+        onOpenTransactionDetail={(transactionId) => {
+          setPeriodModalType(null);
+          onOpenTransactionDetail?.(transactionId);
+        }}
+        transactions={transactions}
+        type="income"
+        visible={periodModalType === 'income'}
+      />
+      <TransactionPeriodModal
+        categories={categories}
+        onAdd={() => {
+          setPeriodModalType(null);
+          onCreateExpense?.();
+        }}
+        onClose={() => setPeriodModalType(null)}
+        onOpenTransactionDetail={(transactionId) => {
+          setPeriodModalType(null);
+          onOpenTransactionDetail?.(transactionId);
+        }}
+        transactions={transactions}
+        type="expense"
+        visible={periodModalType === 'expense'}
+      />
+      <TransactionPeriodModal
+        categories={categories}
+        onAdd={() => {
+          setPeriodModalType(null);
+          onCreateMovement?.();
+        }}
+        onClose={() => setPeriodModalType(null)}
+        onOpenTransactionDetail={(transactionId) => {
+          setPeriodModalType(null);
+          onOpenTransactionDetail?.(transactionId);
+        }}
+        transactions={transactions}
+        type="balance"
+        visible={periodModalType === 'balance'}
+      />
     </>
   );
 }
 
-function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+function createStyles(colors: ColorTokens) {
   return StyleSheet.create({
     movementsHeader: {
       minHeight: minTouchTarget,
@@ -563,25 +542,6 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     },
     filterLinkPressed: {
       opacity: 0.64,
-    },
-    categoryGroupShadow: {
-      ...shadows.subtle,
-      borderRadius: previewCardLayout.borderRadius,
-    },
-    categoryGroup: {
-      overflow: 'hidden',
-      backgroundColor: colors.surface,
-      borderColor: colors.categoryPreviewBorder,
-      borderRadius: previewCardLayout.borderRadius,
-      borderWidth: 2,
-    },
-    categorySeparator: {
-      height: 1,
-      backgroundColor: colors.categoryPreviewBorder,
-    },
-    categoryDetailTitle: {
-      marginBottom: spacing.md,
-      marginTop: spacing.xl,
     },
   });
 }

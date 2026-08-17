@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -108,12 +109,21 @@ import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 import type { CreateActionType } from '@/navigation/createActions';
 import type { MainTabParamList, RootDrawerParamList } from '@/navigation/types';
 import { layout } from '@/theme/layout';
+import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const Tabs = createBottomTabNavigator<MainTabParamList>();
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
-const drawerWidthRatio = 0.88,
-  drawerMaxWidth = 380;
+const drawerWidthRatio = 0.88;
+const drawerMaxWidth = 380;
+
+/** Tablas del espacio de pareja cuya actividad debe refrescar los datos. */
+const coupleSpaceRealtimeTables = [
+  'categories',
+  'recurring_transaction_series',
+  'transactions',
+] as const;
 
 type CategoryCreationContext = 'quick' | 'transaction';
 type CategoryDetailRequest = {
@@ -125,6 +135,7 @@ export function MainTabsNavigator() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const {
     activeSpace,
     createCoupleSpace,
@@ -450,37 +461,15 @@ export function MainTabsNavigator() {
     try {
       const client = getConfiguredSupabaseClient();
       const changeFilter = `space_id=eq.${activeSpace.id}`;
-      channel = client
-        .channel(`couple-space-sync:${activeSpace.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'categories',
-            filter: changeFilter,
-          },
-          scheduleRemoteRefresh,
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'recurring_transaction_series',
-            filter: changeFilter,
-          },
-          scheduleRemoteRefresh,
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'transactions',
-            filter: changeFilter,
-          },
-          scheduleRemoteRefresh,
+      channel = coupleSpaceRealtimeTables
+        .reduce(
+          (subscription, table) =>
+            subscription.on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table, filter: changeFilter },
+              scheduleRemoteRefresh,
+            ),
+          client.channel(`couple-space-sync:${activeSpace.id}`),
         )
         .subscribe();
     } catch {
@@ -1035,15 +1024,7 @@ export function MainTabsNavigator() {
 
   if (!isReady || !isFinanceReady) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.background,
-        }}
-        testID="spaces-loading"
-      >
+      <View style={styles.loading} testID="spaces-loading">
         <ActivityIndicator color={colors.brand} />
       </View>
     );
@@ -1075,12 +1056,12 @@ export function MainTabsNavigator() {
           drawerType: 'front',
           headerShown: false,
           overlayColor: colors.overlay,
-          sceneStyle: { backgroundColor: 'transparent' },
+          sceneStyle: styles.scene,
         }}
       >
         <Drawer.Screen name="Main">
           {({ navigation }) => (
-            <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <View style={styles.container}>
               <ActiveSpaceHeader
                 currencyFlag={
                   (activeMainTab === 'Home' || activeMainTab === 'Activity') &&
@@ -1182,7 +1163,7 @@ export function MainTabsNavigator() {
                       onOpenCategoryDetail={(categoryId, currency) =>
                         setDetailRequest({
                           categoryId,
-                          displayCurrency: currency ?? effectiveHomeCurrency,
+                          displayCurrency: currency,
                         })
                       }
                       onOpenTransactionDetail={setDetailTransactionId}
@@ -1303,6 +1284,8 @@ export function MainTabsNavigator() {
               <CategoryDetailModal
                 category={detailCategory}
                 displayCurrency={
+                  // `detailRequest` solo es nulo con el modal oculto, así que
+                  // este valor de reserva nunca llega a mostrarse.
                   detailRequest?.displayCurrency ?? effectiveHomeCurrency
                 }
                 onAddTransaction={(categoryId) => {
@@ -1342,6 +1325,7 @@ export function MainTabsNavigator() {
                     transactionId,
                   );
                   if (!transaction) return;
+
                   setDetailTransactionId(null);
                   setEditingTransactionId(transaction.id);
                   setTransactionInitialDate(undefined);
@@ -1349,11 +1333,10 @@ export function MainTabsNavigator() {
                   setTransactionType(transaction.type);
                   setTransactionModalVisible(true);
                 }}
-                onOpenCategoryDetail={(categoryId) =>
+                onOpenCategoryDetail={(categoryId, currency) =>
                   setDetailRequest({
                     categoryId,
-                    displayCurrency:
-                      detailTransaction?.currency ?? effectiveHomeCurrency,
+                    displayCurrency: currency,
                   })
                 }
                 onRemoveReminder={handleRemoveTransactionReminder}
@@ -1427,4 +1410,22 @@ export function MainTabsNavigator() {
       />
     </>
   );
+}
+
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: 'transparent',
+    },
+    scene: {
+      backgroundColor: 'transparent',
+    },
+    loading: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+    },
+  });
 }

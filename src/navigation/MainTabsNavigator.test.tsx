@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { listLocalCategories } from '@/features/categories/repositories/localCategoryRepository';
 import { listLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
+import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
@@ -149,6 +150,38 @@ jest.mock(
     countAllScheduledNotifications: jest.fn(async () => 0),
   }),
 );
+
+// Captura las props de `ImportScreen` en cada render sin alterar su
+// comportamiento: permite verificar qué moneda le entrega el navegador.
+const mockImportScreenProps: Record<string, unknown>[] = [];
+jest.mock('@/features/import/screens/ImportScreen', () => {
+  const actual = jest.requireActual('@/features/import/screens/ImportScreen');
+  function ImportScreenPropsSpy(props: Record<string, unknown>) {
+    mockImportScreenProps.push(props);
+    return actual.ImportScreen(props);
+  }
+  return { ...actual, ImportScreen: ImportScreenPropsSpy };
+});
+
+// La importación abre el selector de archivos al mostrarse; al navegador solo
+// le interesa qué props recibe, así que el selector se cancela de inmediato.
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: jest.fn(async () => ({ canceled: true })),
+}));
+
+// SQLite real no existe en Jest: los repositorios de importación se aíslan.
+jest.mock('@/features/import/repositories/localImportBatchRepository', () => ({
+  cancelLocalImportBatch: jest.fn(),
+  completeLocalImportBatch: jest.fn(),
+  createLocalImportBatch: jest.fn(),
+  findLocalImportBatchByFileHash: jest.fn(),
+  listResumableLocalImportBatches: jest.fn(async () => []),
+  saveLocalImportBatchReview: jest.fn(),
+}));
+jest.mock('@/features/import/repositories/localMerchantRuleRepository', () => ({
+  listLocalMerchantRules: jest.fn(async () => []),
+  saveLocalMerchantRule: jest.fn(),
+}));
 
 describe('MainTabsNavigator', () => {
   beforeEach(() => {
@@ -338,6 +371,208 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByTestId('home-currency-flag-button'));
 
     expect(await screen.findByTestId('home-currency-picker')).toBeTruthy();
+  });
+
+  describe('propagación multidivisa (Entrega 2)', () => {
+    beforeEach(() => {
+      mockImportScreenProps.length = 0;
+    });
+
+    afterEach(async () => {
+      await AsyncStorage.multiRemove([
+        '@juntoss/currency-preferences/v1',
+        '@juntoss/home-currency-selection/v1',
+      ]);
+      (listLocalCategories as jest.Mock).mockResolvedValue([]);
+      (listLocalTransactions as jest.Mock).mockResolvedValue([]);
+    });
+
+    it('Actividad en USD abre el detalle de categoría con USD, sin caer en otra moneda', async () => {
+      await AsyncStorage.setItem(
+        '@juntoss/currency-preferences/v1',
+        JSON.stringify({ currencies: ['EUR', 'USD'], version: 1 }),
+      );
+      await AsyncStorage.setItem(
+        '@juntoss/home-currency-selection/v1',
+        JSON.stringify({ currency: 'USD', version: 1 }),
+      );
+      (listLocalCategories as jest.Mock).mockResolvedValue([
+        {
+          id: 'category-food',
+          spaceId: 'personal',
+          name: 'Comida',
+          icon: 'fork-knife',
+          colorToken: 'orange',
+          isDefault: false,
+          isArchived: false,
+        },
+      ]);
+      (listLocalTransactions as jest.Mock).mockResolvedValue([
+        {
+          id: 'tx-usd',
+          spaceId: 'personal',
+          type: 'expense',
+          amountMinor: 1000,
+          currency: 'USD',
+          title: 'Café USD',
+          categoryId: 'category-food',
+          occurredOn: dateInCurrentMonth(2),
+          recurrence: 'once',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+        },
+        {
+          id: 'tx-eur',
+          spaceId: 'personal',
+          type: 'expense',
+          amountMinor: 500,
+          currency: 'EUR',
+          title: 'Café EUR',
+          categoryId: 'category-food',
+          occurredOn: dateInCurrentMonth(3),
+          recurrence: 'once',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+        },
+      ]);
+
+      const screen = await render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <NavigationContainer>
+              <MainTabsNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByLabelText('Moneda seleccionada: 🇺🇸')).toBeTruthy(),
+      );
+      await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+
+      const card = await screen.findByTestId('category-preview-card');
+      await fireEvent.press(card);
+
+      // El modal recibe la divisa visible de Actividad (USD) y muestra sus
+      // importes en USD; el gasto EUR de la misma categoría queda fuera.
+      const detail = await screen.findByTestId('category-detail-modal');
+      expect(
+        within(detail).getAllByText(formatCurrency(1000, 'USD', 'es-ES'))
+          .length,
+      ).toBeGreaterThan(0);
+      expect(
+        within(detail).queryAllByText(formatCurrency(500, 'EUR', 'es-ES')),
+      ).toHaveLength(0);
+    });
+
+    it('entrega a ImportScreen la moneda del espacio (VES) aunque Inicio muestre EUR', async () => {
+      mockUseSpaces.mockReturnValue({
+        activeSpace: {
+          currency: 'VES',
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+        },
+        createSpace: jest.fn(),
+        error: null,
+        isReady: true,
+        selectSpace: jest.fn(),
+        spaces: [
+          {
+            currency: 'VES',
+            id: 'personal',
+            name: 'Personal',
+            type: 'personal',
+          },
+        ],
+      });
+      await AsyncStorage.setItem(
+        '@juntoss/currency-preferences/v1',
+        JSON.stringify({ currencies: ['VES', 'EUR'], version: 1 }),
+      );
+      await AsyncStorage.setItem(
+        '@juntoss/home-currency-selection/v1',
+        JSON.stringify({ currency: 'EUR', version: 1 }),
+      );
+      (listLocalCategories as jest.Mock).mockResolvedValue([
+        {
+          id: 'category-market',
+          spaceId: 'personal',
+          name: 'Mercado',
+          icon: 'fork-knife',
+          colorToken: 'orange',
+          isDefault: false,
+          isArchived: false,
+        },
+      ]);
+      (listLocalTransactions as jest.Mock).mockResolvedValue([
+        {
+          id: 'tx-ves',
+          spaceId: 'personal',
+          type: 'expense',
+          amountMinor: 4000,
+          currency: 'VES',
+          title: 'Mercado VES',
+          categoryId: 'category-market',
+          occurredOn: dateInCurrentMonth(2),
+          recurrence: 'once',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+        },
+        {
+          id: 'tx-eur',
+          spaceId: 'personal',
+          type: 'expense',
+          amountMinor: 1000,
+          currency: 'EUR',
+          title: 'Café EUR',
+          categoryId: 'category-market',
+          occurredOn: dateInCurrentMonth(3),
+          recurrence: 'once',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+        },
+      ]);
+
+      const screen = await render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <NavigationContainer>
+              <MainTabsNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      // La moneda visible de Inicio es EUR (selección del encabezado)…
+      await waitFor(() =>
+        expect(screen.getByLabelText('Moneda seleccionada: 🇪🇺')).toBeTruthy(),
+      );
+
+      await fireEvent.press(screen.getByTestId('floating-create-button'));
+      await fireEvent.press(screen.getByLabelText('Importar movimientos'));
+
+      // …pero la importación recibe la moneda del espacio (VES), no la de Inicio.
+      await waitFor(() =>
+        expect(
+          mockImportScreenProps.some((props) => props.visible === true),
+        ).toBe(true),
+      );
+      const visibleImportProps = mockImportScreenProps.find(
+        (props) => props.visible === true,
+      );
+      expect(visibleImportProps).toMatchObject({
+        activeSpaceId: 'personal',
+        fallbackCurrency: 'VES',
+      });
+    });
   });
 
   it('desplaza el selector y fija el mismo resumen al recorrer movimientos', async () => {

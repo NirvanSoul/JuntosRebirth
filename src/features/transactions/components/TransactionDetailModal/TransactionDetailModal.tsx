@@ -28,6 +28,7 @@ import {
   getUpcomingTransactionDates,
   parseProjectedTransactionId,
 } from '@/features/transactions/utils/transactionRecurrence';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import {
@@ -50,7 +51,7 @@ type TransactionDetailModalProps = {
   ) => boolean | Promise<boolean>;
   onDelete: (transactionId: string) => void;
   onEdit: (transactionId: string) => void;
-  onOpenCategoryDetail?: (categoryId: string) => void;
+  onOpenCategoryDetail?: (categoryId: string, currency: CurrencyCode) => void;
   onRemoveReminder: (transactionId: string) => boolean | Promise<boolean>;
   onSaveNote: (transactionId: string, note: string | null) => void;
   onSaveReminder: (
@@ -110,6 +111,61 @@ export function TransactionDetailModal({
   const [visibleRecurrenceCount, setVisibleRecurrenceCount] =
     useState(recurrencePageSize);
   const modalBottomInset = useAppModalBottomInset();
+  const categoryAccentColor = category
+    ? categoryColors[category.colorToken]
+    : colors.textMuted;
+  const noteSaveTone = category
+    ? getCategoryContentContrast(category.colorToken).tone
+    : undefined;
+  // Las filas de dato (icono + etiqueta + valor) y los botones de acción se
+  // repiten en el modal; estos helpers los desduplican sin comprimir.
+  const renderDetailRow = (
+    caption: string,
+    icon: keyof typeof Ionicons.glyphMap,
+    value: string,
+    iconTestID?: string,
+  ) => (
+    <View style={styles.detailRow}>
+      <Ionicons
+        color={colors.textMuted}
+        name={icon}
+        size={iconSize.sm}
+        testID={iconTestID}
+      />
+      <View style={styles.detailCopy}>
+        <Text tone="secondary" variant="caption">
+          {caption}
+        </Text>
+        <Text variant="label">{value}</Text>
+      </View>
+    </View>
+  );
+  const renderActionButton = (
+    accessibilityLabel: string,
+    icon: keyof typeof Ionicons.glyphMap,
+    label: string,
+    onPress: () => void,
+  ) => (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.secondaryAction,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Ionicons
+        color={colors.textMuted}
+        name={icon}
+        size={iconSize.md}
+        testID={`transaction-action-icon-${icon}`}
+      />
+      <Text align="center" variant="footnote" weight="semibold">
+        {label}
+      </Text>
+    </Pressable>
+  );
 
   useEffect(() => {
     if (visible) {
@@ -193,11 +249,7 @@ export function TransactionDetailModal({
               <View
                 style={[
                   styles.heroIcon,
-                  {
-                    backgroundColor: category
-                      ? categoryColors[category.colorToken]
-                      : colors.textMuted,
-                  },
+                  { backgroundColor: categoryAccentColor },
                 ]}
               >
                 {category ? (
@@ -278,48 +330,20 @@ export function TransactionDetailModal({
 
             {!isProjected ? (
               <View style={styles.actionsRow}>
-                <Pressable
-                  accessibilityLabel={
-                    reminder ? 'Editar recordatorio' : 'Programar recordatorio'
-                  }
-                  accessibilityRole="button"
-                  onPress={() => setReminderModalVisible(true)}
-                  style={({ pressed }) => [
-                    styles.secondaryAction,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Ionicons
-                    color={colors.textMuted}
-                    name="alarm-outline"
-                    size={iconSize.md}
-                    testID="transaction-action-icon-alarm-outline"
-                  />
-                  <Text align="center" variant="footnote" weight="semibold">
-                    {reminder ? 'Editar recordatorio' : 'Recordar'}
-                  </Text>
-                </Pressable>
-                {shareTargets.length > 0 ? (
-                  <Pressable
-                    accessibilityLabel="Copiar en otro espacio"
-                    accessibilityRole="button"
-                    onPress={() => setSpacePickerVisible(true)}
-                    style={({ pressed }) => [
-                      styles.secondaryAction,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Ionicons
-                      color={colors.textMuted}
-                      name="copy-outline"
-                      size={iconSize.md}
-                      testID="transaction-action-icon-copy-outline"
-                    />
-                    <Text align="center" variant="footnote" weight="semibold">
-                      Copiar en otro espacio
-                    </Text>
-                  </Pressable>
-                ) : null}
+                {renderActionButton(
+                  reminder ? 'Editar recordatorio' : 'Programar recordatorio',
+                  'alarm-outline',
+                  reminder ? 'Editar recordatorio' : 'Recordar',
+                  () => setReminderModalVisible(true),
+                )}
+                {shareTargets.length > 0
+                  ? renderActionButton(
+                      'Copiar en otro espacio',
+                      'copy-outline',
+                      'Copiar en otro espacio',
+                      () => setSpacePickerVisible(true),
+                    )
+                  : null}
               </View>
             ) : null}
 
@@ -330,7 +354,10 @@ export function TransactionDetailModal({
                   category && onOpenCategoryDetail ? 'button' : undefined
                 }
                 disabled={!category || !onOpenCategoryDetail}
-                onPress={() => category && onOpenCategoryDetail?.(category.id)}
+                onPress={() =>
+                  category &&
+                  onOpenCategoryDetail?.(category.id, transaction.currency)
+                }
                 style={({ pressed }) => [
                   styles.detailRow,
                   pressed && styles.pressed,
@@ -367,38 +394,18 @@ export function TransactionDetailModal({
                 ) : null}
               </Pressable>
               <View style={styles.divider} />
-              <View style={styles.detailRow}>
-                <Ionicons
-                  color={colors.textMuted}
-                  name="calendar-outline"
-                  size={iconSize.sm}
-                />
-                <View style={styles.detailCopy}>
-                  <Text tone="secondary" variant="caption">
-                    Fecha
-                  </Text>
-                  <Text variant="label">
-                    {formatTransactionDate(transaction.occurredOn)}
-                  </Text>
-                </View>
-              </View>
+              {renderDetailRow(
+                'Fecha',
+                'calendar-outline',
+                formatTransactionDate(transaction.occurredOn),
+              )}
               <View style={styles.divider} />
-              <View style={styles.detailRow}>
-                <Ionicons
-                  color={colors.textMuted}
-                  name="sync-outline"
-                  size={iconSize.sm}
-                  testID="transaction-detail-recurrence-icon"
-                />
-                <View style={styles.detailCopy}>
-                  <Text tone="secondary" variant="caption">
-                    Recurrencia
-                  </Text>
-                  <Text variant="label">
-                    {recurrenceLabels[transaction.recurrence]}
-                  </Text>
-                </View>
-              </View>
+              {renderDetailRow(
+                'Recurrencia',
+                'sync-outline',
+                recurrenceLabels[transaction.recurrence],
+                'transaction-detail-recurrence-icon',
+              )}
               <View style={styles.divider} />
               <Pressable
                 accessibilityLabel={`Próxima repetición: ${nextRecurrenceValue}`}
@@ -484,9 +491,7 @@ export function TransactionDetailModal({
 
             {!isProjected ? (
               <Pressable
-                accessibilityLabel={
-                  transaction.note ? transaction.note : 'Escribir nota'
-                }
+                accessibilityLabel={transaction.note ?? 'Escribir nota'}
                 accessibilityRole="button"
                 onPress={() => setNoteModalVisible(true)}
                 style={({ pressed }) => [
@@ -551,14 +556,8 @@ export function TransactionDetailModal({
           onSaveNote(transaction.id, note);
           setNoteModalVisible(false);
         }}
-        saveColor={
-          category ? categoryColors[category.colorToken] : colors.textMuted
-        }
-        saveTone={
-          category
-            ? getCategoryContentContrast(category.colorToken).tone
-            : undefined
-        }
+        saveColor={categoryAccentColor}
+        saveTone={noteSaveTone}
         subtitle={title}
         testID="transaction-note-modal"
         value={transaction.note}
