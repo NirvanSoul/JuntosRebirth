@@ -110,13 +110,16 @@ una tarea de producto lo toque.
 
 ### Fase 3 — producto, pendientes de dimensionar
 
-- [ ] **Un movimiento en otra moneda se sigue percibiendo como euros.** Antes
-  de estimar: averiguar si el movimiento guarda su moneda y solo se muestra mal
-  (bug de formateo, tarea pequeña) o si el importe se guarda sin moneda y se
-  asume euro (hueco del modelo de datos: migración, totales mezclados,
-  presupuestos por categoría — tarea grande). Existe la migración
-  `08_category_budgets_per_currency`, así que el soporte puede estar a medias.
-  Esa pregunta se responde primero y decide el tamaño.
+- [ ] **Un movimiento en otra moneda se sigue percibiendo como euros.**
+  La persistencia por moneda funciona; el modelo de aplicación está
+  incompleto. El backend ya contiene `spaces.currency` y
+  `profiles.default_currency`: **no se añade ningún campo equivalente**. La
+  tarea consistirá en exponer y propagar los existentes en el cliente,
+  definir cuál es la fuente de verdad y evitar agregaciones entre monedas.
+  Defectos identificados:
+  - Ocho literales `'EUR'` con locale fijo en componentes de actividad y
+    categorías (`CategoryDonutChart` vive en `features/activity`).
+  - `categorySummary.ts:91-93` suma `amountMinor` sin mirar `currency`.
 
 - [ ] **Registrarse con un correo ya usado no avisa de nada** y el usuario
   espera un código que nunca llega. El silencio puede ser deliberado: responder
@@ -209,7 +212,7 @@ cuando el responsable confirma el resultado.
 ### Fase 2b — Protocolo de reproducción y diagnóstico por capas
 
 #### Paquete de commits evaluado
-`5e6bc8b..4499824` en rama local `main`.
+Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los dispositivos se ejecutaron sobre `49d9e28`; los posteriores son documentales.
 
 #### Ficha de dispositivos
 - **Dispositivo A (Usuario A):** iPhone 17 (iOS) | Commit `49d9e28` | Expo Go.
@@ -247,15 +250,15 @@ cuando el responsable confirma el resultado.
 
 #### Paso 4: Aislamiento en el segundo dispositivo (Honor)
 - **Pruebas de interacción manual ejecutadas en el Honor:**
-  1. App en primer plano en espacio Juntos durante >20s: el ingreso no aparece (descarta fallo exclusivo de Realtime, ya que el intervalo de 15s en `MainTabsNavigator.tsx:445-447` tampoco lo trajo).
+  1. App en primer plano en espacio Juntos durante >20s: el ingreso no aparece (descarta fallo exclusivo de Realtime, ya que el intervalo de 15s en `src/navigation/MainTabsNavigator.tsx:445-447` tampoco lo trajo).
   2. Pase a segundo plano y retorno (evento foreground): el ingreso no aparece.
   3. Cambio de espacio a Personal y regreso a Juntos: el ingreso no aparece.
   4. Recarga completa de la app en Expo Go (Reload): el ingreso no aparece.
 - **Aislamiento en Capa 5 (Servicio `restoreRemoteAccount`):**
-  - Al inspeccionar el código de [`src/features/sync/services/restoreRemoteAccount.ts:81`](file:///c:/Projects/JuntosApp/src/features/sync/services/restoreRemoteAccount.ts#L81), se inicia una transacción exclusiva SQLite (`database.withExclusiveTransactionAsync(async (transaction) => { ... })`).
-  - Dentro de esa transacción, las líneas 85, 90 y 173 invocan `findLocalIdForRemoteEntity` y `linkRemoteEntity` ([`src/features/sync/repositories/localRemoteEntityLinkRepository.ts:38`](file:///c:/Projects/JuntosApp/src/features/sync/repositories/localRemoteEntityLinkRepository.ts#L38)), las cuales ejecutan consultas sobre la instancia global `database` en lugar del handle `transaction` activo.
-  - Esto provoca un conflicto de concurrencia y bloqueo en SQLite (`database is locked` / `SQLITE_BUSY`), abortando la transacción exclusiva.
-  - El error es capturado y silenciado en [`src/navigation/MainTabsNavigator.tsx:333`](file:///c:/Projects/JuntosApp/src/navigation/MainTabsNavigator.tsx#L333) (`catch { ... }`), impidiendo que `reloadLocalFinance` se ejecute y dejando SQLite sin las categorías ni los movimientos remotos.
+  - Una vez que la transacción adquiere escritura, Expo SQLite documenta que las escrituras desde otra conexión abortan con `database is locked`. El código viola ese contrato; el mensaje literal no fue capturado porque la excepción se silencia en `src/navigation/MainTabsNavigator.tsx:333`.
+  - Al inspeccionar el código de `src/features/sync/services/restoreRemoteAccount.ts:81`, se inicia una transacción exclusiva SQLite (`database.withExclusiveTransactionAsync(async (transaction) => { ... })`).
+  - Dentro de esa transacción, las líneas 85, 90 y 173 invocan `findLocalIdForRemoteEntity` y `linkRemoteEntity` (`src/features/sync/repositories/localRemoteEntityLinkRepository.ts:38`), las cuales ejecutan consultas sobre la instancia global `database` en lugar del handle `transaction` activo.
+  - Auditoría de los 19 bloques `withExclusiveTransactionAsync`: cero casos adicionales. No se justifica una reforma transversal de repositorios.
 
 #### Paso 5: Prueba en sentido B → A y verificación de monedas
 - **Acción UI:**
@@ -267,3 +270,31 @@ cuando el responsable confirma el resultado.
 - **Conclusión del diagnóstico:**
   - La subida (`sync_couple_space_data`) opera correctamente de forma bidireccional (iOS → Postgres y Android → Postgres).
   - La sincronización descendente (`restoreRemoteAccount`) falla de forma simétrica en ambos dispositivos debido al bloqueo de concurrencia SQLite dentro de `withExclusiveTransactionAsync`.
+
+---
+
+## 8. Ficha de Fase 3 — Corrección de `restoreRemoteAccount`
+
+### 1. Ficha de tarea
+- **Clasificación:** Mediana (toca restauración de datos financieros → dos verificadores).
+- **Objetivo:** Que todos los accesos a SQLite dentro de la transacción exclusiva en `restoreRemoteAccount` utilicen el handle `transaction`.
+  - Afecta a las llamadas de las líneas 85, 90 y 173 en `src/features/sync/services/restoreRemoteAccount.ts`.
+  - `linkRemoteEntity` y `findLocalIdForRemoteEntity` (`src/features/sync/repositories/localRemoteEntityLinkRepository.ts`) deben poder recibir el executor transaccional, y `linkRemoteEntity` no puede reconsultar por la conexión global al final.
+- **Llamadas de las líneas 43 y 51 (`restoreRemoteAccount.ts`):** Conservan su comportamiento fuera del bloque exclusivo. Se permiten los ajustes mecánicos de firma que exija hacer obligatorio el executor, pero **no se trasladan dentro del bloque exclusivo** ni cambia su semántica.
+- **Estrategia de pruebas automáticas:**
+  - **Prueba estructural:** Se escribirá una prueba estructural que verifique que dentro de la restauración todos los accesos a `remote_entity_links`, categorías y movimientos usen estrictamente el mismo handle/executor `transaction`. Esta prueba fallará contra el código actual y pasará tras el cambio (los tests unitarios estándar mockean SQLite y no reproducen el interbloqueo nativo).
+- **Verificación real en dispositivos:**
+  - Tras el arreglo, repetir el protocolo en los dos teléfonos (A → B y B → A) comprobando:
+    1. Llegada inmediata (Realtime).
+    2. Sondeo de 15 segundos en primer plano.
+    3. Retorno a primer plano (evento foreground).
+  - Esta repetición determinará empíricamente si Realtime tiene un segundo defecto independiente.
+- **Fuera de alcance:**
+  - Todo lo demás. En particular, no dejar de silenciar los errores de restauración en `src/navigation/MainTabsNavigator.tsx:333`; es un cambio de comportamiento distinto y va en tarea separada.
+
+### 2. Cola de Fase 3 (orden de ejecución)
+1. Dejar de silenciar los errores de restauración (`src/navigation/MainTabsNavigator.tsx:333`).
+2. Los ocho literales `'EUR'` con locale fijo en componentes de actividad y categorías (pequeña).
+3. Exponer y propagar `spaces.currency` / `profiles.default_currency` en el cliente, y agregar por moneda (mediana; depende de la 1 para no silenciar fallos).
+4. Permisos `PUBLIC EXECUTE`: migración nueva en backend, jamás reescribir una aplicada.
+5. Actualizar `space_invitations.test.sql` al nombre de índice vigente (`space_invitations_one_pending_per_target_idx`).
