@@ -21,8 +21,8 @@ Orden de autoridad en el trabajo diario:
 
 1. **Responsable del proyecto (humano).** Aprueba prioridades, alcance y
    decisiones. Es la voz final.
-2. **Actor principal de código — actualmente Gemini.** Implementa, ejecuta
-   los checks automáticos y corrige los hallazgos.
+2. **Actor principal de código — actualmente Cline (desde 2026-08-17).**
+   Implementa, ejecuta los checks automáticos y corrige los hallazgos.
 3. **Claude — verificador / supervisor de auditorías.** Revisa el trabajo del
    actor principal de código y busca errores, bugs y desviaciones de las reglas.
 4. **ChatGPT — segundo verificador.** Revisión cruzada e independiente.
