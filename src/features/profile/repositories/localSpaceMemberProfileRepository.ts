@@ -38,6 +38,22 @@ export async function listSpaceMemberProfiles(
   return rows.map(mapProfile);
 }
 
+export async function saveSpaceMemberAvatarCache(
+  spaceId: string,
+  userId: string,
+  cachedUri: string | null,
+): Promise<void> {
+  const database = await getLocalDatabase();
+  await database.runAsync(
+    `UPDATE space_member_profiles
+        SET avatar_cached_uri = ?
+      WHERE space_id = ? AND user_id = ?`,
+    cachedUri,
+    spaceId,
+    userId,
+  );
+}
+
 /**
  * Vuelca el censo del espacio tal y como lo devuelve el servidor.
  *
