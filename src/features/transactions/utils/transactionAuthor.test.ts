@@ -10,6 +10,7 @@ const ana: SpaceMemberProfile = {
   avatarPath: null,
   avatarUpdatedAt: null,
   avatarUri: null,
+  defaultCurrency: null,
 };
 const beto: SpaceMemberProfile = {
   userId: 'uuid-beto',
@@ -17,6 +18,7 @@ const beto: SpaceMemberProfile = {
   avatarPath: null,
   avatarUpdatedAt: null,
   avatarUri: null,
+  defaultCurrency: null,
 };
 
 const context: TransactionAuthorContext = {

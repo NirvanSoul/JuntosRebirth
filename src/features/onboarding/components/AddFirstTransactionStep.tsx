@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 
+import { FloatingCreateButton } from '@/components/navigation/FloatingCreateButton/FloatingCreateButton';
+import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryPickerModal } from '@/features/categories/components/CategoryPickerModal/CategoryPickerModal';
 import { CreateCategoryModal } from '@/features/categories/components/CreateCategoryModal/CreateCategoryModal';
@@ -26,10 +28,10 @@ import type {
   TransactionType,
 } from '@/features/transactions/types';
 import { defaultCurrencyCode } from '@/lib/currency/currencyCatalog';
+import type { CreateActionType } from '@/navigation/createActions';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
 
 type AddFirstTransactionStepProps = {
-  actionLabel: string;
   currentStep: number;
   illustrationAspectRatio?: number;
   illustrationScale?: number;
@@ -50,7 +52,6 @@ type AddFirstTransactionStepProps = {
  * resto de la app, solo con el selector de tipo del formulario oculto.
  */
 export function AddFirstTransactionStep({
-  actionLabel,
   currentStep,
   illustrationAspectRatio,
   illustrationScale,
@@ -69,6 +70,7 @@ export function AddFirstTransactionStep({
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
   );
+  const [isQuickCreateVisible, setQuickCreateVisible] = useState(false);
   const [isModalVisible, setModalVisible] = useState(false);
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [isCustomVisible, setCustomVisible] = useState(false);
@@ -153,16 +155,29 @@ export function AddFirstTransactionStep({
     }
   };
 
+  const disabledActionTypes: readonly CreateActionType[] =
+    type === 'income'
+      ? ['expense', 'category', 'import']
+      : ['income', 'category', 'import'];
+
+  const handleQuickCreateSelection = (action: CreateActionType) => {
+    if (action !== type) return;
+    setQuickCreateVisible(false);
+    setModalVisible(true);
+  };
+
   return (
     <>
       <OnboardingScreenLayout
-        actionDisabled={!isReady}
-        actionLabel={actionLabel}
-        onAction={() => {
-          if (isReady) {
-            setModalVisible(true);
-          }
-        }}
+        footerAccessory={
+          <FloatingCreateButton
+            onPress={() => {
+              if (isReady) setQuickCreateVisible(true);
+            }}
+            placement="inline"
+            visible={isReady}
+          />
+        }
         onBack={onBack}
         currentStep={currentStep}
         illustrationAspectRatio={illustrationAspectRatio}
@@ -178,6 +193,12 @@ export function AddFirstTransactionStep({
           </Text>
         ) : null}
       </OnboardingScreenLayout>
+      <QuickCreateMenu
+        disabledActionTypes={disabledActionTypes}
+        onClose={() => setQuickCreateVisible(false)}
+        onSelect={handleQuickCreateSelection}
+        visible={isQuickCreateVisible}
+      />
       <CreateTransactionModal
         activeSpaceId={spaceId}
         availableCurrencies={activeCurrencies}

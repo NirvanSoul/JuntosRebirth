@@ -27,7 +27,9 @@ const frozenLineDebt = {
   'src/features/activity/screens/ActivityScreen.tsx': 573,
   'src/components/ui/AppCalendar/AppCalendar.tsx': 565,
   'src/features/import/repositories/localImportBatchRepository.ts': 556,
-  'src/lib/storage/localDatabase.ts': 427,
+  // `localDatabase.ts` salió de esta lista el 2026-08-17: al extraer el esquema
+  // fundacional y la escalera de migraciones bajó de 536 a 62 líneas y ya
+  // cumple el umbral general de 400. Sus dos módulos hijos también.
   'src/features/activity/components/TransactionFiltersModal.tsx': 536,
   'src/features/categories/components/CategoryPickerModal/CategoryPickerModal.tsx': 485,
   'src/features/activity/components/CategoryDonutChart.tsx': 462,

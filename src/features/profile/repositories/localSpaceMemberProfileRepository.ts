@@ -1,4 +1,5 @@
 import type { SpaceMemberProfile } from '@/features/profile/types';
+import { isCurrencyCode } from '@/lib/currency/currencyCatalog';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 
 type SpaceMemberProfileRow = {
@@ -7,6 +8,7 @@ type SpaceMemberProfileRow = {
   avatar_path: string | null;
   avatar_updated_at: string | null;
   avatar_cached_uri: string | null;
+  default_currency: string | null;
 };
 
 function mapProfile(row: SpaceMemberProfileRow): SpaceMemberProfile {
@@ -20,6 +22,10 @@ function mapProfile(row: SpaceMemberProfileRow): SpaceMemberProfile {
     avatarUri: row.avatar_cached_uri
       ? `${row.avatar_cached_uri}?v=${row.avatar_updated_at ?? ''}`
       : null,
+    defaultCurrency:
+      row.default_currency && isCurrencyCode(row.default_currency)
+        ? row.default_currency
+        : null,
   };
 }
 
@@ -29,7 +35,7 @@ export async function listSpaceMemberProfiles(
   const database = await getLocalDatabase();
   const rows = await database.getAllAsync<SpaceMemberProfileRow>(
     `SELECT user_id, display_name, avatar_path, avatar_updated_at,
-            avatar_cached_uri
+            avatar_cached_uri, default_currency
        FROM space_member_profiles
       WHERE space_id = ?
       ORDER BY user_id ASC`,
@@ -92,14 +98,15 @@ export async function replaceSpaceMemberProfiles(
       await transaction.runAsync(
         `INSERT INTO space_member_profiles
            (space_id, user_id, display_name, avatar_path, avatar_updated_at,
-            avatar_cached_uri, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            avatar_cached_uri, default_currency, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         spaceId,
         profile.userId,
         profile.displayName,
         profile.avatarPath,
         profile.avatarUpdatedAt,
         cachedByUserId.get(profile.userId) ?? null,
+        profile.defaultCurrency,
         now,
       );
     }

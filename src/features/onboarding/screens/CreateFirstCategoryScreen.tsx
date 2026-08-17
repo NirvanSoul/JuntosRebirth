@@ -1,6 +1,8 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 
+import { FloatingCreateButton } from '@/components/navigation/FloatingCreateButton/FloatingCreateButton';
+import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryPickerModal } from '@/features/categories/components/CategoryPickerModal/CategoryPickerModal';
 import { CreateCategoryModal } from '@/features/categories/components/CreateCategoryModal/CreateCategoryModal';
@@ -41,6 +43,7 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
   const { activeSpace } = useSpaces();
   const [firstName, setFirstName] = useState('');
   const [categories, setCategories] = useState<readonly Category[]>([]);
+  const [isQuickCreateVisible, setQuickCreateVisible] = useState(false);
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [isCustomVisible, setCustomVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,8 +128,12 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
   return (
     <>
       <OnboardingScreenLayout
-        actionLabel="Crear categoría"
-        onAction={() => setPickerVisible(true)}
+        footerAccessory={
+          <FloatingCreateButton
+            onPress={() => setQuickCreateVisible(true)}
+            placement="inline"
+          />
+        }
         onBack={() => navigation.goBack()}
         currentStep={6}
         illustrationAspectRatio={categoryIllustrationAspectRatio}
@@ -145,6 +152,16 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
           </Text>
         ) : null}
       </OnboardingScreenLayout>
+      <QuickCreateMenu
+        disabledActionTypes={['income', 'expense', 'import']}
+        onClose={() => setQuickCreateVisible(false)}
+        onSelect={(action) => {
+          if (action !== 'category') return;
+          setQuickCreateVisible(false);
+          setPickerVisible(true);
+        }}
+        visible={isQuickCreateVisible}
+      />
       <CategoryPickerModal
         categories={categories}
         mode="create"

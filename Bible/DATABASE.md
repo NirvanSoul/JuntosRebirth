@@ -310,6 +310,20 @@ evita una columna extra para recordar a qué versión corresponde la copia: el
 propio nombre lo dice, así que basta compararlo con el sello que llega del
 censo para saber si hay que volver a bajar la foto.
 
+La versión 19 añade `space_member_profiles.default_currency`. Un espacio
+compartido ofrece las monedas de todas las personas que lo usan, no solo la
+suya: si una trabaja en VES y la otra en EUR, cada una necesita ver y poder
+elegir la del otro. Sin esa columna, quien se une a un espacio en una moneda
+que no tiene activa lo encuentra vacío, porque el resumen se filtra a una
+moneda en la que no hay ningún movimiento.
+
+La unión la calcula `listSpaceCurrencies` (`src/features/spaces/utils/`), que
+ordena la moneda del espacio primero —es donde está el grueso de sus
+movimientos y actúa de valor por defecto— y después las propias y las de los
+demás miembros. El tope de `maxActiveCurrencies` no se aplica aquí: limita
+cuántas monedas gestiona una persona, no cuántas puede tener un espacio
+compartido entre dos.
+
 ### 5.5 Identificadores
 
 Los datos locales deben usar identificadores globalmente únicos desde su creación.

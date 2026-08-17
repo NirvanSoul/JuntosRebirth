@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from 'react';
+import type { PropsWithChildren, ReactNode } from 'react';
 import {
   Image,
   type ImageSourcePropType,
@@ -6,10 +6,12 @@ import {
   Pressable,
   StyleSheet,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { Screen } from '@/components/layout/Screen/Screen';
+import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { OnboardingProgressIndicator } from '@/features/onboarding/components/OnboardingProgressIndicator';
 import {
@@ -45,9 +47,11 @@ const heroIllustrationMaxHeight = { compact: 260, regular: 300 } as const;
 const compactIllustrationWidth = { compact: 112, regular: 128 } as const;
 
 type OnboardingScreenLayoutProps = PropsWithChildren<{
-  actionLabel: string;
+  actionLabel?: string;
   actionDisabled?: boolean;
-  onAction: () => void;
+  /** Acción circular colocada junto a Atrás, normalmente el FAB del onboarding. */
+  footerAccessory?: ReactNode;
+  onAction?: () => void;
   onBack?: () => void;
   currentStep: number;
   /** Imagen opcional mostrada entre el progreso y el título, a tamaño estándar. */
@@ -100,6 +104,7 @@ export function OnboardingScreenLayout({
   illustrationScale = 1,
   illustrationSource,
   isCompact = false,
+  footerAccessory,
   onAction,
   onBack,
   currentStep,
@@ -215,23 +220,28 @@ export function OnboardingScreenLayout({
         </Animated.View>
         <Animated.View layout={layoutTransition} style={styles.actions}>
           {onBack ? (
-            <ModalPrimaryAction
-              accessibilityLabel="Atrás"
-              label="Atrás"
+            <ModalCloseButton
               onPress={onBack}
+              showBackground
+              size={layout.floatingActionSize}
               testID={testID ? `${testID}-back` : undefined}
-              variant="surface"
+              variant="back"
             />
           ) : null}
-          <ModalPrimaryAction
-            accessibilityLabel={actionLabel}
-            disabled={actionDisabled}
-            label={actionLabel}
-            onPress={onAction}
-            style={styles.primaryAction}
-            testID={testID ? `${testID}-action` : undefined}
-            variant="cta"
-          />
+          {actionLabel && onAction ? (
+            <ModalPrimaryAction
+              accessibilityLabel={actionLabel}
+              disabled={actionDisabled}
+              label={actionLabel}
+              onPress={onAction}
+              style={styles.primaryAction}
+              testID={testID ? `${testID}-action` : undefined}
+              variant="cta"
+            />
+          ) : null}
+          {footerAccessory ? (
+            <View style={styles.footerAccessory}>{footerAccessory}</View>
+          ) : null}
         </Animated.View>
       </Pressable>
     </Screen>
@@ -265,6 +275,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
-  actions: { flexDirection: 'row', gap: spacing.md },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  footerAccessory: { marginLeft: 'auto' },
   primaryAction: { flex: 1 },
 });

@@ -13,7 +13,6 @@ export function AddFirstIncomeScreen({ navigation }: Props) {
 
   return (
     <AddFirstTransactionStep
-      actionLabel="Añadir ingreso"
       currentStep={7}
       illustrationAspectRatio={incomeIllustrationAspectRatio}
       illustrationSource={require('../../../../assets/Onboarding/7 Bien.png')}

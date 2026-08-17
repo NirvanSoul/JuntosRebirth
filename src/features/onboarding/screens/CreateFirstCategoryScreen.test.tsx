@@ -68,9 +68,26 @@ describe('CreateFirstCategoryScreen', () => {
     expect(screen.queryByText(/María/)).toBeNull();
 
     expect(screen.queryByText('Nueva categoría')).toBeNull();
-    await fireEvent.press(
-      screen.getByTestId('onboarding-create-category-action'),
-    );
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    expect(
+      screen.queryByTestId('onboarding-create-category-action'),
+    ).toBeNull();
+    expect(
+      screen.getByLabelText('Crear ingreso').props.accessibilityState,
+    ).toMatchObject({
+      disabled: true,
+    });
+    expect(
+      screen.getByLabelText('Crear gasto').props.accessibilityState,
+    ).toMatchObject({
+      disabled: true,
+    });
+    expect(
+      screen.getByLabelText('Crear categoría').props.accessibilityState,
+    ).toMatchObject({
+      disabled: false,
+    });
+    await fireEvent.press(screen.getByLabelText('Crear categoría'));
     expect(screen.getByText('Nueva categoría')).toBeTruthy();
     expect(screen.getByLabelText('Salario')).toBeTruthy();
   });
@@ -80,9 +97,8 @@ describe('CreateFirstCategoryScreen', () => {
       <CreateFirstCategoryScreen navigation={navigation} route={route} />,
     );
 
-    await fireEvent.press(
-      screen.getByTestId('onboarding-create-category-action'),
-    );
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    await fireEvent.press(screen.getByLabelText('Crear categoría'));
     await fireEvent.press(screen.getByLabelText('Salario'));
     await fireEvent.press(screen.getByLabelText('Guardar categorías'));
 
@@ -108,20 +124,15 @@ describe('CreateFirstCategoryScreen', () => {
       <CreateFirstCategoryScreen navigation={navigation} route={route} />,
     );
 
-    await fireEvent.press(
-      screen.getByTestId('onboarding-create-category-action'),
-    );
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    await fireEvent.press(screen.getByLabelText('Crear categoría'));
     await fireEvent.press(screen.getByLabelText('Crear otra categoría'));
     await fireEvent.changeText(
       screen.getByLabelText('Nombre de la categoría'),
       'Jardinería',
     );
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
-    // Hay dos botones con esta etiqueta: el que abre el selector (pantalla de
-    // onboarding) y el de enviar dentro del formulario personalizado; este
-    // último es el último en el árbol.
-    const submitButtons = screen.getAllByLabelText('Crear categoría');
-    await fireEvent.press(submitButtons[submitButtons.length - 1]!);
+    await fireEvent.press(screen.getByLabelText('Crear categoría'));
 
     await waitFor(() => {
       expect(mockCreateLocalCategory).toHaveBeenCalledWith(
@@ -153,9 +164,8 @@ describe('CreateFirstCategoryScreen', () => {
       <CreateFirstCategoryScreen navigation={navigation} route={route} />,
     );
 
-    await fireEvent.press(
-      screen.getByTestId('onboarding-create-category-action'),
-    );
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    await fireEvent.press(screen.getByLabelText('Crear categoría'));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Salario, ya creada')).toBeTruthy();

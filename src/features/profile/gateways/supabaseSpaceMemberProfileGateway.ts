@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { SpaceMemberProfile } from '@/features/profile/types';
+import { isCurrencyCode } from '@/lib/currency/currencyCatalog';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 
 /**
@@ -32,7 +33,9 @@ export async function fetchSpaceMemberProfiles(
 
   const { data: profiles, error: profilesError } = await client
     .from('profiles')
-    .select('id, display_name, avatar_path, avatar_updated_at')
+    .select(
+      'id, display_name, avatar_path, avatar_updated_at, default_currency',
+    )
     .in('id', userIds);
   if (profilesError || !profiles) {
     throw new Error('No pudimos recuperar los perfiles del espacio');
@@ -54,5 +57,10 @@ export async function fetchSpaceMemberProfiles(
         ? profile.avatar_updated_at
         : null,
     avatarUri: null,
+    defaultCurrency:
+      typeof profile.default_currency === 'string' &&
+      isCurrencyCode(profile.default_currency)
+        ? profile.default_currency
+        : null,
   }));
 }

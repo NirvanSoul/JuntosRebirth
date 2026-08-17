@@ -47,9 +47,7 @@ export function OnboardingNavigator() {
   if (!areIllustrationsReady) return null;
 
   return (
-    <Stack.Navigator
-      screenOptions={{ animation: 'slide_from_right', headerShown: false }}
-    >
+    <Stack.Navigator screenOptions={{ animation: 'fade', headerShown: false }}>
       <Stack.Screen
         component={NameScreen}
         name="Name"

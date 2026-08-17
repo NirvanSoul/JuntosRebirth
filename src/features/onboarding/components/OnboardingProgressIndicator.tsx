@@ -1,5 +1,13 @@
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, {
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
+import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
@@ -34,16 +42,59 @@ export function OnboardingProgressIndicator({
       style={styles.container}
       testID={testID}
     >
-      {Array.from({ length: totalSteps }, (_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.segment,
-            index < visibleCurrentStep ? styles.segmentComplete : null,
-          ]}
-          testID={`${testID}-segment-${index + 1}`}
-        />
-      ))}
+      {Array.from({ length: totalSteps }, (_, index) => {
+        const step = index + 1;
+        return (
+          <OnboardingProgressSegment
+            complete={step < visibleCurrentStep}
+            current={step === visibleCurrentStep}
+            key={step}
+            styles={styles}
+            testID={`${testID}-segment-${step}`}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+type OnboardingProgressSegmentProps = {
+  complete: boolean;
+  current: boolean;
+  styles: ReturnType<typeof createStyles>;
+  testID: string;
+};
+
+function OnboardingProgressSegment({
+  complete,
+  current,
+  styles,
+  testID,
+}: OnboardingProgressSegmentProps) {
+  const fillProgress = useSharedValue(complete ? 1 : 0);
+
+  useEffect(() => {
+    if (current) {
+      fillProgress.value = 0;
+      fillProgress.value = withTiming(1, {
+        duration: motion.stepProgressFillDuration,
+        reduceMotion: ReduceMotion.System,
+      });
+      return;
+    }
+    fillProgress.value = complete ? 1 : 0;
+  }, [complete, current, fillProgress]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${Math.max(0, Math.min(1, fillProgress.value)) * 100}%`,
+  }));
+
+  return (
+    <View style={styles.segment} testID={testID}>
+      <Animated.View
+        style={[styles.segmentFill, fillStyle]}
+        testID={`${testID}-fill`}
+      />
     </View>
   );
 }
@@ -58,9 +109,14 @@ function createStyles(colors: ColorTokens) {
     segment: {
       flex: 1,
       height: spacing.xs,
+      overflow: 'hidden',
       borderRadius: radii.round,
       backgroundColor: colors.surfaceMuted,
     },
-    segmentComplete: { backgroundColor: colors.cta },
+    segmentFill: {
+      height: '100%',
+      borderRadius: radii.round,
+      backgroundColor: colors.cta,
+    },
   });
 }

@@ -68,7 +68,8 @@ describe('AddFirstIncomeScreen', () => {
 
     expect(screen.getByText(/Ahora añade\s+tu primer ingreso/)).toBeTruthy();
 
-    await fireEvent.press(screen.getByTestId('onboarding-add-income-action'));
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    await fireEvent.press(screen.getByLabelText('Crear ingreso'));
 
     // El toggle interactivo de tipo no debe existir; la insignia fija sí.
     expect(screen.queryByTestId('transaction-type-selector')).toBeNull();

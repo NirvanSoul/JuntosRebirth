@@ -16,7 +16,6 @@ export function AddFirstExpenseScreen({ navigation }: Props) {
 
   return (
     <AddFirstTransactionStep
-      actionLabel="Añadir gasto"
       currentStep={8}
       illustrationAspectRatio={expenseIllustrationAspectRatio}
       illustrationScale={1.2}

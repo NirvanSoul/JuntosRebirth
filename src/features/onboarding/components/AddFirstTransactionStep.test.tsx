@@ -57,7 +57,6 @@ describe('AddFirstTransactionStep', () => {
       >
         <ThemeProvider initialAppearance="light">
           <AddFirstTransactionStep
-            actionLabel="Añadir primer ingreso"
             currentStep={4}
             onBack={jest.fn()}
             onSaved={jest.fn()}
@@ -72,9 +71,12 @@ describe('AddFirstTransactionStep', () => {
       </SafeAreaProvider>,
     );
 
-    fireEvent.press(
-      screen.getByRole('button', { name: 'Añadir primer ingreso' }),
-    );
+    fireEvent.press(screen.getByTestId('floating-create-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText('¿Qué quieres crear?')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByLabelText('Crear ingreso'));
 
     await waitFor(() => {
       expect(screen.getByTestId('create-transaction-modal')).toBeTruthy();
@@ -108,7 +110,6 @@ describe('AddFirstTransactionStep', () => {
         >
           <ThemeProvider initialAppearance="light">
             <AddFirstTransactionStep
-              actionLabel="Añadir primer ingreso"
               currentStep={4}
               onBack={jest.fn()}
               onSaved={jest.fn()}
@@ -127,16 +128,11 @@ describe('AddFirstTransactionStep', () => {
     // 1. Inicialmente las preferencias no están listas (isReady = false, valor provisional EUR)
     const screen = await render(<TestContainer />);
 
-    // 2. El botón refleja estado deshabilitado
-    const initialButton = screen.getByRole('button', {
-      name: 'Añadir primer ingreso',
-    });
-    expect(initialButton.props.accessibilityState).toMatchObject({
-      disabled: true,
-    });
+    // 2. Mientras no hay moneda definitiva, el FAB queda oculto también para
+    // lectores de pantalla y no puede abrir el menú.
+    expect(screen.queryByRole('button', { name: 'Crear' })).toBeNull();
 
-    // Pulsar el botón antes de que carguen las preferencias no abre el modal
-    fireEvent.press(initialButton);
+    // No se muestra ningún menú antes de que carguen las preferencias.
     expect(screen.queryByTestId('create-transaction-modal')).toBeNull();
 
     // 3. Llegada tardía de preferencias: isReady = true con VES
@@ -145,15 +141,15 @@ describe('AddFirstTransactionStep', () => {
     });
 
     // 4. El botón queda habilitado
-    const updatedButton = screen.getByRole('button', {
-      name: 'Añadir primer ingreso',
-    });
-    expect(updatedButton.props.accessibilityState).toMatchObject({
-      disabled: false,
-    });
+    expect(screen.getByRole('button', { name: 'Crear' })).toBeTruthy();
 
     // 5. Al pulsar el botón habilitado, abre directamente en VES
-    fireEvent.press(updatedButton);
+    fireEvent.press(screen.getByTestId('floating-create-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText('¿Qué quieres crear?')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByLabelText('Crear ingreso'));
 
     await waitFor(() => {
       expect(screen.getByTestId('create-transaction-modal')).toBeTruthy();
@@ -161,5 +157,65 @@ describe('AddFirstTransactionStep', () => {
 
     expect(screen.getByText('Bs.')).toBeTruthy();
     expect(screen.queryByText('€')).toBeNull();
+  });
+
+  it('en el paso de gasto solo habilita el gasto dentro del menú', async () => {
+    mockUseCurrencyPreferences.mockReturnValue({
+      activeCurrencies: ['EUR'],
+      isReady: true,
+      preferences: { currencies: ['EUR'] },
+      setCurrencyPreferences: jest.fn(),
+      error: null,
+    });
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <AddFirstTransactionStep
+            currentStep={8}
+            onBack={jest.fn()}
+            onSaved={jest.fn()}
+            spaceId="personal"
+            spaceName="Personal"
+            subtitle="Registra lo que gastas"
+            testID="add-first-expense-step"
+            title="Tu primer gasto"
+            type="expense"
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    fireEvent.press(screen.getByTestId('floating-create-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText('Crear ingreso').props.accessibilityState,
+      ).toMatchObject({
+        disabled: true,
+      });
+      expect(
+        screen.getByLabelText('Crear categoría').props.accessibilityState,
+      ).toMatchObject({
+        disabled: true,
+      });
+      expect(
+        screen.getByLabelText('Crear gasto').props.accessibilityState,
+      ).toMatchObject({
+        disabled: false,
+      });
+    });
+
+    fireEvent.press(screen.getByLabelText('Crear gasto'));
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('transaction-type-indicator-expense'),
+      ).toBeTruthy();
+    });
   });
 });

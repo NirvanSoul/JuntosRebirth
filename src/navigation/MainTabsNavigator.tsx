@@ -59,6 +59,7 @@ import { useSpaceMemberAvatars } from '@/features/profile/hooks/useSpaceMemberAv
 import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
 import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
 import { PendingInvitationBanner } from '@/features/spaces/components/PendingInvitationBanner';
+import { useSpaceCurrencies } from '@/features/spaces/hooks/useSpaceCurrencies';
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
 import { AcceptInvitationScreen } from '@/features/spaces/screens/AcceptInvitationScreen';
 import { AwaitingPartnerScreen } from '@/features/spaces/screens/AwaitingPartnerScreen';
@@ -237,11 +238,14 @@ export function MainTabsNavigator() {
     () => notificationRules.filter((rule) => rule.spaceId === activeSpace.id),
     [activeSpace.id, notificationRules],
   );
-  const hasMultipleHomeCurrencies = activeCurrencies.length > 1;
+  // Las del espacio, no solo las propias: en uno compartido hay que poder ver
+  // y elegir también la moneda en la que trabaja la otra persona.
+  const spaceCurrencies = useSpaceCurrencies(activeSpace, activeCurrencies);
+  const hasMultipleHomeCurrencies = spaceCurrencies.length > 1;
   const effectiveHomeCurrency =
-    (selectedHomeCurrency && activeCurrencies.includes(selectedHomeCurrency)
+    (selectedHomeCurrency && spaceCurrencies.includes(selectedHomeCurrency)
       ? selectedHomeCurrency
-      : activeCurrencies[0]) ?? defaultCurrencyCode;
+      : spaceCurrencies[0]) ?? defaultCurrencyCode;
   const selectedCategory =
     spaceCategories.find((category) => category.id === selectedCategoryId) ??
     null;
@@ -513,9 +517,11 @@ export function MainTabsNavigator() {
     );
   }, []);
 
+  // Sobre las del espacio, no las propias: si no, en un espacio compartido con
+  // dos monedas el botón no alternaría nada para quien solo tiene una.
   const handleHomeCurrencyPress = useCallback(() => {
-    if (activeCurrencies.length === 2) {
-      const nextCurrency = activeCurrencies.find(
+    if (spaceCurrencies.length === 2) {
+      const nextCurrency = spaceCurrencies.find(
         (currency) => currency !== effectiveHomeCurrency,
       );
       if (nextCurrency) {
@@ -524,11 +530,11 @@ export function MainTabsNavigator() {
       return;
     }
 
-    if (activeCurrencies.length >= 3) {
+    if (spaceCurrencies.length >= 3) {
       setHomeCurrencyPickerVisible(true);
     }
   }, [
-    activeCurrencies,
+    spaceCurrencies,
     effectiveHomeCurrency,
     setSelectedHomeCurrency,
     showSaveError,
@@ -1239,7 +1245,7 @@ export function MainTabsNavigator() {
               />
               <CreateTransactionModal
                 activeSpaceId={activeSpace.id}
-                availableCurrencies={activeCurrencies}
+                availableCurrencies={spaceCurrencies}
                 initialDate={transactionInitialDate}
                 initialDraft={editingTransaction ?? undefined}
                 onClose={() => {
@@ -1261,7 +1267,7 @@ export function MainTabsNavigator() {
               <ImportScreen
                 activeSpaceId={activeSpace.id}
                 activeSpaceName={activeSpace.name}
-                availableCurrencies={activeCurrencies}
+                availableCurrencies={spaceCurrencies}
                 categories={categories}
                 existingTransactions={activeSpaceTransactions}
                 fallbackCurrency={activeSpace.currency}
@@ -1374,7 +1380,7 @@ export function MainTabsNavigator() {
                 onDismiss={handleDismissCopyNotice}
               />
               <HomeCurrencyPickerModal
-                currencies={activeCurrencies}
+                currencies={spaceCurrencies}
                 onClose={() => setHomeCurrencyPickerVisible(false)}
                 onSelect={(currency) => {
                   setHomeCurrencyPickerVisible(false);
