@@ -65,9 +65,8 @@ import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScre
 import { isAwaitingPartnerSpace } from '@/features/spaces/types';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
 import { syncCoupleSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
-import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
 import { useHomeComparisonIndicatorsPreference } from '@/state/appPreferences/useHomeComparisonIndicatorsPreference';
-import { useHomeCurrencySelection } from '@/state/appPreferences/useHomeCurrencySelection';
+import { useVisibleCurrencyCatalog } from '@/state/appPreferences/useVisibleCurrencyCatalog';
 import { CreateTransactionModal } from '@/features/transactions/components/CreateTransactionModal/CreateTransactionModal';
 import { TransactionDetailModal } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal';
 import type {
@@ -100,7 +99,6 @@ import { resolveTransactionForDetail } from '@/features/transactions/utils/trans
 import { parseProjectedTransactionId } from '@/features/transactions/utils/transactionRecurrence';
 import { useAppForeground } from '@/hooks/useAppForeground';
 import {
-  defaultCurrencyCode,
   getCurrencyFlag,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
@@ -156,15 +154,6 @@ export function MainTabsNavigator() {
   // compartida (sondeo, realtime, publicación) queda en pausa hasta que acepte.
   const isAwaitingPartner = isAwaitingPartnerSpace(activeSpace);
   const {
-    activeCurrencies,
-    preferences: currencyPreferences,
-    setCurrencyPreferences,
-  } = useCurrencyPreferences();
-  const {
-    selectedCurrency: selectedHomeCurrency,
-    setSelectedCurrency: setSelectedHomeCurrency,
-  } = useHomeCurrencySelection();
-  const {
     enabled: showHomeComparisonIndicators,
     setEnabled: setShowHomeComparisonIndicators,
   } = useHomeComparisonIndicatorsPreference();
@@ -175,8 +164,6 @@ export function MainTabsNavigator() {
   // revelado del arco de balance y del donut de categorías.
   const [homeChartResetKey, setHomeChartResetKey] = useState(0);
   const [activityChartResetKey, setActivityChartResetKey] = useState(0);
-  const [isHomeCurrencyPickerVisible, setHomeCurrencyPickerVisible] =
-    useState(false);
   const [isFloatingCreateButtonVisible, setFloatingCreateButtonVisible] =
     useState(true);
   const [isActivitySummaryPinned, setActivitySummaryPinned] = useState(false);
@@ -245,11 +232,31 @@ export function MainTabsNavigator() {
     () => notificationRules.filter((rule) => rule.spaceId === activeSpace.id),
     [activeSpace.id, notificationRules],
   );
-  const hasMultipleHomeCurrencies = activeCurrencies.length > 1;
-  const effectiveHomeCurrency =
-    (selectedHomeCurrency && activeCurrencies.includes(selectedHomeCurrency)
-      ? selectedHomeCurrency
-      : activeCurrencies[0]) ?? defaultCurrencyCode;
+  const movementCurrencies = useMemo(
+    () => activeSpaceTransactions.map((transaction) => transaction.currency),
+    [activeSpaceTransactions],
+  );
+  const showSaveError = useCallback(() => {
+    Alert.alert(
+      'No pudimos guardar el cambio',
+      'Tus datos anteriores siguen intactos. Inténtalo de nuevo.',
+    );
+  }, []);
+  const {
+    closeHomeCurrencyPicker,
+    effectiveHomeCurrency,
+    hasMultipleVisibleCurrencies,
+    isHomeCurrencyPickerVisible,
+    preferences: currencyPreferences,
+    pressHomeCurrency: handleHomeCurrencyPress,
+    selectHomeCurrency,
+    setCurrencyPreferences,
+    visibleCurrencies,
+  } = useVisibleCurrencyCatalog({
+    movementCurrencies,
+    onSaveError: showSaveError,
+    spaceCurrency: activeSpace.currency,
+  });
   const selectedCategory =
     spaceCategories.find((category) => category.id === selectedCategoryId) ??
     null;
@@ -490,34 +497,6 @@ export function MainTabsNavigator() {
     isFinanceReady,
     refreshSharedCoupleData,
     session,
-  ]);
-
-  const showSaveError = useCallback(() => {
-    Alert.alert(
-      'No pudimos guardar el cambio',
-      'Tus datos anteriores siguen intactos. Inténtalo de nuevo.',
-    );
-  }, []);
-
-  const handleHomeCurrencyPress = useCallback(() => {
-    if (activeCurrencies.length === 2) {
-      const nextCurrency = activeCurrencies.find(
-        (currency) => currency !== effectiveHomeCurrency,
-      );
-      if (nextCurrency) {
-        void setSelectedHomeCurrency(nextCurrency).catch(showSaveError);
-      }
-      return;
-    }
-
-    if (activeCurrencies.length >= 3) {
-      setHomeCurrencyPickerVisible(true);
-    }
-  }, [
-    activeCurrencies,
-    effectiveHomeCurrency,
-    setSelectedHomeCurrency,
-    showSaveError,
   ]);
 
   const handleInvitePartner = useCallback(() => {
@@ -1065,7 +1044,7 @@ export function MainTabsNavigator() {
               <ActiveSpaceHeader
                 currencyFlag={
                   (activeMainTab === 'Home' || activeMainTab === 'Activity') &&
-                  hasMultipleHomeCurrencies
+                  hasMultipleVisibleCurrencies
                     ? getCurrencyFlag(effectiveHomeCurrency)
                     : undefined
                 }
@@ -1216,7 +1195,7 @@ export function MainTabsNavigator() {
               />
               <CreateTransactionModal
                 activeSpaceId={activeSpace.id}
-                availableCurrencies={activeCurrencies}
+                availableCurrencies={visibleCurrencies}
                 initialDate={transactionInitialDate}
                 initialDraft={editingTransaction ?? undefined}
                 onClose={() => {
@@ -1238,7 +1217,7 @@ export function MainTabsNavigator() {
               <ImportScreen
                 activeSpaceId={activeSpace.id}
                 activeSpaceName={activeSpace.name}
-                availableCurrencies={activeCurrencies}
+                availableCurrencies={visibleCurrencies}
                 categories={categories}
                 existingTransactions={activeSpaceTransactions}
                 fallbackCurrency={activeSpace.currency}
@@ -1351,12 +1330,9 @@ export function MainTabsNavigator() {
                 onDismiss={handleDismissCopyNotice}
               />
               <HomeCurrencyPickerModal
-                currencies={activeCurrencies}
-                onClose={() => setHomeCurrencyPickerVisible(false)}
-                onSelect={(currency) => {
-                  setHomeCurrencyPickerVisible(false);
-                  setSelectedHomeCurrency(currency).catch(showSaveError);
-                }}
+                currencies={visibleCurrencies}
+                onClose={closeHomeCurrencyPicker}
+                onSelect={selectHomeCurrency}
                 selectedCurrency={effectiveHomeCurrency}
                 visible={isHomeCurrencyPickerVisible}
               />

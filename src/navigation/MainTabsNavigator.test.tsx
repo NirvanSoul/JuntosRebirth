@@ -642,6 +642,110 @@ describe('MainTabsNavigator', () => {
         fallbackCurrency: 'VES',
       });
     });
+
+    it('entrega el mismo catálogo canónico (VES primero) al selector y a la importación aunque las preferencias omitan VES', async () => {
+      mockUseSpaces.mockReturnValue({
+        activeSpace: {
+          currency: 'VES',
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+        },
+        createSpace: jest.fn(),
+        error: null,
+        isReady: true,
+        selectSpace: jest.fn(),
+        spaces: [
+          {
+            currency: 'VES',
+            id: 'personal',
+            name: 'Personal',
+            type: 'personal',
+          },
+        ],
+      });
+      await AsyncStorage.setItem(
+        '@juntoss/currency-preferences/v1',
+        JSON.stringify({ currencies: ['EUR'], version: 1 }),
+      );
+      (listLocalCategories as jest.Mock).mockResolvedValue([
+        {
+          id: 'category-market',
+          spaceId: 'personal',
+          name: 'Mercado',
+          icon: 'fork-knife',
+          colorToken: 'orange',
+          isDefault: false,
+          isArchived: false,
+        },
+      ]);
+      (listLocalTransactions as jest.Mock).mockResolvedValue([
+        {
+          id: 'tx-usd',
+          spaceId: 'personal',
+          type: 'expense',
+          amountMinor: 1000,
+          currency: 'USD',
+          title: 'Café USD',
+          categoryId: 'category-market',
+          occurredOn: dateInCurrentMonth(2),
+          recurrence: 'once',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+        },
+      ]);
+
+      const screen = await render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <NavigationContainer>
+              <MainTabsNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      // Sin selección guardada, la moneda visible de Inicio es la del
+      // espacio (VES), aunque las preferencias solo tengan EUR.
+      await waitFor(() =>
+        expect(screen.getByLabelText('Moneda seleccionada: 🇻🇪')).toBeTruthy(),
+      );
+      // Se espera a que carguen los movimientos para que el catálogo
+      // canónico incluya USD antes de abrir el selector.
+      expect(await screen.findByText('Café USD')).toBeTruthy();
+      await fireEvent.press(screen.getByTestId('home-currency-flag-button'));
+
+      // El selector del encabezado recibe el catálogo canónico completo:
+      // VES (espacio), EUR (preferencias) y USD (movimientos).
+      expect(await screen.findByTestId('home-currency-picker')).toBeTruthy();
+      expect(screen.getByTestId('home-currency-VES-option')).toBeTruthy();
+      expect(screen.getByTestId('home-currency-EUR-option')).toBeTruthy();
+      expect(screen.getByTestId('home-currency-USD-option')).toBeTruthy();
+      await fireEvent.press(screen.getByLabelText('Cerrar'));
+
+      await fireEvent.press(screen.getByTestId('floating-create-button'));
+      await fireEvent.press(screen.getByLabelText('Importar movimientos'));
+
+      // La importación recibe ese mismo catálogo, con VES presente aunque
+      // las preferencias personales lo omitan.
+      await waitFor(() =>
+        expect(
+          mockImportScreenProps.some((props) => props.visible === true),
+        ).toBe(true),
+      );
+      const visibleImportProps = mockImportScreenProps.find(
+        (props) => props.visible === true,
+      );
+      expect(visibleImportProps).toMatchObject({
+        activeSpaceId: 'personal',
+        availableCurrencies: ['VES', 'EUR', 'USD'],
+        fallbackCurrency: 'VES',
+      });
+    });
   });
 
   it('desplaza el selector y fija el mismo resumen al recorrer movimientos', async () => {
