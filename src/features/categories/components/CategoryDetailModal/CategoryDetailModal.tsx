@@ -24,6 +24,10 @@ import { summarizeCategories } from '@/features/categories/utils/categorySummary
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
+import {
+  defaultCurrencyCode,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import { triggerHaptic } from '@/lib/haptics/haptics';
@@ -42,6 +46,7 @@ type DetailPanel = 'delete' | null;
 
 type CategoryDetailModalProps = {
   category: Category | null;
+  currency?: CurrencyCode;
   onAddTransaction: (categoryId: string) => void;
   onClose: () => void;
   onDelete: (categoryId: string) => void;
@@ -92,6 +97,7 @@ function ActionButton({ icon, label, onPress }: ActionButtonProps) {
 
 export function CategoryDetailModal({
   category,
+  currency = defaultCurrencyCode,
   onAddTransaction,
   onClose,
   onDelete,
@@ -181,10 +187,10 @@ export function CategoryDetailModal({
 
   if (!category || !summary) return null;
 
-  const expense = formatCurrency(summary.expenseMinor, 'EUR', 'es-ES');
-  const income = formatCurrency(summary.incomeMinor, 'EUR', 'es-ES');
+  const expense = formatCurrency(summary.expenseMinor, currency, 'es-ES');
+  const income = formatCurrency(summary.incomeMinor, currency, 'es-ES');
   const budget = category.budgetMinor
-    ? formatCurrency(category.budgetMinor, 'EUR', 'es-ES')
+    ? formatCurrency(category.budgetMinor, currency, 'es-ES')
     : null;
   const availableBudgetMinor = category.budgetMinor
     ? Math.max(category.budgetMinor - summary.expenseMinor, 0)
@@ -192,7 +198,7 @@ export function CategoryDetailModal({
   const availableBudget =
     availableBudgetMinor === null
       ? null
-      : formatCurrency(availableBudgetMinor, 'EUR', 'es-ES');
+      : formatCurrency(availableBudgetMinor, currency, 'es-ES');
   const budgetProgress = category.budgetMinor
     ? Math.min(summary.expenseMinor / category.budgetMinor, 1)
     : 0;
@@ -463,6 +469,7 @@ export function CategoryDetailModal({
       <CategoryBudgetModal
         categoryColor={categoryColors[category.colorToken]}
         categoryName={category.name}
+        currency={currency}
         initialBudgetMinor={category.budgetMinor}
         onClose={() => setBudgetModalVisible(false)}
         onRemove={() => {
@@ -519,9 +526,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       paddingTop: spacing.xl,
     },
     scroll: { flex: 1 },
-    scrollContent: {
-      paddingTop: spacing.xl + layout.minTouchTarget,
-    },
+    scrollContent: { paddingTop: spacing.xl + layout.minTouchTarget },
     hero: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
     titleBlock: { alignItems: 'center', gap: spacing.xxs },
     heroIcon: {
@@ -532,11 +537,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: radii.round,
       marginBottom: spacing.xs,
     },
-    metrics: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-      marginTop: spacing.xl,
-    },
+    metrics: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
     metric: {
       minWidth: 0,
       flex: 1,

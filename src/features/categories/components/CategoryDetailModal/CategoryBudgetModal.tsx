@@ -13,6 +13,13 @@ import {
   formatAmountInputForDisplay,
   parseAmountMinor,
 } from '@/lib/currency/amountInput';
+import {
+  defaultCurrencyCode,
+  getCurrencyPluralName,
+  getCurrencySymbol,
+  getCurrencySymbolPosition,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
 import { createDiagonalGradient } from '@/theme/gradients';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -24,6 +31,7 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type CategoryBudgetModalProps = {
   categoryColor: string;
   categoryName: string;
+  currency?: CurrencyCode;
   initialBudgetMinor?: number;
   onClose: () => void;
   onRemove: () => void;
@@ -42,6 +50,7 @@ const budgetAmountHeight = 64;
 export function CategoryBudgetModal({
   categoryColor,
   categoryName,
+  currency = defaultCurrencyCode,
   initialBudgetMinor,
   onClose,
   onRemove,
@@ -54,6 +63,9 @@ export function CategoryBudgetModal({
   const [amountInput, setAmountInput] = useState('0');
   const budgetMinor = parseAmountMinor(amountInput);
   const displayAmount = formatAmountInputForDisplay(amountInput);
+  const currencySymbol = getCurrencySymbol(currency);
+  const currencySymbolPosition = getCurrencySymbolPosition(currency);
+  const currencyPluralName = getCurrencyPluralName(currency);
   const contentHeight = useMemo(
     () =>
       layout.minTouchTarget +
@@ -105,13 +117,15 @@ export function CategoryBudgetModal({
         </View>
 
         <View
-          accessibilityLabel={`${displayAmount} euros de presupuesto`}
+          accessibilityLabel={`${displayAmount} ${currencyPluralName} de presupuesto`}
           accessibilityLiveRegion="polite"
           style={styles.amountArea}
           testID="category-budget-amount"
         >
           <Text adjustsFontSizeToFit numberOfLines={1} variant="amountHero">
-            {displayAmount} €
+            {currencySymbolPosition === 'before'
+              ? `${currencySymbol} ${displayAmount}`
+              : `${displayAmount} ${currencySymbol}`}
           </Text>
         </View>
 

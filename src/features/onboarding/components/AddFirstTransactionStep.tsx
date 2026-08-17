@@ -25,6 +25,7 @@ import type {
   CreateTransactionDraft,
   TransactionType,
 } from '@/features/transactions/types';
+import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
 
 type AddFirstTransactionStepProps = {
   actionLabel: string;
@@ -62,6 +63,7 @@ export function AddFirstTransactionStep({
   title,
   type,
 }: AddFirstTransactionStepProps) {
+  const { activeCurrencies } = useCurrencyPreferences();
   const [categories, setCategories] = useState<readonly Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
@@ -172,7 +174,9 @@ export function AddFirstTransactionStep({
       </OnboardingScreenLayout>
       <CreateTransactionModal
         activeSpaceId={spaceId}
+        availableCurrencies={activeCurrencies}
         hideTypeToggle
+        lastUsedCurrency={activeCurrencies[0]}
         onClose={() => setModalVisible(false)}
         onOpenCategoryPicker={() => setPickerVisible(true)}
         onSubmit={(draft) => void handleSubmit(draft)}

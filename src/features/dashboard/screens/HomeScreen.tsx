@@ -179,8 +179,8 @@ export function HomeScreen({
       ) ?? undefined)
     : undefined;
   const categorySummaries = useMemo(
-    () => summarizeCategories(categories, transactionsThroughCurrentMonth),
-    [categories, transactionsThroughCurrentMonth],
+    () => summarizeCategories(categories, currencyTransactions),
+    [categories, currencyTransactions],
   );
   const recentTransactions = useMemo(
     () => sortTransactionsByRecentActivity(transactionsThroughCurrentMonth),
@@ -258,6 +258,7 @@ export function HomeScreen({
               <CategoryPreviewCard
                 key={id}
                 {...category}
+                currency={currency}
                 onPress={() => onOpenCategoryDetail?.(id)}
                 variant="tile"
               />

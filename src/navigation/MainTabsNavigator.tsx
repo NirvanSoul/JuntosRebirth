@@ -321,17 +321,16 @@ export function MainTabsNavigator() {
       if (spaceId) {
         try {
           await syncCoupleSpaceDataForCurrentSession({ spaceId });
-        } catch {
-          // La escritura local permanece pendiente y se reintenta en el
-          // siguiente regreso a primer plano o mientras Juntos está abierto.
+        } catch (error) {
+          console.error('[sync] Subida de espacio compartido falló:', error);
         }
       }
 
       try {
         await restoreRemoteAccountForCurrentSession();
         await reloadLocalFinance();
-      } catch {
-        // Un fallo de red no debe ocultar los datos locales ya visibles.
+      } catch (error) {
+        console.error('[sync] Restauración remota falló:', error);
       }
     },
     [reloadLocalFinance, session],
@@ -1311,6 +1310,7 @@ export function MainTabsNavigator() {
               />
               <CategoryDetailModal
                 category={detailCategory}
+                currency={effectiveHomeCurrency}
                 onAddTransaction={(categoryId) => {
                   setDetailCategoryId(null);
                   setTransactionInitialDate(undefined);

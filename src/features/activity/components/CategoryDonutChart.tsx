@@ -26,6 +26,10 @@ import {
   summarizeCategories,
 } from '@/features/categories/utils/categorySummary';
 import type { SessionTransaction } from '@/features/transactions/types';
+import {
+  defaultCurrencyCode,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { categoryColors } from '@/theme/categoryColors';
 import { motion } from '@/theme/motion';
@@ -39,6 +43,7 @@ type ChartMode = 'expense' | 'income';
 
 type CategoryDonutChartProps = {
   categories: readonly Category[];
+  currency?: CurrencyCode;
   onOpenCategoryDetail?: (categoryId: string) => void;
   /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
   resetKey?: number;
@@ -61,21 +66,30 @@ const segmentIndicatorWidth =
 
 type MotionDirection = -1 | 1;
 
+const chartSpringConfig = {
+  damping: motion.chartModeSpring.damping,
+  mass: motion.chartModeSpring.mass,
+  stiffness: motion.chartModeSpring.stiffness,
+  reduceMotion: ReduceMotion.System,
+};
+const chartTimingConfig = {
+  duration: motion.chartContentExitDuration,
+  easing: Easing.inOut(Easing.cubic),
+  reduceMotion: ReduceMotion.System,
+};
+
 export function getChartContentEntering(
   direction: MotionDirection,
   delay: number = motion.chartContentEnterDelay,
 ): EntryExitAnimationFunction {
   return () => {
     'worklet';
-
-    const springConfig = {
-      damping: motion.chartModeSpring.damping,
-      mass: motion.chartModeSpring.mass,
-      stiffness: motion.chartModeSpring.stiffness,
-      reduceMotion: ReduceMotion.System,
-    };
     const delayedSpring = (value: number) =>
-      withDelay(delay, withSpring(value, springConfig), ReduceMotion.System);
+      withDelay(
+        delay,
+        withSpring(value, chartSpringConfig),
+        ReduceMotion.System,
+      );
     const delayedOpacity = withDelay(
       delay,
       withTiming(1, {
@@ -110,28 +124,21 @@ export function getChartContentExiting(
 ): EntryExitAnimationFunction {
   return () => {
     'worklet';
-
-    const timingConfig = {
-      duration: motion.chartContentExitDuration,
-      easing: Easing.inOut(Easing.cubic),
-      reduceMotion: ReduceMotion.System,
-    };
-
     return {
       initialValues: {
         opacity: 1,
         transform: [{ translateX: 0 }, { translateY: 0 }],
       },
       animations: {
-        opacity: withTiming(0, timingConfig),
+        opacity: withTiming(0, chartTimingConfig),
         transform: [
           {
             translateX: withTiming(
               direction * motion.chartContentTravel,
-              timingConfig,
+              chartTimingConfig,
             ),
           },
-          { translateY: withTiming(-spacing.sm, timingConfig) },
+          { translateY: withTiming(-spacing.sm, chartTimingConfig) },
         ],
       },
     };
@@ -146,6 +153,7 @@ const chartLayoutTransition = LinearTransition.springify()
 
 export function CategoryDonutChart({
   categories,
+  currency = defaultCurrencyCode,
   onOpenCategoryDetail,
   resetKey,
   transactions,
@@ -178,7 +186,7 @@ export function CategoryDonutChart({
 
     return { items, totalMinor };
   }, [mode, monthCategories]);
-  const formattedTotal = formatCurrency(data.totalMinor, 'EUR', 'es-ES');
+  const formattedTotal = formatCurrency(data.totalMinor, currency, 'es-ES');
   const segmentLengths = useMemo(
     () =>
       distributeDonutSegmentLengths(
@@ -408,12 +416,8 @@ export function CategoryDonutChart({
 
 function createStyles(colors: ColorTokens) {
   return StyleSheet.create({
-    card: {
-      alignItems: 'center',
-    },
-    monthNavigator: {
-      marginBottom: spacing.md,
-    },
+    card: { alignItems: 'center' },
+    monthNavigator: { marginBottom: spacing.md },
     segmentedControl: {
       width: segmentedControlWidth,
       flexDirection: 'row',
@@ -438,9 +442,7 @@ function createStyles(colors: ColorTokens) {
       borderRadius: radii.round,
       zIndex: 1,
     },
-    segmentPressed: {
-      opacity: 0.64,
-    },
+    segmentPressed: { opacity: 0.64 },
     chartArea: {
       width: chartSize,
       height: chartSize,
@@ -453,11 +455,7 @@ function createStyles(colors: ColorTokens) {
       width: chartSize - chartStrokeWidth * 3,
       alignItems: 'center',
     },
-    total: {
-      width: '100%',
-      marginTop: spacing.xs,
-      textAlign: 'center',
-    },
+    total: { width: '100%', marginTop: spacing.xs, textAlign: 'center' },
     legend: {
       width: '100%',
       flexDirection: 'row',
@@ -473,12 +471,8 @@ function createStyles(colors: ColorTokens) {
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
     },
-    legendItemContainer: {
-      maxWidth: '100%',
-    },
-    legendItemPressed: {
-      backgroundColor: colors.surfaceMuted,
-    },
+    legendItemContainer: { maxWidth: '100%' },
+    legendItemPressed: { backgroundColor: colors.surfaceMuted },
     legendDot: {
       width: legendDotSize,
       height: legendDotSize,

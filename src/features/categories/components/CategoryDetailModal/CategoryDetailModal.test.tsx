@@ -455,4 +455,46 @@ describe('CategoryDetailModal', () => {
     expect(within(upcomingList).queryByText('Almuerzo')).toBeNull();
     expect(within(detail).getByText('Movimientos futuros')).toBeTruthy();
   });
+
+  it('formatea presupuesto y gastos con la moneda indicada (VES) en vez de EUR', async () => {
+    const budgetedCategory: Category = {
+      ...category,
+      budgetMinor: 50000,
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={budgetedCategory}
+            currency="VES"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={jest.fn()}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[
+              { ...transaction, amountMinor: 20000, currency: 'VES' },
+            ]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const detail = screen.getByTestId('category-detail-modal');
+    const budgetCard = within(detail).getByTestId('category-budget-summary');
+    expect(
+      within(budgetCard).getAllByText(/Bs\./).length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(within(budgetCard).queryByText(/€/)).toBeNull();
+  });
 });

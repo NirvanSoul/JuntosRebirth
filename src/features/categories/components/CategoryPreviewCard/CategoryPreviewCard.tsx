@@ -7,6 +7,10 @@ import { Text } from '@/components/ui/Text/Text';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { CategoryIconName } from '@/features/categories/types';
+import {
+  defaultCurrencyCode,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import {
   categoryColors,
@@ -27,6 +31,7 @@ type CategoryPreviewCardProps = {
   icon: CategoryIconName;
   colorToken: CategoryColorToken;
   budgetMinor?: number;
+  currency?: CurrencyCode;
   incomeMinor: number;
   expenseMinor: number;
   variant?: CategoryPreviewCardVariant;
@@ -56,6 +61,7 @@ function CategoryTile({
   icon,
   colorToken,
   budgetMinor,
+  currency = defaultCurrencyCode,
   incomeMinor,
   expenseMinor,
   onPress,
@@ -66,7 +72,7 @@ function CategoryTile({
   const isIncomeOnly = incomeMinor > 0 && expenseMinor === 0;
   const amount = formatCurrency(
     isIncomeOnly ? incomeMinor : expenseMinor,
-    'EUR',
+    currency,
     'es-ES',
   );
   const hasBudget = typeof budgetMinor === 'number' && budgetMinor > 0;
@@ -210,32 +216,13 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
   }
 
   if (variant === 'tile') {
-    const {
-      budgetMinor,
-      colorToken,
-      expenseMinor,
-      icon,
-      incomeMinor,
-      name,
-      onPress,
-    } = props;
-
-    return (
-      <CategoryTile
-        budgetMinor={budgetMinor}
-        colorToken={colorToken}
-        expenseMinor={expenseMinor}
-        icon={icon}
-        incomeMinor={incomeMinor}
-        name={name}
-        onPress={onPress}
-      />
-    );
+    return <CategoryTile {...props} />;
   }
 
   const {
     budgetMinor,
     colorToken,
+    currency = defaultCurrencyCode,
     expenseMinor,
     icon,
     incomeMinor,
@@ -247,14 +234,19 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
     typeof budgetMinor === 'number' && budgetMinor > 0 && !isIncomeOnly;
   const spent = formatCurrency(
     isIncomeOnly ? incomeMinor : expenseMinor,
-    'EUR',
+    currency,
     'es-ES',
     { omitZeroDecimals: true },
   );
   const available = hasBudget
-    ? formatCurrency(Math.max(budgetMinor - expenseMinor, 0), 'EUR', 'es-ES', {
-        omitZeroDecimals: true,
-      })
+    ? formatCurrency(
+        Math.max(budgetMinor - expenseMinor, 0),
+        currency,
+        'es-ES',
+        {
+          omitZeroDecimals: true,
+        },
+      )
     : null;
   const budgetProgress = hasBudget
     ? Math.min(expenseMinor / budgetMinor, 1)
@@ -393,21 +385,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: previewCardLayout.iconRadius,
   },
-  content: {
-    flex: 1,
-    minWidth: 0,
-    gap: spacing.sm,
-  },
+  content: { flex: 1, minWidth: 0, gap: spacing.sm },
   budgetSummary: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     width: '100%',
   },
-  budgetProgress: {
-    flex: 1,
-    minWidth: 0,
-  },
+  budgetProgress: { flex: 1, minWidth: 0 },
   tile: {
     width: tileWidth,
     minHeight: tileMinHeight,
@@ -435,7 +420,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  progress: {
-    position: 'absolute',
-  },
+  progress: { position: 'absolute' },
 });
