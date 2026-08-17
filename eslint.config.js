@@ -12,29 +12,27 @@ const expoConfig = require('eslint-config-expo/flat');
 // en el mensaje del commit. Un umbral que sube en silencio invalida la
 // congelación.
 const frozenLineDebt = {
-  'src/navigation/MainTabsNavigator.tsx': 1372,
+  'src/navigation/MainTabsNavigator.tsx': 1358,
   // Umbral elevado de 1209 (techo 1216) el 2026-08-16 por la corrección del
   // stale closure del catálogo (F4, commit 5c19b3b), con aprobación explícita
   // del responsable. La encapsulación en `updateLocalCategories` lo dejó en
   // 1214. Candidato prioritario a extracción (PLAN.md §3 Fase 4).
-  'src/features/import/screens/ImportScreen.tsx': 1214,
-  'src/features/transactions/components/CreateTransactionModal/CreateTransactionModal.tsx': 1163,
+  'src/features/import/screens/ImportScreen.tsx': 1188,
+  'src/features/transactions/components/CreateTransactionModal/CreateTransactionModal.tsx': 1160,
   'src/features/transactions/repositories/localTransactionRepository.ts': 895,
   'src/features/transactions/components/TransactionDetailModal/TransactionDetailModal.tsx': 701,
   'src/features/settings/screens/SettingsScreen.tsx': 660,
-  'src/features/categories/components/CategoryDetailModal/CategoryDetailModal.tsx': 627,
+  'src/features/categories/components/CategoryDetailModal/CategoryDetailModal.tsx': 610,
   'src/features/map/screens/MapScreen.tsx': 597,
-  'src/features/activity/screens/ActivityScreen.tsx': 573,
   'src/components/ui/AppCalendar/AppCalendar.tsx': 565,
   'src/features/import/repositories/localImportBatchRepository.ts': 556,
   'src/lib/storage/localDatabase.ts': 547,
   'src/features/activity/components/TransactionFiltersModal.tsx': 536,
+  'src/features/activity/screens/ActivityScreen.tsx': 535,
   'src/features/categories/components/CategoryPickerModal/CategoryPickerModal.tsx': 485,
-  'src/features/activity/components/CategoryDonutChart.tsx': 462,
   'src/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal.tsx': 441,
   'src/features/map/components/WeeklyMovementCalendar.tsx': 439,
   'src/features/spaces/components/SpaceSideMenu.tsx': 439,
-  'src/features/categories/components/CategoryPreviewCard/CategoryPreviewCard.tsx': 425,
 };
 
 module.exports = defineConfig([
