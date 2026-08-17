@@ -55,6 +55,7 @@ import {
 } from '@/features/map/screens/MapScreen';
 import { AuthModal } from '@/features/settings/components/AuthModal';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
+import { useSpaceMemberAvatars } from '@/features/profile/hooks/useSpaceMemberAvatars';
 import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
 import { PendingInvitationBanner } from '@/features/spaces/components/PendingInvitationBanner';
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
@@ -144,6 +145,7 @@ export function MainTabsNavigator() {
   // que sincronizar: Inicio pasa a la pantalla de espera y toda la maquinaria
   // compartida (sondeo, realtime, publicación) queda en pausa hasta que acepte.
   const isAwaitingPartner = isAwaitingPartnerSpace(activeSpace);
+  const spaceMemberAvatarUris = useSpaceMemberAvatars(activeSpace);
   const {
     activeCurrencies,
     preferences: currencyPreferences,
@@ -1088,6 +1090,7 @@ export function MainTabsNavigator() {
                     ? getCurrencyFlag(effectiveHomeCurrency)
                     : undefined
                 }
+                memberAvatarUris={spaceMemberAvatarUris}
                 onCurrencyPress={handleHomeCurrencyPress}
                 onSpacePress={() => navigation.openDrawer()}
                 spaceName={activeSpace.name}

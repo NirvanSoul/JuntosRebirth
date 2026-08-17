@@ -1,13 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect } from 'react';
-import {
-  Image,
-  type ImageSourcePropType,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   ReduceMotion,
@@ -18,6 +11,8 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
+import { Avatar } from '@/components/ui/Avatar/Avatar';
+import { AvatarPair } from '@/components/ui/AvatarPair/AvatarPair';
 import { Text } from '@/components/ui/Text/Text';
 import { iconSize, layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
@@ -34,7 +29,11 @@ type ActiveSpaceHeaderProps = {
    * tiene más de una moneda activa y está viendo esa pestaña. */
   currencyFlag?: string;
   onCurrencyPress?: () => void;
-  profileImageSource?: ImageSourcePropType;
+  /**
+   * Fotos de los miembros del espacio, la primera delante. Una sola en un
+   * espacio personal; dos, solapadas, en uno juntos.
+   */
+  memberAvatarUris?: readonly (string | null)[];
   visible?: boolean;
 };
 
@@ -46,12 +45,14 @@ export function ActiveSpaceHeader({
   spaceName,
   currencyFlag,
   onCurrencyPress,
-  profileImageSource,
+  memberAvatarUris,
   visible = true,
 }: ActiveSpaceHeaderProps) {
   const density = useLayoutDensity();
   const { width } = useWindowDimensions();
   const { colors, shadows } = useTheme();
+  const [frontAvatarUri, backAvatarUri] = memberAvatarUris ?? [];
+  const isSharedSpace = (memberAvatarUris?.length ?? 0) > 1;
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const visibilityProgress = useSharedValue(visible ? 1 : 0);
 
@@ -95,13 +96,16 @@ export function ActiveSpaceHeader({
           <View
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
-            style={styles.avatar}
             testID="active-space-avatar"
           >
-            {profileImageSource ? (
-              <Image source={profileImageSource} style={styles.profileImage} />
+            {isSharedSpace ? (
+              <AvatarPair
+                backUri={backAvatarUri}
+                frontUri={frontAvatarUri}
+                size={avatarSize}
+              />
             ) : (
-              <Ionicons color={colors.brand} name="person" size={iconSize.sm} />
+              <Avatar size={avatarSize} uri={frontAvatarUri} />
             )}
           </View>
           <Text numberOfLines={1} variant="label" weight="semibold">
@@ -167,20 +171,6 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     },
     spaceButtonPressed: {
       opacity: 0.72,
-    },
-    avatar: {
-      width: avatarSize,
-      height: avatarSize,
-      overflow: 'hidden',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      backgroundColor: colors.brandSoft,
-    },
-    profileImage: {
-      width: '100%',
-      height: '100%',
-      borderRadius: radii.round,
     },
     currencyButton: {
       ...shadows.subtle,
