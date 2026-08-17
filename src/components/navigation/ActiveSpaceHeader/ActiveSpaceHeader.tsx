@@ -37,7 +37,7 @@ type ActiveSpaceHeaderProps = {
   visible?: boolean;
 };
 
-const avatarSize = 36;
+const avatarSize = 32;
 const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 
 export function ActiveSpaceHeader({
