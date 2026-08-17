@@ -365,13 +365,19 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
      - `displayCurrency` (Moneda visible): Selección temporal en Inicio o Actividad para consulta.
      - `transaction.currency`: Moneda de cada movimiento individual.
      - *Regla derivada:* El progreso del presupuesto solo se calcula y compara contra movimientos en `spaces.currency`.
-   - **Entrega 1 — El Modelo (Pendiente de aprobación de ficha):**
-      - Exponer `currency: CurrencyCode` en `Space`.
-      - Versionar `StoredSpacesState` a `version: 2` en AsyncStorage (`@juntoss/spaces/v1`) con migración v1→v2 que use la preferencia real interna (`loadCurrencyPreferences()`) como semilla y EUR solo como fallback de último recurso. Sin parámetro en `loadSpaces()`.
-      - Enviar `currency: CurrencyCode` obligatorio en la creación local y remota (`create_couple_space`).
-      - Soportar `currency` en `fetchRemoteAccountSnapshot` y `fetchRemoteCoupleSpace` validando con `isCurrencyCode` con error explícito registrado (sin casts ni fallbacks silenciosos ante filas remotas corruptas).
-      - Migración nueva de PostgreSQL (`23_preserve_guest_space_currency.sql`) con lógica asimétrica (INSERT usa `'EUR'` si falta; UPDATE conserva `spaces.currency` existente ante clientes antiguos sin `currency`).
-      - Sin tocar la interfaz.
+   - **Entrega 1 — El Modelo (Implementada, probada y aplicada en staging):**
+     - Exponer `currency: CurrencyCode` en `Space`.
+     - Versionar `StoredSpacesState` a `version: 2` en AsyncStorage (`@juntoss/spaces/v1`) con migración v1→v2 que use la preferencia real interna (`loadCurrencyPreferences()`) como semilla y EUR solo como fallback de último recurso. Sin parámetro en `loadSpaces()`. Persistencia inmediata del estado inicial en disco.
+     - Enviar `currency: CurrencyCode` obligatorio en la creación local y remota (`create_couple_space`).
+     - Soportar `currency` en `fetchRemoteAccountSnapshot` y `fetchRemoteCoupleSpace` validando con `isCurrencyCode` con error explícito estructurado (`RemoteSpaceIntegrityError`, sin casts ni fallbacks silenciosos ante filas remotas corruptas).
+     - Migración nueva de PostgreSQL (`23_preserve_guest_space_currency.sql`) con lógica asimétrica (INSERT usa `'EUR'` si falta; UPDATE conserva `spaces.currency` existente ante clientes antiguos sin `currency`).
+     - Suite pgTAP focal (`guest_space_currency.test.sql`) con 17 aserciones incluyendo idempotencia discriminante con payload modificado.
+     - **Aplicación y Verificación en Staging (`blaanqqxtdezsscdkkvz`):**
+       - Dry-run: `npx supabase db push --dry-run` confirmó solo `23_preserve_guest_space_currency.sql` pendiente (`EXIT=0`).
+       - Aplicación: `npx supabase db push` aplicó `23_preserve_guest_space_currency.sql` (`EXIT=0`).
+       - Comprobación de historial: `npx supabase migration list --linked` confirmó 01-08 y 10-23 aplicadas (`EXIT=0`).
+       - Suite focal pgTAP en staging: `npx supabase test db --linked supabase/tests/guest_space_currency.test.sql` → 17/17 tests PASS (`EXIT=0`).
+     - Sin tocar la interfaz.
    - **Entrega 2 — El Consumo:**
      - Agregación con `summarizeCategories(categories, transactions, currency)` donde `currency` es obligatoria y el filtrado ocurre dentro.
      - Pantallas de Inicio y Actividad propagando su moneda visible al modal de detalle de categoría.
