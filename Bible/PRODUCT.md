@@ -139,6 +139,24 @@ Ejemplo:
 - Casa → reparación.
 - Casa → venta de un mueble.
 
+### Cuenta
+
+Dónde está guardado el dinero: efectivo, cuenta bancaria, tarjeta de débito,
+tarjeta de crédito o ahorro. Es el segundo eje de clasificación de un
+movimiento, junto a la categoría, y siempre **opcional**: un movimiento sin
+cuenta es igual de válido y no afecta a ningún saldo.
+
+Una cuenta pertenece a un espacio, como la categoría, y tiene nombre, tipo,
+color, icono, moneda y saldo inicial. Su saldo es el saldo inicial más los
+ingresos menos los gastos que tenga asignados, con la misma regla de horizonte
+mensual que el balance. Elegir una cuenta al registrar un movimiento fija la
+moneda de ese movimiento, de modo que un saldo nunca mezcla divisas. El tipo
+solo cambia el aspecto y el icono por defecto: una tarjeta de crédito calcula
+su saldo igual que las demás y puede quedar en negativo.
+
+Eliminar una cuenta la archiva y conserva sus movimientos. Las transferencias
+entre cuentas quedan fuera de esta versión.
+
 ### Balance
 
 Definición consistente:
@@ -196,6 +214,11 @@ Después del onboarding, el usuario entra como invitado o crea su cuenta (ver §
 - No pedir correo ni contraseña antes de probar.
 - No pedir permisos sin explicar por qué.
 - Pedir un primer ingreso y un primer gasto al final, para dejar el espacio local con datos reales.
+- En los pasos 6, 7 y 8, enseñar la creación con el mismo botón flotante y el
+  mismo menú de opciones de la app; las acciones ajenas al paso permanecen
+  visibles pero deshabilitadas.
+- La transición entre láminas usa un fundido breve y el segmento del paso que
+  entra se rellena de izquierda a derecha, como el progreso de una story.
 - Permitir omitir cuando corresponda.
 - No repetirlo sin acción explícita.
 
@@ -274,6 +297,7 @@ Tiene tres destinos principales:
 - Ingresos y gastos del mes.
 - Progreso circular por categoría únicamente cuando tenga presupuesto.
 - Vista previa de categorías.
+- Vista previa de cuentas.
 - Movimientos recientes.
 - Crear gasto.
 - Crear ingreso.
@@ -360,6 +384,8 @@ Nombre de trabajo para agrupar:
 - Categorías.
 - Detalle de categoría.
 - Movimientos asociados.
+- Cuentas.
+- Detalle de cuenta.
 
 Debajo del título `Movimientos`, Actividad muestra un resumen compacto de
 ingresos, gastos y balance. Las tres cifras se calculan sobre el mismo conjunto
@@ -373,6 +399,19 @@ volver por encima del resumen o al cambiar de pantalla. Cada badge abre la misma
 que su acceso equivalente en Inicio, con navegación histórica y futura y la
 acción para añadir un ingreso, gasto o movimiento. El conjunto incluye el mes local actual completo y excluye los
 meses posteriores, que continúan accesibles desde Mapa.
+
+Debajo de la sección de categorías aparece la sección `Cuentas`, también
+plegable. Presenta las cuentas del espacio como tarjetas con la forma de una
+tarjeta física, desplazables en horizontal, y debajo la misma información como
+lista compacta con icono, nombre y saldo. Tocar una tarjeta o una fila abre el
+detalle de la cuenta, con su saldo, el saldo inicial, los totales de ingresos
+y gastos, sus movimientos y las acciones de editar y eliminar. Cada tarjeta
+muestra el saldo en la moneda de su propia cuenta, así que el selector de
+moneda de los movimientos no las filtra ni mezcla divisas, y no se muestra
+ningún total agregado de todas las cuentas.
+
+Inicio repite esa sección debajo de las categorías, pero solo con las
+tarjetas: su enlace `Ver más` lleva a la sección de cuentas de Actividad.
 
 La gráfica y el listado forman una única sección plegable antes de los
 movimientos: el donut aparece primero y debajo se muestra el detalle por
@@ -594,10 +633,17 @@ Contenido base:
 - Cerrar.
 - Importe con teclado o calculadora.
 - Categoría.
+- Cuenta opcional.
 - Título.
 - Fecha.
 - Recurrencia opcional.
 - Guardar.
+
+El botón de cuenta acompaña a los de recurrencia y moneda, y solo aparece
+cuando el espacio activo ya tiene alguna cuenta. Al elegir una, el movimiento
+adopta su moneda y el selector de moneda desaparece; al quitarla, vuelve a la
+moneda del espacio. Desde el propio selector se puede crear una cuenta sin
+salir del flujo.
 
 El espacio se deriva del contexto activo y no se pregunta de nuevo por defecto.
 El importe debe ser válido y la categoría es obligatoria: el movimiento no se

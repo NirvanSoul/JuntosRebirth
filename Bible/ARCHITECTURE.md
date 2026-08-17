@@ -187,6 +187,7 @@ src/features/
 ├── guest/
 ├── transactions/
 ├── categories/
+├── accounts/
 ├── import/
 ├── spaces/
 ├── dashboard/

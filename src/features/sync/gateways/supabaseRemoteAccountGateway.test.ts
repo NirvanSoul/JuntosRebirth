@@ -10,6 +10,8 @@ function createMockSupabaseClient(
     spacesError?: Error | null;
     categoriesData?: Record<string, unknown>[] | null;
     categoriesError?: Error | null;
+    moneyAccountsData?: Record<string, unknown>[] | null;
+    moneyAccountsError?: Error | null;
     seriesData?: Record<string, unknown>[] | null;
     seriesError?: Error | null;
     transactionsData?: Record<string, unknown>[] | null;
@@ -25,6 +27,8 @@ function createMockSupabaseClient(
     spacesError = null,
     categoriesData = [],
     categoriesError = null,
+    moneyAccountsData = [],
+    moneyAccountsError = null,
     seriesData = [],
     seriesError = null,
     transactionsData = [],
@@ -48,6 +52,16 @@ function createMockSupabaseClient(
           in: jest.fn().mockResolvedValue({
             data: categoriesData,
             error: categoriesError,
+          }),
+        }),
+      };
+    }
+    if (table === 'money_accounts') {
+      return {
+        select: jest.fn().mockReturnValue({
+          in: jest.fn().mockResolvedValue({
+            data: moneyAccountsData,
+            error: moneyAccountsError,
           }),
         }),
       };

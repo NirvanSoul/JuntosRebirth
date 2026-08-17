@@ -4,6 +4,10 @@ import {
   createInitialSchema,
   createRecurringSeriesSchema,
 } from '@/lib/storage/localDatabaseBaseSchema';
+import {
+  createMoneyAccountSchema,
+  recreateRemoteEntityLinksWithMoneyAccounts,
+} from '@/lib/storage/localDatabaseMoneyAccountSchema';
 import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabaseSchemaRepair';
 
 /**
@@ -12,7 +16,7 @@ import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabase
  * versión, de modo que la escalera es acumulativa y ningún bloque se
  * reejecuta.
  */
-export const localDatabaseVersion = 19;
+export const localDatabaseVersion = 21;
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -419,6 +423,14 @@ export async function migrateLocalDatabase(
       await transaction.execAsync(`
         ALTER TABLE space_member_profiles ADD COLUMN default_currency TEXT;
       `);
+    }
+
+    if (currentVersion < 20) {
+      await createMoneyAccountSchema(transaction);
+    }
+
+    if (currentVersion < 21) {
+      await recreateRemoteEntityLinksWithMoneyAccounts(transaction);
     }
 
     await transaction.execAsync(

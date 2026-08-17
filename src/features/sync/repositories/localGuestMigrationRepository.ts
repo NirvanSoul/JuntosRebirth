@@ -4,64 +4,18 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type { Space } from '@/features/spaces/types';
 import type {
   GuestMigrationCategory,
+  GuestMigrationMoneyAccount,
   GuestMigrationPayload,
-  GuestMigrationSeries,
-  GuestMigrationTransaction,
 } from '@/features/sync/types';
+import type {
+  CategorySyncRow,
+  MoneyAccountSyncRow,
+  SeriesSyncRow,
+  SyncAccountRow,
+  TransactionSyncRow,
+} from '@/features/sync/repositories/guestMigrationRows';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
-
-type SyncAccountRow = { user_id: string };
-type CategorySyncRow = {
-  id: string;
-  space_id: string;
-  name: string;
-  icon: string;
-  color_token: string;
-  budget_minor: number | null;
-  is_default: number;
-  template_key: string | null;
-  source_category_id: string | null;
-  is_archived: number;
-  created_at: string;
-  updated_at: string;
-  archived_at: string | null;
-};
-type SeriesSyncRow = {
-  id: string;
-  space_id: string;
-  category_id: string;
-  type: GuestMigrationSeries['type'];
-  amount_minor: number;
-  currency: GuestMigrationSeries['currency'];
-  title: string;
-  frequency: GuestMigrationSeries['frequency'];
-  starts_on: string;
-  generated_occurrences: number;
-  next_occurrence_on: string;
-  is_archived: number;
-  created_at: string;
-  updated_at: string;
-  archived_at: string | null;
-};
-type TransactionSyncRow = {
-  id: string;
-  space_id: string;
-  category_id: string;
-  type: GuestMigrationTransaction['type'];
-  amount_minor: number;
-  currency: GuestMigrationTransaction['currency'];
-  title: string;
-  occurred_on: string;
-  recurrence: GuestMigrationTransaction['recurrence'];
-  recurrence_group_id: string | null;
-  recurrence_series_id: string | null;
-  source_transaction_id: string | null;
-  is_archived: number;
-  created_at: string;
-  updated_at: string;
-  archived_at: string | null;
-};
 
 const uploadableStatuses = "('local_only', 'pending', 'failed', 'syncing')";
 
@@ -71,13 +25,17 @@ export class GuestDataAccountMismatchError extends Error {}
 function assertSpacesCoverPayload(
   spaces: readonly Space[],
   categories: readonly CategorySyncRow[],
+  moneyAccounts: readonly MoneyAccountSyncRow[],
   series: readonly SeriesSyncRow[],
   transactions: readonly TransactionSyncRow[],
 ): void {
   const spaceIds = new Set(spaces.map((space) => space.id));
-  const missingSpaceId = [...categories, ...series, ...transactions].find(
-    (row) => !spaceIds.has(row.space_id),
-  )?.space_id;
+  const missingSpaceId = [
+    ...categories,
+    ...moneyAccounts,
+    ...series,
+    ...transactions,
+  ].find((row) => !spaceIds.has(row.space_id))?.space_id;
   if (missingSpaceId) {
     throw new Error(`Falta el espacio local ${missingSpaceId} en la migración`);
   }
@@ -89,7 +47,11 @@ function placeholders(count: number): string {
 
 async function setRowsStatus(
   database: SQLiteDatabase,
-  table: 'categories' | 'recurring_transaction_series' | 'transactions',
+  table:
+    | 'categories'
+    | 'money_accounts'
+    | 'recurring_transaction_series'
+    | 'transactions',
   ids: readonly string[],
   status: 'syncing' | 'synced' | 'failed',
   onlyIfSyncing = false,
@@ -105,7 +67,11 @@ async function setRowsStatus(
 
 async function markRowsSyncedIfUnchanged(
   database: SQLiteDatabase,
-  table: 'categories' | 'recurring_transaction_series' | 'transactions',
+  table:
+    | 'categories'
+    | 'money_accounts'
+    | 'recurring_transaction_series'
+    | 'transactions',
   rows: readonly { id: string; updatedAt: string }[],
 ): Promise<void> {
   for (const row of rows) {
@@ -150,34 +116,49 @@ export async function prepareLocalGuestMigration(
   }
 
   let categories: CategorySyncRow[] = [];
+  let moneyAccounts: MoneyAccountSyncRow[] = [];
   let series: SeriesSyncRow[] = [];
   let transactions: TransactionSyncRow[] = [];
   const batchId = randomUUID();
   const now = new Date().toISOString();
   await database.withExclusiveTransactionAsync(async (transaction) => {
-    [categories, series, transactions] = await Promise.all([
+    [categories, moneyAccounts, series, transactions] = await Promise.all([
       transaction.getAllAsync<CategorySyncRow>(
         `SELECT id, space_id, name, icon, color_token, budget_minor, is_default,
                 template_key, source_category_id, is_archived, created_at,
                 updated_at, archived_at
            FROM categories WHERE sync_status IN ${uploadableStatuses}`,
       ),
+      transaction.getAllAsync<MoneyAccountSyncRow>(
+        `SELECT id, space_id, name, kind, icon, color_token, currency,
+                opening_balance_minor, is_archived, created_at, updated_at,
+                archived_at
+           FROM money_accounts WHERE sync_status IN ${uploadableStatuses}`,
+      ),
       transaction.getAllAsync<SeriesSyncRow>(
-        `SELECT id, space_id, category_id, type, amount_minor, currency, title,
+        `SELECT id, space_id, category_id, money_account_id, type, amount_minor,
+                currency, title,
                 frequency, starts_on, generated_occurrences, next_occurrence_on,
                 is_archived, created_at, updated_at, archived_at
            FROM recurring_transaction_series
           WHERE sync_status IN ${uploadableStatuses}`,
       ),
       transaction.getAllAsync<TransactionSyncRow>(
-        `SELECT id, space_id, category_id, type, amount_minor, currency, title,
+        `SELECT id, space_id, category_id, money_account_id, type, amount_minor,
+                currency, title,
                 occurred_on, recurrence, recurrence_group_id,
                 recurrence_series_id, source_transaction_id, is_archived,
                 created_at, updated_at, archived_at
            FROM transactions WHERE sync_status IN ${uploadableStatuses}`,
       ),
     ]);
-    assertSpacesCoverPayload(spaces, categories, series, transactions);
+    assertSpacesCoverPayload(
+      spaces,
+      categories,
+      moneyAccounts,
+      series,
+      transactions,
+    );
 
     await transaction.runAsync(
       `INSERT INTO local_sync_batches (
@@ -197,6 +178,12 @@ export async function prepareLocalGuestMigration(
       transaction,
       'categories',
       categories.map((row) => row.id),
+      'syncing',
+    );
+    await setRowsStatus(
+      transaction,
+      'money_accounts',
+      moneyAccounts.map((row) => row.id),
       'syncing',
     );
     await setRowsStatus(
@@ -233,10 +220,25 @@ export async function prepareLocalGuestMigration(
       updatedAt: row.updated_at,
       archivedAt: row.archived_at,
     })),
+    moneyAccounts: moneyAccounts.map((row): GuestMigrationMoneyAccount => ({
+      id: row.id,
+      spaceId: row.space_id,
+      name: row.name,
+      kind: row.kind,
+      icon: row.icon,
+      colorToken: row.color_token,
+      currency: row.currency,
+      openingBalanceMinor: row.opening_balance_minor,
+      isArchived: row.is_archived === 1,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      archivedAt: row.archived_at,
+    })),
     recurringSeries: series.map((row) => ({
       id: row.id,
       spaceId: row.space_id,
       categoryId: row.category_id,
+      moneyAccountId: row.money_account_id,
       type: row.type,
       amountMinor: row.amount_minor,
       currency: row.currency,
@@ -254,6 +256,7 @@ export async function prepareLocalGuestMigration(
       id: row.id,
       spaceId: row.space_id,
       categoryId: row.category_id,
+      moneyAccountId: row.money_account_id,
       type: row.type,
       amountMinor: row.amount_minor,
       currency: row.currency,
@@ -281,6 +284,11 @@ export async function completeLocalGuestMigration(
       transaction,
       'categories',
       payload.categories,
+    );
+    await markRowsSyncedIfUnchanged(
+      transaction,
+      'money_accounts',
+      payload.moneyAccounts,
     );
     await markRowsSyncedIfUnchanged(
       transaction,
@@ -314,6 +322,13 @@ export async function failLocalGuestMigration(
       transaction,
       'categories',
       payload.categories.map((row) => row.id),
+      'failed',
+      true,
+    );
+    await setRowsStatus(
+      transaction,
+      'money_accounts',
+      payload.moneyAccounts.map((row) => row.id),
       'failed',
       true,
     );

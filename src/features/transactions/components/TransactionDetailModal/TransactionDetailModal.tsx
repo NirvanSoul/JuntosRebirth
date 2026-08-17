@@ -17,6 +17,8 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { Avatar } from '@/components/ui/Avatar/Avatar';
 import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal';
 import { Text } from '@/components/ui/Text/Text';
+import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
+import type { MoneyAccount } from '@/features/accounts/types';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { Category } from '@/features/categories/types';
 import { createStyles } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal.styles';
@@ -45,6 +47,8 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type TransactionDetailModalProps = {
   category: Category | null;
+  /** Cuenta del movimiento; puede estar archivada y se sigue mostrando. */
+  moneyAccount?: MoneyAccount | null;
   onClose: () => void;
   onCopy: (
     transactionId: string,
@@ -87,6 +91,7 @@ function formatTransactionDate(occurredOn: string): string {
 
 export function TransactionDetailModal({
   category,
+  moneyAccount,
   onClose,
   onCopy,
   onDelete,
@@ -369,6 +374,27 @@ export function TransactionDetailModal({
                   />
                 ) : null}
               </Pressable>
+              {moneyAccount ? (
+                <>
+                  <View style={styles.divider} />
+                  <View
+                    style={styles.detailRow}
+                    testID="transaction-detail-money-account-row"
+                  >
+                    <MoneyAccountIcon
+                      color={categoryColors[moneyAccount.colorToken]}
+                      name={moneyAccount.icon}
+                      size={iconSize.sm}
+                    />
+                    <View style={styles.detailCopy}>
+                      <Text tone="secondary" variant="caption">
+                        Cuenta
+                      </Text>
+                      <Text variant="label">{moneyAccount.name}</Text>
+                    </View>
+                  </View>
+                </>
+              ) : null}
               <View style={styles.divider} />
               <View style={styles.detailRow}>
                 <Ionicons

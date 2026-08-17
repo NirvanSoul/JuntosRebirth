@@ -9,6 +9,7 @@ export type TransactionRow = {
   id: string;
   space_id: string;
   category_id: string;
+  money_account_id: string | null;
   created_by: string;
   type: string;
   amount_minor: number;
@@ -60,6 +61,9 @@ export function mapTransaction(row: TransactionRow): SessionTransaction {
     id: row.id,
     spaceId: row.space_id,
     categoryId: row.category_id,
+    ...(row.money_account_id === null || row.money_account_id === undefined
+      ? {}
+      : { moneyAccountId: row.money_account_id }),
     createdBy: row.created_by,
     type: row.type as TransactionType,
     amountMinor: row.amount_minor,

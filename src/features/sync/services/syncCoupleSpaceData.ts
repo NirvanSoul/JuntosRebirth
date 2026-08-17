@@ -6,6 +6,7 @@ type SyncRow = { id: string; updated_at: string } & Record<string, unknown>;
 
 type CoupleSpaceSyncResult = {
   categoryCount: number;
+  moneyAccountCount: number;
   recurringSeriesCount: number;
   transactionCount: number;
 };
@@ -29,7 +30,11 @@ function serializeRow(row: SyncRow): Record<string, unknown> {
 }
 
 async function markRowsSynced(
-  table: 'categories' | 'recurring_transaction_series' | 'transactions',
+  table:
+    | 'categories'
+    | 'money_accounts'
+    | 'recurring_transaction_series'
+    | 'transactions',
   rows: readonly SyncRow[],
 ): Promise<void> {
   const database = await getLocalDatabase();
@@ -49,18 +54,29 @@ async function syncCoupleSpaceData(input: {
 }): Promise<CoupleSpaceSyncResult> {
   const database = await getLocalDatabase();
   const installationId = await getOrCreateInstallationId(database);
-  const [categories, recurringSeries, transactions] = await Promise.all([
-    database.getAllAsync<SyncRow>(
-      `SELECT id, name, icon, color_token AS "colorToken",
+  const [categories, moneyAccounts, recurringSeries, transactions] =
+    await Promise.all([
+      database.getAllAsync<SyncRow>(
+        `SELECT id, name, icon, color_token AS "colorToken",
               budget_minor AS "budgetMinor", is_default AS "isDefault",
               template_key AS "templateKey", is_archived AS "isArchived",
               created_at AS "createdAt", updated_at
          FROM categories
         WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
-      input.spaceId,
-    ),
-    database.getAllAsync<SyncRow>(
-      `SELECT id, category_id AS "categoryId", type,
+        input.spaceId,
+      ),
+      database.getAllAsync<SyncRow>(
+        `SELECT id, name, kind, icon, color_token AS "colorToken", currency,
+              opening_balance_minor AS "openingBalanceMinor",
+              is_archived AS "isArchived", created_at AS "createdAt",
+              updated_at
+         FROM money_accounts
+        WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
+        input.spaceId,
+      ),
+      database.getAllAsync<SyncRow>(
+        `SELECT id, category_id AS "categoryId",
+              money_account_id AS "moneyAccountId", type,
               amount_minor AS "amountMinor", currency, title,
               frequency, starts_on AS "startsOn",
               generated_occurrences AS "generatedOccurrences",
@@ -68,10 +84,11 @@ async function syncCoupleSpaceData(input: {
               is_archived AS "isArchived", created_at AS "createdAt", updated_at
          FROM recurring_transaction_series
         WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
-      input.spaceId,
-    ),
-    database.getAllAsync<SyncRow>(
-      `SELECT id, category_id AS "categoryId", type,
+        input.spaceId,
+      ),
+      database.getAllAsync<SyncRow>(
+        `SELECT id, category_id AS "categoryId",
+              money_account_id AS "moneyAccountId", type,
               amount_minor AS "amountMinor", currency, title,
               occurred_on AS "occurredOn", recurrence,
               recurrence_group_id AS "recurrenceGroupId",
@@ -80,34 +97,43 @@ async function syncCoupleSpaceData(input: {
               is_archived AS "isArchived", created_at AS "createdAt", updated_at
          FROM transactions
         WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
-      input.spaceId,
-    ),
-  ]);
+        input.spaceId,
+      ),
+    ]);
 
   if (
     categories.length === 0 &&
+    moneyAccounts.length === 0 &&
     recurringSeries.length === 0 &&
     transactions.length === 0
   ) {
-    return { categoryCount: 0, recurringSeriesCount: 0, transactionCount: 0 };
+    return {
+      categoryCount: 0,
+      moneyAccountCount: 0,
+      recurringSeriesCount: 0,
+      transactionCount: 0,
+    };
   }
 
   await syncCoupleSpaceRemotely({
     installationId,
     spaceId: input.spaceId,
     categories: categories.map(serializeRow),
+    moneyAccounts: moneyAccounts.map(serializeRow),
     recurringSeries: recurringSeries.map(serializeRow),
     transactions: transactions.map(serializeRow),
   });
 
   await Promise.all([
     markRowsSynced('categories', categories),
+    markRowsSynced('money_accounts', moneyAccounts),
     markRowsSynced('recurring_transaction_series', recurringSeries),
     markRowsSynced('transactions', transactions),
   ]);
 
   return {
     categoryCount: categories.length,
+    moneyAccountCount: moneyAccounts.length,
     recurringSeriesCount: recurringSeries.length,
     transactionCount: transactions.length,
   };

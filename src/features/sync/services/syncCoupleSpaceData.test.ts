@@ -38,10 +38,25 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
           updated_at: '2026-08-13T10:00:00.000Z',
         },
       ])
+      .mockResolvedValueOnce([
+        {
+          id: 'money-account-a',
+          name: 'Cuenta nómina',
+          kind: 'bank',
+          icon: 'bank',
+          colorToken: 'blue',
+          currency: 'EUR',
+          openingBalanceMinor: 100000,
+          isArchived: 0,
+          createdAt: '2026-08-13T09:00:00.000Z',
+          updated_at: '2026-08-13T09:00:00.000Z',
+        },
+      ])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           id: 'transaction-a',
+          moneyAccountId: 'money-account-a',
           categoryId: 'category-a',
           type: 'expense',
           amountMinor: 2450,
@@ -71,17 +86,32 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
           isArchived: false,
         }),
       ],
+      moneyAccounts: [
+        expect.objectContaining({
+          id: 'money-account-a',
+          remoteId: 'money-account-a',
+          currency: 'EUR',
+          openingBalanceMinor: 100000,
+          isArchived: false,
+        }),
+      ],
       recurringSeries: [],
       transactions: [
         expect.objectContaining({
           id: 'transaction-a',
           categoryId: 'category-a',
+          moneyAccountId: 'money-account-a',
           remoteId: 'transaction-a',
           isArchived: false,
         }),
       ],
     });
-    expect(runAsync).toHaveBeenCalledTimes(2);
+    expect(runAsync).toHaveBeenCalledTimes(3);
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE money_accounts'),
+      'money-account-a',
+      '2026-08-13T09:00:00.000Z',
+    );
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining("SET sync_status = 'synced'"),
       'category-a',
@@ -96,6 +126,7 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
       syncCoupleSpaceDataForCurrentSession({ spaceId: 'couple-empty' }),
     ).resolves.toEqual({
       categoryCount: 0,
+      moneyAccountCount: 0,
       recurringSeriesCount: 0,
       transactionCount: 0,
     });

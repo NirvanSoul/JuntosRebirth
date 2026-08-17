@@ -33,6 +33,7 @@ export async function deleteLocalData(): Promise<void> {
         DELETE FROM category_budgets;
         DELETE FROM transactions;
         DELETE FROM recurring_transaction_series;
+        DELETE FROM money_accounts;
         DELETE FROM categories;
         DELETE FROM local_sync_batches;
         DELETE FROM local_sync_account;

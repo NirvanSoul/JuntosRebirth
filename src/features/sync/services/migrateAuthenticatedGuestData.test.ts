@@ -16,6 +16,7 @@ const payload: GuestMigrationPayload = {
     { id: 'personal', name: 'Personal', type: 'personal', currency: 'EUR' },
   ],
   categories: [],
+  moneyAccounts: [],
   recurringSeries: [],
   transactions: [],
 };

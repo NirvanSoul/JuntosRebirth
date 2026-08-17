@@ -6,6 +6,7 @@ export type CoupleSpaceSyncPayload = {
   installationId: string;
   spaceId: string;
   categories: readonly Record<string, unknown>[];
+  moneyAccounts: readonly Record<string, unknown>[];
   recurringSeries: readonly Record<string, unknown>[];
   transactions: readonly Record<string, unknown>[];
 };
@@ -23,6 +24,7 @@ export async function syncCoupleSpaceRemotely(
   const { error } = await client.rpc('sync_couple_space_data', {
     p_categories: payload.categories,
     p_installation_id: payload.installationId,
+    p_money_accounts: payload.moneyAccounts,
     p_recurring_series: payload.recurringSeries,
     p_space_id: payload.spaceId,
     p_transactions: payload.transactions,

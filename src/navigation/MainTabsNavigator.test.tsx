@@ -59,6 +59,27 @@ jest.mock('@/features/sync/services/restoreRemoteAccount', () => ({
   restoreRemoteAccountForCurrentSession: () => mockRestoreRemoteAccount(),
 }));
 
+jest.mock(
+  '@/features/accounts/repositories/localMoneyAccountRepository',
+  () => {
+    let nextId = 1;
+
+    return {
+      archiveLocalMoneyAccount: jest.fn(async () => undefined),
+      countLocalMoneyAccountUsages: jest.fn(async () => 0),
+      createLocalMoneyAccount: jest.fn(
+        async (input: Record<string, unknown>) => ({
+          ...input,
+          id: `money-account-${nextId++}`,
+          isArchived: false,
+        }),
+      ),
+      listLocalMoneyAccounts: jest.fn(async () => []),
+      updateLocalMoneyAccount: jest.fn(async (account) => account),
+    };
+  },
+);
+
 jest.mock('@/features/categories/repositories/localCategoryRepository', () => {
   let nextId = 1;
   const create = async (input: Record<string, unknown>) => ({

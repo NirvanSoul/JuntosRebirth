@@ -113,8 +113,10 @@ describe('HomeScreen', () => {
     expect(screen.getAllByText(/^0\s*€$/)).toHaveLength(3);
     expect(screen.getByText('Aún no hay categorías')).toBeTruthy();
     expect(screen.getByText('Aún no hay movimientos')).toBeTruthy();
+    expect(screen.getByText('Aún no hay cuentas')).toBeTruthy();
     expect(screen.getByText('Movimientos Recientes')).toBeTruthy();
-    expect(screen.getAllByText('Ver más')).toHaveLength(2);
+    // Categorías, Cuentas y Movimientos Recientes.
+    expect(screen.getAllByText('Ver más')).toHaveLength(3);
     const movementsLink = screen.getByLabelText(
       'Ver más de Movimientos Recientes',
     );
@@ -856,5 +858,68 @@ describe('HomeScreen', () => {
 
     // Anillo de progreso de presupuesto calculado en VES (40 VES / 100 VES = 40%)
     expect(screen.getByLabelText('Presupuesto utilizado 40%')).toBeTruthy();
+  });
+  describe('sección de cuentas', () => {
+    const account = {
+      id: 'account-1',
+      spaceId: 'personal',
+      name: 'Cuenta nómina',
+      kind: 'bank' as const,
+      icon: 'bank' as const,
+      colorToken: 'blue' as const,
+      currency: 'EUR' as const,
+      openingBalanceMinor: 100000,
+      isArchived: false,
+    };
+
+    const renderHome = (props = {}) =>
+      render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <HomeScreen
+              categories={categories}
+              transactions={transactions}
+              {...props}
+            />
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+    it('muestra solo las tarjetas, sin la lista de Actividad', async () => {
+      const screen = await renderHome({ moneyAccounts: [account] });
+
+      expect(screen.getByTestId('home-account-scroller')).toBeTruthy();
+      expect(screen.getByTestId('money-account-card-account-1')).toBeTruthy();
+      expect(screen.queryByTestId('money-account-row-account-1')).toBeNull();
+    });
+
+    it('lleva a Actividad desde «Ver más»', async () => {
+      const onViewAccounts = jest.fn();
+      const screen = await renderHome({
+        moneyAccounts: [account],
+        onViewAccounts,
+      });
+
+      await fireEvent.press(screen.getByLabelText('Ver más de Cuentas'));
+
+      expect(onViewAccounts).toHaveBeenCalled();
+    });
+
+    it('abre el detalle al tocar una tarjeta', async () => {
+      const onOpenMoneyAccountDetail = jest.fn();
+      const screen = await renderHome({
+        moneyAccounts: [account],
+        onOpenMoneyAccountDetail,
+      });
+
+      await fireEvent.press(screen.getByTestId('money-account-card-account-1'));
+
+      expect(onOpenMoneyAccountDetail).toHaveBeenCalledWith('account-1');
+    });
   });
 });

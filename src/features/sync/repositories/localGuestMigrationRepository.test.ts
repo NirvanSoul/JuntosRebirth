@@ -76,9 +76,26 @@ describe('localGuestMigrationRepository', () => {
       ])
       .mockResolvedValueOnce([
         {
+          id: 'money-account-1',
+          space_id: 'personal',
+          name: 'Cuenta nómina',
+          kind: 'bank',
+          icon: 'bank',
+          color_token: 'blue',
+          currency: 'EUR',
+          opening_balance_minor: 100_000,
+          is_archived: 0,
+          created_at: '2026-08-01T09:00:00.000Z',
+          updated_at: '2026-08-01T09:00:00.000Z',
+          archived_at: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
           id: 'series-1',
           space_id: 'personal',
           category_id: 'category-1',
+          money_account_id: 'money-account-1',
           type: 'expense',
           amount_minor: 1250,
           currency: 'EUR',
@@ -98,6 +115,7 @@ describe('localGuestMigrationRepository', () => {
           id: 'transaction-1',
           space_id: 'personal',
           category_id: 'category-1',
+          money_account_id: 'money-account-1',
           type: 'expense',
           amount_minor: 1250,
           currency: 'EUR',
@@ -187,6 +205,7 @@ describe('localGuestMigrationRepository', () => {
           space_id: 'missing-space',
         },
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 

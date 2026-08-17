@@ -44,6 +44,7 @@ export function createSupabaseGuestMigrationGateway(
         p_installation_id: payload.installationId,
         p_spaces: payload.spaces,
         p_categories: payload.categories,
+        p_money_accounts: payload.moneyAccounts,
         p_recurring_series: payload.recurringSeries,
         p_transactions: payload.transactions,
       });

@@ -27,9 +27,24 @@ export type RemoteAccountCategory = {
   updatedAt: string;
 };
 
+export type RemoteAccountMoneyAccount = {
+  remoteId: string;
+  spaceRemoteId: string;
+  name: string;
+  kind: string;
+  icon: string;
+  colorToken: string;
+  currency: CurrencyCode;
+  openingBalanceMinor: number;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type RemoteAccountSnapshot = {
   spaces: readonly RemoteAccountSpace[];
   categories: readonly RemoteAccountCategory[];
+  moneyAccounts: readonly RemoteAccountMoneyAccount[];
   recurringSeries: readonly Record<string, unknown>[];
   transactions: readonly Record<string, unknown>[];
 };
@@ -53,6 +68,7 @@ export async function fetchRemoteAccountSnapshot(
     return {
       spaces: [],
       categories: [],
+      moneyAccounts: [],
       recurringSeries: [],
       transactions: [],
     };
@@ -96,9 +112,16 @@ export async function fetchRemoteAccountSnapshot(
     throw new Error('No pudimos recuperar tus categorías');
   }
   const [
+    { data: moneyAccounts, error: moneyAccountsError },
     { data: recurringSeries, error: seriesError },
     { data: transactions, error: transactionsError },
   ] = await Promise.all([
+    client
+      .from('money_accounts')
+      .select(
+        'id, space_id, name, kind, icon, color_token, currency, opening_balance_minor, is_archived, created_at, updated_at',
+      )
+      .in('space_id', spaceIds),
     client
       .from('recurring_transaction_series')
       .select(
@@ -115,6 +138,9 @@ export async function fetchRemoteAccountSnapshot(
   if (seriesError || transactionsError || !recurringSeries || !transactions) {
     throw new Error('No pudimos recuperar tus movimientos');
   }
+  if (moneyAccountsError || !moneyAccounts) {
+    throw new Error('No pudimos recuperar tus cuentas');
+  }
   return {
     spaces: mappedSpaces,
     categories: categories.map((category) => ({
@@ -130,6 +156,30 @@ export async function fetchRemoteAccountSnapshot(
       createdAt: category.created_at as string,
       updatedAt: category.updated_at as string,
     })),
+    moneyAccounts: moneyAccounts.map((account) => {
+      const rawCurrency = account.currency;
+      // La moneda es la que da sentido al saldo: una fila remota corrupta se
+      // detiene aquí en vez de propagarse a la interfaz ya tipada.
+      if (typeof rawCurrency !== 'string' || !isCurrencyCode(rawCurrency)) {
+        throw new Error(
+          `[sync] Integridad comprometida en cuenta remota ${String(account.id)}: currency=${String(rawCurrency)}`,
+        );
+      }
+
+      return {
+        remoteId: account.id as string,
+        spaceRemoteId: account.space_id as string,
+        name: account.name as string,
+        kind: account.kind as string,
+        icon: account.icon as string,
+        colorToken: account.color_token as string,
+        currency: rawCurrency,
+        openingBalanceMinor: account.opening_balance_minor as number,
+        isArchived: account.is_archived as boolean,
+        createdAt: account.created_at as string,
+        updatedAt: account.updated_at as string,
+      };
+    }),
     recurringSeries: recurringSeries as Record<string, unknown>[],
     transactions: transactions as Record<string, unknown>[],
   };

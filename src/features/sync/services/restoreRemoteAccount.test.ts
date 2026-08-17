@@ -54,6 +54,7 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     await restoreRemoteAccount({
       userId: 'test-user-id',
       snapshot: {
+        moneyAccounts: [],
         spaces: [
           {
             remoteId: 'space-remote-1',
@@ -173,6 +174,7 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
       'tx-remote-1',
       'space-remote-1',
       'cat-remote-1',
+      null,
       'test-user-id',
       'income',
       4000,

@@ -5,7 +5,7 @@ export type MainTabParamList = {
   Activity:
     | {
         requestId: number;
-        section: 'categories' | 'movements';
+        section: 'accounts' | 'categories' | 'movements';
       }
     | undefined;
   Map: undefined;

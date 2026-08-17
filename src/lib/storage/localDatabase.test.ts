@@ -253,6 +253,34 @@ describe('migrateLocalDatabase', () => {
     expect(migration).toContain("'space', 'category', 'transaction'");
   });
 
+  it('añade las cuentas y su columna opcional al actualizar desde la versión 19', async () => {
+    const transaction = { execAsync: jest.fn(async () => undefined) };
+    const database = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ user_version: 19 })),
+      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    const migration = (transaction.execAsync as jest.Mock).mock.calls
+      .map(([statement]) => statement)
+      .join('\n');
+    expect(migration).toContain('CREATE TABLE money_accounts');
+    expect(migration).toContain("'cash', 'bank', 'debit', 'credit', 'savings'");
+    expect(migration).toContain(
+      'ALTER TABLE transactions ADD COLUMN money_account_id TEXT',
+    );
+    expect(migration).toContain(
+      'ALTER TABLE recurring_transaction_series ADD COLUMN money_account_id',
+    );
+    expect(migration).toContain('transactions_money_account_idx');
+    // La columna llega nula: ningún movimiento anterior gana cuenta sola.
+    expect(migration).not.toContain(
+      'UPDATE transactions\n           SET money_account_id',
+    );
+  });
+
   it('rechaza una base creada por una versión futura de la app', async () => {
     const database = {
       execAsync: jest.fn(async () => undefined),

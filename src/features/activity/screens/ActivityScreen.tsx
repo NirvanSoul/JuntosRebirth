@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -14,6 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
 import { Screen } from '@/components/layout/Screen/Screen';
 import { Text } from '@/components/ui/Text/Text';
+import type { MoneyAccount } from '@/features/accounts/types';
+import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
+import { ActivityAccountsSection } from '@/features/activity/components/ActivityAccountsSection';
 import {
   ActivityCollapsibleSection,
   getActivityLayoutTransition,
@@ -54,16 +57,16 @@ import {
   defaultCurrencyCode,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
-import { iconSize, minTouchTarget } from '@/theme/layout';
+import { createStyles } from '@/features/activity/screens/ActivityScreen.styles';
+import { iconSize } from '@/theme/layout';
 import { motion } from '@/theme/motion';
-import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
-import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ActivityScreenProps = {
   categories?: readonly Category[];
+  moneyAccounts?: readonly MoneyAccount[];
   /** Moneda elegida en el encabezado global; nunca se mezclan importes aquí. */
   currency?: CurrencyCode;
   /** Moneda del espacio activo para presupuestos. */
@@ -72,15 +75,17 @@ type ActivityScreenProps = {
   focusResetKey?: number;
   onCreateCategory?: () => void;
   onCreateExpense?: () => void;
+  onCreateMoneyAccount?: () => void;
   onCreateIncome?: () => void;
   onCreateMovement?: () => void;
   onOpenCategoryDetail?: (categoryId: string, currency?: CurrencyCode) => void;
+  onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   onOpenTransactionDetail?: (transactionId: string) => void;
   onScrollDirectionChange?: (direction: 'down' | 'up') => void;
   onSummaryPinnedChange?: (pinned: boolean) => void;
   summaryPinned?: boolean;
   targetRequestId?: number;
-  targetSection?: 'categories' | 'movements';
+  targetSection?: 'accounts' | 'categories' | 'movements';
   transactions?: readonly SessionTransaction[];
 };
 
@@ -88,11 +93,14 @@ export function ActivityScreen({
   categories = [],
   currency = defaultCurrencyCode,
   focusResetKey,
+  moneyAccounts = [],
   onCreateCategory,
   onCreateExpense,
   onCreateIncome,
+  onCreateMoneyAccount,
   onCreateMovement,
   onOpenCategoryDetail,
+  onOpenMoneyAccountDetail,
   onOpenTransactionDetail,
   onScrollDirectionChange,
   onSummaryPinnedChange,
@@ -112,7 +120,9 @@ export function ActivityScreen({
   const summaryOffsetRef = useRef(0);
   const summaryPulse = useSharedValue(1);
   const [movementsOffset, setMovementsOffset] = useState(0);
+  const [accountsOffset, setAccountsOffset] = useState(0);
   const [areCategoriesExpanded, setCategoriesExpanded] = useState(true);
+  const [areAccountsExpanded, setAccountsExpanded] = useState(true);
   const [transactionFilter, setTransactionFilter] =
     useState<TransactionTypeFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>([]);
@@ -174,6 +184,12 @@ export function ActivityScreen({
   const budgetExpenseByCategoryId = useMemo(
     () => new Map(budgetSummaries.map((item) => [item.id, item.expenseMinor])),
     [budgetSummaries],
+  );
+  // Cada tarjeta lleva su propia moneda, así que la selección de moneda de
+  // los movimientos no filtra las cuentas ni mezcla divisas en un saldo.
+  const moneyAccountSummaries = useMemo(
+    () => summarizeMoneyAccounts(moneyAccounts, transactions),
+    [moneyAccounts, transactions],
   );
   const matchesNonDateFilters = useCallback(
     (transaction: SessionTransaction) =>
@@ -285,7 +301,8 @@ export function ActivityScreen({
 
     if (
       handledTargetKeyRef.current === targetKey ||
-      (targetSection === 'movements' && movementsOffset <= 0)
+      (targetSection === 'movements' && movementsOffset <= 0) ||
+      (targetSection === 'accounts' && accountsOffset <= 0)
     ) {
       return;
     }
@@ -293,17 +310,25 @@ export function ActivityScreen({
     if (targetSection === 'categories') {
       setCategoriesExpanded(true);
     }
+    if (targetSection === 'accounts') {
+      setAccountsExpanded(true);
+    }
 
     const frame = requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({
         animated: false,
-        y: targetSection === 'movements' ? movementsOffset : 0,
+        y:
+          targetSection === 'movements'
+            ? movementsOffset
+            : targetSection === 'accounts'
+              ? accountsOffset
+              : 0,
       });
       handledTargetKeyRef.current = targetKey;
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [movementsOffset, targetRequestId, targetSection]);
+  }, [accountsOffset, movementsOffset, targetRequestId, targetSection]);
 
   return (
     <>
@@ -314,7 +339,7 @@ export function ActivityScreen({
         }}
         onScrollDirectionChange={onScrollDirectionChange}
         scrollRef={scrollRef}
-        stickyHeaderIndices={[2]}
+        stickyHeaderIndices={[3]}
         testID="activity-screen"
         transparentBackground
       >
@@ -391,6 +416,22 @@ export function ActivityScreen({
             )}
           </Animated.View>
         </ActivityCollapsibleSection>
+
+        <Animated.View
+          layout={getActivityLayoutTransition()}
+          onLayout={({ nativeEvent }) =>
+            setAccountsOffset(nativeEvent.layout.y)
+          }
+          testID="activity-accounts-anchor"
+        >
+          <ActivityAccountsSection
+            accounts={moneyAccountSummaries}
+            expanded={areAccountsExpanded}
+            onCreateMoneyAccount={onCreateMoneyAccount}
+            onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
+            onToggle={() => setAccountsExpanded((expanded) => !expanded)}
+          />
+        </Animated.View>
 
         <Animated.View
           layout={getActivityLayoutTransition()}
@@ -538,50 +579,4 @@ export function ActivityScreen({
       ) : null}
     </>
   );
-}
-
-function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
-  return StyleSheet.create({
-    movementsHeader: {
-      minHeight: minTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: spacing.xxl,
-      marginBottom: spacing.md,
-    },
-    movementSummary: {
-      marginBottom: spacing.lg,
-    },
-    filterLink: {
-      minHeight: minTouchTarget,
-      justifyContent: 'center',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      paddingLeft: spacing.lg,
-    },
-    filterLinkPressed: {
-      opacity: 0.64,
-    },
-    categoryGroupShadow: {
-      ...shadows.subtle,
-      borderRadius: previewCardLayout.borderRadius,
-    },
-    categoryGroup: {
-      overflow: 'hidden',
-      backgroundColor: colors.surface,
-      borderColor: colors.categoryPreviewBorder,
-      borderRadius: previewCardLayout.borderRadius,
-      borderWidth: 2,
-    },
-    categorySeparator: {
-      height: 1,
-      backgroundColor: colors.categoryPreviewBorder,
-    },
-    categoryDetailTitle: {
-      marginBottom: spacing.md,
-      marginTop: spacing.xl,
-    },
-  });
 }

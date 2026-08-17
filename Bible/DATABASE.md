@@ -330,6 +330,29 @@ principal visible para los demás miembros y la que se usa al crear un espacio
 compartido; las preferencias adicionales permanecen locales y se incorporan a
 la lista del espacio por quien las haya activado.
 
+La versión 20 añade `money_accounts`: la cuenta es el segundo eje de
+clasificación de un movimiento, opcional y con saldo propio. Guarda espacio,
+nombre, tipo (`cash`, `bank`, `debit`, `credit`, `savings`), icono, color,
+moneda, saldo inicial en unidades menores, autor, archivado, fechas técnicas y
+estado de sincronización. El saldo inicial admite cero y negativos: una
+tarjeta de crédito arranca con deuda. `transactions` y
+`recurring_transaction_series` ganan una columna `money_account_id` nula.
+
+Esa columna usa una foránea de una sola columna, no la compuesta
+`(id, space_id)` que sí protege a `category_id`: SQLite no admite una foránea
+de dos columnas en `ALTER TABLE ADD COLUMN`, y reconstruir `transactions`
+reescribiría de paso la foránea de `transaction_reminders` —el procedimiento
+seguro que documenta SQLite exige `PRAGMA foreign_keys = OFF` fuera de la
+transacción, algo que el migrador no hace—. La coincidencia de espacio y de
+moneda se valida entonces en `localTransactionRepository`
+(`assertMoneyAccountAssignment`), y en Postgres, que es la autoridad real, la
+migración 28 sí declara la foránea compuesta.
+
+La versión 21 añade `money_account` a los valores admitidos por
+`remote_entity_links.entity_type`. Como un CHECK de SQLite no se puede
+alterar, la tabla se reconstruye copiando sus filas; nada la referencia, así
+que la reconstrucción es segura.
+
 ### 5.5 Identificadores
 
 Los datos locales deben usar identificadores globalmente únicos desde su creación.
@@ -614,6 +637,48 @@ Reglas:
   su autor (`categories_update_author`). El presupuesto es la excepción:
   cualquier miembro activo del espacio puede fijarlo o retirarlo mediante
   `update_category_budget`, sin ganar permiso sobre el resto de campos.
+
+---
+
+### 6.5.1 `money_accounts`
+
+Campos:
+
+```text
+id                     uuid, PK
+space_id               uuid, FK
+name                   text
+kind                   text (cash | bank | debit | credit | savings)
+icon                   text
+color_token            text
+currency               text
+opening_balance_minor  bigint, admite cero y negativos
+created_by             uuid nullable
+source_installation_id text
+source_local_id        text
+is_archived            boolean
+created_at             timestamptz
+updated_at             timestamptz
+archived_at            timestamptz nullable
+```
+
+Reglas:
+
+- La cuenta pertenece a un espacio, igual que la categoría: ambos miembros la
+  ven y solo su autor la edita o archiva.
+- La moneda queda fijada en la cuenta y elegirla fija la del movimiento, de
+  modo que un saldo nunca mezcla divisas.
+- La moneda solo puede cambiarse mientras la cuenta no tenga movimientos ni
+  series asignados; después reinterpretaría dinero ya registrado.
+- El saldo es saldo inicial más ingresos menos gastos asignados, con la misma
+  regla de horizonte mensual que el resto de la app (§8).
+- Eliminar una cuenta es archivarla; sus movimientos se conservan.
+- `transactions.money_account_id` y su equivalente en las series son opcionales
+  y usan la foránea compuesta `(money_account_id, space_id)`: con `match
+  simple` no se evalúa cuando la columna es nula, así que protege el caso que
+  importa —asignar la cuenta de otro espacio— sin estorbar al movimiento sin
+  cuenta.
+- La importación bancaria no asigna cuenta todavía.
 
 ---
 
@@ -973,6 +1038,13 @@ cliente defectuoso.
 - Editar o archivar según permisos.
 - Validar que `created_by` sea el usuario autenticado o se asigne en servidor.
 
+### 9.5.1 Cuentas
+
+Misma tríada que categorías (migración 28): `money_accounts_select_member` lee
+con membresía activa, `money_accounts_insert_author` y
+`money_accounts_update_author` exigen además ser el autor. No hay política de
+borrado porque eliminar es archivar.
+
 ### 9.6 Movimientos
 
 - Leer movimientos del espacio.
@@ -1240,6 +1312,9 @@ La función debe ser transaccional o implementar compensación segura.
 - `transactions(space_id, category_id, occurred_on desc)`
 - `transactions(created_by, created_at desc)`
 - `categories(space_id, is_archived)`
+- `money_accounts(space_id, is_archived, name)`
+- `transactions(money_account_id, is_archived, occurred_on desc)` parcial, solo
+  cuando la cuenta no es nula
 - `space_invitations(token_hash)`
 - `space_invitations(invitee_email, status)`
 

@@ -2,7 +2,8 @@ import { randomUUID } from 'expo-crypto';
 
 import type { LocalSqlExecutor } from '@/lib/storage/localSqlExecutor';
 
-export type RemoteEntityType = 'space' | 'category' | 'transaction';
+export type RemoteEntityType =
+  'space' | 'category' | 'money_account' | 'transaction';
 
 type LinkRow = { local_id: string };
 

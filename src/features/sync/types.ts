@@ -17,10 +17,26 @@ export type GuestMigrationCategory = {
   archivedAt: string | null;
 };
 
+export type GuestMigrationMoneyAccount = {
+  id: string;
+  spaceId: string;
+  name: string;
+  kind: string;
+  icon: string;
+  colorToken: string;
+  currency: CurrencyCode;
+  openingBalanceMinor: number;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+};
+
 export type GuestMigrationSeries = {
   id: string;
   spaceId: string;
   categoryId: string;
+  moneyAccountId: string | null;
   type: 'expense' | 'income';
   amountMinor: number;
   currency: CurrencyCode;
@@ -39,6 +55,7 @@ export type GuestMigrationTransaction = {
   id: string;
   spaceId: string;
   categoryId: string;
+  moneyAccountId: string | null;
   type: 'expense' | 'income';
   amountMinor: number;
   currency: CurrencyCode;
@@ -60,6 +77,7 @@ export type GuestMigrationPayload = {
   userId: string;
   spaces: readonly Space[];
   categories: readonly GuestMigrationCategory[];
+  moneyAccounts: readonly GuestMigrationMoneyAccount[];
   recurringSeries: readonly GuestMigrationSeries[];
   transactions: readonly GuestMigrationTransaction[];
 };

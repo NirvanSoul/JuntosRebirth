@@ -12,10 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActiveSpaceHeader } from '@/components/navigation/ActiveSpaceHeader/ActiveSpaceHeader';
 import { FloatingCreateButton } from '@/components/navigation/FloatingCreateButton/FloatingCreateButton';
 import { AppTabBar } from '@/components/navigation/AppTabBar/AppTabBar';
-import {
-  CopySuccessToast,
-  type CopySuccessNotice,
-} from '@/components/overlays/CopySuccessToast/CopySuccessToast';
+import { CopySuccessToast } from '@/components/overlays/CopySuccessToast/CopySuccessToast';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { ActivityScreen } from '@/features/activity/screens/ActivityScreen';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
@@ -25,6 +22,9 @@ import {
 } from '@/features/categories/components/CategoryPickerModal/CategoryPickerModal';
 import { CategoryDetailModal } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal';
 import { CreateCategoryModal } from '@/features/categories/components/CreateCategoryModal/CreateCategoryModal';
+import { MoneyAccountModals } from '@/features/accounts/components/MoneyAccountModals';
+import { useMoneyAccounts } from '@/features/accounts/hooks/useMoneyAccounts';
+import { listLocalMoneyAccounts } from '@/features/accounts/repositories/localMoneyAccountRepository';
 import {
   createDefaultCategoryInputForSpace,
   type DefaultCategoryDefinition,
@@ -42,7 +42,6 @@ import type {
   CreateCategoryInput,
 } from '@/features/categories/types';
 import {
-  findEquivalentCategoryBySpace,
   listCategoriesBySpace,
   validateCategoryName,
 } from '@/features/categories/utils/categoryCatalog';
@@ -60,6 +59,7 @@ import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershi
 import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
 import { PendingInvitationBanner } from '@/features/spaces/components/PendingInvitationBanner';
 import { useSpaceCurrencies } from '@/features/spaces/hooks/useSpaceCurrencies';
+import { useCopyToSpace } from '@/features/spaces/hooks/useCopyToSpace';
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
 import { AcceptInvitationScreen } from '@/features/spaces/screens/AcceptInvitationScreen';
 import { AwaitingPartnerScreen } from '@/features/spaces/screens/AwaitingPartnerScreen';
@@ -196,8 +196,6 @@ export function MainTabsNavigator() {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
     null,
   );
-  const [copySuccessNotice, setCopySuccessNotice] =
-    useState<CopySuccessNotice | null>(null);
   const [detailRequest, setDetailRequest] =
     useState<CategoryDetailRequest | null>(null);
   const [detailTransactionId, setDetailTransactionId] = useState<string | null>(
@@ -210,7 +208,6 @@ export function MainTabsNavigator() {
   >(null);
   const [categoryCreationContext, setCategoryCreationContext] =
     useState<CategoryCreationContext | null>(null);
-  const nextCopyNoticeId = useRef(1);
   const activityRequestId = useRef(0);
   const mapScreenRef = useRef<MapScreenHandle>(null);
   const handleScrollDirectionChange = useCallback(
@@ -280,18 +277,53 @@ export function MainTabsNavigator() {
       ? 'select'
       : 'create';
 
+  const moneyAccountsController = useMoneyAccounts({
+    activeSpaceId: activeSpace.id,
+    onChangesPublished: () => publishActiveCoupleChanges(),
+    onError: () => showSaveError(),
+  });
+  const { setMoneyAccounts } = moneyAccountsController;
+
+  const detailTransactionMoneyAccount = detailTransaction
+    ? (moneyAccountsController.spaceMoneyAccounts.find(
+        (account) => account.id === detailTransaction.moneyAccountId,
+      ) ?? null)
+    : null;
+
+  const {
+    copyCategory: handleShareCategory,
+    copyTransaction: handleCopyTransaction,
+    dismissNotice: handleDismissCopyNotice,
+    notice: copySuccessNotice,
+  } = useCopyToSpace({
+    activeSpaceId: activeSpace.id,
+    categories,
+    onCategoryCopied: (category) =>
+      setCategories((current) => [...current, category]),
+    onChangesPublished: (targetSpaceId) =>
+      publishCoupleSpaceChanges(targetSpaceId),
+    onError: () => showSaveError(),
+    onTransactionsCopied: (copied) =>
+      setTransactions((current) => [...current, ...copied]),
+    spaces,
+    transactions,
+  });
+
   const reloadLocalFinance = useCallback(async (): Promise<void> => {
-    const [storedCategories, storedTransactions] = await Promise.all([
-      listLocalCategories(),
-      listLocalTransactions(),
-    ]);
+    const [storedCategories, storedMoneyAccounts, storedTransactions] =
+      await Promise.all([
+        listLocalCategories(),
+        listLocalMoneyAccounts(),
+        listLocalTransactions(),
+      ]);
     setCategories(storedCategories);
+    setMoneyAccounts(storedMoneyAccounts);
     setTransactions(storedTransactions);
     void reconcileNotificationRules({
       categories: storedCategories,
       transactions: storedTransactions,
     }).catch(() => undefined);
-  }, []);
+  }, [setMoneyAccounts]);
 
   const refreshSharedCoupleData = useCallback(
     async (spaceId?: string): Promise<void> => {
@@ -474,6 +506,16 @@ export function MainTabsNavigator() {
           {
             event: '*',
             schema: 'public',
+            table: 'money_accounts',
+            filter: changeFilter,
+          },
+          scheduleRemoteRefresh,
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
             table: 'recurring_transaction_series',
             filter: changeFilter,
           },
@@ -583,6 +625,11 @@ export function MainTabsNavigator() {
 
     if (action === 'import') {
       setImportVisible(true);
+      return;
+    }
+
+    if (action === 'moneyAccount') {
+      moneyAccountsController.openCreation();
       return;
     }
 
@@ -921,127 +968,6 @@ export function MainTabsNavigator() {
       .catch(showSaveError);
   };
 
-  const handleDismissCopyNotice = useCallback((noticeId: number) => {
-    setCopySuccessNotice((current) =>
-      current?.id === noticeId ? null : current,
-    );
-  }, []);
-
-  const handleShareCategory = (
-    categoryId: string,
-    targetSpaceId: string,
-  ): Promise<boolean> => {
-    const source = categories.find((category) => category.id === categoryId);
-    const targetSpace = spaces.find((space) => space.id === targetSpaceId);
-    if (
-      !source ||
-      source.spaceId !== activeSpace.id ||
-      !targetSpace ||
-      targetSpace.id === activeSpace.id
-    ) {
-      return Promise.resolve(false);
-    }
-
-    const validation = validateCategoryName(
-      source.name,
-      categories,
-      targetSpaceId,
-    );
-    if (!validation.valid) return Promise.resolve(false);
-
-    return createLocalCategory({
-      ...source,
-      spaceId: targetSpaceId,
-      name: validation.name,
-      isDefault: false,
-      templateKey: undefined,
-      sourceCategoryId: source.id,
-    })
-      .then((sharedCategory) => {
-        setCategories((current) => [...current, sharedCategory]);
-        publishCoupleSpaceChanges(targetSpaceId);
-        setCopySuccessNotice({
-          destinationName: targetSpace.name,
-          id: nextCopyNoticeId.current,
-          itemName: source.name,
-        });
-        nextCopyNoticeId.current += 1;
-        return true;
-      })
-      .catch(() => {
-        showSaveError();
-        return false;
-      });
-  };
-
-  const handleCopyTransaction = (
-    transactionId: string,
-    targetSpaceId: string,
-  ): Promise<boolean> => {
-    const source = transactions.find(
-      (transaction) => transaction.id === transactionId,
-    );
-    const sourceCategory = source
-      ? categories.find((category) => category.id === source.categoryId)
-      : undefined;
-    const targetSpace = spaces.find((space) => space.id === targetSpaceId);
-
-    if (
-      !source ||
-      source.spaceId !== activeSpace.id ||
-      !sourceCategory ||
-      sourceCategory.spaceId !== activeSpace.id ||
-      !targetSpace ||
-      targetSpace.id === activeSpace.id
-    ) {
-      return Promise.resolve(false);
-    }
-
-    const existingTargetCategory = findEquivalentCategoryBySpace(
-      categories,
-      targetSpaceId,
-      sourceCategory.name,
-    );
-    return (async () => {
-      try {
-        const targetCategory =
-          existingTargetCategory ??
-          (await createLocalCategory({
-            ...sourceCategory,
-            spaceId: targetSpaceId,
-            budgetMinor: undefined,
-            isDefault: false,
-            templateKey: undefined,
-            sourceCategoryId: sourceCategory.id,
-          }));
-        if (!existingTargetCategory) {
-          setCategories((current) => [...current, targetCategory]);
-        }
-        const copiedTransactions = await createLocalTransaction({
-          ...source,
-          id: undefined,
-          spaceId: targetSpaceId,
-          categoryId: targetCategory.id,
-          sourceTransactionId: source.id,
-          customOccurrenceDates:
-            source.recurrence === 'custom' ? [source.occurredOn] : undefined,
-        });
-        setTransactions((current) => [...current, ...copiedTransactions]);
-        publishCoupleSpaceChanges(targetSpaceId);
-        setCopySuccessNotice({
-          destinationName: targetSpace.name,
-          id: nextCopyNoticeId.current,
-          itemName: source.title.trim() || sourceCategory.name,
-        });
-        nextCopyNoticeId.current += 1;
-        return true;
-      } catch {
-        showSaveError();
-        return false;
-      }
-    })();
-  };
-
   if (!isReady || !isFinanceReady) {
     return (
       <View
@@ -1130,9 +1056,15 @@ export function MainTabsNavigator() {
                         categories={activeSpaceCategories}
                         currency={effectiveHomeCurrency}
                         focusResetKey={homeChartResetKey}
+                        moneyAccounts={
+                          moneyAccountsController.activeSpaceMoneyAccounts
+                        }
                         onCreateCategory={() => handleCreateAction('category')}
                         onCreateExpense={() => handleCreateAction('expense')}
                         onCreateIncome={() => handleCreateAction('income')}
+                        onCreateMoneyAccount={
+                          moneyAccountsController.openCreation
+                        }
                         onCreateMovement={() => handleCreateAction('expense')}
                         onOpenCategoryDetail={(categoryId) =>
                           setDetailRequest({
@@ -1140,8 +1072,18 @@ export function MainTabsNavigator() {
                             displayCurrency: effectiveHomeCurrency,
                           })
                         }
+                        onOpenMoneyAccountDetail={
+                          moneyAccountsController.openDetail
+                        }
                         onOpenTransactionDetail={setDetailTransactionId}
                         onScrollDirectionChange={handleScrollDirectionChange}
+                        onViewAccounts={() => {
+                          activityRequestId.current += 1;
+                          navigation.navigate('Activity', {
+                            requestId: activityRequestId.current,
+                            section: 'accounts',
+                          });
+                        }}
                         onViewCategories={() => {
                           activityRequestId.current += 1;
                           navigation.navigate('Activity', {
@@ -1185,15 +1127,24 @@ export function MainTabsNavigator() {
                       categories={activeSpaceCategories}
                       currency={effectiveHomeCurrency}
                       focusResetKey={activityChartResetKey}
+                      moneyAccounts={
+                        moneyAccountsController.activeSpaceMoneyAccounts
+                      }
                       onCreateCategory={() => handleCreateAction('category')}
                       onCreateExpense={() => handleCreateAction('expense')}
                       onCreateIncome={() => handleCreateAction('income')}
+                      onCreateMoneyAccount={
+                        moneyAccountsController.openCreation
+                      }
                       onCreateMovement={() => handleCreateAction('expense')}
                       onOpenCategoryDetail={(categoryId, currency) =>
                         setDetailRequest({
                           categoryId,
                           displayCurrency: currency ?? effectiveHomeCurrency,
                         })
+                      }
+                      onOpenMoneyAccountDetail={
+                        moneyAccountsController.openDetail
                       }
                       onOpenTransactionDetail={setDetailTransactionId}
                       onScrollDirectionChange={handleScrollDirectionChange}
@@ -1248,11 +1199,13 @@ export function MainTabsNavigator() {
                 availableCurrencies={spaceCurrencies}
                 initialDate={transactionInitialDate}
                 initialDraft={editingTransaction ?? undefined}
+                moneyAccounts={moneyAccountsController.activeSpaceMoneyAccounts}
                 onClose={() => {
                   setEditingTransactionId(null);
                   setTransactionInitialDate(undefined);
                   setTransactionModalVisible(false);
                 }}
+                onCreateMoneyAccount={moneyAccountsController.openCreation}
                 onOpenCategoryPicker={() => {
                   setCategoryCreationContext('transaction');
                   setCategoryPickerVisible(true);
@@ -1341,8 +1294,18 @@ export function MainTabsNavigator() {
                 transactions={activeSpaceTransactions}
                 visible={detailCategory !== null}
               />
+              <MoneyAccountModals
+                availableCurrencies={spaceCurrencies}
+                categories={spaceCategories}
+                controller={moneyAccountsController}
+                onOpenTransactionDetail={setDetailTransactionId}
+                spaceId={activeSpace.id}
+                spaceName={activeSpace.name}
+                transactions={activeSpaceTransactions}
+              />
               <TransactionDetailModal
                 category={detailTransactionCategory}
+                moneyAccount={detailTransactionMoneyAccount}
                 onClose={() => setDetailTransactionId(null)}
                 onCopy={handleCopyTransaction}
                 onDelete={handleDeleteTransaction}

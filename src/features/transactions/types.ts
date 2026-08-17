@@ -12,6 +12,12 @@ export type CreateTransactionDraft = {
   currency: CurrencyCode;
   title: string;
   categoryId: string;
+  /**
+   * Cuenta opcional a la que se asigna el movimiento. Cuando existe, su
+   * moneda es la del movimiento y el importe entra en el saldo de la cuenta.
+   * Un movimiento sin cuenta es igual de válido y no afecta a ningún saldo.
+   */
+  moneyAccountId?: string;
   occurredOn: string;
   recurrence: TransactionRecurrence;
   customOccurrenceDates?: readonly string[];

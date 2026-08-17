@@ -81,6 +81,7 @@ export async function restoreRemoteAccount(input: {
   await saveSpaces({ spaces, activeSpaceId });
 
   const localCategoryIdByRemoteId = new Map<string, string>();
+  const localMoneyAccountIdByRemoteId = new Map<string, string>();
   await database.withExclusiveTransactionAsync(async (transaction) => {
     for (const remoteCategory of input.snapshot.categories) {
       const spaceId = localSpaceIdByRemoteId.get(remoteCategory.spaceRemoteId);
@@ -127,6 +128,50 @@ export async function restoreRemoteAccount(input: {
         remoteCategory.updatedAt,
       );
     }
+    for (const remoteAccount of input.snapshot.moneyAccounts) {
+      const spaceId = localSpaceIdByRemoteId.get(remoteAccount.spaceRemoteId);
+      if (!spaceId) continue;
+      const linked = await findLocalIdForRemoteEntity({
+        executor: transaction,
+        userId: input.userId,
+        entityType: 'money_account',
+        remoteId: remoteAccount.remoteId,
+      });
+      const moneyAccountId = await linkRemoteEntity({
+        executor: transaction,
+        userId: input.userId,
+        entityType: 'money_account',
+        remoteId: remoteAccount.remoteId,
+        localId: linked ?? remoteAccount.remoteId,
+      });
+      localMoneyAccountIdByRemoteId.set(remoteAccount.remoteId, moneyAccountId);
+      await transaction.runAsync(
+        `INSERT INTO money_accounts (
+           id, space_id, name, kind, icon, color_token, currency,
+           opening_balance_minor, created_by, sync_status, is_archived,
+           created_at, updated_at, archived_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?, NULL)
+         ON CONFLICT (id) DO UPDATE SET
+           space_id = excluded.space_id, name = excluded.name,
+           kind = excluded.kind, icon = excluded.icon,
+           color_token = excluded.color_token, currency = excluded.currency,
+           opening_balance_minor = excluded.opening_balance_minor,
+           is_archived = excluded.is_archived, updated_at = excluded.updated_at
+         WHERE money_accounts.sync_status = 'synced'`,
+        moneyAccountId,
+        spaceId,
+        remoteAccount.name,
+        remoteAccount.kind,
+        remoteAccount.icon,
+        remoteAccount.colorToken,
+        remoteAccount.currency,
+        remoteAccount.openingBalanceMinor,
+        input.userId,
+        remoteAccount.isArchived ? 1 : 0,
+        remoteAccount.createdAt,
+        remoteAccount.updatedAt,
+      );
+    }
     for (const series of input.snapshot.recurringSeries) {
       const spaceId = localSpaceIdByRemoteId.get(String(series.space_id));
       const categoryId = localCategoryIdByRemoteId.get(
@@ -135,12 +180,14 @@ export async function restoreRemoteAccount(input: {
       if (!spaceId || !categoryId) continue;
       await transaction.runAsync(
         `INSERT INTO recurring_transaction_series (
-           id, space_id, category_id, created_by, type, amount_minor, currency,
+           id, space_id, category_id, money_account_id, created_by, type,
+           amount_minor, currency,
            title, frequency, starts_on, generated_occurrences, next_occurrence_on,
            sync_status, is_archived, created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?, ?)
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET
-           category_id = excluded.category_id, type = excluded.type,
+           category_id = excluded.category_id,
+           money_account_id = excluded.money_account_id, type = excluded.type,
            amount_minor = excluded.amount_minor, currency = excluded.currency,
            title = excluded.title, frequency = excluded.frequency,
            starts_on = excluded.starts_on,
@@ -152,6 +199,8 @@ export async function restoreRemoteAccount(input: {
         String(series.id),
         spaceId,
         categoryId,
+        localMoneyAccountIdByRemoteId.get(String(series.money_account_id)) ??
+          null,
         String(series.created_by),
         String(series.type),
         Number(series.amount_minor),
@@ -184,13 +233,15 @@ export async function restoreRemoteAccount(input: {
       });
       await transaction.runAsync(
         `INSERT INTO transactions (
-           id, space_id, category_id, created_by, type, amount_minor, currency,
+           id, space_id, category_id, money_account_id, created_by, type,
+           amount_minor, currency,
            title, occurred_on, recurrence, recurrence_group_id,
            recurrence_series_id, source_transaction_id, note, sync_status,
            is_archived, created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'synced', ?, ?, ?, ?)
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'synced', ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET
-           category_id = excluded.category_id, type = excluded.type,
+           category_id = excluded.category_id,
+           money_account_id = excluded.money_account_id, type = excluded.type,
            amount_minor = excluded.amount_minor, currency = excluded.currency,
            title = excluded.title, occurred_on = excluded.occurred_on,
            recurrence = excluded.recurrence,
@@ -202,6 +253,9 @@ export async function restoreRemoteAccount(input: {
         transactionId,
         spaceId,
         categoryId,
+        localMoneyAccountIdByRemoteId.get(
+          String(remoteTransaction.money_account_id),
+        ) ?? null,
         String(remoteTransaction.created_by),
         String(remoteTransaction.type),
         Number(remoteTransaction.amount_minor),

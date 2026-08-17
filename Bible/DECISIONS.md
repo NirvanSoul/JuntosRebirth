@@ -5185,6 +5185,111 @@ ambos paquetes se comprobó que la premisa era incorrecta.
 
 ---
 
+# ADR-080 — Cuentas como segundo eje de clasificación, con saldo y moneda propia
+
+**Estado:** Aceptada
+
+## Contexto
+
+Un movimiento solo podía organizarse por categoría (`transactions.category_id`,
+obligatorio). No existía forma de registrar desde qué medio de pago salió o
+entró el dinero, ni de saber cuánto queda en cada uno. Era la última función
+grande pendiente del producto.
+
+## Opciones consideradas
+
+1. La cuenta como simple etiqueta: filtros y totales, sin saldo propio.
+2. La cuenta con saldo: saldo inicial más ingresos menos gastos asignados.
+3. La opción 2 más transferencias entre cuentas, como tercer tipo de
+   movimiento que no cuenta como ingreso ni gasto.
+
+## Decisión
+
+Se adopta la opción 2. La 3 queda fuera: exigiría un tercer tipo de movimiento
+y revisar balances, Inicio, Actividad, presupuestos e importación.
+
+- **Nombre.** El dominio se llama `MoneyAccount` / `money_accounts`, no
+  `Account`: en `src/features/sync/` «account» ya significa la cuenta de
+  usuario de Supabase (`supabaseRemoteAccountGateway`, `restoreRemoteAccount`,
+  `local_sync_account`), que es justo donde más código nuevo hay. En la
+  interfaz el usuario lee «cuenta».
+- **Propiedad.** La cuenta pertenece al espacio, como la categoría: ambos
+  miembros la ven y solo su autor la edita o archiva. Reutiliza el modelo de
+  espacios, RLS y sincronización ya existentes.
+- **Moneda.** Cada cuenta tiene una moneda y elegirla fija la del movimiento,
+  así que un saldo nunca mezcla divisas —el problema que ADR-060 dejó
+  explícitamente pendiente para los agregados—. La moneda solo puede cambiarse
+  mientras la cuenta no tenga movimientos ni series asignados.
+- **Saldo.** Saldo inicial más ingresos menos gastos, contando hasta el último
+  día del mes local actual: la misma regla de horizonte que ya rige balance,
+  Inicio y presupuestos (ADR-056), para que ningún número se contradiga entre
+  pantallas. El saldo inicial admite negativos y una cuenta de crédito se
+  calcula igual que las demás; el tipo solo cambia aspecto e icono.
+- **Opcional.** El campo llega vacío y sin preselección. Los movimientos
+  anteriores se quedan sin cuenta y nada cambia para quien no las use.
+- **Superficies.** Sección propia en Actividad, bajo categorías, con carrusel
+  de tarjetas y lista compacta; en Inicio, solo las tarjetas y un `Ver más`
+  que lleva a esa sección. Creación desde el menú rápido, desde el estado
+  vacío y desde el propio selector del modal de movimiento.
+- **Iconos.** Catálogo cerrado propio (`moneyAccountIconNames`) en vez de
+  reutilizar el de categorías: los iconos de categoría describen en qué se
+  gasta el dinero y los de cuenta dónde está guardado. Los 18 colores sí se
+  comparten.
+
+## Consecuencias positivas
+
+- Cada tarjeta es monomoneda, así que las cuentas muestran importes correctos
+  sin esperar al desglose entre divisas pendiente desde ADR-060.
+- El modal de movimiento no gana fricción: el botón de cuenta solo aparece si
+  el espacio ya tiene alguna.
+- El circuito compartido no cambia de forma: cuentas, categorías, series y
+  movimientos viajan en el mismo RPC y por el mismo estado de sincronización.
+
+## Consecuencias negativas
+
+- La importación bancaria no asigna cuenta todavía: las filas importadas nacen
+  sin ella.
+- No hay total agregado de todas las cuentas, porque sumaría divisas
+  distintas.
+- Al copiar un movimiento a otro espacio se descarta su cuenta, ya que la
+  cuenta pertenece al espacio de origen.
+
+## Riesgos
+
+- En SQLite la columna `money_account_id` solo tiene una foránea de una
+  columna: la de dos columnas no cabe en `ALTER TABLE ADD COLUMN` y
+  reconstruir `transactions` reescribiría la foránea de
+  `transaction_reminders` (el procedimiento seguro de SQLite exige
+  `PRAGMA foreign_keys = OFF` fuera de la transacción, que el migrador no
+  hace). La guarda vive en `assertMoneyAccountAssignment`, y Postgres —la
+  autoridad real de permisos— sí declara la foránea compuesta.
+- `sync_couple_space_data` y `migrate_guest_data` cambian de firma; ambas
+  migraciones retiran la anterior con `drop function` para que PostgREST no
+  tenga dos candidatas.
+
+## Validación
+
+- Pruebas del repositorio local (identidad, saldo negativo, moneda no
+  reconocida, rechazo de cuenta de otro espacio y de moneda distinta a la de
+  su cuenta, herencia en la materialización de series).
+- Pruebas del cálculo de saldo (horizonte mensual, divisa distinta ignorada,
+  saldo negativo) y de la validación de nombre por espacio.
+- Pruebas de interfaz: modal de movimiento (selector oculto sin cuentas,
+  moneda forzada, envío con cuenta, precarga al editar), modal de creación
+  (tipo, moneda bloqueada, saldo negativo, nombre duplicado), detalle de
+  cuenta, e Inicio y Actividad con sus secciones.
+- Pruebas de sincronización (subida, snapshot remoto, restauración) y
+  `supabase/tests/money_accounts.test.sql`.
+- `npm run validate`.
+
+## Pendiente
+
+Transferencias entre cuentas, límite de crédito y fechas de corte, filtro por
+cuenta en Actividad, asignar cuenta a un extracto importado y límites de plan
+sobre el número de cuentas.
+
+---
+
 ## 5. Principio final
 
 > Una decisión no documentada se convierte con el tiempo en una suposición.

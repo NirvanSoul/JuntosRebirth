@@ -96,6 +96,7 @@ describe('localTransactionRepository', () => {
       created.id,
       'personal',
       'category-id',
+      null,
       'installation-id',
       'expense',
       1250,
@@ -116,6 +117,7 @@ describe('localTransactionRepository', () => {
         id: created.id,
         space_id: 'personal',
         category_id: 'category-id',
+        money_account_id: null,
         created_by: 'installation-id',
         type: 'expense',
         amount_minor: 1250,
@@ -161,6 +163,7 @@ describe('localTransactionRepository', () => {
         id: created.id,
         space_id: 'personal',
         category_id: 'category-id',
+        money_account_id: null,
         created_by: 'installation-id',
         type: 'expense',
         amount_minor: 1250,
@@ -211,6 +214,7 @@ describe('localTransactionRepository', () => {
       'series-id',
       'personal',
       'category-id',
+      null,
       'installation-id',
       'expense',
       1250,
@@ -260,6 +264,7 @@ describe('localTransactionRepository', () => {
         id: 'series-id',
         space_id: 'personal',
         category_id: 'category-id',
+        money_account_id: null,
         created_by: 'installation-id',
         type: 'expense',
         amount_minor: 1250,
@@ -304,6 +309,7 @@ describe('localTransactionRepository', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining("ELSE 'pending'"),
       'category-id',
+      null,
       'expense',
       1250,
       'EUR',
@@ -387,6 +393,7 @@ describe('localTransactionRepository', () => {
       1,
       expect.stringContaining('recurrence_series_id = NULL'),
       'category-id',
+      null,
       'expense',
       1250,
       'EUR',
@@ -462,6 +469,7 @@ describe('localTransactionRepository', () => {
       'new-series',
       'personal',
       'category-id',
+      null,
       'installation-id',
       'expense',
       1250,
@@ -489,6 +497,7 @@ describe('localTransactionRepository', () => {
       1,
       expect.stringContaining('recurrence_series_id = NULL'),
       'category-id',
+      null,
       'expense',
       1250,
       'EUR',
@@ -522,6 +531,7 @@ describe('localTransactionRepository', () => {
           id: 'occurrence-10',
           space_id: 'personal',
           category_id: 'category-id',
+          money_account_id: null,
           type,
           amount_minor: 1800,
           currency: 'EUR',
@@ -537,6 +547,7 @@ describe('localTransactionRepository', () => {
           id: 'occurrence-9',
           space_id: 'personal',
           category_id: 'category-id',
+          money_account_id: null,
           type,
           amount_minor: 1800,
           currency: 'EUR',
@@ -568,6 +579,7 @@ describe('localTransactionRepository', () => {
         2,
         expect.stringContaining('occurred_on > ?'),
         'category-id',
+        null,
         type,
         1800,
         'EUR',
@@ -581,6 +593,7 @@ describe('localTransactionRepository', () => {
         3,
         expect.stringContaining('UPDATE recurring_transaction_series'),
         'category-id',
+        null,
         type,
         1800,
         'EUR',
@@ -598,6 +611,7 @@ describe('localTransactionRepository', () => {
         id: 'monthly-series',
         space_id: 'personal',
         category_id: 'category-id',
+        money_account_id: null,
         created_by: 'installation-id',
         type: 'income',
         amount_minor: 250_000,
@@ -619,6 +633,7 @@ describe('localTransactionRepository', () => {
         id: 'materialized-november',
         space_id: 'personal',
         category_id: 'category-id',
+        money_account_id: null,
         type: 'income',
         amount_minor: 275_000,
         currency: 'EUR',
@@ -654,6 +669,7 @@ describe('localTransactionRepository', () => {
       expect.any(String),
       'personal',
       'category-id',
+      null,
       'installation-id',
       'income',
       250_000,
@@ -668,6 +684,7 @@ describe('localTransactionRepository', () => {
     expect(runAsync).toHaveBeenLastCalledWith(
       expect.stringContaining('UPDATE recurring_transaction_series'),
       'category-id',
+      null,
       'income',
       275_000,
       'EUR',
@@ -683,6 +700,131 @@ describe('localTransactionRepository', () => {
       createLocalTransaction({ ...draft, amountMinor: 1.5 }),
     ).rejects.toThrow('El movimiento local no es válido');
     expect(runAsync).not.toHaveBeenCalled();
+  });
+
+  describe('cuenta asignada', () => {
+    const accountDraft = { ...draft, moneyAccountId: 'account-1' };
+
+    it('guarda y restaura la cuenta del movimiento', async () => {
+      getFirstAsync.mockResolvedValueOnce({ currency: 'EUR' });
+
+      const [created] = await createLocalTransaction(accountDraft);
+
+      expect(created!.moneyAccountId).toBe('account-1');
+      expect(runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO transactions'),
+        created!.id,
+        'personal',
+        'category-id',
+        'account-1',
+        'installation-id',
+        'expense',
+        1250,
+        'EUR',
+        'Compra',
+        '2026-08-01',
+        'once',
+        null,
+        null,
+        null,
+        expect.any(String),
+        expect.any(String),
+      );
+
+      getAllAsync.mockResolvedValueOnce([]);
+      getAllAsync.mockResolvedValueOnce([
+        {
+          id: created!.id,
+          space_id: 'personal',
+          category_id: 'category-id',
+          money_account_id: 'account-1',
+          created_by: 'installation-id',
+          type: 'expense',
+          amount_minor: 1250,
+          currency: 'EUR',
+          title: 'Compra',
+          occurred_on: '2026-08-01',
+          recurrence: 'once',
+          next_occurrence_on: null,
+          recurrence_group_id: null,
+          recurrence_series_id: null,
+          recurrence_starts_on: null,
+          updated_at: created!.updatedAt,
+        },
+      ]);
+
+      await expect(listLocalTransactions()).resolves.toEqual([created]);
+    });
+
+    // La foránea local es de una sola columna, así que esta guarda ocupa el
+    // lugar de la clave compuesta que sí protege a `category_id`.
+    it('rechaza una cuenta que no pertenece al espacio del movimiento', async () => {
+      getFirstAsync.mockResolvedValueOnce(undefined);
+
+      await expect(createLocalTransaction(accountDraft)).rejects.toThrow(
+        'La cuenta no pertenece a este espacio',
+      );
+      expect(runAsync).not.toHaveBeenCalled();
+    });
+
+    it('rechaza un movimiento en una moneda distinta a la de su cuenta', async () => {
+      getFirstAsync.mockResolvedValueOnce({ currency: 'USD' });
+
+      await expect(createLocalTransaction(accountDraft)).rejects.toThrow(
+        'El movimiento debe usar la moneda de su cuenta',
+      );
+      expect(runAsync).not.toHaveBeenCalled();
+    });
+
+    it('no consulta la cuenta cuando el movimiento no lleva ninguna', async () => {
+      await createLocalTransaction(draft);
+
+      expect(getFirstAsync).not.toHaveBeenCalledWith(
+        expect.stringContaining('money_accounts'),
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('hereda la cuenta de la serie en cada ocurrencia materializada', async () => {
+      getAllAsync.mockResolvedValueOnce([
+        {
+          id: 'series-id',
+          space_id: 'personal',
+          category_id: 'category-id',
+          money_account_id: 'account-1',
+          created_by: 'installation-id',
+          type: 'expense',
+          amount_minor: 1250,
+          currency: 'EUR',
+          title: 'Compra',
+          frequency: 'monthly',
+          starts_on: '2026-06-01',
+          generated_occurrences: 1,
+          next_occurrence_on: '2026-07-01',
+        },
+      ]);
+
+      await materializeDueRecurringTransactions(database, '2026-07-01');
+
+      expect(runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT OR IGNORE INTO transactions'),
+        expect.any(String),
+        'personal',
+        'category-id',
+        'account-1',
+        'installation-id',
+        'expense',
+        1250,
+        'EUR',
+        'Compra',
+        '2026-07-01',
+        'monthly',
+        'series-id',
+        expect.any(String),
+        expect.any(String),
+      );
+    });
   });
 
   describe('createLocalTransactions', () => {
@@ -707,6 +849,7 @@ describe('localTransactionRepository', () => {
         '00000000-0000-4000-8000-000000000010',
         'personal',
         'category-id',
+        null,
         'installation-id',
         'expense',
         1250,

@@ -6,39 +6,29 @@ import type {
   SessionTransaction,
 } from '@/features/transactions/types';
 import {
+  materializeDueRecurringTransactions,
+  materializeRecurringSeriesThroughDate,
+  type RecurringSeriesRow,
+} from '@/features/transactions/repositories/localTransactionMaterialization';
+import {
+  assertMoneyAccountAssignment,
+  assertTransaction,
+  resolveLocalAuthorId,
+} from '@/features/transactions/repositories/localTransactionGuards';
+import {
   automaticRecurrences,
   mapTransaction,
-  recurrences,
-  transactionTypes,
   type TransactionRow,
 } from '@/features/transactions/repositories/transactionRowMapper';
-import { isCurrencyCode } from '@/lib/currency/currencyCatalog';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
   getRecurrenceOccurrenceDate,
-  isValidLocalDate,
   normalizeCustomOccurrenceDates,
   parseProjectedTransactionId,
   type AutomaticTransactionRecurrence,
 } from '@/features/transactions/utils/transactionRecurrence';
-import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
-
-type RecurringSeriesRow = {
-  id: string;
-  space_id: string;
-  category_id: string;
-  created_by: string;
-  type: string;
-  amount_minor: number;
-  currency: string;
-  title: string;
-  frequency: string;
-  starts_on: string;
-  generated_occurrences: number;
-  next_occurrence_on: string;
-};
 
 type ExistingTransactionRow = {
   occurred_on: string;
@@ -47,40 +37,12 @@ type ExistingTransactionRow = {
   created_by: string;
 };
 
+export { materializeDueRecurringTransactions };
+
 export type CreateLocalTransactionInput = CreateTransactionDraft & {
   id?: string;
   sourceTransactionId?: string;
 };
-
-/**
- * Identidad que se graba en `created_by` al crear una fila en este dispositivo.
- *
- * Prefiere el uuid de usuario porque es lo que guarda el servidor y lo que baja
- * en cada restauración: usar el id de instalación dejaba la columna con dos
- * tipos de identificador según el origen de la fila, y la interfaz no podía
- * distinguirlos. En modo invitado no hay uuid todavía, y ahí el id de
- * instalación sigue siendo el único ancla disponible.
- */
-async function resolveLocalAuthorId(database: SQLiteDatabase): Promise<string> {
-  return (
-    (await getAuthenticatedUserId()) ??
-    (await getOrCreateInstallationId(database))
-  );
-}
-
-function assertTransaction(input: CreateTransactionDraft): void {
-  if (
-    !input.spaceId ||
-    !input.categoryId ||
-    !Number.isSafeInteger(input.amountMinor) ||
-    input.amountMinor <= 0 ||
-    !isValidLocalDate(input.occurredOn) ||
-    !recurrences.has(input.recurrence) ||
-    !isCurrencyCode(input.currency)
-  ) {
-    throw new Error('El movimiento local no es válido');
-  }
-}
 
 async function insertTransaction(
   database: SQLiteDatabase,
@@ -94,15 +56,17 @@ async function insertTransaction(
 ): Promise<void> {
   await database.runAsync(
     `INSERT INTO transactions (
-       id, space_id, category_id, created_by, type, amount_minor, currency,
+       id, space_id, category_id, money_account_id, created_by, type,
+       amount_minor, currency,
        title, occurred_on, recurrence, recurrence_group_id,
        recurrence_series_id,
        source_transaction_id, sync_status, is_archived, created_at, updated_at,
        archived_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
     id,
     input.spaceId,
     input.categoryId,
+    input.moneyAccountId ?? null,
     createdBy,
     input.type,
     input.amountMinor,
@@ -118,91 +82,12 @@ async function insertTransaction(
   );
 }
 
-async function materializeRecurringSeriesThroughDate(
-  database: SQLiteDatabase,
-  series: RecurringSeriesRow,
-  throughDate: string,
-): Promise<void> {
-  if (
-    !transactionTypes.has(series.type) ||
-    !automaticRecurrences.has(series.frequency) ||
-    !isCurrencyCode(series.currency)
-  ) {
-    throw new Error('La serie recurrente contiene valores no reconocidos');
-  }
-
-  await database.withExclusiveTransactionAsync(async (transaction) => {
-    let generatedOccurrences = series.generated_occurrences;
-    let occurrenceDate = series.next_occurrence_on;
-    const now = new Date().toISOString();
-
-    while (occurrenceDate <= throughDate) {
-      await transaction.runAsync(
-        `INSERT OR IGNORE INTO transactions (
-           id, space_id, category_id, created_by, type, amount_minor,
-           currency, title, occurred_on, recurrence, recurrence_group_id,
-           recurrence_series_id,
-           source_transaction_id, sync_status, is_archived, created_at,
-           updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, 'local_only', 0, ?, ?, NULL)`,
-        randomUUID(),
-        series.space_id,
-        series.category_id,
-        series.created_by,
-        series.type,
-        series.amount_minor,
-        series.currency,
-        series.title,
-        occurrenceDate,
-        series.frequency,
-        series.id,
-        now,
-        now,
-      );
-      generatedOccurrences += 1;
-      occurrenceDate = getRecurrenceOccurrenceDate(
-        series.starts_on,
-        series.frequency as AutomaticTransactionRecurrence,
-        generatedOccurrences,
-      );
-    }
-
-    await transaction.runAsync(
-      `UPDATE recurring_transaction_series
-          SET generated_occurrences = ?, next_occurrence_on = ?, updated_at = ?
-        WHERE id = ? AND is_archived = 0`,
-      generatedOccurrences,
-      occurrenceDate,
-      now,
-      series.id,
-    );
-  });
-}
-
-export async function materializeDueRecurringTransactions(
-  database: SQLiteDatabase,
-  throughDate = getLocalTodayKey(),
-): Promise<void> {
-  const dueSeries = await database.getAllAsync<RecurringSeriesRow>(
-    `SELECT id, space_id, category_id, created_by, type, amount_minor, currency,
-            title, frequency, starts_on, generated_occurrences,
-            next_occurrence_on
-       FROM recurring_transaction_series
-      WHERE is_archived = 0 AND next_occurrence_on <= ?
-      ORDER BY next_occurrence_on ASC`,
-    throughDate,
-  );
-
-  for (const series of dueSeries) {
-    await materializeRecurringSeriesThroughDate(database, series, throughDate);
-  }
-}
-
 export async function listLocalTransactions(): Promise<SessionTransaction[]> {
   const database = await getLocalDatabase();
   await materializeDueRecurringTransactions(database);
   const rows = await database.getAllAsync<TransactionRow>(
     `SELECT transactions.id, transactions.space_id, transactions.category_id,
+            transactions.money_account_id,
             transactions.created_by,
             transactions.type, transactions.amount_minor,
             transactions.currency, transactions.title,
@@ -227,6 +112,7 @@ export async function createLocalTransaction(
 ): Promise<SessionTransaction[]> {
   assertTransaction(input);
   const database = await getLocalDatabase();
+  await assertMoneyAccountAssignment(database, input);
   const createdBy = await resolveLocalAuthorId(database);
   const now = new Date().toISOString();
   const automatic = automaticRecurrences.has(input.recurrence);
@@ -274,14 +160,16 @@ export async function createLocalTransaction(
       nextOccurrenceOn = nextOccurrence;
       await transaction.runAsync(
         `INSERT INTO recurring_transaction_series (
-           id, space_id, category_id, created_by, type, amount_minor, currency,
+           id, space_id, category_id, money_account_id, created_by, type,
+           amount_minor, currency,
            title, frequency, starts_on, generated_occurrences,
            next_occurrence_on, sync_status, is_archived, created_at, updated_at,
            archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
         seriesId,
         input.spaceId,
         input.categoryId,
+        input.moneyAccountId ?? null,
         createdBy,
         input.type,
         input.amountMinor,
@@ -314,6 +202,7 @@ export async function createLocalTransaction(
     id: ids[index]!,
     spaceId: input.spaceId,
     categoryId: input.categoryId,
+    moneyAccountId: input.moneyAccountId,
     createdBy,
     type: input.type,
     amountMinor: input.amountMinor,
@@ -351,6 +240,9 @@ export async function createLocalTransactions(
   });
 
   const database = await getLocalDatabase();
+  for (const input of inputs) {
+    await assertMoneyAccountAssignment(database, input);
+  }
   const createdBy = await getOrCreateInstallationId(database);
   const now = new Date().toISOString();
   const ids = inputs.map((input) => input.id ?? randomUUID());
@@ -374,6 +266,7 @@ export async function createLocalTransactions(
     id: ids[index]!,
     spaceId: input.spaceId,
     categoryId: input.categoryId,
+    moneyAccountId: input.moneyAccountId,
     createdBy,
     type: input.type,
     amountMinor: input.amountMinor,
@@ -392,11 +285,13 @@ export async function updateLocalTransaction(
 ): Promise<SessionTransaction[]> {
   assertTransaction(draft);
   const database = await getLocalDatabase();
+  await assertMoneyAccountAssignment(database, draft);
   const projectedIdentity = parseProjectedTransactionId(id);
 
   if (projectedIdentity) {
     const series = await database.getFirstAsync<RecurringSeriesRow>(
-      `SELECT id, space_id, category_id, created_by, type, amount_minor,
+      `SELECT id, space_id, category_id, money_account_id, created_by, type,
+              amount_minor,
               currency, title, frequency, starts_on, generated_occurrences,
               next_occurrence_on
          FROM recurring_transaction_series
@@ -458,7 +353,8 @@ export async function updateLocalTransaction(
     await database.withExclusiveTransactionAsync(async (transaction) => {
       const result = await transaction.runAsync(
         `UPDATE transactions
-            SET category_id = ?, type = ?, amount_minor = ?, currency = ?,
+            SET category_id = ?, money_account_id = ?, type = ?,
+                amount_minor = ?, currency = ?,
                 title = ?, occurred_on = ?, recurrence = 'custom',
                 recurrence_group_id = ?, recurrence_series_id = NULL,
                 updated_at = ?,
@@ -468,6 +364,7 @@ export async function updateLocalTransaction(
                 END
           WHERE id = ? AND space_id = ? AND is_archived = 0`,
         draft.categoryId,
+        draft.moneyAccountId ?? null,
         draft.type,
         draft.amountMinor,
         draft.currency,
@@ -531,6 +428,7 @@ export async function updateLocalTransaction(
       id: occurrenceIds[index]!,
       spaceId: draft.spaceId,
       categoryId: draft.categoryId,
+      moneyAccountId: draft.moneyAccountId,
       createdBy,
       type: draft.type,
       amountMinor: draft.amountMinor,
@@ -606,14 +504,16 @@ export async function updateLocalTransaction(
 
       await transaction.runAsync(
         `INSERT INTO recurring_transaction_series (
-           id, space_id, category_id, created_by, type, amount_minor, currency,
+           id, space_id, category_id, money_account_id, created_by, type,
+           amount_minor, currency,
            title, frequency, starts_on, generated_occurrences,
            next_occurrence_on, sync_status, is_archived, created_at, updated_at,
            archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
         seriesId,
         draft.spaceId,
         draft.categoryId,
+        draft.moneyAccountId ?? null,
         createdBy,
         draft.type,
         draft.amountMinor,
@@ -629,7 +529,8 @@ export async function updateLocalTransaction(
 
       const result = await transaction.runAsync(
         `UPDATE transactions
-            SET category_id = ?, type = ?, amount_minor = ?, currency = ?,
+            SET category_id = ?, money_account_id = ?, type = ?,
+                amount_minor = ?, currency = ?,
                 title = ?, occurred_on = ?, recurrence = ?,
                 recurrence_group_id = NULL, recurrence_series_id = ?,
                 updated_at = ?,
@@ -639,6 +540,7 @@ export async function updateLocalTransaction(
                 END
           WHERE id = ? AND space_id = ? AND is_archived = 0`,
         draft.categoryId,
+        draft.moneyAccountId ?? null,
         draft.type,
         draft.amountMinor,
         draft.currency,
@@ -693,7 +595,8 @@ export async function updateLocalTransaction(
     await database.withExclusiveTransactionAsync(async (transaction) => {
       const result = await transaction.runAsync(
         `UPDATE transactions
-            SET category_id = ?, type = ?, amount_minor = ?, currency = ?,
+            SET category_id = ?, money_account_id = ?, type = ?,
+                amount_minor = ?, currency = ?,
                 title = ?, occurred_on = ?, recurrence = ?,
                 recurrence_group_id = NULL, updated_at = ?,
                 sync_status = CASE
@@ -702,6 +605,7 @@ export async function updateLocalTransaction(
                 END
           WHERE id = ? AND space_id = ? AND is_archived = 0`,
         draft.categoryId,
+        draft.moneyAccountId ?? null,
         draft.type,
         draft.amountMinor,
         draft.currency,
@@ -718,7 +622,8 @@ export async function updateLocalTransaction(
 
       await transaction.runAsync(
         `UPDATE transactions
-            SET category_id = ?, type = ?, amount_minor = ?, currency = ?,
+            SET category_id = ?, money_account_id = ?, type = ?,
+                amount_minor = ?, currency = ?,
                 title = ?, updated_at = ?,
                 sync_status = CASE
                   WHEN sync_status = 'local_only' THEN 'local_only'
@@ -727,6 +632,7 @@ export async function updateLocalTransaction(
           WHERE recurrence_series_id = ? AND occurred_on > ?
             AND space_id = ? AND is_archived = 0`,
         draft.categoryId,
+        draft.moneyAccountId ?? null,
         draft.type,
         draft.amountMinor,
         draft.currency,
@@ -739,7 +645,8 @@ export async function updateLocalTransaction(
 
       await transaction.runAsync(
         `UPDATE recurring_transaction_series
-            SET category_id = ?, type = ?, amount_minor = ?, currency = ?,
+            SET category_id = ?, money_account_id = ?, type = ?,
+                amount_minor = ?, currency = ?,
                 title = ?, updated_at = ?,
                 sync_status = CASE
                   WHEN sync_status = 'local_only' THEN 'local_only'
@@ -747,6 +654,7 @@ export async function updateLocalTransaction(
                 END
           WHERE id = ? AND space_id = ? AND is_archived = 0`,
         draft.categoryId,
+        draft.moneyAccountId ?? null,
         draft.type,
         draft.amountMinor,
         draft.currency,
@@ -759,7 +667,8 @@ export async function updateLocalTransaction(
 
     const updatedRows = await database.getAllAsync<TransactionRow>(
       `SELECT transactions.id, transactions.space_id,
-              transactions.category_id, transactions.created_by,
+              transactions.category_id, transactions.money_account_id,
+              transactions.created_by,
               transactions.type,
               transactions.amount_minor, transactions.currency,
               transactions.title, transactions.occurred_on,
@@ -791,7 +700,8 @@ export async function updateLocalTransaction(
     await database.withExclusiveTransactionAsync(async (transaction) => {
       const result = await transaction.runAsync(
         `UPDATE transactions
-            SET category_id = ?, type = ?, amount_minor = ?, currency = ?,
+            SET category_id = ?, money_account_id = ?, type = ?,
+                amount_minor = ?, currency = ?,
                 title = ?, occurred_on = ?, recurrence = ?,
                 recurrence_group_id = NULL, recurrence_series_id = NULL,
                 updated_at = ?,
@@ -801,6 +711,7 @@ export async function updateLocalTransaction(
                 END
           WHERE id = ? AND space_id = ? AND is_archived = 0`,
         draft.categoryId,
+        draft.moneyAccountId ?? null,
         draft.type,
         draft.amountMinor,
         draft.currency,
@@ -846,7 +757,8 @@ export async function updateLocalTransaction(
   } else {
     const result = await database.runAsync(
       `UPDATE transactions
-          SET category_id = ?, type = ?, amount_minor = ?, currency = ?,
+          SET category_id = ?, money_account_id = ?, type = ?,
+              amount_minor = ?, currency = ?,
               title = ?, occurred_on = ?, recurrence = ?,
               recurrence_group_id = NULL, recurrence_series_id = NULL,
               updated_at = ?,
@@ -856,6 +768,7 @@ export async function updateLocalTransaction(
               END
         WHERE id = ? AND space_id = ? AND is_archived = 0`,
       draft.categoryId,
+      draft.moneyAccountId ?? null,
       draft.type,
       draft.amountMinor,
       draft.currency,

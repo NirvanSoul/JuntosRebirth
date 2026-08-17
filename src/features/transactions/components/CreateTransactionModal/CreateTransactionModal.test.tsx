@@ -1014,4 +1014,180 @@ describe('CreateTransactionModal', () => {
       expect.objectContaining({ currency: 'VES' }),
     );
   });
+  describe('cuenta del movimiento', () => {
+    const bankAccount = {
+      id: 'account-1',
+      spaceId: 'personal',
+      name: 'Cuenta nómina',
+      kind: 'bank' as const,
+      icon: 'bank' as const,
+      colorToken: 'blue' as const,
+      currency: 'USD' as const,
+      openingBalanceMinor: 0,
+      isArchived: false,
+    };
+
+    it('no muestra el selector cuando el espacio no tiene cuentas', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      expect(
+        screen.queryByTestId('transaction-money-account-button'),
+      ).toBeNull();
+    });
+
+    it('deja fuera las cuentas archivadas y las de otro espacio', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          initialType="expense"
+          moneyAccounts={[
+            { ...bankAccount, id: 'archivada', isArchived: true },
+            { ...bankAccount, id: 'de-pareja', spaceId: 'pareja' },
+          ]}
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      expect(
+        screen.queryByTestId('transaction-money-account-button'),
+      ).toBeNull();
+    });
+
+    it('envía la cuenta elegida y adopta su moneda', async () => {
+      const onSubmit = jest.fn();
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          availableCurrencies={['EUR', 'USD']}
+          initialType="expense"
+          moneyAccounts={[bankAccount]}
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={onSubmit}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByLabelText('Cuenta: ninguna'));
+      await fireEvent.press(screen.getByLabelText('Cuenta nómina · USD'));
+      await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
+
+      // La moneda pasa a ser la de la cuenta y su selector desaparece: el
+      // importe pertenece al saldo de esa cuenta.
+      expect(
+        screen.getByTestId('transaction-amount-currency').props.children,
+      ).toBe('$ ');
+      expect(screen.queryByTestId('transaction-currency-button')).toBeNull();
+
+      await fireEvent.press(screen.getByLabelText('1'));
+      await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currency: 'USD',
+          moneyAccountId: 'account-1',
+        }),
+      );
+    });
+
+    it('devuelve la moneda del espacio al quitar la cuenta', async () => {
+      const onSubmit = jest.fn();
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          availableCurrencies={['EUR', 'USD']}
+          initialType="expense"
+          moneyAccounts={[bankAccount]}
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={onSubmit}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByLabelText('Cuenta: ninguna'));
+      await fireEvent.press(screen.getByLabelText('Cuenta nómina · USD'));
+      await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
+
+      await fireEvent.press(screen.getByLabelText('Cuenta: Cuenta nómina'));
+      await fireEvent.press(screen.getByLabelText('Sin cuenta'));
+      await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
+
+      await fireEvent.press(screen.getByLabelText('1'));
+      await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currency: 'EUR',
+          moneyAccountId: undefined,
+        }),
+      );
+    });
+
+    it('precarga la cuenta al editar un movimiento', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          initialDraft={{
+            spaceId: 'personal',
+            type: 'expense',
+            amountMinor: 1250,
+            currency: 'USD',
+            title: 'Compra',
+            categoryId: category.id,
+            moneyAccountId: 'account-1',
+            occurredOn: '2026-08-01',
+            recurrence: 'once',
+          }}
+          initialType="expense"
+          moneyAccounts={[bankAccount]}
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      expect(screen.getByLabelText('Cuenta: Cuenta nómina')).toBeTruthy();
+    });
+
+    it('ofrece crear una cuenta desde el propio selector', async () => {
+      const onCreateMoneyAccount = jest.fn();
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          initialType="expense"
+          moneyAccounts={[bankAccount]}
+          onClose={jest.fn()}
+          onCreateMoneyAccount={onCreateMoneyAccount}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByLabelText('Cuenta: ninguna'));
+      await fireEvent.press(screen.getByLabelText('Crear cuenta'));
+
+      expect(onCreateMoneyAccount).toHaveBeenCalled();
+    });
+  });
 });

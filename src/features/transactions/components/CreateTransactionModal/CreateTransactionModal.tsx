@@ -14,13 +14,12 @@ import Animated, {
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
-import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
+import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
 import type {
   CreateTransactionDraft,
-  TransactionRecurrence,
   TransactionType,
 } from '@/features/transactions/types';
 import {
@@ -35,8 +34,6 @@ import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
   defaultCurrencyCode,
-  getCurrencyFlag,
-  getCurrencyName,
   getCurrencyPluralName,
   getCurrencySymbol,
   getCurrencySymbolPosition,
@@ -55,14 +52,24 @@ import type { ColorTokens } from '@/theme/types';
 import { maxFontScale, typography } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
+import {
+  defaultRecurrence,
+  recurrenceOptions,
+  TransactionCurrencyPickerModal,
+  TransactionMoneyAccountPickerModal,
+  TransactionRecurrencePickerModal,
+} from './TransactionOptionPickers';
 import { TransactionDatePickerModal } from './TransactionDatePickerModal';
-import { TransactionCustomRecurrenceModal } from './TransactionCustomRecurrenceModal';
 
 type CreateTransactionModalProps = {
   activeSpaceId: string;
   availableCurrencies?: readonly CurrencyCode[];
   initialDate?: string;
   initialDraft?: CreateTransactionDraft;
+  /** Cuentas activas del espacio; sin ninguna, el selector no aparece. */
+  moneyAccounts?: readonly MoneyAccount[];
+  /** Abre la creación de una cuenta desde el propio selector. */
+  onCreateMoneyAccount?: () => void;
   spaceCurrency: CurrencyCode;
   /**
    * Oculta el selector interactivo de tipo (muestra `type` como una
@@ -86,19 +93,6 @@ type PendingOperationStep = {
   operator: CalculatorOperator;
 };
 
-const defaultRecurrence: {
-  value: TransactionRecurrence;
-  label: string;
-} = { value: 'once', label: 'Único' };
-
-const recurrenceOptions: readonly (typeof defaultRecurrence)[] = [
-  defaultRecurrence,
-  { value: 'weekly', label: 'Semanal' },
-  { value: 'biweekly', label: 'Quincenal' },
-  { value: 'monthly', label: 'Mensual' },
-  { value: 'custom', label: 'Personalizada' },
-];
-
 const keypadRows = [
   ['7', '8', '9', 'divide'],
   ['4', '5', '6', 'multiply'],
@@ -120,6 +114,8 @@ const operatorPresentation: Record<
 const defaultAvailableCurrencies: readonly CurrencyCode[] = [
   defaultCurrencyCode,
 ];
+/** Referencia estable, por el mismo motivo que el array de monedas. */
+const defaultMoneyAccounts: readonly MoneyAccount[] = [];
 /** Altura del bloque del importe antes de repartir el espacio sobrante. */
 const amountAreaMinHeight = { compact: 64, regular: 88 } as const;
 /** Límites visuales que evitan el autoajuste defectuoso de texto en iOS. */
@@ -145,7 +141,9 @@ export function CreateTransactionModal({
   hideTypeToggle = false,
   initialDate,
   initialDraft,
+  moneyAccounts = defaultMoneyAccounts,
   onClose,
+  onCreateMoneyAccount,
   onOpenCategoryPicker,
   onSubmit,
   onTypeChange,
@@ -177,6 +175,11 @@ export function CreateTransactionModal({
   const [isRecurrencePickerVisible, setRecurrencePickerVisible] =
     useState(false);
   const [isCurrencyPickerVisible, setCurrencyPickerVisible] = useState(false);
+  const [moneyAccountId, setMoneyAccountId] = useState<string | undefined>(
+    undefined,
+  );
+  const [isMoneyAccountPickerVisible, setMoneyAccountPickerVisible] =
+    useState(false);
   const [segmentedControlWidth, setSegmentedControlWidth] = useState(0);
   const wasVisible = useRef(false);
   const typeProgress = useSharedValue(type === 'income' ? 1 : 0);
@@ -212,6 +215,21 @@ export function CreateTransactionModal({
         ? 'amount'
         : 'amountHero';
   const transactionTone = type === 'income' ? 'income' : 'expense';
+  const selectableMoneyAccounts = useMemo(
+    () =>
+      moneyAccounts.filter(
+        (account) => account.spaceId === activeSpaceId && !account.isArchived,
+      ),
+    [activeSpaceId, moneyAccounts],
+  );
+  /**
+   * Puede ser una cuenta ya archivada si se está editando un movimiento
+   * antiguo: el botón debe seguir nombrándola aunque no se pueda elegir.
+   */
+  const selectedMoneyAccount = useMemo(
+    () => moneyAccounts.find((account) => account.id === moneyAccountId),
+    [moneyAccountId, moneyAccounts],
+  );
   const currencySymbol = getCurrencySymbol(currency);
   const currencySymbolPosition = getCurrencySymbolPosition(currency);
   const currencyPluralName = getCurrencyPluralName(currency);
@@ -273,9 +291,11 @@ export function CreateTransactionModal({
         : [],
     );
     setCurrency(initialDraft?.currency ?? spaceCurrency);
+    setMoneyAccountId(initialDraft?.moneyAccountId);
     setDatePickerVisible(false);
     setRecurrencePickerVisible(false);
     setCurrencyPickerVisible(false);
+    setMoneyAccountPickerVisible(false);
   }, [
     activeSpaceId,
     effectiveAvailableCurrencies,
@@ -430,6 +450,7 @@ export function CreateTransactionModal({
       currency,
       title: title.trim(),
       categoryId: selectedCategory.id,
+      moneyAccountId,
       occurredOn,
       recurrence: recurrence.value,
       customOccurrenceDates:
@@ -677,7 +698,45 @@ export function CreateTransactionModal({
                 {recurrence.label}
               </Text>
             </Pressable>
-            {effectiveAvailableCurrencies.length > 1 ? (
+            {selectableMoneyAccounts.length > 0 ? (
+              <Pressable
+                accessibilityHint="Elige la cuenta del movimiento"
+                accessibilityLabel={
+                  selectedMoneyAccount
+                    ? `Cuenta: ${selectedMoneyAccount.name}`
+                    : 'Cuenta: ninguna'
+                }
+                accessibilityRole="button"
+                onPress={() => setMoneyAccountPickerVisible(true)}
+                style={({ pressed }) => [
+                  styles.metadataButton,
+                  pressed && styles.pressed,
+                ]}
+                testID="transaction-money-account-button"
+              >
+                <Ionicons
+                  color={colors.textPrimary}
+                  name="wallet-outline"
+                  size={iconSize.md}
+                  testID="transaction-money-account-icon"
+                />
+                <Text
+                  numberOfLines={1}
+                  style={styles.metadataLabel}
+                  tone="secondary"
+                  variant="label"
+                  weight="semibold"
+                >
+                  {selectedMoneyAccount?.name ?? 'Cuenta'}
+                </Text>
+              </Pressable>
+            ) : null}
+            {/*
+              Con una cuenta elegida la moneda ya no se puede tocar: es la de
+              la cuenta, y cambiarla dejaría el importe fuera de su saldo.
+            */}
+            {effectiveAvailableCurrencies.length > 1 &&
+            !selectedMoneyAccount ? (
               <Pressable
                 accessibilityHint="Abre las opciones de moneda"
                 accessibilityLabel={`Moneda: ${currency}`}
@@ -875,164 +934,25 @@ export function CreateTransactionModal({
         }}
         visible={isCurrencyPickerVisible}
       />
-    </>
-  );
-}
 
-type TransactionCurrencyPickerModalProps = {
-  availableCurrencies: readonly CurrencyCode[];
-  currency: CurrencyCode;
-  visible: boolean;
-  onClose: () => void;
-  onSelectCurrency: (currency: CurrencyCode) => void;
-};
-
-function TransactionCurrencyPickerModal({
-  availableCurrencies,
-  currency,
-  visible,
-  onClose,
-  onSelectCurrency,
-}: TransactionCurrencyPickerModalProps) {
-  const [draftCurrency, setDraftCurrency] = useState(currency);
-
-  useEffect(() => {
-    if (visible) {
-      setDraftCurrency(currency);
-    }
-  }, [currency, visible]);
-
-  return (
-    <AppModal
-      onClose={onClose}
-      stackBehavior="push"
-      testID="transaction-currency-picker"
-      visible={visible}
-    >
-      <View style={optionPickerStyles.container}>
-        <View style={optionPickerStyles.header}>
-          <ModalCloseButton onPress={onClose} variant="back" />
-          <Text accessibilityRole="header" variant="heading">
-            Elige la moneda
-          </Text>
-        </View>
-
-        <View accessibilityRole="radiogroup" style={optionPickerStyles.list}>
-          {availableCurrencies.map((code) => (
-            <SelectableOption
-              accessibilityLabel={`${getCurrencyFlag(code)} ${getCurrencyName(code)} (${code})`}
-              indicatorTestID={`transaction-currency-${code}-check`}
-              key={code}
-              label={`${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`}
-              onPress={() => setDraftCurrency(code)}
-              selected={draftCurrency === code}
-            />
-          ))}
-        </View>
-
-        <ModalPrimaryAction
-          accessibilityLabel="Guardar moneda"
-          label="Guardar"
-          onPress={() => onSelectCurrency(draftCurrency)}
-          style={optionPickerStyles.saveButton}
-        />
-      </View>
-    </AppModal>
-  );
-}
-
-type TransactionRecurrencePickerModalProps = {
-  customOccurrenceDates: readonly string[];
-  initialDate: string;
-  recurrenceIndex: number;
-  visible: boolean;
-  onClose: () => void;
-  onSelectRecurrence: (index: number) => void;
-  onSelectCustomDates: (dates: readonly string[]) => void;
-};
-
-function TransactionRecurrencePickerModal({
-  customOccurrenceDates,
-  initialDate,
-  recurrenceIndex,
-  visible,
-  onClose,
-  onSelectRecurrence,
-  onSelectCustomDates,
-}: TransactionRecurrencePickerModalProps) {
-  const [draftRecurrenceIndex, setDraftRecurrenceIndex] =
-    useState(recurrenceIndex);
-  const [isCustomPickerVisible, setCustomPickerVisible] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setDraftRecurrenceIndex(recurrenceIndex);
-      setCustomPickerVisible(false);
-    }
-  }, [recurrenceIndex, visible]);
-
-  return (
-    <>
-      <AppModal
-        onClose={onClose}
-        stackBehavior="push"
-        testID="transaction-recurrence-picker"
-        visible={visible}
-      >
-        <View style={optionPickerStyles.container}>
-          <View style={optionPickerStyles.header}>
-            <ModalCloseButton onPress={onClose} variant="back" />
-            <Text accessibilityRole="header" variant="heading">
-              Elige la recurrencia
-            </Text>
-          </View>
-
-          <View accessibilityRole="radiogroup" style={optionPickerStyles.list}>
-            {recurrenceOptions.map((option, index) => {
-              const selected = index === draftRecurrenceIndex;
-
-              return (
-                <SelectableOption
-                  accessibilityLabel={option.label}
-                  indicatorTestID={`transaction-recurrence-${option.value}-check`}
-                  key={option.value}
-                  label={option.label}
-                  onPress={() => {
-                    setDraftRecurrenceIndex(index);
-                    if (option.value === 'custom') {
-                      setCustomPickerVisible(true);
-                    }
-                  }}
-                  selected={selected}
-                />
-              );
-            })}
-          </View>
-
-          <ModalPrimaryAction
-            accessibilityLabel="Guardar recurrencia"
-            disabled={
-              recurrenceOptions[draftRecurrenceIndex]?.value === 'custom' &&
-              customOccurrenceDates.length === 0
-            }
-            label="Guardar"
-            onPress={() => onSelectRecurrence(draftRecurrenceIndex)}
-            style={optionPickerStyles.saveButton}
-          />
-        </View>
-      </AppModal>
-      <TransactionCustomRecurrenceModal
-        initialDate={initialDate}
-        onClose={() => setCustomPickerVisible(false)}
-        onSelect={(dates) => {
-          onSelectCustomDates(dates);
-          setDraftRecurrenceIndex(
-            recurrenceOptions.findIndex((option) => option.value === 'custom'),
-          );
-          setCustomPickerVisible(false);
+      <TransactionMoneyAccountPickerModal
+        accounts={selectableMoneyAccounts}
+        moneyAccountId={moneyAccountId}
+        onClose={() => setMoneyAccountPickerVisible(false)}
+        onCreateMoneyAccount={onCreateMoneyAccount}
+        onSelectMoneyAccount={(selectedId) => {
+          setMoneyAccountId(selectedId);
+          // Elegir cuenta fija la moneda del movimiento; quitarla devuelve la
+          // del espacio sin tocar el importe ya escrito.
+          const account = selectedId
+            ? selectableMoneyAccounts.find(
+                (candidate) => candidate.id === selectedId,
+              )
+            : undefined;
+          setCurrency(account?.currency ?? spaceCurrency);
+          setMoneyAccountPickerVisible(false);
         }}
-        selectedDates={customOccurrenceDates}
-        visible={isCustomPickerVisible}
+        visible={isMoneyAccountPickerVisible}
       />
     </>
   );
@@ -1196,20 +1116,3 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
     },
   });
 }
-
-const optionPickerStyles = StyleSheet.create({
-  container: {
-    gap: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  header: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  list: {
-    gap: spacing.sm,
-  },
-  saveButton: { marginTop: spacing.md },
-});

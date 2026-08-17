@@ -1050,6 +1050,43 @@ Antes de una versión pública deben verificarse, como mínimo:
 
 ---
 
+# Fase 21 — Cuentas
+
+**Prioridad:** P1
+
+## Objetivo
+
+Permitir clasificar los movimientos también por la cuenta donde está el
+dinero, y saber cuánto queda en cada una.
+
+## Tareas
+
+- [x] Dominio local: tipos, repositorio SQLite, catálogo y cálculo de saldo.
+- [x] Columna opcional `money_account_id` en movimientos y series.
+- [x] Selector de cuenta en el modal de movimiento, con la moneda que fija.
+- [x] Sección de cuentas en Actividad, con tarjetas y lista.
+- [x] Sección de cuentas en Inicio, con `Ver más` hacia Actividad.
+- [x] Crear, editar y archivar una cuenta.
+- [x] Esquema remoto, RLS y pruebas SQL.
+- [x] Sincronización del espacio compartido, realtime y migración de invitado.
+- [x] Borrado y exportación de datos.
+- [ ] Verificación manual en iOS y Android.
+
+## Criterios de terminado
+
+- Un movimiento sin cuenta se comporta exactamente como antes.
+- El saldo de una cuenta no contradice al balance del mismo periodo.
+- Ningún saldo mezcla divisas.
+- Archivar una cuenta conserva sus movimientos.
+- La cuenta creada en un dispositivo aparece en el otro del mismo espacio.
+
+## Fuera de alcance
+
+Transferencias entre cuentas, límite de crédito, filtro por cuenta en
+Actividad e importación bancaria con cuenta.
+
+---
+
 ## 9. Principio final
 
 > Cada fase debe dejar una aplicación más útil, no únicamente una arquitectura más grande.

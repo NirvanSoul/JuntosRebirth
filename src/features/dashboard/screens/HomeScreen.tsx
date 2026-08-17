@@ -1,11 +1,17 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
 import { Screen } from '@/components/layout/Screen/Screen';
 import { Text } from '@/components/ui/Text/Text';
+import { MoneyAccountCarousel } from '@/features/accounts/components/MoneyAccountCarousel/MoneyAccountCarousel';
+import type { MoneyAccount } from '@/features/accounts/types';
+import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
+import {
+  HomeSectionHeader,
+  HomeTransactionListFooter,
+} from '@/features/dashboard/components/HomeSectionHeader/HomeSectionHeader';
 import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
@@ -28,7 +34,7 @@ import {
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
-import { iconSize, layout } from '@/theme/layout';
+import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 
@@ -36,17 +42,21 @@ const recentTransactionLimit = 8;
 
 type HomeScreenProps = {
   categories?: readonly Category[];
+  moneyAccounts?: readonly MoneyAccount[];
   /** Moneda del resumen superior (balance, ingresos y gastos del mes). */
   currency?: CurrencyCode;
   /** Moneda del espacio activo para cálculo de presupuestos. */
   spaceCurrency?: CurrencyCode;
   onCreateCategory?: () => void;
   onCreateExpense?: () => void;
+  onCreateMoneyAccount?: () => void;
   onCreateIncome?: () => void;
   onCreateMovement?: () => void;
   onOpenCategoryDetail?: (categoryId: string) => void;
+  onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   onOpenTransactionDetail?: (transactionId: string) => void;
   onScrollDirectionChange?: (direction: 'down' | 'up') => void;
+  onViewAccounts?: () => void;
   onViewCategories?: () => void;
   onViewMovements?: () => void;
   /** Cambia al reenfocar la pantalla para reiniciar el arco de balance. */
@@ -57,77 +67,21 @@ type HomeScreenProps = {
   transactions?: readonly SessionTransaction[];
 };
 
-type SectionHeaderProps = {
-  onViewMore?: () => void;
-  title: string;
-};
-
-function SectionHeader({ onViewMore, title }: SectionHeaderProps) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text accessibilityRole="header" variant="subheading">
-        {title}
-      </Text>
-      <Pressable
-        accessibilityLabel={`Ver más de ${title}`}
-        accessibilityRole="button"
-        disabled={!onViewMore}
-        onPress={onViewMore}
-        style={({ pressed }) => [
-          styles.sectionLink,
-          pressed && styles.sectionLinkPressed,
-        ]}
-      >
-        <Text tone="secondary" variant="footnote" weight="light">
-          Ver más
-        </Text>
-      </Pressable>
-    </View>
-  );
-}
-
-type TransactionListFooterProps = {
-  onPress?: () => void;
-};
-
-function TransactionListFooter({ onPress }: TransactionListFooterProps) {
-  const { colors } = useTheme();
-
-  return (
-    <Pressable
-      accessibilityLabel="Ver más movimientos en Actividad"
-      accessibilityRole="button"
-      disabled={!onPress}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.transactionListFooter,
-        pressed ? styles.sectionLinkPressed : null,
-      ]}
-      testID="home-transactions-view-more"
-    >
-      <Text tone="secondary" variant="footnote" weight="semibold">
-        Ver más movimientos
-      </Text>
-      <Ionicons
-        color={colors.textSecondary}
-        name="chevron-forward"
-        size={iconSize.xs}
-      />
-    </Pressable>
-  );
-}
-
 export function HomeScreen({
   categories = [],
   currency = defaultCurrencyCode,
   focusResetKey,
+  moneyAccounts = [],
   onCreateCategory,
   onCreateExpense,
   onCreateIncome,
+  onCreateMoneyAccount,
   onCreateMovement,
   onOpenCategoryDetail,
+  onOpenMoneyAccountDetail,
   onOpenTransactionDetail,
   onScrollDirectionChange,
+  onViewAccounts,
   onViewCategories,
   onViewMovements,
   showComparisonIndicators = false,
@@ -196,6 +150,13 @@ export function HomeScreen({
     () => new Map(budgetSummaries.map((item) => [item.id, item.expenseMinor])),
     [budgetSummaries],
   );
+  // Cada tarjeta muestra el saldo en la moneda de su propia cuenta, así que
+  // el selector de moneda del encabezado no las filtra: un saldo nunca mezcla
+  // divisas y ninguna cuenta desaparece al cambiar de moneda.
+  const moneyAccountSummaries = useMemo(
+    () => summarizeMoneyAccounts(moneyAccounts, transactions),
+    [moneyAccounts, transactions],
+  );
   const recentTransactions = useMemo(
     () => sortTransactionsByRecentActivity(transactionsThroughCurrentMonth),
     [transactionsThroughCurrentMonth],
@@ -256,7 +217,7 @@ export function HomeScreen({
           testIDPrefix="home"
         />
 
-        <SectionHeader onViewMore={onViewCategories} title="Categorías" />
+        <HomeSectionHeader onViewMore={onViewCategories} title="Categorías" />
         {categorySummaries.length > 0 ? (
           <ScrollView
             contentContainerStyle={[
@@ -292,7 +253,27 @@ export function HomeScreen({
           />
         )}
 
-        <SectionHeader
+        <HomeSectionHeader onViewMore={onViewAccounts} title="Cuentas" />
+        {moneyAccountSummaries.length > 0 ? (
+          <MoneyAccountCarousel
+            accounts={moneyAccountSummaries}
+            gutter={layout.screenGutter[density]}
+            onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
+            testID="home-account-scroller"
+          />
+        ) : (
+          <EmptyState
+            accessibilityLabel="Crear primera cuenta"
+            description="Crea una cuenta para saber cuánto te queda en cada sitio."
+            icon="wallet-outline"
+            iconBackgroundColor={colors.brand}
+            onPress={onCreateMoneyAccount}
+            testID="home-empty-accounts"
+            title="Aún no hay cuentas"
+          />
+        )}
+
+        <HomeSectionHeader
           onViewMore={onViewMovements}
           title="Movimientos Recientes"
         />
@@ -307,7 +288,7 @@ export function HomeScreen({
               transactions={recentTransactions}
             />
             {transactionsThroughCurrentMonth.length > recentTransactionLimit ? (
-              <TransactionListFooter onPress={onViewMovements} />
+              <HomeTransactionListFooter onPress={onViewMovements} />
             ) : null}
           </>
         ) : (
@@ -384,30 +365,6 @@ const styles = StyleSheet.create({
   },
   monthBadges: {
     marginTop: spacing.lg,
-  },
-  sectionHeader: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    marginTop: spacing.xxl,
-  },
-  sectionLink: {
-    minHeight: layout.minTouchTarget,
-    justifyContent: 'center',
-    paddingLeft: spacing.lg,
-  },
-  sectionLinkPressed: {
-    opacity: 0.64,
-  },
-  transactionListFooter: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
   },
   categoryList: {
     gap: spacing.sm,

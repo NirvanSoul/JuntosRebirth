@@ -1,5 +1,6 @@
 import { Share } from 'react-native';
 
+import { listLocalMoneyAccounts } from '@/features/accounts/repositories/localMoneyAccountRepository';
 import { listLocalCategories } from '@/features/categories/repositories/localCategoryRepository';
 import { createSupabaseDataExportGateway } from '@/features/legal/gateways/supabaseDataExportGateway';
 import type { DataExportScope } from '@/features/legal/model/types';
@@ -9,9 +10,10 @@ import { listLocalTransactions } from '@/features/transactions/repositories/loca
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 
 async function buildLocalExportPayload(): Promise<Record<string, unknown>> {
-  const [spaces, categories, transactions] = await Promise.all([
+  const [spaces, categories, moneyAccounts, transactions] = await Promise.all([
     loadSpaces(),
     listLocalCategories(),
+    listLocalMoneyAccounts(),
     listLocalTransactions(),
   ]);
 
@@ -20,6 +22,7 @@ async function buildLocalExportPayload(): Promise<Record<string, unknown>> {
     scope: 'local',
     spaces: spaces.spaces,
     categories,
+    moneyAccounts,
     transactions,
   };
 }

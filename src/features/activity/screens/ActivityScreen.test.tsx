@@ -9,6 +9,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ActivityScreen } from '@/features/activity/screens/ActivityScreen';
+import { formatCurrency } from '@/lib/currency/formatCurrency';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
@@ -221,7 +222,8 @@ describe('ActivityScreen', () => {
     expect(
       screen.getByTestId('activity-screen-scroll-view').props
         .stickyHeaderIndices,
-    ).toEqual([2]);
+      // La sección de cuentas desplaza un hijo el ancla del resumen fijo.
+    ).toEqual([3]);
     const chart = screen.getByTestId('category-donut-chart');
     expect(chart).toBeTruthy();
     expect(
@@ -1301,5 +1303,74 @@ describe('ActivityScreen', () => {
     );
 
     expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR');
+  });
+  describe('sección de cuentas', () => {
+    const account = {
+      id: 'account-1',
+      spaceId: 'personal',
+      name: 'Cuenta nómina',
+      kind: 'bank' as const,
+      icon: 'bank' as const,
+      colorToken: 'blue' as const,
+      currency: 'EUR' as const,
+      openingBalanceMinor: 100000,
+      isArchived: false,
+    };
+
+    const renderWithAccounts = (props = {}) =>
+      render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <ActivityScreen
+              categories={categories}
+              transactions={transactions}
+              {...props}
+            />
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+    it('muestra la tarjeta y la fila de cada cuenta con su saldo', async () => {
+      const screen = await renderWithAccounts({
+        moneyAccounts: [{ ...account, id: 'account-1' }],
+      });
+
+      expect(screen.getByTestId('money-account-card-account-1')).toBeTruthy();
+      expect(screen.getByTestId('money-account-row-account-1')).toBeTruthy();
+      // Ningún movimiento está asignado todavía: el saldo es el inicial.
+      expect(
+        screen.getByTestId('money-account-card-account-1-balance').props
+          .children,
+      ).toBe(formatCurrency(100000, 'EUR', 'es-ES'));
+    });
+
+    it('abre el detalle al tocar la tarjeta y la fila', async () => {
+      const onOpenMoneyAccountDetail = jest.fn();
+      const screen = await renderWithAccounts({
+        moneyAccounts: [account],
+        onOpenMoneyAccountDetail,
+      });
+
+      await fireEvent.press(screen.getByTestId('money-account-card-account-1'));
+      await fireEvent.press(screen.getByTestId('money-account-row-account-1'));
+
+      expect(onOpenMoneyAccountDetail).toHaveBeenCalledTimes(2);
+      expect(onOpenMoneyAccountDetail).toHaveBeenCalledWith('account-1');
+    });
+
+    it('propone crear una cuenta cuando no hay ninguna', async () => {
+      const onCreateMoneyAccount = jest.fn();
+      const screen = await renderWithAccounts({ onCreateMoneyAccount });
+
+      expect(screen.getByText('Aún no hay cuentas')).toBeTruthy();
+      await fireEvent.press(screen.getByLabelText('Crear primera cuenta'));
+
+      expect(onCreateMoneyAccount).toHaveBeenCalled();
+    });
   });
 });
