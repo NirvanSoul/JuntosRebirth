@@ -256,3 +256,14 @@ cuando el responsable confirma el resultado.
   - Dentro de esa transacción, las líneas 85, 90 y 173 invocan `findLocalIdForRemoteEntity` y `linkRemoteEntity` ([`src/features/sync/repositories/localRemoteEntityLinkRepository.ts:38`](file:///c:/Projects/JuntosApp/src/features/sync/repositories/localRemoteEntityLinkRepository.ts#L38)), las cuales ejecutan consultas sobre la instancia global `database` en lugar del handle `transaction` activo.
   - Esto provoca un conflicto de concurrencia y bloqueo en SQLite (`database is locked` / `SQLITE_BUSY`), abortando la transacción exclusiva.
   - El error es capturado y silenciado en [`src/navigation/MainTabsNavigator.tsx:333`](file:///c:/Projects/JuntosApp/src/navigation/MainTabsNavigator.tsx#L333) (`catch { ... }`), impidiendo que `reloadLocalFinance` se ejecute y dejando SQLite sin las categorías ni los movimientos remotos.
+
+#### Paso 5: Prueba en sentido B → A y verificación de monedas
+- **Acción UI:**
+  - Usuario B (Honor) registra en el espacio «Juntos» la categoría «Compras» y un ingreso de 80.00 VES.
+  - Usuario A (iPhone) no visualiza el movimiento registrado por Usuario B.
+- **Observación en base de datos remota (Postgres):**
+  - La subida desde el Honor funcionó al 100%: `public.categories` contiene la categoría «Compras» (`b9215993-660b-45ae-9170-72f1f108c19a`) y `public.transactions` contiene el ingreso de 8000 céntimos (`8650c205-146a-4e24-a613-367acbc8a52c`, currency `VES`).
+  - **Descarte de hipótesis de monedas:** La moneda `VES` es aceptada por la restricción `currency ~ '^[A-Z]{3}$'` y persistida correctamente en Postgres y SQLite local.
+- **Conclusión del diagnóstico:**
+  - La subida (`sync_couple_space_data`) opera correctamente de forma bidireccional (iOS → Postgres y Android → Postgres).
+  - La sincronización descendente (`restoreRemoteAccount`) falla de forma simétrica en ambos dispositivos debido al bloqueo de concurrencia SQLite dentro de `withExclusiveTransactionAsync`.
