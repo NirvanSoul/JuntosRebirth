@@ -1,8 +1,13 @@
 import {
-  defaultCurrencyCode,
   isCurrencyCode,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
+
+/**
+ * Catálogo canónico y no vacío de monedas visibles del espacio activo: la
+ * moneda del espacio siempre lo encabeza, así que `catalog[0]` existe siempre.
+ */
+export type VisibleCurrencyCatalog = readonly [CurrencyCode, ...CurrencyCode[]];
 
 type VisibleCurrencyCatalogInput = {
   /**
@@ -26,7 +31,7 @@ export function buildVisibleCurrencyCatalog({
   movementCurrencies = [],
   preferenceCurrencies = [],
   spaceCurrency,
-}: VisibleCurrencyCatalogInput): CurrencyCode[] {
+}: VisibleCurrencyCatalogInput): VisibleCurrencyCatalog {
   const catalog: CurrencyCode[] = [spaceCurrency];
   const appendCurrency = (currency: CurrencyCode) => {
     if (!catalog.includes(currency)) catalog.push(currency);
@@ -37,22 +42,22 @@ export function buildVisibleCurrencyCatalog({
     if (isCurrencyCode(currency)) appendCurrency(currency);
   });
 
-  return catalog;
+  // `catalog[0]` siempre es la moneda del espacio; se reconstruye como tupla
+  // no vacía sin recurrir a un fallback monetario.
+  return [spaceCurrency, ...catalog.slice(1)];
 }
 
 /**
- * Elige la divisa visible dentro de un catálogo: la selección guardada si
- * pertenece al catálogo y, si no existe o dejó de ser válida, la primera
- * moneda del catálogo. Nunca sustituye por una divisa ajena al catálogo.
+ * Elige la divisa visible dentro de un catálogo no vacío: la selección guardada
+ * si pertenece al catálogo y, si no existe o dejó de ser válida, la moneda del
+ * espacio (primera del catálogo). Nunca sustituye por una divisa ajena al
+ * catálogo ni por un fallback monetario.
  */
 export function pickVisibleCurrency(
-  catalog: readonly CurrencyCode[],
+  catalog: VisibleCurrencyCatalog,
   selection: CurrencyCode | null | undefined,
 ): CurrencyCode {
-  return (
-    (selection && catalog.includes(selection) ? selection : catalog[0]) ??
-    defaultCurrencyCode
-  );
+  return selection && catalog.includes(selection) ? selection : catalog[0];
 }
 
 /**

@@ -41,10 +41,6 @@ import {
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import { TransactionSummaryBadges } from '@/features/transactions/components/TransactionSummaryBadges/TransactionSummaryBadges';
 import type { SessionTransaction } from '@/features/transactions/types';
-import {
-  getAvailableCurrencies,
-  pickEffectiveCurrency,
-} from '@/features/transactions/utils/transactionCurrencyGrouping';
 import { calculatePeriodComparison } from '@/features/transactions/utils/periodComparison';
 import {
   listTransactionsThroughCurrentMonth,
@@ -54,6 +50,10 @@ import {
   defaultCurrencyCode,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
+import {
+  pickVisibleCurrency,
+  type VisibleCurrencyCatalog,
+} from '@/lib/currency/visibleCurrencyCatalog';
 import { iconSize, minTouchTarget } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
@@ -67,6 +67,12 @@ type ActivityScreenProps = {
   currency?: CurrencyCode;
   /** Moneda del espacio activo para presupuestos. */
   spaceCurrency?: CurrencyCode;
+  /**
+   * Catálogo canónico y no vacío de monedas visibles del espacio activo.
+   * Determina la moneda efectiva, alimenta el filtro y permite la selección
+   * local; nunca se deriva de los movimientos.
+   */
+  visibleCurrencies: VisibleCurrencyCatalog;
   /** Cambia al reenfocar la pantalla para reiniciar el donut de categorías. */
   focusResetKey?: number;
   onCreateCategory?: () => void;
@@ -104,6 +110,7 @@ export function ActivityScreen({
   targetRequestId,
   targetSection,
   transactions = [],
+  visibleCurrencies,
 }: ActivityScreenProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -132,14 +139,9 @@ export function ActivityScreen({
     () => listTransactionsThroughCurrentMonth(transactions),
     [transactions],
   );
-  const availableCurrencies = useMemo(
-    () => getAvailableCurrencies(transactions),
-    [transactions],
-  );
-  const effectiveCurrency = pickEffectiveCurrency(
-    availableCurrencies,
+  const effectiveCurrency = pickVisibleCurrency(
+    visibleCurrencies,
     selectedCurrency ?? currency,
-    currency,
   );
   const currencyTransactionsThroughCurrentMonth = useMemo(
     () =>
@@ -451,7 +453,7 @@ export function ActivityScreen({
       </Screen>
       <TransactionFiltersModal
         categories={categories}
-        currencies={availableCurrencies}
+        currencies={visibleCurrencies}
         filters={{
           category: categoryFilter,
           currency: effectiveCurrency,

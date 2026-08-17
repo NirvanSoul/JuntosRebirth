@@ -5,6 +5,7 @@ import {
   buildVisibleCurrencyCatalog,
   getNextHomeCurrency,
   pickVisibleCurrency,
+  type VisibleCurrencyCatalog,
 } from '@/lib/currency/visibleCurrencyCatalog';
 import type { CurrencyPreferences } from '@/state/appPreferences/currencyPreferences';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
@@ -28,7 +29,7 @@ type VisibleCurrencyCatalogController = {
   pressHomeCurrency: () => void;
   selectHomeCurrency: (currency: CurrencyCode) => void;
   setCurrencyPreferences: (next: CurrencyPreferences) => Promise<void>;
-  visibleCurrencies: readonly CurrencyCode[];
+  visibleCurrencies: VisibleCurrencyCatalog;
 };
 
 /**

@@ -746,6 +746,116 @@ describe('MainTabsNavigator', () => {
         fallbackCurrency: 'VES',
       });
     });
+
+    it('Actividad arranca en la moneda del espacio (VES) con el catálogo canónico y no salta a USD', async () => {
+      mockUseSpaces.mockReturnValue({
+        activeSpace: {
+          currency: 'VES',
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+        },
+        createSpace: jest.fn(),
+        error: null,
+        isReady: true,
+        selectSpace: jest.fn(),
+        spaces: [
+          {
+            currency: 'VES',
+            id: 'personal',
+            name: 'Personal',
+            type: 'personal',
+          },
+        ],
+      });
+      await AsyncStorage.setItem(
+        '@juntoss/currency-preferences/v1',
+        JSON.stringify({ currencies: ['EUR'], version: 1 }),
+      );
+      (listLocalCategories as jest.Mock).mockResolvedValue([
+        {
+          id: 'category-food',
+          spaceId: 'personal',
+          name: 'Comida',
+          icon: 'fork-knife',
+          colorToken: 'orange',
+          isDefault: false,
+          isArchived: false,
+        },
+      ]);
+      (listLocalTransactions as jest.Mock).mockResolvedValue([
+        {
+          id: 'tx-usd',
+          spaceId: 'personal',
+          type: 'expense',
+          amountMinor: 1000,
+          currency: 'USD',
+          title: 'Café USD',
+          categoryId: 'category-food',
+          occurredOn: dateInCurrentMonth(2),
+          recurrence: 'once',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+        },
+      ]);
+
+      const screen = await render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <NavigationContainer>
+              <MainTabsNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      // Encabezado e Inicio arrancan en la moneda del espacio (VES), no en la
+      // preferencia (EUR) ni en el único movimiento (USD).
+      await waitFor(() =>
+        expect(screen.getByLabelText('Moneda seleccionada: 🇻🇪')).toBeTruthy(),
+      );
+
+      await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+
+      // Actividad también arranca en VES: el único movimiento es USD, así que
+      // muestra el estado vacío filtrado en vez de saltar en silencio a USD.
+      expect(
+        await screen.findByText('No hay movimientos de este tipo'),
+      ).toBeTruthy();
+      expect(
+        screen.queryByTestId('activity-transaction-preview-list'),
+      ).toBeNull();
+
+      // El filtro ofrece exactamente las tres monedas del catálogo canónico.
+      await fireEvent.press(screen.getByLabelText('Filtros'));
+      await fireEvent.press(screen.getByLabelText('Moneda'));
+      const currencyOptions = screen.getAllByLabelText(/^Moneda:/);
+      expect(currencyOptions).toHaveLength(3);
+      expect(screen.getByTestId('currency-filter-VES')).toBeTruthy();
+      expect(screen.getByTestId('currency-filter-EUR')).toBeTruthy();
+      expect(screen.getByTestId('currency-filter-USD')).toBeTruthy();
+      expect(
+        screen.getByTestId('currency-filter-VES').props.accessibilityState,
+      ).toMatchObject({ checked: true });
+
+      // Seleccionar USD muestra el movimiento USD, sin cambiar Inicio.
+      await fireEvent.press(screen.getByTestId('currency-filter-USD'));
+      await fireEvent.press(screen.getByLabelText('Aplicar filtros'));
+      expect(
+        within(
+          screen.getByTestId('activity-transaction-preview-list'),
+        ).getByText('Café USD'),
+      ).toBeTruthy();
+
+      await fireEvent.press(screen.getByRole('tab', { name: 'Inicio' }));
+      await waitFor(() =>
+        expect(screen.getByLabelText('Moneda seleccionada: 🇻🇪')).toBeTruthy(),
+      );
+    });
   });
 
   it('desplaza el selector y fija el mismo resumen al recorrer movimientos', async () => {
@@ -1642,10 +1752,15 @@ describe('MainTabsNavigator', () => {
       );
 
       await waitFor(() => {
+        expect(mockRealtimeChannel.channelName).toBe(
+          'couple-space-sync:couple-space-1',
+        );
+        expect(mockRealtimeChannel.subscribeCalls).toBe(1);
+        expect(mockRealtimeChannel.subscriptions).toHaveLength(3);
         expect(
-          mockRealtimeChannel.subscriptions
-            .slice(0, 3)
-            .map((subscription) => subscription.table),
+          mockRealtimeChannel.subscriptions.map(
+            (subscription) => subscription.table,
+          ),
         ).toEqual([
           'categories',
           'recurring_transaction_series',
@@ -1653,23 +1768,16 @@ describe('MainTabsNavigator', () => {
         ]);
       });
 
-      expect(mockRealtimeChannel.channelName).toBe(
-        'couple-space-sync:couple-space-1',
-      );
-      expect(mockRealtimeChannel.subscribeCalls).toBeGreaterThanOrEqual(1);
-
-      const primerasSuscripciones = mockRealtimeChannel.subscriptions.slice(
-        0,
-        3,
-      );
-      for (const subscription of primerasSuscripciones) {
+      for (const subscription of mockRealtimeChannel.subscriptions) {
         expect(subscription.channelType).toBe('postgres_changes');
         expect(subscription.changeEvent).toBe('*');
         expect(subscription.schema).toBe('public');
         expect(subscription.filter).toBe('space_id=eq.couple-space-1');
       }
       const callbacks = new Set(
-        primerasSuscripciones.map((subscription) => subscription.callback),
+        mockRealtimeChannel.subscriptions.map(
+          (subscription) => subscription.callback,
+        ),
       );
       expect(callbacks.size).toBe(1);
     });

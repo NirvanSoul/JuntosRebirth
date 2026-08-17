@@ -94,6 +94,7 @@ describe('ActivityScreen scroll dirigido', () => {
             targetRequestId={1}
             targetSection="movements"
             transactions={transactions}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,

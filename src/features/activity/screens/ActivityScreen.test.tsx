@@ -78,7 +78,11 @@ describe('ActivityScreen', () => {
         }}
       >
         <ThemeProvider initialAppearance="light">
-          <ActivityScreen categories={categories} transactions={transactions} />
+          <ActivityScreen
+            categories={categories}
+            transactions={transactions}
+            visibleCurrencies={['EUR']}
+          />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
@@ -315,6 +319,7 @@ describe('ActivityScreen', () => {
             onCreateIncome={onCreateIncome}
             onCreateMovement={onCreateMovement}
             transactions={transactions}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -365,6 +370,7 @@ describe('ActivityScreen', () => {
             categories={categories}
             onOpenCategoryDetail={onOpenCategoryDetail}
             transactions={transactions}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -389,6 +395,7 @@ describe('ActivityScreen', () => {
             categories={categories}
             onOpenCategoryDetail={onOpenCategoryDetail}
             transactions={transactions}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -413,7 +420,11 @@ describe('ActivityScreen', () => {
         }}
       >
         <ThemeProvider initialAppearance="light">
-          <ActivityScreen categories={categories} transactions={transactions} />
+          <ActivityScreen
+            categories={categories}
+            transactions={transactions}
+            visibleCurrencies={['EUR']}
+          />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
@@ -454,6 +465,7 @@ describe('ActivityScreen', () => {
             categories={categories}
             onOpenTransactionDetail={onOpenTransactionDetail}
             transactions={transactions}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -486,6 +498,7 @@ describe('ActivityScreen', () => {
           <ActivityScreen
             categories={categories}
             transactions={[...transactions, previousMonthTransaction]}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -513,7 +526,11 @@ describe('ActivityScreen', () => {
         }}
       >
         <ThemeProvider initialAppearance="light">
-          <ActivityScreen categories={categories} transactions={[]} />
+          <ActivityScreen
+            categories={categories}
+            transactions={[]}
+            visibleCurrencies={['EUR']}
+          />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
@@ -554,6 +571,7 @@ describe('ActivityScreen', () => {
             onCreateCategory={onCreateCategory}
             onCreateExpense={onCreateExpense}
             transactions={[]}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -590,6 +608,7 @@ describe('ActivityScreen', () => {
           <ActivityScreen
             categories={[...categories, otherCategory]}
             transactions={transactions}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -624,6 +643,7 @@ describe('ActivityScreen', () => {
           <ActivityScreen
             categories={[categoryWithoutBudget]}
             transactions={transactions}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -684,6 +704,7 @@ describe('ActivityScreen', () => {
           <ActivityScreen
             categories={[...categories, subscriptionCategory]}
             transactions={[...transactions, recurringTransaction]}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -750,7 +771,11 @@ describe('ActivityScreen', () => {
         }}
       >
         <ThemeProvider initialAppearance="light">
-          <ActivityScreen categories={categories} transactions={transactions} />
+          <ActivityScreen
+            categories={categories}
+            transactions={transactions}
+            visibleCurrencies={['EUR']}
+          />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
@@ -768,7 +793,11 @@ describe('ActivityScreen', () => {
         }}
       >
         <ThemeProvider initialAppearance="light">
-          <ActivityScreen categories={categories} transactions={transactions} />
+          <ActivityScreen
+            categories={categories}
+            transactions={transactions}
+            visibleCurrencies={['EUR']}
+          />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
@@ -807,7 +836,11 @@ describe('ActivityScreen', () => {
         }}
       >
         <ThemeProvider initialAppearance="light">
-          <ActivityScreen categories={categories} transactions={transactions} />
+          <ActivityScreen
+            categories={categories}
+            transactions={transactions}
+            visibleCurrencies={['EUR']}
+          />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
@@ -1108,6 +1141,7 @@ describe('ActivityScreen', () => {
             categories={categories}
             currency="EUR"
             transactions={[...transactions, usdTransaction]}
+            visibleCurrencies={['EUR', 'USD']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -1156,6 +1190,7 @@ describe('ActivityScreen', () => {
           <ActivityScreen
             categories={categories}
             transactions={[...transactions, olderTransaction]}
+            visibleCurrencies={['EUR']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -1199,7 +1234,11 @@ describe('ActivityScreen', () => {
         }}
       >
         <ThemeProvider initialAppearance="light">
-          <ActivityScreen categories={categories} transactions={transactions} />
+          <ActivityScreen
+            categories={categories}
+            transactions={transactions}
+            visibleCurrencies={['EUR']}
+          />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
@@ -1279,6 +1318,7 @@ describe('ActivityScreen', () => {
             onOpenCategoryDetail={onOpenCategoryDetail}
             spaceCurrency="VES"
             transactions={multiTransactions}
+            visibleCurrencies={['EUR', 'VES']}
           />
         </ThemeProvider>
       </SafeAreaProvider>,

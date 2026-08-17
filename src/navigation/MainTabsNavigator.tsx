@@ -1153,6 +1153,7 @@ export function MainTabsNavigator() {
                       targetRequestId={route.params?.requestId}
                       targetSection={route.params?.section}
                       transactions={activeSpaceTransactions}
+                      visibleCurrencies={visibleCurrencies}
                     />
                   )}
                 </Tabs.Screen>
