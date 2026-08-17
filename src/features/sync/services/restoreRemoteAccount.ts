@@ -36,11 +36,13 @@ export async function restoreRemoteAccount(input: {
   snapshot: RemoteAccountSnapshot;
 }): Promise<RestoredRemoteAccount> {
   const stored = await loadSpaces();
+  const database = await getLocalDatabase();
   const localSpaceIdByRemoteId = new Map<string, string>();
   const remoteSpaces: Space[] = [];
 
   for (const remoteSpace of input.snapshot.spaces) {
     const linked = await findLocalIdForRemoteEntity({
+      executor: database,
       userId: input.userId,
       entityType: 'space',
       remoteId: remoteSpace.remoteId,
@@ -49,6 +51,7 @@ export async function restoreRemoteAccount(input: {
       linked ??
       (remoteSpace.type === 'personal' ? 'personal' : remoteSpace.remoteId);
     await linkRemoteEntity({
+      executor: database,
       userId: input.userId,
       entityType: 'space',
       remoteId: remoteSpace.remoteId,
@@ -76,18 +79,19 @@ export async function restoreRemoteAccount(input: {
     throw new Error('La cuenta remota no tiene espacios activos');
   await saveSpaces({ spaces, activeSpaceId });
 
-  const database = await getLocalDatabase();
   const localCategoryIdByRemoteId = new Map<string, string>();
   await database.withExclusiveTransactionAsync(async (transaction) => {
     for (const remoteCategory of input.snapshot.categories) {
       const spaceId = localSpaceIdByRemoteId.get(remoteCategory.spaceRemoteId);
       if (!spaceId) continue;
       const linked = await findLocalIdForRemoteEntity({
+        executor: transaction,
         userId: input.userId,
         entityType: 'category',
         remoteId: remoteCategory.remoteId,
       });
       const categoryId = await linkRemoteEntity({
+        executor: transaction,
         userId: input.userId,
         entityType: 'category',
         remoteId: remoteCategory.remoteId,
@@ -171,6 +175,7 @@ export async function restoreRemoteAccount(input: {
       );
       if (!spaceId || !categoryId) continue;
       const transactionId = await linkRemoteEntity({
+        executor: transaction,
         userId: input.userId,
         entityType: 'transaction',
         remoteId: String(remoteTransaction.id),
