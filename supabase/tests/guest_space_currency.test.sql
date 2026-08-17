@@ -1,4 +1,5 @@
 begin;
+set local role postgres;
 select plan(17);
 
 -- 1. Existencia de la función y permisos
@@ -50,19 +51,10 @@ select is(
   'migrate_guest_data configures search_path to empty string'
 );
 
--- 3. Preparar usuario en auth.users y profile
-insert into auth.users (id, aud, role, email, created_at, updated_at)
-values ('11111111-1111-4111-8111-111111111111'::uuid, 'authenticated', 'authenticated', 'test_user@example.com', now(), now())
-on conflict (id) do nothing;
-
-insert into public.profiles (id, display_name, default_currency)
-values ('11111111-1111-4111-8111-111111111111'::uuid, 'Usuario Prueba', 'EUR')
-on conflict (id) do nothing;
-
--- 4. Ejecución de casos de prueba
+-- 3. Preparación de datos y ejecución de casos de prueba
 do $$
 declare
-  test_user_id uuid := '11111111-1111-4111-8111-111111111111'::uuid;
+  test_user_id uuid;
   batch_1 uuid := '22222222-2222-4222-8222-222222222221'::uuid;
   batch_2 uuid := '22222222-2222-4222-8222-222222222222'::uuid;
   batch_3 uuid := '22222222-2222-4222-8222-222222222223'::uuid;
@@ -72,6 +64,25 @@ declare
   batch_idempotent uuid := '22222222-2222-4222-8222-222222222299'::uuid;
   res jsonb;
 begin
+  -- En entorno local creamos el usuario en auth.users; en staging obtenemos el usuario existente de profiles
+  select id into test_user_id from public.profiles limit 1;
+  if test_user_id is null then
+    begin
+      insert into auth.users (id, aud, role, email, created_at, updated_at)
+      values ('11111111-1111-4111-8111-111111111111'::uuid, 'authenticated', 'authenticated', 'test_user@example.com', now(), now())
+      on conflict (id) do nothing;
+      test_user_id := '11111111-1111-4111-8111-111111111111'::uuid;
+    exception when others then
+      null;
+    end;
+  end if;
+
+  if test_user_id is not null then
+    insert into public.profiles (id, display_name, default_currency)
+    values (test_user_id, 'Usuario Prueba', 'EUR')
+    on conflict (id) do nothing;
+  end if;
+
   -- Configurar auth.uid() para la sesión de prueba
   perform set_config('request.jwt.claim.sub', test_user_id::text, true);
 
@@ -160,7 +171,6 @@ begin
   );
 
   -- Caso 8: Segunda ejecución con el MISMO batch_id pero payload DELIBERADAMENTE DIFERENTE
-  -- Si la rama de idempotencia funciona (retorno temprano), este payload modificado no se aplicará.
   res := public.migrate_guest_data(
     batch_idempotent,
     'install-test-1',
@@ -174,7 +184,7 @@ begin
 end;
 $$;
 
--- 5. Aserciones de verificación de estado
+-- 4. Aserciones de verificación de estado
 
 -- Inserción con VES
 select is(
@@ -245,7 +255,7 @@ select is(
   'downgraded space preserves USD currency'
 );
 
--- 6. Verificación discriminante de idempotencia
+-- 5. Verificación discriminante de idempotencia
 select is(
   (select s.name from public.spaces s
     join public.space_local_sources sls on sls.space_id = s.id
