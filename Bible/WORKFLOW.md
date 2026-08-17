@@ -89,9 +89,13 @@ Gate 1, salvo que toquen datos, dinero, acciones destructivas o
 comportamiento nativo. El régimen puede retirarse tras **cinco tareas medianas
 consecutivas** cuyo primer paquete sea aceptado por ambos verificadores sin
 devolución por hallazgo bloqueante o importante, evidencia deficiente ni alcance
-no declarado. Los hallazgos menores no reinician el contador, que empieza con la
-próxima tarea mediana posterior a esta modificación. La decisión final de
-retirarlo o prorrogarlo corresponde al responsable y debe quedar registrada.
+no declarado. Cada tarea mediana puede aportar como máximo una unidad al
+contador, y solo cuando su primer paquete sea aceptado por ambos verificadores
+sin los defectos indicados. Las reentregas, subtareas y entregas parciales de una
+tarea grande no cuentan como unidades independientes. Los hallazgos menores no
+reinician el contador, que empieza con la próxima tarea mediana posterior a esta
+modificación. La decisión final de retirarlo o prorrogarlo corresponde al
+responsable y debe quedar registrada.
 
 Cada verificador responde una de dos cosas:
 
