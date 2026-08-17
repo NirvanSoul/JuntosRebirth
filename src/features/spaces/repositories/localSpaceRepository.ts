@@ -79,19 +79,35 @@ function isLegacyV1Space(value: unknown): value is LegacyV1Space {
   );
 }
 
-function parseStoredSpaces(
-  value: string,
-  seedCurrency: CurrencyCode,
-): { state: SpacesState; needsSave: boolean } {
-  const parsed: unknown = JSON.parse(value);
+async function resolveSeedCurrency(): Promise<CurrencyCode> {
+  const preferences = await loadCurrencyPreferences();
+  const firstCurrency = preferences.currencies[0];
+  return firstCurrency && isCurrencyCode(firstCurrency)
+    ? firstCurrency
+    : defaultCurrencyCode;
+}
 
+export async function loadSpaces(): Promise<SpacesState> {
+  const stored = await AsyncStorage.getItem(spacesStorageKey);
+
+  if (stored === null) {
+    const seedCurrency = await resolveSeedCurrency();
+    const initialState: SpacesState = {
+      activeSpaceId: personalSpace.id,
+      spaces: [{ ...personalSpace, currency: seedCurrency }],
+    };
+    await saveSpaces(initialState);
+    return initialState;
+  }
+
+  const parsed: unknown = JSON.parse(stored);
   if (typeof parsed !== 'object' || parsed === null) {
     throw new Error('El catálogo de espacios guardado no es válido');
   }
 
   const record = parsed as Record<string, unknown>;
 
-  // Payload v2 vigente: debe contener currency válida en todos los espacios
+  // Payload v2 vigente: no lee preferencias, valida directamente
   if (record.version === 2) {
     const candidate = parsed as Partial<StoredSpacesState>;
     if (
@@ -104,15 +120,12 @@ function parseStoredSpaces(
     }
 
     return {
-      state: {
-        activeSpaceId: candidate.activeSpaceId,
-        spaces: candidate.spaces,
-      },
-      needsSave: false,
+      activeSpaceId: candidate.activeSpaceId,
+      spaces: candidate.spaces,
     };
   }
 
-  // Payload v1 histórico: se migra enriqueciendo cada espacio con la semilla real
+  // Payload v1 histórico: consulta preferencias para la semilla y persiste versión 2
   if (record.version === 1) {
     const candidate = parsed as Partial<LegacyV1StoredSpacesState>;
     if (
@@ -124,53 +137,34 @@ function parseStoredSpaces(
       throw new Error('El catálogo de espacios guardado no es válido');
     }
 
-    const migratedSpaces: Space[] = candidate.spaces.map((space) => ({
-      id: space.id,
-      name: space.name,
-      type: space.type,
-      currency:
-        typeof space.currency === 'string' && isCurrencyCode(space.currency)
-          ? (space.currency as CurrencyCode)
-          : seedCurrency,
-      ...(space.isAwaitingPartner !== undefined
-        ? { isAwaitingPartner: space.isAwaitingPartner }
-        : {}),
-    }));
+    const seedCurrency = await resolveSeedCurrency();
+    const migratedSpaces: Space[] = candidate.spaces.map((space) => {
+      const rawCurrency = space.currency;
+      const currency: CurrencyCode =
+        typeof rawCurrency === 'string' && isCurrencyCode(rawCurrency)
+          ? rawCurrency
+          : seedCurrency;
 
-    return {
-      state: {
-        activeSpaceId: candidate.activeSpaceId,
-        spaces: migratedSpaces,
-      },
-      needsSave: true,
+      return {
+        id: space.id,
+        name: space.name,
+        type: space.type,
+        currency,
+        ...(space.isAwaitingPartner !== undefined
+          ? { isAwaitingPartner: space.isAwaitingPartner }
+          : {}),
+      };
+    });
+
+    const migratedState: SpacesState = {
+      activeSpaceId: candidate.activeSpaceId,
+      spaces: migratedSpaces,
     };
+    await saveSpaces(migratedState);
+    return migratedState;
   }
 
   throw new Error('El catálogo de espacios guardado no es válido');
-}
-
-export async function loadSpaces(): Promise<SpacesState> {
-  const stored = await AsyncStorage.getItem(spacesStorageKey);
-  const preferences = await loadCurrencyPreferences();
-  const seedCurrency: CurrencyCode =
-    preferences.currencies[0] && isCurrencyCode(preferences.currencies[0])
-      ? preferences.currencies[0]
-      : defaultCurrencyCode;
-
-  if (stored === null) {
-    return {
-      activeSpaceId: personalSpace.id,
-      spaces: [{ ...personalSpace, currency: seedCurrency }],
-    };
-  }
-
-  const { state, needsSave } = parseStoredSpaces(stored, seedCurrency);
-
-  if (needsSave) {
-    await saveSpaces(state);
-  }
-
-  return state;
 }
 
 export async function saveSpaces(state: SpacesState): Promise<void> {

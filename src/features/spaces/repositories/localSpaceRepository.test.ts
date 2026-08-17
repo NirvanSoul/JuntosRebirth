@@ -13,11 +13,29 @@ describe('localSpaceRepository', () => {
     await AsyncStorage.clear();
   });
 
-  it('restaura el espacio personal con EUR cuando no hay datos ni preferencias guardadas', async () => {
-    await expect(loadSpaces()).resolves.toEqual(initialSpacesState);
+  it('restaura el espacio personal con EUR cuando no hay datos ni preferencias guardadas y lo persiste en disco', async () => {
+    const state = await loadSpaces();
+    expect(state).toEqual(initialSpacesState);
+
+    // Verificar que se persistió inmediatamente en AsyncStorage como versión 2
+    const raw = await AsyncStorage.getItem(localSpaceStorage.key);
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!);
+    expect(parsed).toEqual({
+      version: 2,
+      activeSpaceId: 'personal',
+      spaces: [
+        {
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+        },
+      ],
+    });
   });
 
-  it('inicializa el espacio personal con VES cuando la preferencia guardada es VES', async () => {
+  it('inicializa el espacio personal con VES cuando la preferencia guardada es VES y lo fija en disco', async () => {
     await saveCurrencyPreferences({ currencies: ['VES'] });
 
     const state = await loadSpaces();
@@ -32,6 +50,31 @@ describe('localSpaceRepository', () => {
         },
       ],
     });
+
+    // Verificar persistencia inmediata en AsyncStorage
+    const raw = await AsyncStorage.getItem(localSpaceStorage.key);
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!);
+    expect(parsed.version).toBe(2);
+    expect(parsed.spaces[0].currency).toBe('VES');
+  });
+
+  it('inmutabilidad: inicializar en VES, cambiar preferencias a EUR y recargar mantiene el espacio en VES', async () => {
+    // 1. Inicialización en VES
+    await saveCurrencyPreferences({ currencies: ['VES'] });
+    const initial = await loadSpaces();
+    expect(initial.spaces[0]!.currency).toBe('VES');
+
+    // 2. Usuario cambia preferencias posteriormente a EUR
+    await saveCurrencyPreferences({ currencies: ['EUR'] });
+
+    // 3. Recarga del catálogo: debe mantenerse inmutable en VES
+    const reloaded = await loadSpaces();
+    expect(reloaded.spaces[0]!.currency).toBe('VES');
+
+    const raw = await AsyncStorage.getItem(localSpaceStorage.key);
+    const parsed = JSON.parse(raw!);
+    expect(parsed.spaces[0].currency).toBe('VES');
   });
 
   it('guarda y restaura espacios versión 2 junto con la selección activa y sus monedas', async () => {

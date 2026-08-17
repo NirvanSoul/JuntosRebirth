@@ -59,16 +59,23 @@ export async function fetchRemoteAccountSnapshot(
   }
 
   const mappedSpaces: RemoteAccountSpace[] = spaces.map((space) => {
-    if (typeof space.currency !== 'string' || !isCurrencyCode(space.currency)) {
+    const rawCurrency = space.currency;
+    if (typeof rawCurrency !== 'string' || !isCurrencyCode(rawCurrency)) {
       throw new Error(
-        `[sync] Moneda no reconocida en espacio remoto ${space.id}: ${space.currency}`,
+        `[sync] Moneda no reconocida en espacio remoto ${String(space.id)}: ${String(rawCurrency)}`,
       );
     }
+    const rawType = space.type;
+    const type: RemoteAccountSpace['type'] =
+      rawType === 'personal' || rawType === 'couple' || rawType === 'other'
+        ? rawType
+        : 'other';
+
     return {
-      remoteId: space.id as string,
-      name: space.name as string,
-      type: space.type as RemoteAccountSpace['type'],
-      currency: space.currency as CurrencyCode,
+      remoteId: String(space.id),
+      name: String(space.name),
+      type,
+      currency: rawCurrency,
     };
   });
 

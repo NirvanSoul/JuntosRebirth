@@ -38,7 +38,14 @@ const frozenLineDebt = {
 };
 
 module.exports = defineConfig([
-  globalIgnores(['coverage/*', 'dist/*', 'android/*', 'ios/*', '.expo/*']),
+  globalIgnores([
+    'coverage/*',
+    'dist/*',
+    'android/*',
+    'ios/*',
+    '.expo/*',
+    'supabase/.temp/*',
+  ]),
   expoConfig,
   {
     rules: {

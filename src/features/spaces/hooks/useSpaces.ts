@@ -16,13 +16,19 @@ import {
 import {
   defaultCurrencyCode,
   isCurrencyCode,
-  type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 import { loadCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 
 const maxSpaceNameLength = 40;
 const defaultCoupleSpaceName = 'Juntos';
+
+export class RemoteSpaceIntegrityError extends Error {
+  override readonly name = 'RemoteSpaceIntegrityError';
+}
+
+export const remoteSpaceIntegrityErrorMessage =
+  'No pudimos comprobar tu espacio de pareja por un error de integridad.';
 
 type SpacesController = {
   activeSpace: Space;
@@ -57,17 +63,18 @@ async function fetchRemoteCoupleSpace(): Promise<Space | null> {
   }
   if (!data) return null;
 
-  if (typeof data.currency !== 'string' || !isCurrencyCode(data.currency)) {
-    throw new Error(
-      `[useSpaces] Moneda no reconocida en espacio de pareja remoto: ${data.currency}`,
+  const rawCurrency = data.currency;
+  if (typeof rawCurrency !== 'string' || !isCurrencyCode(rawCurrency)) {
+    throw new RemoteSpaceIntegrityError(
+      `Moneda no reconocida en espacio de pareja remoto: ${String(rawCurrency)}`,
     );
   }
 
   return {
-    id: data.id as string,
-    name: data.name as string,
+    id: String(data.id),
+    name: String(data.name),
     type: 'couple',
-    currency: data.currency as CurrencyCode,
+    currency: rawCurrency,
     // `activated_at` es null mientras la invitación siga sin aceptar; en cuanto
     // la otra persona entra, esta misma consulta devuelve la fecha y el espacio
     // se comporta como cualquier otro.
@@ -176,20 +183,23 @@ export function useSpaces(): SpacesController {
       remoteSpace = await fetchRemoteCoupleSpace();
     } catch (caught) {
       // Si es un error de integridad (moneda no reconocida), se registra y se fija el error
-      if (caught instanceof Error && caught.message.includes('[useSpaces]')) {
+      if (caught instanceof RemoteSpaceIntegrityError) {
         console.error(
           '[useSpaces] Error de integridad en espacio remoto:',
           caught,
         );
-        setError(
-          'No pudimos comprobar tu espacio de pareja por un error de integridad.',
-        );
+        setError(remoteSpaceIntegrityErrorMessage);
         return;
       }
       // Un hipo de red transitorio al comprobar el espacio de pareja no debe bloquear
       // el resto de la app: se reintenta en la siguiente sincronización.
       return;
     }
+
+    // Si la consulta fue exitosa, limpiamos solo el error de integridad si estaba activo
+    setError((currentError) =>
+      currentError === remoteSpaceIntegrityErrorMessage ? null : currentError,
+    );
 
     const merged = mergeRemoteCoupleSpace(stateRef.current, remoteSpace);
     if (merged === stateRef.current) return;
@@ -237,9 +247,10 @@ export function useSpaces(): SpacesController {
       }
 
       const preferences = await loadCurrencyPreferences();
+      const firstCurrency = preferences.currencies[0];
       const spaceCurrency =
-        preferences.currencies[0] && isCurrencyCode(preferences.currencies[0])
-          ? preferences.currencies[0]
+        firstCurrency && isCurrencyCode(firstCurrency)
+          ? firstCurrency
           : defaultCurrencyCode;
 
       const space: Space = {
@@ -296,9 +307,10 @@ export function useSpaces(): SpacesController {
 
       const name = rawName?.trim() || defaultCoupleSpaceName;
       const preferences = await loadCurrencyPreferences();
+      const firstCurrency = preferences.currencies[0];
       const spaceCurrency =
-        preferences.currencies[0] && isCurrencyCode(preferences.currencies[0])
-          ? preferences.currencies[0]
+        firstCurrency && isCurrencyCode(firstCurrency)
+          ? firstCurrency
           : defaultCurrencyCode;
 
       const gateway = createSupabaseInvitationGateway();

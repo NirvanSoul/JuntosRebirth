@@ -403,6 +403,61 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it('transición: limpia el error de integridad cuando una sincronización posterior devuelve datos válidos', async () => {
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    mockAuthSession(fakeSession);
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+
+    // 1. Primera consulta remota falla por moneda corrupta
+    const builder = mockRemoteCoupleSpace({
+      data: {
+        id: 'space-corrupted',
+        name: 'Juntos',
+        type: 'couple',
+        currency: 'CORRUPTED',
+        activated_at: null,
+      },
+      error: null,
+    });
+
+    const { result } = await renderHook(() => useSpaces());
+
+    await waitFor(() => {
+      expect(result.current.error).toBe(
+        'No pudimos comprobar tu espacio de pareja por un error de integridad.',
+      );
+    });
+
+    // 2. Segunda consulta remota (tras corrección en backend) devuelve datos válidos
+    builder.maybeSingle.mockResolvedValueOnce({
+      data: {
+        id: 'space-valid',
+        name: 'Juntos',
+        type: 'couple',
+        currency: 'VES',
+        activated_at: '2026-08-16T12:00:00.000Z',
+      },
+      error: null,
+    });
+
+    await act(async () => {
+      await result.current.refreshCoupleSpace();
+    });
+
+    // 3. El error de integridad debe haberse limpiado
+    expect(result.current.error).toBeNull();
+    expect(result.current.spaces.some((s) => s.id === 'space-valid')).toBe(
+      true,
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it('dissolveCoupleSpace elimina la entrada local y cae a Personal si era la activa', async () => {
     mockAuthSession(fakeSession);
     const coupleSpace: Space = {
