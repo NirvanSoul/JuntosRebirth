@@ -359,10 +359,34 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
 2. **Implementación parcial vigente (mantenida y probada):**
    - `HomeScreen.tsx:182`: Aislamiento por moneda en `categorySummaries` para no sumar importes entre divisas distintas.
    - `AddFirstTransactionStep.tsx:66, 158-164, 182-184`: Conexión de preferencias en onboarding blindada con `actionDisabled={!isReady}` y guard en `onAction` para prevenir la carrera de reinicio de draft.
-3. **Tareas 2 y 3 (Replanteadas juntas):** Exponer y propagar `spaces.currency` y `profiles.default_currency`, definir el modelo monetario de presupuestos y eliminar literales `'EUR'` fijos. *(Pendiente de clasificación formal tras evaluación del inventario §8.3).*
+3. **Tareas 2 y 3 (Clasificadas como Grande — Opción A en dos entregas):**
+   - **Distinción de 3 monedas:**
+     - `spaces.currency`: Moneda principal del espacio. Rige el presupuesto y es el valor por defecto para movimientos e importaciones.
+     - `displayCurrency` (Moneda visible): Selección temporal en Inicio o Actividad para consulta.
+     - `transaction.currency`: Moneda de cada movimiento individual.
+     - *Regla derivada:* El progreso del presupuesto solo se calcula y compara contra movimientos en `spaces.currency`.
+   - **Entrega 1 — El Modelo (Pendiente de aprobación de ficha):**
+      - Exponer `currency: CurrencyCode` en `Space`.
+      - Versionar `StoredSpacesState` a `version: 2` en AsyncStorage (`@juntoss/spaces/v1`) con migración v1→v2 que use la preferencia real interna (`loadCurrencyPreferences()`) como semilla y EUR solo como fallback de último recurso. Sin parámetro en `loadSpaces()`.
+      - Enviar `currency: CurrencyCode` obligatorio en la creación local y remota (`create_couple_space`).
+      - Soportar `currency` en `fetchRemoteAccountSnapshot` y `fetchRemoteCoupleSpace` validando con `isCurrencyCode` con error explícito registrado (sin casts ni fallbacks silenciosos ante filas remotas corruptas).
+      - Migración nueva de PostgreSQL (`23_preserve_guest_space_currency.sql`) con lógica asimétrica (INSERT usa `'EUR'` si falta; UPDATE conserva `spaces.currency` existente ante clientes antiguos sin `currency`).
+      - Sin tocar la interfaz.
+   - **Entrega 2 — El Consumo:**
+     - Agregación con `summarizeCategories(categories, transactions, currency)` donde `currency` es obligatoria y el filtrado ocurre dentro.
+     - Pantallas de Inicio y Actividad propagando su moneda visible al modal de detalle de categoría.
+     - Presupuesto calculado y comparado exclusivamente contra movimientos en `spaces.currency`.
+     - Creación e importación garantizando que `activeSpace.currency` sea la predeterminada.
+     - Sustitución de los 8 literales `'EUR'` operativos.
+   - **Fuera de alcance:**
+     - `profiles.default_currency` queda fuera de ambas entregas.
+     - `category_budgets` (SQLite local y PostgreSQL remota) sigue dormida: con una moneda principal por espacio, el presupuesto por divisa no aporta valor hasta que existan espacios multidivisa habituales.
+     - Camino heredado `categories.budget_amount_minor` (contradicción migración 08 vs 18/20) registrado como pendiente.
+     - `ensure_personal_space` no se invoca desde el cliente.
 4. **Des-silenciar subida en segundo plano (`MainTabsNavigator.tsx:352`):** Registrar fallo estructurado en `publishCoupleSpaceChanges({ spaceId }).catch(...)` (pequeña).
 5. **Indicador de novedades en el selector de espacio (mediana):** Un punto cuando hay algo nuevo en un espacio que no estás mirando, calculado con una consulta ligera al abrir la app y al volver a primer plano. Sin suscripciones ni notificaciones flotantes (`JUNTOSS_NOTIFICATIONS.md` §19).
 6. **Permisos `PUBLIC EXECUTE`:** Migración **nueva**, jamás reescribir una aplicada (pequeña).
 7. **Actualizar `space_invitations.test.sql`** al nombre de índice vigente `space_invitations_one_pending_per_target_idx` (pequeña).
+8. **Higiene de tests:** Resolver avisos de `act(...)` en la suite de onboarding `AddFirstTransactionStep.test.tsx` (pequeña).
 
 *Pendiente aparte, por contacto:* Extracción de `ImportScreen.tsx` y `AppCalendar.tsx` (§4).
