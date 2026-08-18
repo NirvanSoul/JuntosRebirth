@@ -9,6 +9,7 @@ import type {
 } from '@/features/sync/types';
 import type {
   CategorySyncRow,
+  MoneyAccountBalanceSyncRow,
   MoneyAccountSyncRow,
   SeriesSyncRow,
   SyncAccountRow,
@@ -117,41 +118,48 @@ export async function prepareLocalGuestMigration(
 
   let categories: CategorySyncRow[] = [];
   let moneyAccounts: MoneyAccountSyncRow[] = [];
+  let moneyAccountBalances: MoneyAccountBalanceSyncRow[] = [];
   let series: SeriesSyncRow[] = [];
   let transactions: TransactionSyncRow[] = [];
   const batchId = randomUUID();
   const now = new Date().toISOString();
   await database.withExclusiveTransactionAsync(async (transaction) => {
-    [categories, moneyAccounts, series, transactions] = await Promise.all([
-      transaction.getAllAsync<CategorySyncRow>(
-        `SELECT id, space_id, name, icon, color_token, budget_minor, is_default,
+    [categories, moneyAccounts, moneyAccountBalances, series, transactions] =
+      await Promise.all([
+        transaction.getAllAsync<CategorySyncRow>(
+          `SELECT id, space_id, name, icon, color_token, budget_minor, is_default,
                 template_key, source_category_id, is_archived, created_at,
                 updated_at, archived_at
            FROM categories WHERE sync_status IN ${uploadableStatuses}`,
-      ),
-      transaction.getAllAsync<MoneyAccountSyncRow>(
-        `SELECT id, space_id, name, kind, icon, color_token, currency,
+        ),
+        transaction.getAllAsync<MoneyAccountSyncRow>(
+          `SELECT id, space_id, name, kind, icon, color_token, currency,
                 opening_balance_minor, is_archived, created_at, updated_at,
                 archived_at
            FROM money_accounts WHERE sync_status IN ${uploadableStatuses}`,
-      ),
-      transaction.getAllAsync<SeriesSyncRow>(
-        `SELECT id, space_id, category_id, money_account_id, type, amount_minor,
+        ),
+        transaction.getAllAsync<MoneyAccountBalanceSyncRow>(
+          `SELECT money_account_id, currency, opening_balance_minor, position
+           FROM money_account_balances
+          ORDER BY position ASC`,
+        ),
+        transaction.getAllAsync<SeriesSyncRow>(
+          `SELECT id, space_id, category_id, money_account_id, type, amount_minor,
                 currency, title,
                 frequency, starts_on, generated_occurrences, next_occurrence_on,
                 is_archived, created_at, updated_at, archived_at
            FROM recurring_transaction_series
           WHERE sync_status IN ${uploadableStatuses}`,
-      ),
-      transaction.getAllAsync<TransactionSyncRow>(
-        `SELECT id, space_id, category_id, money_account_id, type, amount_minor,
+        ),
+        transaction.getAllAsync<TransactionSyncRow>(
+          `SELECT id, space_id, category_id, money_account_id, type, amount_minor,
                 currency, title,
                 occurred_on, recurrence, recurrence_group_id,
                 recurrence_series_id, source_transaction_id, is_archived,
                 created_at, updated_at, archived_at
            FROM transactions WHERE sync_status IN ${uploadableStatuses}`,
-      ),
-    ]);
+        ),
+      ]);
     assertSpacesCoverPayload(
       spaces,
       categories,
@@ -228,7 +236,13 @@ export async function prepareLocalGuestMigration(
       icon: row.icon,
       colorToken: row.color_token,
       currency: row.currency,
-      openingBalanceMinor: row.opening_balance_minor,
+      balances: moneyAccountBalances
+        .filter((balance) => balance.money_account_id === row.id)
+        .map((balance) => ({
+          currency: balance.currency,
+          openingBalanceMinor: balance.opening_balance_minor,
+          position: balance.position,
+        })),
       isArchived: row.is_archived === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

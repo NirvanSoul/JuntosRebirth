@@ -3,7 +3,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import { getMoneyAccountKindLabel } from '@/features/accounts/constants/moneyAccountKindDefinitions';
-import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
+import {
+  getPrimaryBalance,
+  type MoneyAccountSummary,
+} from '@/features/accounts/utils/moneyAccountSummary';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import {
   categoryColors,
@@ -23,11 +26,13 @@ export function MoneyAccountRow({ account, onPress }: MoneyAccountRowProps) {
   const styles = useThemedStyles(createStyles);
   const accountColor = categoryColors[account.colorToken];
   const contentContrast = getCategoryContentContrast(account.colorToken);
+  const primary = getPrimaryBalance(account);
   const balance = formatCurrency(
-    account.balanceMinor,
-    account.currency,
+    primary.balanceMinor,
+    primary.currency,
     'es-ES',
   );
+  const extraCurrencyCount = account.balanceByCurrency.length - 1;
 
   return (
     <Pressable
@@ -50,7 +55,9 @@ export function MoneyAccountRow({ account, onPress }: MoneyAccountRowProps) {
           {account.name}
         </Text>
         <Text numberOfLines={1} tone="secondary" variant="caption">
-          {getMoneyAccountKindLabel(account.kind)}
+          {extraCurrencyCount > 0
+            ? `${getMoneyAccountKindLabel(account.kind)} · ${extraCurrencyCount + 1} monedas`
+            : getMoneyAccountKindLabel(account.kind)}
         </Text>
       </View>
       <Text numberOfLines={1} variant="label" weight="semibold">

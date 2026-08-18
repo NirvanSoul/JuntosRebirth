@@ -195,4 +195,53 @@ export async function applyMoneyAccountMigrations(
     await recreateRemoteEntityLinksWithMoneyAccounts(transaction);
   if (currentVersion < 22) await reduceMoneyAccountKinds(transaction);
   if (currentVersion < 23) await repairMoneyAccountReferences(transaction);
+  if (currentVersion < 24) await createMoneyAccountBalancesSchema(transaction);
+}
+
+/**
+ * Una cuenta puede guardar varias monedas (versión local 24).
+ *
+ * Hay bancos que mantienen divisas distintas dentro de la misma cuenta, y cada
+ * una lleva su propio saldo: sumarlas no significaría nada. La tabla hija
+ * sigue el patrón de `category_budgets`, que ya resuelve lo mismo para los
+ * presupuestos.
+ *
+ * `money_accounts.currency` se conserva como moneda principal —la que encabeza
+ * la tarjeta y se propone al registrar un movimiento—, pero el saldo inicial
+ * deja de leerse de `money_accounts.opening_balance_minor`: a partir de aquí
+ * vive siempre en esta tabla, incluida la moneda principal, para no repetir el
+ * error de mantener dos fuentes de verdad.
+ *
+ * El bloque es idempotente a propósito: mientras la escalera está en obras,
+ * una recarga a medias no debe dejar la base en un estado que obligue a
+ * borrarla entera.
+ */
+export async function createMoneyAccountBalancesSchema(
+  transaction: SQLite.SQLiteDatabase,
+): Promise<void> {
+  await transaction.execAsync(`
+    CREATE TABLE IF NOT EXISTS money_account_balances (
+      id TEXT PRIMARY KEY NOT NULL,
+      money_account_id TEXT NOT NULL,
+      currency TEXT NOT NULL,
+      opening_balance_minor INTEGER NOT NULL DEFAULT 0,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (money_account_id, currency),
+      FOREIGN KEY (money_account_id)
+        REFERENCES money_accounts(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS money_account_balances_account_idx
+      ON money_account_balances(money_account_id, position);
+
+    INSERT OR IGNORE INTO money_account_balances (
+      id, money_account_id, currency, opening_balance_minor, position,
+      created_at, updated_at
+    )
+    SELECT 'primary-balance-' || id, id, currency, opening_balance_minor, 0,
+           created_at, updated_at
+      FROM money_accounts;
+  `);
 }

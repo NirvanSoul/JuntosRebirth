@@ -80,16 +80,22 @@ export function TransactionMoneyAccountPickerModal({
             onPress={() => setDraftMoneyAccountId(undefined)}
             selected={draftMoneyAccountId === undefined}
           />
-          {accounts.map((account) => (
-            <SelectableOption
-              accessibilityLabel={`${account.name} · ${account.currency}`}
-              indicatorTestID={`transaction-money-account-${account.id}-check`}
-              key={account.id}
-              label={`${account.name} · ${account.currency}`}
-              onPress={() => setDraftMoneyAccountId(account.id)}
-              selected={draftMoneyAccountId === account.id}
-            />
-          ))}
+          {accounts.map((account) => {
+            const currencies = account.balances
+              .map((balance) => balance.currency)
+              .join(', ');
+
+            return (
+              <SelectableOption
+                accessibilityLabel={`${account.name} · ${currencies}`}
+                indicatorTestID={`transaction-money-account-${account.id}-check`}
+                key={account.id}
+                label={`${account.name} · ${currencies}`}
+                onPress={() => setDraftMoneyAccountId(account.id)}
+                selected={draftMoneyAccountId === account.id}
+              />
+            );
+          })}
         </View>
 
         {onCreateMoneyAccount ? (

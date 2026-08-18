@@ -348,6 +348,14 @@ moneda se valida entonces en `localTransactionRepository`
 (`assertMoneyAccountAssignment`), y en Postgres, que es la autoridad real, la
 migración 28 sí declara la foránea compuesta.
 
+La versión 24 añade `money_account_balances`: una cuenta puede guardar varias
+monedas, como hace un banco, y cada una lleva su propio saldo inicial. Sigue el
+patrón de `category_budgets`. `money_accounts.currency` se conserva como moneda
+principal —la que encabeza la tarjeta y se propone al registrar un
+movimiento—, pero `money_accounts.opening_balance_minor` deja de leerse: el
+saldo inicial vive siempre en la tabla hija, incluida la moneda principal, para
+no mantener dos fuentes del mismo dato.
+
 La versión 23 repara la foránea que dejó colgando la versión 22. Al
 reconstruir `money_accounts` con `ALTER TABLE ... RENAME`, SQLite reescribió
 las referencias de `transactions` y `recurring_transaction_series` para que
@@ -685,8 +693,10 @@ Reglas:
 
 - La cuenta pertenece a un espacio, igual que la categoría: ambos miembros la
   ven y solo su autor la edita o archiva.
-- La moneda queda fijada en la cuenta y elegirla fija la del movimiento, de
-  modo que un saldo nunca mezcla divisas.
+- Una cuenta puede guardar varias monedas (`money_account_balances`), cada una
+  con su saldo. Nunca se suman entre sí: un total mezclando divisas no
+  significaría nada mientras no exista conversión.
+- Un movimiento solo puede asignarse a una cuenta que guarde su misma moneda.
 - La moneda solo puede cambiarse mientras la cuenta no tenga movimientos ni
   series asignados; después reinterpretaría dinero ya registrado.
 - El saldo es saldo inicial más ingresos menos gastos asignados, con la misma

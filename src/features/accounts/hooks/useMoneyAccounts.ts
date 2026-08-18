@@ -113,10 +113,9 @@ export function useMoneyAccounts({
             kind: input.kind,
             icon: input.icon,
             colorToken: input.colorToken,
-            currency: isCurrencyLocked
-              ? currentAccount.currency
-              : input.currency,
-            openingBalanceMinor: input.openingBalanceMinor,
+            balances: isCurrencyLocked
+              ? currentAccount.balances
+              : input.balances,
           });
           setMoneyAccounts((current) =>
             current.map((account) =>

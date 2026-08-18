@@ -11,8 +11,7 @@ const account: MoneyAccount = {
   kind: 'bank',
   icon: 'bank',
   colorToken: 'blue',
-  currency: 'EUR',
-  openingBalanceMinor: 100000,
+  balances: [{ currency: 'EUR', openingBalanceMinor: 100000 }],
   isArchived: false,
 };
 
@@ -47,12 +46,13 @@ describe('summarizeMoneyAccounts', () => {
       referenceDate,
     );
 
-    expect(summary).toMatchObject({
+    expect(summary?.balanceByCurrency[0]).toMatchObject({
+      currency: 'EUR',
       balanceMinor: 100000 - 2500 + 40000,
       expenseMinor: 2500,
       incomeMinor: 40000,
-      transactionCount: 2,
     });
+    expect(summary?.transactionCount).toBe(2);
   });
 
   it('ignora los movimientos sin cuenta y los de otra cuenta', () => {
@@ -65,10 +65,8 @@ describe('summarizeMoneyAccounts', () => {
       referenceDate,
     );
 
-    expect(summary).toMatchObject({
-      balanceMinor: 100000,
-      transactionCount: 0,
-    });
+    expect(summary?.balanceByCurrency[0]?.balanceMinor).toBe(100000);
+    expect(summary?.transactionCount).toBe(0);
   });
 
   it('no mezcla divisas en un mismo saldo', () => {
@@ -78,7 +76,9 @@ describe('summarizeMoneyAccounts', () => {
       referenceDate,
     );
 
-    expect(summary).toMatchObject({ balanceMinor: 100000 });
+    // La divisa ajena no entra en el saldo de una cuenta que no la guarda.
+    expect(summary?.balanceByCurrency[0]?.balanceMinor).toBe(100000);
+    expect(summary?.balanceByCurrency).toHaveLength(1);
   });
 
   it('incluye una fecha futura de este mes y excluye la del mes siguiente', () => {
@@ -91,19 +91,49 @@ describe('summarizeMoneyAccounts', () => {
       referenceDate,
     );
 
-    expect(summary).toMatchObject({
-      balanceMinor: 100000 - 1000,
-      transactionCount: 1,
-    });
+    expect(summary?.balanceByCurrency[0]?.balanceMinor).toBe(100000 - 1000);
+    expect(summary?.transactionCount).toBe(1);
   });
 
   it('deja el saldo en negativo cuando el gasto supera lo disponible', () => {
     const [summary] = summarizeMoneyAccounts(
-      [{ ...account, openingBalanceMinor: 0, kind: 'card' }],
+      [
+        {
+          ...account,
+          kind: 'card',
+          balances: [{ currency: 'EUR', openingBalanceMinor: 0 }],
+        },
+      ],
       [createTransaction({ amountMinor: 30000 })],
       referenceDate,
     );
 
-    expect(summary?.balanceMinor).toBe(-30000);
+    expect(summary?.balanceByCurrency[0]?.balanceMinor).toBe(-30000);
+  });
+
+  it('lleva un saldo independiente por cada moneda de la cuenta', () => {
+    const multiCurrency = {
+      ...account,
+      balances: [
+        { currency: 'EUR' as const, openingBalanceMinor: 100000 },
+        { currency: 'USD' as const, openingBalanceMinor: 50000 },
+      ],
+    };
+
+    const [summary] = summarizeMoneyAccounts(
+      [multiCurrency],
+      [
+        createTransaction({ id: 'a', amountMinor: 2500 }),
+        createTransaction({ id: 'b', amountMinor: 1000, currency: 'USD' }),
+      ],
+      referenceDate,
+    );
+
+    // Cada divisa se calcula por separado: sumarlas no significaría nada.
+    expect(summary?.balanceByCurrency).toEqual([
+      expect.objectContaining({ currency: 'EUR', balanceMinor: 97500 }),
+      expect.objectContaining({ currency: 'USD', balanceMinor: 49000 }),
+    ]);
+    expect(summary?.transactionCount).toBe(2);
   });
 });

@@ -707,7 +707,9 @@ describe('localTransactionRepository', () => {
     const accountDraft = { ...draft, moneyAccountId: 'account-1' };
 
     it('guarda y restaura la cuenta del movimiento', async () => {
-      getFirstAsync.mockResolvedValueOnce({ currency: 'EUR' });
+      getFirstAsync
+        .mockResolvedValueOnce({ id: 'account-1' })
+        .mockResolvedValueOnce({ currency: 'EUR' });
 
       const [created] = await createLocalTransaction(accountDraft);
 
@@ -768,11 +770,13 @@ describe('localTransactionRepository', () => {
       expect(runAsync).not.toHaveBeenCalled();
     });
 
-    it('rechaza un movimiento en una moneda distinta a la de su cuenta', async () => {
-      getFirstAsync.mockResolvedValueOnce({ currency: 'USD' });
+    it('rechaza un movimiento en una moneda que su cuenta no guarda', async () => {
+      getFirstAsync
+        .mockResolvedValueOnce({ id: 'account-1' })
+        .mockResolvedValueOnce(undefined);
 
       await expect(createLocalTransaction(accountDraft)).rejects.toThrow(
-        'El movimiento debe usar la moneda de su cuenta',
+        'El movimiento debe usar una moneda de su cuenta',
       );
       expect(runAsync).not.toHaveBeenCalled();
     });
@@ -832,6 +836,7 @@ describe('localTransactionRepository', () => {
     it('asigna una cuenta sin tocar el resto del movimiento', async () => {
       getFirstAsync
         .mockResolvedValueOnce({ currency: 'EUR' })
+        .mockResolvedValueOnce({ id: 'account-1' })
         .mockResolvedValueOnce({ currency: 'EUR' });
 
       await updateLocalTransactionMoneyAccount(
@@ -870,10 +875,11 @@ describe('localTransactionRepository', () => {
       expect(moneyAccountId).toBeNull();
     });
 
-    it('rechaza una cuenta en otra moneda que la del movimiento', async () => {
+    it('rechaza una cuenta que no guarda la moneda del movimiento', async () => {
       getFirstAsync
         .mockResolvedValueOnce({ currency: 'EUR' })
-        .mockResolvedValueOnce({ currency: 'USD' });
+        .mockResolvedValueOnce({ id: 'account-1' })
+        .mockResolvedValueOnce(undefined);
 
       await expect(
         updateLocalTransactionMoneyAccount(
@@ -881,7 +887,7 @@ describe('localTransactionRepository', () => {
           'personal',
           'account-1',
         ),
-      ).rejects.toThrow('El movimiento debe usar la moneda de su cuenta');
+      ).rejects.toThrow('El movimiento debe usar una moneda de su cuenta');
       expect(runAsync).not.toHaveBeenCalled();
     });
 

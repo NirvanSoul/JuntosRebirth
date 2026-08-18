@@ -30,8 +30,7 @@ const account: MoneyAccount = {
   kind: 'bank',
   icon: 'bank',
   colorToken: 'blue',
-  currency: 'EUR',
-  openingBalanceMinor: 100000,
+  balances: [{ currency: 'EUR', openingBalanceMinor: 100000 }],
   isArchived: false,
 };
 
@@ -111,7 +110,7 @@ describe('MoneyAccountDetailModal', () => {
     expect(
       screen.getByTestId('money-account-detail-balance').props.children,
     ).toBe(formatCurrency(100000 - 2500, 'EUR', 'es-ES'));
-    expect(screen.getByTestId('money-account-opening-metric')).toBeTruthy();
+    expect(screen.getByTestId('money-account-metrics-EUR')).toBeTruthy();
   });
 
   it('lista solo los movimientos asignados a la cuenta', async () => {
@@ -147,5 +146,20 @@ describe('MoneyAccountDetailModal', () => {
     const screen = await renderModal({ account: null });
 
     expect(screen.queryByTestId('money-account-detail-modal')).toBeNull();
+  });
+
+  it('enseña un bloque de saldo por cada moneda de la cuenta', async () => {
+    const screen = await renderModal({
+      account: {
+        ...account,
+        balances: [
+          { currency: 'EUR' as const, openingBalanceMinor: 100000 },
+          { currency: 'USD' as const, openingBalanceMinor: 50000 },
+        ],
+      },
+    });
+
+    expect(screen.getByTestId('money-account-metrics-EUR')).toBeTruthy();
+    expect(screen.getByTestId('money-account-metrics-USD')).toBeTruthy();
   });
 });

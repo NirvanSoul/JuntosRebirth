@@ -13,7 +13,7 @@ import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabase
  * versión, de modo que la escalera es acumulativa y ningún bloque se
  * reejecuta.
  */
-export const localDatabaseVersion = 23;
+export const localDatabaseVersion = 24;
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,

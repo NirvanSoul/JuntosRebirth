@@ -4,6 +4,10 @@ import { syncCoupleSpaceRemotely } from '@/features/sync/gateways/supabaseCouple
 
 type SyncRow = { id: string; updated_at: string } & Record<string, unknown>;
 
+type MoneyAccountBalanceRow = {
+  money_account_id: string;
+} & Record<string, unknown>;
+
 type CoupleSpaceSyncResult = {
   categoryCount: number;
   moneyAccountCount: number;
@@ -54,28 +58,42 @@ async function syncCoupleSpaceData(input: {
 }): Promise<CoupleSpaceSyncResult> {
   const database = await getLocalDatabase();
   const installationId = await getOrCreateInstallationId(database);
-  const [categories, moneyAccounts, recurringSeries, transactions] =
-    await Promise.all([
-      database.getAllAsync<SyncRow>(
-        `SELECT id, name, icon, color_token AS "colorToken",
+  const [
+    categories,
+    moneyAccounts,
+    moneyAccountBalances,
+    recurringSeries,
+    transactions,
+  ] = await Promise.all([
+    database.getAllAsync<SyncRow>(
+      `SELECT id, name, icon, color_token AS "colorToken",
               budget_minor AS "budgetMinor", is_default AS "isDefault",
               template_key AS "templateKey", is_archived AS "isArchived",
               created_at AS "createdAt", updated_at
          FROM categories
         WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
-        input.spaceId,
-      ),
-      database.getAllAsync<SyncRow>(
-        `SELECT id, name, kind, icon, color_token AS "colorToken", currency,
-              opening_balance_minor AS "openingBalanceMinor",
+      input.spaceId,
+    ),
+    database.getAllAsync<SyncRow>(
+      `SELECT id, name, kind, icon, color_token AS "colorToken", currency,
               is_archived AS "isArchived", created_at AS "createdAt",
               updated_at
          FROM money_accounts
         WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
-        input.spaceId,
-      ),
-      database.getAllAsync<SyncRow>(
-        `SELECT id, category_id AS "categoryId",
+      input.spaceId,
+    ),
+    database.getAllAsync<MoneyAccountBalanceRow>(
+      `SELECT money_account_id, currency,
+              opening_balance_minor AS "openingBalanceMinor", position
+         FROM money_account_balances
+        WHERE money_account_id IN (
+          SELECT id FROM money_accounts WHERE space_id = ?
+        )
+        ORDER BY position ASC`,
+      input.spaceId,
+    ),
+    database.getAllAsync<SyncRow>(
+      `SELECT id, category_id AS "categoryId",
               money_account_id AS "moneyAccountId", type,
               amount_minor AS "amountMinor", currency, title,
               frequency, starts_on AS "startsOn",
@@ -84,10 +102,10 @@ async function syncCoupleSpaceData(input: {
               is_archived AS "isArchived", created_at AS "createdAt", updated_at
          FROM recurring_transaction_series
         WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
-        input.spaceId,
-      ),
-      database.getAllAsync<SyncRow>(
-        `SELECT id, category_id AS "categoryId",
+      input.spaceId,
+    ),
+    database.getAllAsync<SyncRow>(
+      `SELECT id, category_id AS "categoryId",
               money_account_id AS "moneyAccountId", type,
               amount_minor AS "amountMinor", currency, title,
               occurred_on AS "occurredOn", recurrence,
@@ -97,9 +115,9 @@ async function syncCoupleSpaceData(input: {
               is_archived AS "isArchived", created_at AS "createdAt", updated_at
          FROM transactions
         WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
-        input.spaceId,
-      ),
-    ]);
+      input.spaceId,
+    ),
+  ]);
 
   if (
     categories.length === 0 &&
@@ -119,7 +137,14 @@ async function syncCoupleSpaceData(input: {
     installationId,
     spaceId: input.spaceId,
     categories: categories.map(serializeRow),
-    moneyAccounts: moneyAccounts.map(serializeRow),
+    // Cada cuenta viaja con sus monedas: el RPC las reescribe enteras, así
+    // que una divisa retirada aquí desaparece también en el otro dispositivo.
+    moneyAccounts: moneyAccounts.map((row) => ({
+      ...serializeRow(row),
+      balances: moneyAccountBalances
+        .filter((balance) => balance.money_account_id === row.id)
+        .map(({ money_account_id: _accountId, ...balance }) => balance),
+    })),
     recurringSeries: recurringSeries.map(serializeRow),
     transactions: transactions.map(serializeRow),
   });

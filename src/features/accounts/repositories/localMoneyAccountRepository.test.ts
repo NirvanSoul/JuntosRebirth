@@ -23,13 +23,17 @@ jest.mock('expo-crypto', () => ({
 }));
 
 describe('localMoneyAccountRepository', () => {
-  const runAsync = jest.fn(async () => ({ changes: 1, lastInsertRowId: 0 }));
+  const runAsync = jest.fn(async (..._args: unknown[]) => ({
+    changes: 1,
+    lastInsertRowId: 0,
+  }));
   const getAllAsync = jest.fn();
   const getFirstAsync = jest.fn();
   const database = {
     getAllAsync,
     getFirstAsync,
     runAsync,
+    withExclusiveTransactionAsync: jest.fn(async (task) => task(database)),
   } as unknown as SQLiteDatabase;
 
   beforeEach(() => {
@@ -37,15 +41,14 @@ describe('localMoneyAccountRepository', () => {
     mockGetLocalDatabase.mockResolvedValue(database);
   });
 
-  it('crea una cuenta con UUID y conserva su identidad al recargarla', async () => {
+  it('crea una cuenta con su moneda y la restaura desde las dos tablas', async () => {
     const created = await createLocalMoneyAccount({
       spaceId: 'personal',
       name: '  Cuenta nómina  ',
       kind: 'bank',
       icon: 'bank',
       colorToken: 'blue',
-      currency: 'EUR',
-      openingBalanceMinor: 125000,
+      balances: [{ currency: 'EUR', openingBalanceMinor: 125000 }],
     });
 
     expect(created).toEqual({
@@ -55,21 +58,16 @@ describe('localMoneyAccountRepository', () => {
       kind: 'bank',
       icon: 'bank',
       colorToken: 'blue',
-      currency: 'EUR',
-      openingBalanceMinor: 125000,
+      balances: [{ currency: 'EUR', openingBalanceMinor: 125000 }],
       isArchived: false,
     });
     expect(runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO money_accounts'),
-      '00000000-0000-4000-8000-000000000001',
-      'personal',
-      'Cuenta nómina',
-      'bank',
-      'bank',
-      'blue',
+      expect.stringContaining('INSERT INTO money_account_balances'),
+      `${created.id}--EUR`,
+      created.id,
       'EUR',
       125000,
-      'installation-id',
+      0,
       expect.any(String),
       expect.any(String),
     );
@@ -82,27 +80,44 @@ describe('localMoneyAccountRepository', () => {
         kind: 'bank',
         icon: 'bank',
         color_token: 'blue',
+        is_archived: 0,
+      },
+    ]);
+    getAllAsync.mockResolvedValueOnce([
+      {
+        money_account_id: created.id,
         currency: 'EUR',
         opening_balance_minor: 125000,
-        is_archived: 0,
       },
     ]);
 
     await expect(listLocalMoneyAccounts()).resolves.toEqual([created]);
   });
 
-  it('admite un saldo inicial negativo para una tarjeta de crédito', async () => {
+  // Un banco puede guardar varias divisas dentro de la misma cuenta.
+  it('guarda una moneda por saldo y conserva su orden', async () => {
     const created = await createLocalMoneyAccount({
       spaceId: 'personal',
-      name: 'Visa',
-      kind: 'card',
-      icon: 'credit-card',
-      colorToken: 'violet',
-      currency: 'EUR',
-      openingBalanceMinor: -45000,
+      name: 'Cuenta multidivisa',
+      kind: 'bank',
+      icon: 'bank',
+      colorToken: 'blue',
+      balances: [
+        { currency: 'EUR', openingBalanceMinor: 100000 },
+        { currency: 'USD', openingBalanceMinor: -2500 },
+      ],
     });
 
-    expect(created.openingBalanceMinor).toBe(-45000);
+    expect(created.balances).toHaveLength(2);
+    const positions = runAsync.mock.calls
+      .filter(([sql]) =>
+        String(sql).includes('INSERT INTO money_account_balances'),
+      )
+      .map((call) => [call[3], call[5]]);
+    expect(positions).toEqual([
+      ['EUR', 0],
+      ['USD', 1],
+    ]);
   });
 
   it('rechaza una moneda que no está en el catálogo', async () => {
@@ -113,11 +128,39 @@ describe('localMoneyAccountRepository', () => {
         kind: 'bank',
         icon: 'bank',
         colorToken: 'blue',
-        currency: 'XXX' as 'EUR',
-        openingBalanceMinor: 0,
+        balances: [{ currency: 'XXX' as 'EUR', openingBalanceMinor: 0 }],
       }),
     ).rejects.toThrow('La moneda de la cuenta no está reconocida');
     expect(runAsync).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una cuenta sin ninguna moneda', async () => {
+    await expect(
+      createLocalMoneyAccount({
+        spaceId: 'personal',
+        name: 'Cuenta vacía',
+        kind: 'cash',
+        icon: 'money',
+        colorToken: 'emerald',
+        balances: [],
+      }),
+    ).rejects.toThrow('La cuenta necesita al menos una moneda');
+  });
+
+  it('rechaza la misma moneda repetida', async () => {
+    await expect(
+      createLocalMoneyAccount({
+        spaceId: 'personal',
+        name: 'Cuenta',
+        kind: 'bank',
+        icon: 'bank',
+        colorToken: 'blue',
+        balances: [
+          { currency: 'EUR', openingBalanceMinor: 0 },
+          { currency: 'EUR', openingBalanceMinor: 100 },
+        ],
+      }),
+    ).rejects.toThrow('La cuenta no puede repetir una moneda');
   });
 
   it('rechaza un saldo inicial con decimales', async () => {
@@ -128,13 +171,12 @@ describe('localMoneyAccountRepository', () => {
         kind: 'cash',
         icon: 'money',
         colorToken: 'emerald',
-        currency: 'EUR',
-        openingBalanceMinor: 10.5,
+        balances: [{ currency: 'EUR', openingBalanceMinor: 10.5 }],
       }),
     ).rejects.toThrow('El saldo inicial debe expresarse en unidades menores');
   });
 
-  it('no degrada a pendiente una cuenta que nunca salió del dispositivo', async () => {
+  it('reescribe las monedas al editar en vez de acumularlas', async () => {
     await updateLocalMoneyAccount({
       id: 'account-1',
       spaceId: 'personal',
@@ -142,14 +184,16 @@ describe('localMoneyAccountRepository', () => {
       kind: 'cash',
       icon: 'money',
       colorToken: 'emerald',
-      currency: 'EUR',
-      openingBalanceMinor: 0,
+      balances: [{ currency: 'EUR', openingBalanceMinor: 0 }],
       isArchived: false,
     });
 
-    const [sql] = runAsync.mock.calls[0] as unknown as [string];
-    expect(sql).toContain("WHEN sync_status = 'local_only' THEN 'local_only'");
-    expect(sql).toContain("ELSE 'pending'");
+    const statements = runAsync.mock.calls.map(([sql]) => String(sql));
+    expect(statements[0]).toContain(
+      "WHEN sync_status = 'local_only' THEN 'local_only'",
+    );
+    expect(statements[1]).toContain('DELETE FROM money_account_balances');
+    expect(statements[2]).toContain('INSERT INTO money_account_balances');
   });
 
   it('avisa cuando la cuenta ya no está disponible al archivarla', async () => {
@@ -169,9 +213,14 @@ describe('localMoneyAccountRepository', () => {
         kind: 'crypto',
         icon: 'bank',
         color_token: 'blue',
+        is_archived: 0,
+      },
+    ]);
+    getAllAsync.mockResolvedValueOnce([
+      {
+        money_account_id: 'account-1',
         currency: 'EUR',
         opening_balance_minor: 0,
-        is_archived: 0,
       },
     ]);
 

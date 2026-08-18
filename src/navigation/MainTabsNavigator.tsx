@@ -25,6 +25,7 @@ import { CreateCategoryModal } from '@/features/categories/components/CreateCate
 import { MoneyAccountModals } from '@/features/accounts/components/MoneyAccountModals';
 import { useMoneyAccounts } from '@/features/accounts/hooks/useMoneyAccounts';
 import { listLocalMoneyAccounts } from '@/features/accounts/repositories/localMoneyAccountRepository';
+import { moneyAccountSupportsCurrency } from '@/features/accounts/types';
 import {
   createDefaultCategoryInputForSpace,
   type DefaultCategoryDefinition,
@@ -970,8 +971,8 @@ export function MainTabsNavigator() {
    * significado al entrar en un saldo.
    */
   const assignableMoneyAccounts = detailTransaction
-    ? moneyAccountsController.activeSpaceMoneyAccounts.filter(
-        (account) => account.currency === detailTransaction.currency,
+    ? moneyAccountsController.activeSpaceMoneyAccounts.filter((account) =>
+        moneyAccountSupportsCurrency(account, detailTransaction.currency),
       )
     : [];
 

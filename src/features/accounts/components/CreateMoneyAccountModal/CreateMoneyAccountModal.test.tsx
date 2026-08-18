@@ -30,8 +30,7 @@ const account: MoneyAccount = {
   kind: 'bank',
   icon: 'bank',
   colorToken: 'blue',
-  currency: 'EUR',
-  openingBalanceMinor: 125000,
+  balances: [{ currency: 'EUR', openingBalanceMinor: 125000 }],
   isArchived: false,
 };
 
@@ -71,8 +70,7 @@ describe('CreateMoneyAccountModal', () => {
         spaceId: 'personal',
         name: 'Efectivo',
         kind: 'cash',
-        currency: 'EUR',
-        openingBalanceMinor: 25000,
+        balances: [{ currency: 'EUR', openingBalanceMinor: 25000 }],
       }),
     );
   });
@@ -90,7 +88,9 @@ describe('CreateMoneyAccountModal', () => {
     await fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ openingBalanceMinor: -45000 }),
+      expect.objectContaining({
+        balances: [{ currency: 'EUR', openingBalanceMinor: -45000 }],
+      }),
     );
   });
 
@@ -110,7 +110,9 @@ describe('CreateMoneyAccountModal', () => {
     await fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ openingBalanceMinor: -45050 }),
+      expect.objectContaining({
+        balances: [{ currency: 'EUR', openingBalanceMinor: -45050 }],
+      }),
     );
   });
 
@@ -153,7 +155,7 @@ describe('CreateMoneyAccountModal', () => {
     });
 
     expect(
-      screen.getByText('No se puede cambiar: la cuenta ya tiene movimientos.'),
+      screen.getByText('No se pueden cambiar: la cuenta ya tiene movimientos.'),
     ).toBeTruthy();
 
     await fireEvent.press(
@@ -162,8 +164,11 @@ describe('CreateMoneyAccountModal', () => {
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
     await fireEvent.press(screen.getByLabelText('Guardar cambios de cuenta'));
 
+    // La cuenta conserva exactamente las monedas que ya tenía.
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ currency: 'EUR' }),
+      expect.objectContaining({
+        balances: [{ currency: 'EUR', openingBalanceMinor: 125000 }],
+      }),
     );
   });
 
@@ -178,10 +183,54 @@ describe('CreateMoneyAccountModal', () => {
 
   it('precarga el signo de una cuenta que arrastra deuda', async () => {
     const screen = await renderModal({
-      account: { ...account, openingBalanceMinor: -45000 },
+      account: {
+        ...account,
+        balances: [{ currency: 'EUR' as const, openingBalanceMinor: -45000 }],
+      },
       accounts: [account],
     });
 
     expect(screen.getByLabelText('Saldo inicial').props.value).toBe('-450');
+  });
+
+  it('permite marcar varias monedas y dar a cada una su saldo', async () => {
+    const onSubmit = jest.fn();
+    const screen = await renderModal({ onSubmit });
+
+    await fireEvent.changeText(
+      screen.getByLabelText('Nombre de la cuenta'),
+      'Cuenta multidivisa',
+    );
+    await fireEvent.press(
+      screen.getByLabelText('🇺🇸 Dólar estadounidense (USD)'),
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText('Saldo inicial en EUR'),
+      '1000',
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText('Saldo inicial en USD'),
+      '-250',
+    );
+    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
+    await fireEvent.press(screen.getByLabelText('Crear cuenta'));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        balances: [
+          { currency: 'EUR', openingBalanceMinor: 100000 },
+          { currency: 'USD', openingBalanceMinor: -25000 },
+        ],
+      }),
+    );
+  });
+
+  it('no deja quedarse sin ninguna moneda', async () => {
+    const screen = await renderModal();
+
+    await fireEvent.press(screen.getByLabelText('🇪🇺 Euro (EUR)'));
+
+    // Sin moneda no habría saldo que calcular, así que la última no se quita.
+    expect(screen.getByLabelText('Saldo inicial')).toBeTruthy();
   });
 });

@@ -16,7 +16,11 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
-import type { MoneyAccount } from '@/features/accounts/types';
+import {
+  getPrimaryMoneyAccountCurrency,
+  moneyAccountSupportsCurrency,
+  type MoneyAccount,
+} from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
 import type {
   CreateTransactionDraft,
@@ -942,14 +946,20 @@ export function CreateTransactionModal({
         onCreateMoneyAccount={onCreateMoneyAccount}
         onSelectMoneyAccount={(selectedId) => {
           setMoneyAccountId(selectedId);
-          // Elegir cuenta fija la moneda del movimiento; quitarla devuelve la
-          // del espacio sin tocar el importe ya escrito.
           const account = selectedId
             ? selectableMoneyAccounts.find(
                 (candidate) => candidate.id === selectedId,
               )
             : undefined;
-          setCurrency(account?.currency ?? spaceCurrency);
+          // El movimiento tiene que quedar en una moneda que la cuenta
+          // guarde. Si ya está en una de ellas se conserva —una cuenta con
+          // varias divisas no debe cambiar lo que el usuario eligió—; si no,
+          // se adopta la principal. Sin cuenta vuelve la del espacio.
+          if (!account) {
+            setCurrency(spaceCurrency);
+          } else if (!moneyAccountSupportsCurrency(account, currency)) {
+            setCurrency(getPrimaryMoneyAccountCurrency(account));
+          }
           setMoneyAccountPickerVisible(false);
         }}
         visible={isMoneyAccountPickerVisible}

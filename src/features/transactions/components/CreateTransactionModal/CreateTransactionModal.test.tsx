@@ -1022,8 +1022,7 @@ describe('CreateTransactionModal', () => {
       kind: 'bank' as const,
       icon: 'bank' as const,
       colorToken: 'blue' as const,
-      currency: 'USD' as const,
-      openingBalanceMinor: 0,
+      balances: [{ currency: 'USD' as const, openingBalanceMinor: 0 }],
       isArchived: false,
     };
 

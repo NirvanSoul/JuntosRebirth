@@ -92,6 +92,14 @@ describe('localGuestMigrationRepository', () => {
       ])
       .mockResolvedValueOnce([
         {
+          money_account_id: 'money-account-1',
+          currency: 'EUR',
+          opening_balance_minor: 100_000,
+          position: 0,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
           id: 'series-1',
           space_id: 'personal',
           category_id: 'category-1',
@@ -205,6 +213,7 @@ describe('localGuestMigrationRepository', () => {
           space_id: 'missing-space',
         },
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);

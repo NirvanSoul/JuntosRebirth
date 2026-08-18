@@ -150,12 +150,14 @@ saldo.
 Una cuenta pertenece a un espacio, como la categoría, y tiene nombre, tipo,
 color, icono, moneda y saldo inicial. Su saldo es el saldo inicial más los
 ingresos menos los gastos que tenga asignados, con la misma regla de horizonte
-mensual que el balance. Elegir una cuenta al registrar un movimiento fija la
-moneda de ese movimiento, de modo que un saldo nunca mezcla divisas. El tipo
+mensual que el balance. Una cuenta puede guardar varias monedas —hay bancos que
+lo permiten— y cada una lleva su propio saldo; nunca se suman entre sí. Al
+registrar un movimiento solo se ofrecen cuentas que guarden su moneda. El tipo
 solo propone el icono y el color al crearla: los tres calculan el saldo igual y
 cualquiera puede quedar en negativo.
 
-El nombre y el icono son libres en los tres tipos. El saldo inicial se escribe
+El nombre y el icono son libres en los tres tipos, y el tipo se elige en una
+sola fila con las tres opciones. El saldo inicial es opcional y se escribe
 tal cual, con un signo menos delante si se arrastra una deuda: no hay un
 control aparte para el signo, porque ese caso es poco frecuente y conviene
 esperar al uso real antes de darle interfaz propia.

@@ -60,10 +60,13 @@ export function CreateMoneyAccountModal({
   const [step, setStep] = useState<'details' | 'appearance'>('details');
   const [name, setName] = useState('');
   const [kind, setKind] = useState<MoneyAccountKind>(defaultKind);
-  const [currency, setCurrency] = useState<CurrencyCode>(
-    availableCurrencies[0] ?? 'EUR',
+  /** Saldo inicial escrito por moneda, indexado por código. */
+  const [balanceInputs, setBalanceInputs] = useState<Record<string, string>>(
+    {},
   );
-  const [balanceInput, setBalanceInput] = useState('0');
+  const [selectedCurrencies, setSelectedCurrencies] = useState<CurrencyCode[]>(
+    [],
+  );
   const [icon, setIcon] = useState<MoneyAccountIconName>('bank');
   const [colorToken, setColorToken] = useState<CategoryColorToken>('blue');
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
@@ -86,9 +89,17 @@ export function CreateMoneyAccountModal({
     setStep('details');
     setName(account?.name ?? '');
     setKind(account?.kind ?? defaultKind);
-    setCurrency(account?.currency ?? availableCurrencies[0] ?? 'EUR');
-    setBalanceInput(
-      signedAmountMinorToInput(account?.openingBalanceMinor ?? 0),
+    const initialCurrencies = account
+      ? account.balances.map((balance) => balance.currency)
+      : [availableCurrencies[0] ?? 'EUR'];
+    setSelectedCurrencies(initialCurrencies);
+    setBalanceInputs(
+      Object.fromEntries(
+        (account?.balances ?? []).map((balance) => [
+          balance.currency,
+          signedAmountMinorToInput(balance.openingBalanceMinor),
+        ]),
+      ),
     );
     setIcon(account?.icon ?? kindDefinition?.icon ?? 'bank');
     setColorToken(account?.colorToken ?? kindDefinition?.colorToken ?? 'blue');
@@ -112,6 +123,16 @@ export function CreateMoneyAccountModal({
     }
   };
 
+  const handleToggleCurrency = (code: CurrencyCode) => {
+    setSelectedCurrencies((current) => {
+      if (!current.includes(code)) return [...current, code];
+      // Nunca se queda sin ninguna: sin moneda no habría saldo que calcular.
+      return current.length === 1
+        ? current
+        : current.filter((candidate) => candidate !== code);
+    });
+  };
+
   const handleContinue = () => {
     setHasAttemptedSubmit(true);
     if (validation.valid) setStep('appearance');
@@ -126,9 +147,15 @@ export function CreateMoneyAccountModal({
       kind,
       icon,
       colorToken,
-      // La moneda bloqueada se respeta también aquí, no solo en la interfaz.
-      currency: isCurrencyLocked ? (account?.currency ?? currency) : currency,
-      openingBalanceMinor: parseSignedAmountMinor(balanceInput),
+      // Las monedas bloqueadas se respetan también aquí, no solo en la
+      // interfaz: la cuenta conserva exactamente las que ya tenía.
+      balances: (isCurrencyLocked && account
+        ? account.balances.map((balance) => balance.currency)
+        : selectedCurrencies
+      ).map((code) => ({
+        currency: code,
+        openingBalanceMinor: parseSignedAmountMinor(balanceInputs[code] ?? '0'),
+      })),
     });
   };
 
@@ -174,21 +201,24 @@ export function CreateMoneyAccountModal({
         {step === 'details' ? (
           <MoneyAccountDetailsStep
             availableCurrencies={availableCurrencies}
-            balanceInput={balanceInput}
-            currency={currency}
+            balanceInputs={balanceInputs}
+            selectedCurrencies={selectedCurrencies}
             hasAttemptedSubmit={hasAttemptedSubmit}
             isCurrencyLocked={isCurrencyLocked}
             kind={kind}
             name={name}
-            onChangeBalance={(value) =>
-              setBalanceInput(sanitizeSignedAmountInput(value))
+            onChangeBalance={(code, value) =>
+              setBalanceInputs((current) => ({
+                ...current,
+                [code]: sanitizeSignedAmountInput(value),
+              }))
             }
             onChangeName={(value) => {
               setName(value);
               setHasAttemptedSubmit(false);
             }}
             onContinue={handleContinue}
-            onSelectCurrency={setCurrency}
+            onToggleCurrency={handleToggleCurrency}
             onSelectKind={handleSelectKind}
             styles={styles}
             validation={validation}

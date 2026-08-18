@@ -5342,6 +5342,32 @@ lleva a su detalle. Solo se ofrecen cuentas en la moneda del movimiento:
 `updateLocalTransactionMoneyAccount` no cambia el importe ni la moneda, así
 que aceptar otra divisa rompería el saldo de la cuenta.
 
+## Corrección — varias monedas por cuenta, tres tipos en una fila y saldo opcional
+
+Un banco puede guardar divisas distintas dentro de la misma cuenta, así que la
+moneda deja de ser un campo de la cuenta y pasa a una tabla hija
+(`money_account_balances` local en la versión 24, migración 32 en Supabase),
+con el patrón que `category_budgets` ya usaba para los presupuestos. Cada
+moneda lleva su propio saldo y **nunca se suman entre sí**: un total mezclando
+divisas no significaría nada mientras no exista conversión, que sigue fuera de
+alcance desde ADR-060.
+
+- `money_accounts.currency` se conserva como moneda principal: encabeza la
+  tarjeta y es la que se propone al registrar un movimiento.
+  `opening_balance_minor` deja de leerse —el saldo vive en la tabla hija,
+  incluida la principal— para no repetir el problema de dos fuentes del mismo
+  dato que ya arrastra `categories.budget_minor`.
+- Un movimiento solo puede asignarse a una cuenta que guarde su moneda. Al
+  elegir cuenta en el modal, si el movimiento ya está en una de sus divisas se
+  conserva; si no, se adopta la principal.
+- Las monedas se reescriben enteras en cada sincronización, en vez de calcular
+  altas y bajas: una divisa retirada en el otro dispositivo tiene que
+  desaparecer, y un cálculo incremental dejaría huérfana la que ya no está.
+- Los tres tipos caben en una sola fila con la variante `compact` de
+  `SelectableOption`: ocupan mejor el ancho y se comparan de un vistazo.
+- El saldo inicial se titula «Saldo inicial (opcional)»: nadie tiene que
+  inventarse una cifra para crear una cuenta.
+
 ## Pendiente
 
 Transferencias entre cuentas, límite de crédito y fechas de corte, filtro por

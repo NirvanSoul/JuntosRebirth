@@ -45,8 +45,8 @@ export function assertTransaction(input: CreateTransactionDraft): void {
  * En SQLite la columna solo tiene una foránea de una columna, así que nada
  * impide a nivel de esquema asignar la cuenta de otro espacio; esta guarda
  * ocupa el lugar de la clave compuesta que sí protege a `category_id`. La
- * moneda se comprueba aquí por la misma razón: elegir una cuenta fija la
- * moneda del movimiento, y un saldo que mezclara divisas no significaría nada.
+ * moneda se comprueba aquí por la misma razón: cada saldo de la cuenta es de
+ * una divisa concreta, y un importe en otra no entraría en ninguno.
  */
 export async function assertMoneyAccountAssignment(
   database: SQLiteDatabase,
@@ -56,16 +56,24 @@ export async function assertMoneyAccountAssignment(
     return;
   }
 
-  const account = await database.getFirstAsync<{ currency: string }>(
-    `SELECT currency FROM money_accounts WHERE id = ? AND space_id = ?`,
+  const account = await database.getFirstAsync<{ id: string }>(
+    `SELECT id FROM money_accounts WHERE id = ? AND space_id = ?`,
     input.moneyAccountId,
     input.spaceId,
   );
-
   if (!account) {
     throw new Error('La cuenta no pertenece a este espacio');
   }
-  if (account.currency !== input.currency) {
-    throw new Error('El movimiento debe usar la moneda de su cuenta');
+
+  // Una cuenta puede guardar varias monedas, como hace un banco: basta con
+  // que la del movimiento sea una de ellas.
+  const balance = await database.getFirstAsync<{ currency: string }>(
+    `SELECT currency FROM money_account_balances
+      WHERE money_account_id = ? AND currency = ?`,
+    input.moneyAccountId,
+    input.currency,
+  );
+  if (!balance) {
+    throw new Error('El movimiento debe usar una moneda de su cuenta');
   }
 }

@@ -4,7 +4,10 @@ import { GradientCard } from '@/components/ui/GradientCard/GradientCard';
 import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import { getMoneyAccountKindLabel } from '@/features/accounts/constants/moneyAccountKindDefinitions';
-import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
+import {
+  getPrimaryBalance,
+  type MoneyAccountSummary,
+} from '@/features/accounts/utils/moneyAccountSummary';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import {
   categoryColors,
@@ -32,11 +35,15 @@ type MoneyAccountCardProps = {
 export function MoneyAccountCard({ account, onPress }: MoneyAccountCardProps) {
   const cardColor = categoryColors[account.colorToken];
   const contentContrast = getCategoryContentContrast(account.colorToken);
+  const primary = getPrimaryBalance(account);
   const balance = formatCurrency(
-    account.balanceMinor,
-    account.currency,
+    primary.balanceMinor,
+    primary.currency,
     'es-ES',
   );
+  // Las divisas nunca se suman: las secundarias se enseñan aparte, cada una
+  // con su propio saldo.
+  const secondaryBalances = account.balanceByCurrency.slice(1);
   const kindLabel = getMoneyAccountKindLabel(account.kind);
 
   return (
@@ -66,7 +73,7 @@ export function MoneyAccountCard({ account, onPress }: MoneyAccountCardProps) {
             variant="caption"
             weight="semibold"
           >
-            {account.currency}
+            {primary.currency}
           </Text>
         </View>
 
@@ -98,6 +105,24 @@ export function MoneyAccountCard({ account, onPress }: MoneyAccountCardProps) {
           >
             {balance}
           </Text>
+          {secondaryBalances.length > 0 ? (
+            <Text
+              numberOfLines={1}
+              testID={`money-account-card-${account.id}-secondary-balances`}
+              tone={contentContrast.tone}
+              variant="caption"
+            >
+              {secondaryBalances
+                .map((balanceByCurrency) =>
+                  formatCurrency(
+                    balanceByCurrency.balanceMinor,
+                    balanceByCurrency.currency,
+                    'es-ES',
+                  ),
+                )
+                .join('  ·  ')}
+            </Text>
+          ) : null}
         </View>
       </GradientCard>
     </Pressable>

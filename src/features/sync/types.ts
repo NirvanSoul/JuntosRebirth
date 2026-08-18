@@ -25,7 +25,11 @@ export type GuestMigrationMoneyAccount = {
   icon: string;
   colorToken: string;
   currency: CurrencyCode;
-  openingBalanceMinor: number;
+  balances: readonly {
+    currency: CurrencyCode;
+    openingBalanceMinor: number;
+    position: number;
+  }[];
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;

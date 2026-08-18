@@ -46,10 +46,17 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
           icon: 'bank',
           colorToken: 'blue',
           currency: 'EUR',
-          openingBalanceMinor: 100000,
           isArchived: 0,
           createdAt: '2026-08-13T09:00:00.000Z',
           updated_at: '2026-08-13T09:00:00.000Z',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          money_account_id: 'money-account-a',
+          currency: 'EUR',
+          openingBalanceMinor: 100000,
+          position: 0,
         },
       ])
       .mockResolvedValueOnce([])
@@ -91,8 +98,10 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
           id: 'money-account-a',
           remoteId: 'money-account-a',
           currency: 'EUR',
-          openingBalanceMinor: 100000,
           isArchived: false,
+          balances: [
+            { currency: 'EUR', openingBalanceMinor: 100000, position: 0 },
+          ],
         }),
       ],
       recurringSeries: [],

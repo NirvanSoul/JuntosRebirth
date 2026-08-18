@@ -1,12 +1,20 @@
 import type { MoneyAccount } from '@/features/accounts/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
-export type MoneyAccountSummary = MoneyAccount & {
-  /** Saldo inicial más ingresos menos gastos asignados a la cuenta. */
+export type MoneyAccountCurrencyBalance = {
+  currency: CurrencyCode;
+  /** Saldo inicial más ingresos menos gastos de esa misma moneda. */
   balanceMinor: number;
   incomeMinor: number;
   expenseMinor: number;
+  transactionCount: number;
+};
+
+export type MoneyAccountSummary = MoneyAccount & {
+  /** Un saldo por moneda, en el mismo orden que declara la cuenta. */
+  balanceByCurrency: readonly MoneyAccountCurrencyBalance[];
   transactionCount: number;
 };
 
@@ -18,9 +26,9 @@ export type MoneyAccountSummary = MoneyAccount & {
  * (ADR-056, `DATABASE.md` §8). Así el saldo de una cuenta nunca contradice
  * al balance que muestra Inicio para el mismo periodo.
  *
- * Solo suma movimientos en la moneda de la cuenta: elegir una cuenta fija la
- * moneda del movimiento, de modo que una divisa distinta solo puede venir de
- * datos anteriores a esta función y no debe mezclarse en un mismo saldo.
+ * Una cuenta puede guardar varias monedas, como hace un banco. Cada una lleva
+ * su propio saldo y jamás se suman entre sí: un total mezclando divisas no
+ * significaría nada mientras no exista conversión.
  */
 export function summarizeMoneyAccounts(
   accounts: readonly MoneyAccount[],
@@ -34,31 +42,55 @@ export function summarizeMoneyAccounts(
 
   return accounts.map((account) => {
     const accountTransactions = transactionsThroughCurrentMonth.filter(
-      (transaction) =>
-        transaction.moneyAccountId === account.id &&
-        transaction.currency === account.currency,
+      (transaction) => transaction.moneyAccountId === account.id,
     );
 
-    return accountTransactions.reduce<MoneyAccountSummary>(
-      (summary, transaction) => {
-        if (transaction.type === 'income') {
-          summary.incomeMinor += transaction.amountMinor;
-          summary.balanceMinor += transaction.amountMinor;
-        } else {
-          summary.expenseMinor += transaction.amountMinor;
-          summary.balanceMinor -= transaction.amountMinor;
-        }
-        summary.transactionCount += 1;
+    const balanceByCurrency = account.balances.map((balance) =>
+      accountTransactions
+        .filter((transaction) => transaction.currency === balance.currency)
+        .reduce<MoneyAccountCurrencyBalance>(
+          (summary, transaction) => {
+            if (transaction.type === 'income') {
+              summary.incomeMinor += transaction.amountMinor;
+              summary.balanceMinor += transaction.amountMinor;
+            } else {
+              summary.expenseMinor += transaction.amountMinor;
+              summary.balanceMinor -= transaction.amountMinor;
+            }
+            summary.transactionCount += 1;
 
-        return summary;
-      },
-      {
-        ...account,
-        balanceMinor: account.openingBalanceMinor,
-        incomeMinor: 0,
-        expenseMinor: 0,
-        transactionCount: 0,
-      },
+            return summary;
+          },
+          {
+            currency: balance.currency,
+            balanceMinor: balance.openingBalanceMinor,
+            incomeMinor: 0,
+            expenseMinor: 0,
+            transactionCount: 0,
+          },
+        ),
     );
+
+    return {
+      ...account,
+      balanceByCurrency,
+      transactionCount: balanceByCurrency.reduce(
+        (total, balance) => total + balance.transactionCount,
+        0,
+      ),
+    };
   });
+}
+
+/** El saldo que encabeza la tarjeta: el de la moneda principal. */
+export function getPrimaryBalance(
+  summary: MoneyAccountSummary,
+): MoneyAccountCurrencyBalance {
+  const primary = summary.balanceByCurrency[0];
+
+  if (!primary) {
+    throw new Error('La cuenta no tiene ninguna moneda asociada');
+  }
+
+  return primary;
 }

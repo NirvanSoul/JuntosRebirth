@@ -867,8 +867,7 @@ describe('HomeScreen', () => {
       kind: 'bank' as const,
       icon: 'bank' as const,
       colorToken: 'blue' as const,
-      currency: 'EUR' as const,
-      openingBalanceMinor: 100000,
+      balances: [{ currency: 'EUR' as const, openingBalanceMinor: 100000 }],
       isArchived: false,
     };
 

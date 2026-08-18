@@ -12,8 +12,7 @@ function createAccount(overrides: Partial<MoneyAccount> = {}): MoneyAccount {
     kind: 'cash',
     icon: 'money',
     colorToken: 'emerald',
-    currency: 'EUR',
-    openingBalanceMinor: 0,
+    balances: [{ currency: 'EUR', openingBalanceMinor: 0 }],
     isArchived: false,
     ...overrides,
   };

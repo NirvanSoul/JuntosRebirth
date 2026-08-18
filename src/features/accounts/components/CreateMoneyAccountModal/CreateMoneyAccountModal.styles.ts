@@ -40,6 +40,11 @@ export function createStyles(colors: ColorTokens) {
     sectionTitle: { marginBottom: spacing.md, marginTop: spacing.xl },
     hint: { marginTop: spacing.sm },
     list: { gap: spacing.sm },
+    // Los tres tipos caben en una fila: ocupan mejor el ancho y se comparan
+    // de un vistazo en vez de leerse en vertical.
+    kindRow: { flexDirection: 'row', gap: spacing.sm },
+    kindOption: { flex: 1 },
+    balanceField: { gap: spacing.xs, marginBottom: spacing.sm },
     primaryButtonLayout: { marginTop: spacing.xl },
     preview: {
       flexDirection: 'row',

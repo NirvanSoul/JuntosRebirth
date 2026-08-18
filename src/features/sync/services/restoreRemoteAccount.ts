@@ -150,12 +150,11 @@ export async function restoreRemoteAccount(input: {
            id, space_id, name, kind, icon, color_token, currency,
            opening_balance_minor, created_by, sync_status, is_archived,
            created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?, NULL)
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'synced', ?, ?, ?, NULL)
          ON CONFLICT (id) DO UPDATE SET
            space_id = excluded.space_id, name = excluded.name,
            kind = excluded.kind, icon = excluded.icon,
            color_token = excluded.color_token, currency = excluded.currency,
-           opening_balance_minor = excluded.opening_balance_minor,
            is_archived = excluded.is_archived, updated_at = excluded.updated_at
          WHERE money_accounts.sync_status = 'synced'`,
         moneyAccountId,
@@ -165,12 +164,33 @@ export async function restoreRemoteAccount(input: {
         remoteAccount.icon,
         remoteAccount.colorToken,
         remoteAccount.currency,
-        remoteAccount.openingBalanceMinor,
         input.userId,
         remoteAccount.isArchived ? 1 : 0,
         remoteAccount.createdAt,
         remoteAccount.updatedAt,
       );
+
+      // Las monedas se reescriben enteras, como en la subida: si el otro
+      // dispositivo retiró una divisa, aquí tampoco debe quedar.
+      await transaction.runAsync(
+        `DELETE FROM money_account_balances WHERE money_account_id = ?`,
+        moneyAccountId,
+      );
+      for (const [position, balance] of remoteAccount.balances.entries()) {
+        await transaction.runAsync(
+          `INSERT INTO money_account_balances (
+             id, money_account_id, currency, opening_balance_minor, position,
+             created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `${moneyAccountId}--${balance.currency}`,
+          moneyAccountId,
+          balance.currency,
+          balance.openingBalanceMinor,
+          position,
+          remoteAccount.createdAt,
+          remoteAccount.updatedAt,
+        );
+      }
     }
     for (const series of input.snapshot.recurringSeries) {
       const spaceId = localSpaceIdByRemoteId.get(String(series.space_id));

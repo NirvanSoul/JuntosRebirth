@@ -38,13 +38,41 @@ export type MoneyAccount = {
   icon: MoneyAccountIconName;
   colorToken: CategoryColorToken;
   /**
-   * Moneda de la cuenta. Elegir una cuenta al registrar un movimiento fija
-   * esta moneda, de modo que un saldo nunca mezcla divisas.
+   * Monedas de la cuenta, con el saldo inicial de cada una. Nunca está vacía y
+   * la primera actúa de principal: encabeza la tarjeta y es la que se propone
+   * al registrar un movimiento.
+   *
+   * Un banco puede guardar varias divisas en la misma cuenta, pero cada una
+   * lleva su propio saldo: sumarlas no significaría nada.
    */
-  currency: CurrencyCode;
-  /** Admite cero y negativos: quien arrastra una deuda escribe el signo. */
-  openingBalanceMinor: number;
+  balances: readonly MoneyAccountBalance[];
   isArchived: boolean;
 };
 
+export type MoneyAccountBalance = {
+  currency: CurrencyCode;
+  /** Admite cero y negativos: quien arrastra una deuda escribe el signo. */
+  openingBalanceMinor: number;
+};
+
 export type CreateMoneyAccountInput = Omit<MoneyAccount, 'id' | 'isArchived'>;
+
+/** La primera moneda: la que encabeza la tarjeta y se propone por defecto. */
+export function getPrimaryMoneyAccountCurrency(
+  account: Pick<MoneyAccount, 'balances'>,
+): CurrencyCode {
+  const primary = account.balances[0];
+
+  if (!primary) {
+    throw new Error('La cuenta no tiene ninguna moneda asociada');
+  }
+
+  return primary.currency;
+}
+
+export function moneyAccountSupportsCurrency(
+  account: Pick<MoneyAccount, 'balances'>,
+  currency: CurrencyCode,
+): boolean {
+  return account.balances.some((balance) => balance.currency === currency);
+}

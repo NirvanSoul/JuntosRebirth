@@ -25,6 +25,13 @@ export type CategorySyncRow = {
   updated_at: string;
   archived_at: string | null;
 };
+export type MoneyAccountBalanceSyncRow = {
+  money_account_id: string;
+  currency: GuestMigrationMoneyAccount['currency'];
+  opening_balance_minor: number;
+  position: number;
+};
+
 export type MoneyAccountSyncRow = {
   id: string;
   space_id: string;

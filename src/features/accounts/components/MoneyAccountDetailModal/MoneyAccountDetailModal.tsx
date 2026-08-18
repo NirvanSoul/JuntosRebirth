@@ -14,7 +14,10 @@ import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import { getMoneyAccountKindLabel } from '@/features/accounts/constants/moneyAccountKindDefinitions';
 import type { MoneyAccount } from '@/features/accounts/types';
-import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
+import {
+  getPrimaryBalance,
+  summarizeMoneyAccounts,
+} from '@/features/accounts/utils/moneyAccountSummary';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
@@ -66,9 +69,7 @@ export function MoneyAccountDetailModal({
     () =>
       account
         ? listTransactionsThroughCurrentMonth(transactions).filter(
-            (transaction) =>
-              transaction.moneyAccountId === account.id &&
-              transaction.currency === account.currency,
+            (transaction) => transaction.moneyAccountId === account.id,
           )
         : [],
     [account, transactions],
@@ -84,14 +85,10 @@ export function MoneyAccountDetailModal({
 
   const accountColor = categoryColors[account.colorToken];
   const contentContrast = getCategoryContentContrast(account.colorToken);
+  const primary = getPrimaryBalance(summary);
   const balance = formatCurrency(
-    summary.balanceMinor,
-    account.currency,
-    'es-ES',
-  );
-  const openingBalance = formatCurrency(
-    account.openingBalanceMinor,
-    account.currency,
+    primary.balanceMinor,
+    primary.currency,
     'es-ES',
   );
 
@@ -171,58 +168,68 @@ export function MoneyAccountDetailModal({
             />
           ) : null}
 
-          <View style={styles.metrics}>
-            <View style={styles.metric} testID="money-account-opening-metric">
-              <Text tone="secondary" variant="caption">
-                Saldo inicial
-              </Text>
-              <Text numberOfLines={1} variant="label" weight="semibold">
-                {openingBalance}
-              </Text>
+          {summary.balanceByCurrency.map((currencyBalance) => (
+            <View
+              key={currencyBalance.currency}
+              style={styles.metrics}
+              testID={`money-account-metrics-${currencyBalance.currency}`}
+            >
+              <View style={styles.metric}>
+                <Text tone="secondary" variant="caption">
+                  Saldo en {currencyBalance.currency}
+                </Text>
+                <Text numberOfLines={1} variant="label" weight="semibold">
+                  {formatCurrency(
+                    currencyBalance.balanceMinor,
+                    currencyBalance.currency,
+                    'es-ES',
+                  )}
+                </Text>
+              </View>
+              {currencyBalance.incomeMinor > 0 ? (
+                <View style={styles.metric}>
+                  <View style={styles.metricHeading}>
+                    <Ionicons
+                      color={colors.income}
+                      name="arrow-up"
+                      size={iconSize.sm}
+                    />
+                    <Text tone="secondary" variant="caption">
+                      Ingresos
+                    </Text>
+                  </View>
+                  <Text numberOfLines={1} variant="label" weight="semibold">
+                    {formatCurrency(
+                      currencyBalance.incomeMinor,
+                      currencyBalance.currency,
+                      'es-ES',
+                    )}
+                  </Text>
+                </View>
+              ) : null}
+              {currencyBalance.expenseMinor > 0 ? (
+                <View style={styles.metric}>
+                  <View style={styles.metricHeading}>
+                    <Ionicons
+                      color={colors.expense}
+                      name="arrow-down"
+                      size={iconSize.sm}
+                    />
+                    <Text tone="secondary" variant="caption">
+                      Gastos
+                    </Text>
+                  </View>
+                  <Text numberOfLines={1} variant="label" weight="semibold">
+                    {formatCurrency(
+                      currencyBalance.expenseMinor,
+                      currencyBalance.currency,
+                      'es-ES',
+                    )}
+                  </Text>
+                </View>
+              ) : null}
             </View>
-            {summary.incomeMinor > 0 ? (
-              <View style={styles.metric} testID="money-account-income-metric">
-                <View style={styles.metricHeading}>
-                  <Ionicons
-                    color={colors.income}
-                    name="arrow-up"
-                    size={iconSize.sm}
-                  />
-                  <Text tone="secondary" variant="caption">
-                    Ingresos
-                  </Text>
-                </View>
-                <Text numberOfLines={1} variant="label" weight="semibold">
-                  {formatCurrency(
-                    summary.incomeMinor,
-                    account.currency,
-                    'es-ES',
-                  )}
-                </Text>
-              </View>
-            ) : null}
-            {summary.expenseMinor > 0 ? (
-              <View style={styles.metric} testID="money-account-expense-metric">
-                <View style={styles.metricHeading}>
-                  <Ionicons
-                    color={colors.expense}
-                    name="arrow-down"
-                    size={iconSize.sm}
-                  />
-                  <Text tone="secondary" variant="caption">
-                    Gastos
-                  </Text>
-                </View>
-                <Text numberOfLines={1} variant="label" weight="semibold">
-                  {formatCurrency(
-                    summary.expenseMinor,
-                    account.currency,
-                    'es-ES',
-                  )}
-                </Text>
-              </View>
-            ) : null}
-          </View>
+          ))}
 
           <Text
             accessibilityRole="header"

@@ -35,7 +35,10 @@ export type RemoteAccountMoneyAccount = {
   icon: string;
   colorToken: string;
   currency: CurrencyCode;
-  openingBalanceMinor: number;
+  balances: readonly {
+    currency: CurrencyCode;
+    openingBalanceMinor: number;
+  }[];
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
@@ -119,7 +122,7 @@ export async function fetchRemoteAccountSnapshot(
     client
       .from('money_accounts')
       .select(
-        'id, space_id, name, kind, icon, color_token, currency, opening_balance_minor, is_archived, created_at, updated_at',
+        'id, space_id, name, kind, icon, color_token, currency, is_archived, created_at, updated_at, money_account_balances(currency, opening_balance_minor, position)',
       )
       .in('space_id', spaceIds),
     client
@@ -166,6 +169,26 @@ export async function fetchRemoteAccountSnapshot(
         );
       }
 
+      const rawBalances = (account.money_account_balances ?? []) as {
+        currency: string;
+        opening_balance_minor: number;
+        position: number;
+      }[];
+      const balances = [...rawBalances]
+        .sort((left, right) => left.position - right.position)
+        .map((balance) => {
+          if (!isCurrencyCode(balance.currency)) {
+            throw new Error(
+              `[sync] Integridad comprometida en cuenta remota ${String(account.id)}: currency=${String(balance.currency)}`,
+            );
+          }
+
+          return {
+            currency: balance.currency,
+            openingBalanceMinor: balance.opening_balance_minor,
+          };
+        });
+
       return {
         remoteId: account.id as string,
         spaceRemoteId: account.space_id as string,
@@ -174,7 +197,11 @@ export async function fetchRemoteAccountSnapshot(
         icon: account.icon as string,
         colorToken: account.color_token as string,
         currency: rawCurrency,
-        openingBalanceMinor: account.opening_balance_minor as number,
+        // Una cuenta anterior a las monedas múltiples solo trae la principal.
+        balances:
+          balances.length > 0
+            ? balances
+            : [{ currency: rawCurrency, openingBalanceMinor: 0 }],
         isArchived: account.is_archived as boolean,
         createdAt: account.created_at as string,
         updatedAt: account.updated_at as string,
