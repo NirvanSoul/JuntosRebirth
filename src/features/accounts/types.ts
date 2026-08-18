@@ -2,17 +2,11 @@ import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import type { CategoryColorToken } from '@/theme/categoryColors';
 
 /**
- * El tipo solo cambia el aspecto y el icono por defecto de la tarjeta. Una
- * cuenta de crédito calcula su saldo igual que las demás y puede quedar en
- * negativo; no existe límite de crédito ni fecha de corte.
+ * Tres tipos y no más: son los que la gente distingue sin pensarlo. El tipo
+ * solo propone el icono y el color al crear la cuenta; el saldo se calcula
+ * igual en los tres y puede quedar en negativo.
  */
-export const moneyAccountKinds = [
-  'cash',
-  'bank',
-  'debit',
-  'credit',
-  'savings',
-] as const;
+export const moneyAccountKinds = ['cash', 'bank', 'card'] as const;
 
 export type MoneyAccountKind = (typeof moneyAccountKinds)[number];
 
@@ -48,7 +42,7 @@ export type MoneyAccount = {
    * esta moneda, de modo que un saldo nunca mezcla divisas.
    */
   currency: CurrencyCode;
-  /** Admite cero y negativos: una tarjeta de crédito empieza con deuda. */
+  /** Admite cero y negativos: quien arrastra una deuda escribe el signo. */
   openingBalanceMinor: number;
   isArchived: boolean;
 };

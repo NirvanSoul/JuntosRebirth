@@ -22,22 +22,10 @@ export const moneyAccountKindDefinitions: readonly MoneyAccountKindDefinition[] 
       colorToken: 'blue',
     },
     {
-      kind: 'debit',
-      label: 'Tarjeta de débito',
-      icon: 'credit-card',
-      colorToken: 'indigo',
-    },
-    {
-      kind: 'credit',
-      label: 'Tarjeta de crédito',
+      kind: 'card',
+      label: 'Tarjeta',
       icon: 'credit-card',
       colorToken: 'violet',
-    },
-    {
-      kind: 'savings',
-      label: 'Ahorro',
-      icon: 'piggy-bank',
-      colorToken: 'teal',
     },
   ];
 

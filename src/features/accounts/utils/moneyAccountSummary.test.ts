@@ -99,7 +99,7 @@ describe('summarizeMoneyAccounts', () => {
 
   it('deja el saldo en negativo cuando el gasto supera lo disponible', () => {
     const [summary] = summarizeMoneyAccounts(
-      [{ ...account, openingBalanceMinor: 0, kind: 'credit' }],
+      [{ ...account, openingBalanceMinor: 0, kind: 'card' }],
       [createTransaction({ amountMinor: 30000 })],
       referenceDate,
     );

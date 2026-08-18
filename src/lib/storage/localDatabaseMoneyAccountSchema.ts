@@ -94,3 +94,66 @@ export async function recreateRemoteEntityLinksWithMoneyAccounts(
           ON remote_entity_links(user_id, entity_type, local_id);
       `);
 }
+
+/**
+ * Reduce los tipos de cuenta a tres (versión local 22): efectivo, cuenta
+ * bancaria y tarjeta. Los cinco iniciales distinguían débito, crédito y ahorro,
+ * una separación que no aporta nada mientras el saldo se calcule igual en
+ * todos y no existan ni límite de crédito ni transferencias.
+ *
+ * Un CHECK de SQLite no se puede alterar, así que la tabla se reconstruye. Las
+ * filas existentes se reasignan: débito y crédito pasan a tarjeta, y ahorro a
+ * cuenta bancaria, que es donde suele estar guardado ese dinero.
+ */
+export async function reduceMoneyAccountKinds(
+  transaction: SQLite.SQLiteDatabase,
+): Promise<void> {
+  await transaction.execAsync(`
+    ALTER TABLE money_accounts RENAME TO money_accounts_v20;
+
+    CREATE TABLE money_accounts (
+      id TEXT PRIMARY KEY NOT NULL,
+      space_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('cash', 'bank', 'card')),
+      icon TEXT NOT NULL,
+      color_token TEXT NOT NULL,
+      currency TEXT NOT NULL,
+      opening_balance_minor INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT NOT NULL,
+      sync_status TEXT NOT NULL DEFAULT 'local_only'
+        CHECK (sync_status IN (
+          'local_only', 'pending', 'syncing', 'synced', 'failed', 'conflict'
+        )),
+      is_archived INTEGER NOT NULL DEFAULT 0
+        CHECK (is_archived IN (0, 1)),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      archived_at TEXT,
+      UNIQUE (id, space_id)
+    );
+
+    INSERT INTO money_accounts (
+      id, space_id, name, kind, icon, color_token, currency,
+      opening_balance_minor, created_by, sync_status, is_archived,
+      created_at, updated_at, archived_at
+    )
+    SELECT id, space_id, name,
+           CASE kind
+             WHEN 'debit' THEN 'card'
+             WHEN 'credit' THEN 'card'
+             WHEN 'savings' THEN 'bank'
+             ELSE kind
+           END,
+           icon, color_token, currency, opening_balance_minor, created_by,
+           sync_status, is_archived, created_at, updated_at, archived_at
+      FROM money_accounts_v20;
+
+    DROP TABLE money_accounts_v20;
+
+    CREATE INDEX money_accounts_space_active_idx
+      ON money_accounts(space_id, is_archived, name);
+    CREATE INDEX money_accounts_sync_idx
+      ON money_accounts(sync_status, updated_at);
+  `);
+}

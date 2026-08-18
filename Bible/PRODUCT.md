@@ -141,18 +141,24 @@ Ejemplo:
 
 ### Cuenta
 
-Dónde está guardado el dinero: efectivo, cuenta bancaria, tarjeta de débito,
-tarjeta de crédito o ahorro. Es el segundo eje de clasificación de un
-movimiento, junto a la categoría, y siempre **opcional**: un movimiento sin
-cuenta es igual de válido y no afecta a ningún saldo.
+Dónde está guardado el dinero. Solo hay tres tipos —efectivo, cuenta bancaria
+y tarjeta—, porque son los que cualquiera distingue sin pensarlo. Es el segundo
+eje de clasificación de un movimiento, junto a la categoría, y siempre
+**opcional**: un movimiento sin cuenta es igual de válido y no afecta a ningún
+saldo.
 
 Una cuenta pertenece a un espacio, como la categoría, y tiene nombre, tipo,
 color, icono, moneda y saldo inicial. Su saldo es el saldo inicial más los
 ingresos menos los gastos que tenga asignados, con la misma regla de horizonte
 mensual que el balance. Elegir una cuenta al registrar un movimiento fija la
 moneda de ese movimiento, de modo que un saldo nunca mezcla divisas. El tipo
-solo cambia el aspecto y el icono por defecto: una tarjeta de crédito calcula
-su saldo igual que las demás y puede quedar en negativo.
+solo propone el icono y el color al crearla: los tres calculan el saldo igual y
+cualquiera puede quedar en negativo.
+
+El nombre y el icono son libres en los tres tipos. El saldo inicial se escribe
+tal cual, con un signo menos delante si se arrastra una deuda: no hay un
+control aparte para el signo, porque ese caso es poco frecuente y conviene
+esperar al uso real antes de darle interfaz propia.
 
 Eliminar una cuenta la archiva y conserva sus movimientos. Las transferencias
 entre cuentas quedan fuera de esta versión.

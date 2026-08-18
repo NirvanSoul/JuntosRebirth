@@ -5282,6 +5282,32 @@ y revisar balances, Inicio, Actividad, presupuestos e importación.
   `supabase/tests/money_accounts.test.sql`.
 - `npm run validate`.
 
+## Corrección — tres tipos de cuenta y saldo inicial sin control de signo
+
+La primera entrega ofrecía cinco tipos (`cash`, `bank`, `debit`, `credit`,
+`savings`) y un botón `+/−` junto al saldo inicial. Ambas cosas se reducen:
+
+- Quedan tres tipos: efectivo, cuenta bancaria y tarjeta. Separar débito de
+  crédito y de ahorro no cambia ningún cálculo mientras no existan límite de
+  crédito ni transferencias, y obliga a elegir entre opciones que para el
+  usuario son la misma cosa. El nombre y el icono siguen siendo libres en los
+  tres, que es donde el usuario sí distingue una cuenta de otra.
+- El saldo inicial se escribe tal cual: quien arrastra una deuda antepone un
+  signo menos. Un control dedicado ocupaba sitio permanente para un caso poco
+  frecuente; la decisión es esperar al uso real antes de darle interfaz propia.
+
+`parseAmountMinor` no servía para leer ese importe: separa la parte entera de
+los céntimos y los suma, así que para `-450,50` devolvía `-44950` en vez de
+`-45050`. `parseSignedAmountMinor` extrae el signo antes de medir la magnitud
+y lo aplica al final, y normaliza el `-0` que devuelve un signo suelto.
+
+En Android el teclado `numbers-and-punctuation` no existe y el numérico no
+ofrece el signo, así que allí el campo usa el teclado normal.
+
+Las restricciones anteriores no se editan en su migración: la versión local 22
+y la migración 31 reconstruyen el CHECK y reasignan las filas existentes
+—débito y crédito a tarjeta, ahorro a cuenta bancaria—.
+
 ## Pendiente
 
 Transferencias entre cuentas, límite de crédito y fechas de corte, filtro por

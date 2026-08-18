@@ -16,9 +16,10 @@ import type {
 } from '@/features/accounts/types';
 import { validateMoneyAccountName } from '@/features/accounts/utils/moneyAccountCatalog';
 import {
-  amountMinorToInput,
-  parseAmountMinor,
-} from '@/lib/currency/amountInput';
+  parseSignedAmountMinor,
+  sanitizeSignedAmountInput,
+  signedAmountMinorToInput,
+} from '@/features/accounts/utils/signedAmountInput';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import type { CategoryColorToken } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
@@ -63,7 +64,6 @@ export function CreateMoneyAccountModal({
     availableCurrencies[0] ?? 'EUR',
   );
   const [balanceInput, setBalanceInput] = useState('0');
-  const [isNegativeBalance, setNegativeBalance] = useState(false);
   const [icon, setIcon] = useState<MoneyAccountIconName>('bank');
   const [colorToken, setColorToken] = useState<CategoryColorToken>('blue');
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
@@ -88,9 +88,8 @@ export function CreateMoneyAccountModal({
     setKind(account?.kind ?? defaultKind);
     setCurrency(account?.currency ?? availableCurrencies[0] ?? 'EUR');
     setBalanceInput(
-      amountMinorToInput(Math.abs(account?.openingBalanceMinor ?? 0)),
+      signedAmountMinorToInput(account?.openingBalanceMinor ?? 0),
     );
-    setNegativeBalance((account?.openingBalanceMinor ?? 0) < 0);
     setIcon(account?.icon ?? kindDefinition?.icon ?? 'bank');
     setColorToken(account?.colorToken ?? kindDefinition?.colorToken ?? 'blue');
     setHasAttemptedSubmit(false);
@@ -129,8 +128,7 @@ export function CreateMoneyAccountModal({
       colorToken,
       // La moneda bloqueada se respeta también aquí, no solo en la interfaz.
       currency: isCurrencyLocked ? (account?.currency ?? currency) : currency,
-      openingBalanceMinor:
-        parseAmountMinor(balanceInput) * (isNegativeBalance ? -1 : 1),
+      openingBalanceMinor: parseSignedAmountMinor(balanceInput),
     });
   };
 
@@ -180,11 +178,10 @@ export function CreateMoneyAccountModal({
             currency={currency}
             hasAttemptedSubmit={hasAttemptedSubmit}
             isCurrencyLocked={isCurrencyLocked}
-            isNegativeBalance={isNegativeBalance}
             kind={kind}
             name={name}
             onChangeBalance={(value) =>
-              setBalanceInput(value.replace(/[^0-9,]/g, '') || '0')
+              setBalanceInput(sanitizeSignedAmountInput(value))
             }
             onChangeName={(value) => {
               setName(value);
@@ -193,9 +190,6 @@ export function CreateMoneyAccountModal({
             onContinue={handleContinue}
             onSelectCurrency={setCurrency}
             onSelectKind={handleSelectKind}
-            onToggleBalanceSign={() =>
-              setNegativeBalance((current) => !current)
-            }
             styles={styles}
             validation={validation}
           />

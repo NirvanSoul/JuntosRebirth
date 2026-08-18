@@ -77,7 +77,7 @@ describe('CreateMoneyAccountModal', () => {
     );
   });
 
-  it('guarda un saldo inicial negativo al marcar el signo', async () => {
+  it('acepta un saldo inicial negativo escrito con el signo', async () => {
     const onSubmit = jest.fn();
     const screen = await renderModal({ onSubmit });
 
@@ -85,14 +85,43 @@ describe('CreateMoneyAccountModal', () => {
       screen.getByLabelText('Nombre de la cuenta'),
       'Visa',
     );
-    await fireEvent.changeText(screen.getByLabelText('Saldo inicial'), '450');
-    await fireEvent.press(screen.getByTestId('money-account-balance-sign'));
+    await fireEvent.changeText(screen.getByLabelText('Saldo inicial'), '-450');
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
     await fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ openingBalanceMinor: -45000 }),
     );
+  });
+
+  it('conserva los céntimos de un saldo negativo', async () => {
+    const onSubmit = jest.fn();
+    const screen = await renderModal({ onSubmit });
+
+    await fireEvent.changeText(
+      screen.getByLabelText('Nombre de la cuenta'),
+      'Visa',
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText('Saldo inicial'),
+      '-450,50',
+    );
+    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
+    await fireEvent.press(screen.getByLabelText('Crear cuenta'));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ openingBalanceMinor: -45050 }),
+    );
+  });
+
+  it('ofrece solo los tres tipos de cuenta', async () => {
+    const screen = await renderModal();
+
+    expect(screen.getByLabelText('Efectivo')).toBeTruthy();
+    expect(screen.getByLabelText('Cuenta bancaria')).toBeTruthy();
+    expect(screen.getByLabelText('Tarjeta')).toBeTruthy();
+    expect(screen.queryByLabelText('Tarjeta de débito')).toBeNull();
+    expect(screen.queryByLabelText('Ahorro')).toBeNull();
   });
 
   it('no deja continuar con un nombre repetido en el mismo espacio', async () => {
@@ -145,5 +174,14 @@ describe('CreateMoneyAccountModal', () => {
       'Cuenta nómina',
     );
     expect(screen.getByLabelText('Saldo inicial').props.value).toBe('1.250');
+  });
+
+  it('precarga el signo de una cuenta que arrastra deuda', async () => {
+    const screen = await renderModal({
+      account: { ...account, openingBalanceMinor: -45000 },
+      accounts: [account],
+    });
+
+    expect(screen.getByLabelText('Saldo inicial').props.value).toBe('-450');
   });
 });

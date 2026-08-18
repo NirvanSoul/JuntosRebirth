@@ -2,7 +2,7 @@ import {
   BottomSheetScrollView,
   BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
-import { Pressable, View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
@@ -28,7 +28,6 @@ type MoneyAccountDetailsStepProps = {
   currency: CurrencyCode;
   hasAttemptedSubmit: boolean;
   isCurrencyLocked: boolean;
-  isNegativeBalance: boolean;
   kind: MoneyAccountKind;
   name: string;
   styles: MoneyAccountModalStyles;
@@ -38,7 +37,6 @@ type MoneyAccountDetailsStepProps = {
   onContinue: () => void;
   onSelectCurrency: (currency: CurrencyCode) => void;
   onSelectKind: (kind: MoneyAccountKind) => void;
-  onToggleBalanceSign: () => void;
 };
 
 export function MoneyAccountDetailsStep({
@@ -47,7 +45,6 @@ export function MoneyAccountDetailsStep({
   currency,
   hasAttemptedSubmit,
   isCurrencyLocked,
-  isNegativeBalance,
   kind,
   name,
   styles,
@@ -57,7 +54,6 @@ export function MoneyAccountDetailsStep({
   onContinue,
   onSelectCurrency,
   onSelectKind,
-  onToggleBalanceSign,
 }: MoneyAccountDetailsStepProps) {
   const density = useLayoutDensity();
   const { colors } = useTheme();
@@ -148,41 +144,24 @@ export function MoneyAccountDetailsStep({
         <Text style={styles.sectionTitle} variant="label" weight="semibold">
           Saldo inicial
         </Text>
-        <View style={styles.balanceRow}>
-          <Pressable
-            accessibilityLabel={
-              isNegativeBalance
-                ? 'Saldo inicial negativo'
-                : 'Saldo inicial positivo'
-            }
-            accessibilityRole="button"
-            accessibilityState={{ selected: isNegativeBalance }}
-            onPress={onToggleBalanceSign}
-            style={styles.signButton}
-            testID="money-account-balance-sign"
-          >
-            <Text variant="label" weight="semibold">
-              {isNegativeBalance ? '−' : '+'}
-            </Text>
-          </Pressable>
-          <BottomSheetTextInput
-            accessibilityLabel="Saldo inicial"
-            keyboardType="numeric"
-            maxFontSizeMultiplier={maxFontScale.body}
-            onChangeText={onChangeBalance}
-            placeholder="0"
-            placeholderTextColor={colors.textMuted}
-            style={[
-              styles.input,
-              styles.balanceInput,
-              { minHeight: layout.controlHeight[density] },
-            ]}
-            value={formatAmountInputForDisplay(balanceInput)}
-          />
-        </View>
+        <BottomSheetTextInput
+          accessibilityLabel="Saldo inicial"
+          // El signo menos tiene que estar al alcance en las dos plataformas.
+          // `numbers-and-punctuation` solo existe en iOS; el teclado numérico
+          // de Android no ofrece el signo, así que allí se usa el normal.
+          keyboardType={
+            Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'
+          }
+          maxFontSizeMultiplier={maxFontScale.body}
+          onChangeText={onChangeBalance}
+          placeholder="0"
+          placeholderTextColor={colors.textMuted}
+          style={[styles.input, { minHeight: layout.controlHeight[density] }]}
+          value={formatAmountInputForDisplay(balanceInput)}
+        />
         <Text style={styles.hint} tone="secondary" variant="footnote">
           Es el dinero que ya hay en la cuenta antes de registrar movimientos.
-          Puede ser negativo si arrastras una deuda.
+          Escribe un signo menos delante si arrastras una deuda.
         </Text>
       </BottomSheetScrollView>
 

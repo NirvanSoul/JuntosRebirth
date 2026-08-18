@@ -95,7 +95,7 @@ describe('localMoneyAccountRepository', () => {
     const created = await createLocalMoneyAccount({
       spaceId: 'personal',
       name: 'Visa',
-      kind: 'credit',
+      kind: 'card',
       icon: 'credit-card',
       colorToken: 'violet',
       currency: 'EUR',

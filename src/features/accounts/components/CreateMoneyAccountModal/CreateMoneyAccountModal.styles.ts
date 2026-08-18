@@ -40,18 +40,6 @@ export function createStyles(colors: ColorTokens) {
     sectionTitle: { marginBottom: spacing.md, marginTop: spacing.xl },
     hint: { marginTop: spacing.sm },
     list: { gap: spacing.sm },
-    balanceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    signButton: {
-      width: layout.minTouchTarget,
-      height: layout.minTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-    },
-    balanceInput: { flex: 1 },
     primaryButtonLayout: { marginTop: spacing.xl },
     preview: {
       flexDirection: 'row',

@@ -7,6 +7,7 @@ import {
 import {
   createMoneyAccountSchema,
   recreateRemoteEntityLinksWithMoneyAccounts,
+  reduceMoneyAccountKinds,
 } from '@/lib/storage/localDatabaseMoneyAccountSchema';
 import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabaseSchemaRepair';
 
@@ -16,7 +17,7 @@ import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabase
  * versión, de modo que la escalera es acumulativa y ningún bloque se
  * reejecuta.
  */
-export const localDatabaseVersion = 21;
+export const localDatabaseVersion = 22;
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -431,6 +432,10 @@ export async function migrateLocalDatabase(
 
     if (currentVersion < 21) {
       await recreateRemoteEntityLinksWithMoneyAccounts(transaction);
+    }
+
+    if (currentVersion < 22) {
+      await reduceMoneyAccountKinds(transaction);
     }
 
     await transaction.execAsync(

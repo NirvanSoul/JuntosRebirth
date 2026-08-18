@@ -332,7 +332,7 @@ la lista del espacio por quien las haya activado.
 
 La versión 20 añade `money_accounts`: la cuenta es el segundo eje de
 clasificación de un movimiento, opcional y con saldo propio. Guarda espacio,
-nombre, tipo (`cash`, `bank`, `debit`, `credit`, `savings`), icono, color,
+nombre, tipo (`cash`, `bank`, `card`), icono, color,
 moneda, saldo inicial en unidades menores, autor, archivado, fechas técnicas y
 estado de sincronización. El saldo inicial admite cero y negativos: una
 tarjeta de crédito arranca con deuda. `transactions` y
@@ -347,6 +347,13 @@ transacción, algo que el migrador no hace—. La coincidencia de espacio y de
 moneda se valida entonces en `localTransactionRepository`
 (`assertMoneyAccountAssignment`), y en Postgres, que es la autoridad real, la
 migración 28 sí declara la foránea compuesta.
+
+La versión 22 reduce los tipos de cuenta a tres: efectivo, cuenta bancaria y
+tarjeta. Distinguir débito, crédito y ahorro no aporta nada mientras el saldo
+se calcule igual en todos y no existan límite de crédito ni transferencias, y
+sí obliga a elegir entre opciones que para el usuario son la misma. Como el
+CHECK no se puede alterar, la tabla se reconstruye y las filas anteriores se
+reasignan: débito y crédito pasan a tarjeta, ahorro a cuenta bancaria.
 
 La versión 21 añade `money_account` a los valores admitidos por
 `remote_entity_links.entity_type`. Como un CHECK de SQLite no se puede
@@ -648,7 +655,7 @@ Campos:
 id                     uuid, PK
 space_id               uuid, FK
 name                   text
-kind                   text (cash | bank | debit | credit | savings)
+kind                   text (cash | bank | card)
 icon                   text
 color_token            text
 currency               text
@@ -672,6 +679,8 @@ Reglas:
   series asignados; después reinterpretaría dinero ya registrado.
 - El saldo es saldo inicial más ingresos menos gastos asignados, con la misma
   regla de horizonte mensual que el resto de la app (§8).
+- El tipo solo propone icono y color al crear la cuenta; los tres se comportan
+  igual. La migración 31 dejó el CHECK en `cash`, `bank` y `card`.
 - Eliminar una cuenta es archivarla; sus movimientos se conservan.
 - `transactions.money_account_id` y su equivalente en las series son opcionales
   y usan la foránea compuesta `(money_account_id, space_id)`: con `match

@@ -267,7 +267,9 @@ describe('migrateLocalDatabase', () => {
       .map(([statement]) => statement)
       .join('\n');
     expect(migration).toContain('CREATE TABLE money_accounts');
-    expect(migration).toContain("'cash', 'bank', 'debit', 'credit', 'savings'");
+    // Desde una v19 la escalera pasa por la v20 y termina en la v22, que
+    // deja los tres tipos definitivos.
+    expect(migration).toContain("'cash', 'bank', 'card'");
     expect(migration).toContain(
       'ALTER TABLE transactions ADD COLUMN money_account_id TEXT',
     );
@@ -279,6 +281,28 @@ describe('migrateLocalDatabase', () => {
     expect(migration).not.toContain(
       'UPDATE transactions\n           SET money_account_id',
     );
+  });
+
+  it('reduce los tipos de cuenta y reasigna los antiguos desde la versión 21', async () => {
+    const transaction = { execAsync: jest.fn(async () => undefined) };
+    const database = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ user_version: 21 })),
+      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    const migration = (transaction.execAsync as jest.Mock).mock.calls
+      .map(([statement]) => statement)
+      .join('\n');
+    expect(migration).toContain("CHECK (kind IN ('cash', 'bank', 'card'))");
+    expect(migration).toContain("WHEN 'debit' THEN 'card'");
+    expect(migration).toContain("WHEN 'credit' THEN 'card'");
+    expect(migration).toContain("WHEN 'savings' THEN 'bank'");
+    // Ninguna cuenta se pierde por el camino.
+    expect(migration).toContain('INSERT INTO money_accounts');
+    expect(migration).toContain('DROP TABLE money_accounts_v20');
   });
 
   it('rechaza una base creada por una versión futura de la app', async () => {
