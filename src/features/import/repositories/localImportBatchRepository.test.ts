@@ -181,6 +181,7 @@ describe('localImportBatchRepository', () => {
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE import_items'),
       null,
+      'EUR',
       'none',
       'pending',
       0,

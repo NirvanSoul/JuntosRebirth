@@ -18,7 +18,7 @@ const frozenLineDebt = {
   'src/navigation/MainTabsNavigator.tsx': 1336,
   // Candidato prioritario a extracción (PLAN.md §3 Fase 4); el umbral se
   // ajusta sin margen a la medición actual.
-  'src/features/import/screens/ImportScreen.tsx': 1188,
+  'src/features/import/screens/ImportScreen.tsx': 1177,
   'src/features/transactions/components/CreateTransactionModal/CreateTransactionModal.tsx': 1160,
   'src/features/transactions/repositories/localTransactionRepository.ts': 895,
   'src/features/transactions/components/TransactionDetailModal/TransactionDetailModal.tsx': 696,

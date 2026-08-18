@@ -6,7 +6,6 @@ import { CategoryIcon } from '@/features/categories/components/CategoryIcon/Cate
 import type { Category } from '@/features/categories/types';
 import type { ImportedTransactionCandidate } from '@/features/import/types';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
-import { defaultCurrencyCode } from '@/lib/currency/currencyCatalog';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -50,12 +49,8 @@ export function ImportRow({
   );
   const hasIssues = visibleIssues.length > 0;
   const amountLabel =
-    candidate.amountMinor !== null
-      ? formatCurrency(
-          candidate.amountMinor,
-          candidate.currency ?? defaultCurrencyCode,
-          'es-ES',
-        )
+    candidate.amountMinor !== null && candidate.currency !== null
+      ? formatCurrency(candidate.amountMinor, candidate.currency, 'es-ES')
       : '—';
 
   return (

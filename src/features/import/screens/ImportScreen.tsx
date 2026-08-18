@@ -59,6 +59,7 @@ import {
   type ResumableLocalImportBatch,
   saveLocalImportBatchReview,
 } from '@/features/import/repositories/localImportBatchRepository';
+import type { Phase } from '@/features/import/screens/importScreenState';
 import type {
   ColumnMapping,
   ColumnRole,
@@ -106,32 +107,6 @@ type ImportScreenProps = {
   onImportComplete: (created: readonly SessionTransaction[]) => void;
   visible: boolean;
 };
-
-type Phase =
-  | { kind: 'idle' }
-  | { kind: 'validating' }
-  | { kind: 'parsing' }
-  | {
-      kind: 'mapping-columns';
-      headers: readonly string[];
-      rows: readonly (readonly unknown[])[];
-      mapping: ColumnMapping;
-      merchantRules: readonly ImportMerchantRule[];
-      sourceType: ImportSourceExtension;
-    }
-  | {
-      kind: 'select-currency';
-      rows: readonly (readonly unknown[])[];
-      mapping: ColumnMapping;
-      merchantRules: readonly ImportMerchantRule[];
-      sourceType: ImportSourceExtension;
-    }
-  | { kind: 'review' }
-  | { kind: 'saved-batches'; batches: readonly ResumableLocalImportBatch[] }
-  | { kind: 'duplicate-file'; existingBatchDate: string }
-  | { kind: 'committing' }
-  | { kind: 'complete'; createdCount: number }
-  | { kind: 'failed'; message: string };
 
 /** Fecha por defecto para desambiguar formatos: el público principal de juntoss usa DD/MM. */
 const dayMonthPreference = 'DMY';
@@ -441,12 +416,25 @@ export function ImportScreen({
     onClose();
   }, [cleanupPickedFile, onClose]);
 
-  const resumeBatch = useCallback((batch: ResumableLocalImportBatch) => {
-    activeBatchIdRef.current = batch.id;
-    reviewCandidatesRef.current = [...batch.candidates];
-    setCandidates([...batch.candidates]);
-    setPhase({ kind: 'review' });
-  }, []);
+  const resumeBatch = useCallback(
+    (batch: ResumableLocalImportBatch) => {
+      activeBatchIdRef.current = batch.id;
+      const restored = batch.candidates.map((candidate) =>
+        candidate.currency === null
+          ? { ...candidate, currency: fallbackCurrency }
+          : candidate,
+      );
+      reviewCandidatesRef.current = restored;
+      setCandidates(restored);
+      setPhase({ kind: 'review' });
+      if (batch.candidates.some((candidate) => candidate.currency === null)) {
+        reviewWriteQueueRef.current = reviewWriteQueueRef.current
+          .catch(() => undefined)
+          .then(() => saveLocalImportBatchReview(batch.id, restored));
+      }
+    },
+    [fallbackCurrency],
+  );
 
   const handleReturnToSavedBatches = useCallback(async () => {
     try {

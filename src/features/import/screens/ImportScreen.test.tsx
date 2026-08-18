@@ -16,6 +16,7 @@ import {
   createLocalImportBatch,
   findLocalImportBatchByFileHash,
   listResumableLocalImportBatches,
+  saveLocalImportBatchReview,
   type ResumableLocalImportBatch,
 } from '@/features/import/repositories/localImportBatchRepository';
 import { enqueueMerchantFeedback } from '@/features/import/repositories/localMerchantFeedbackQueueRepository';
@@ -23,6 +24,7 @@ import type { ImportedTransactionCandidate } from '@/features/import/types';
 import { computeImportFileHash } from '@/features/import/utils/computeImportFileHash';
 import { createLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
 import type { Category } from '@/features/categories/types';
+import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
@@ -561,6 +563,61 @@ describe('ImportScreen', () => {
         spaceId: 'space-ves',
         fallbackCurrency: 'VES',
       }),
+    );
+  });
+
+  it('reanuda un lote con moneda nula en un espacio VES y lo repara, muestra e importa como VES', async () => {
+    const nullCurrencyCandidate: ImportedTransactionCandidate = {
+      ...readyCandidate,
+      id: 'candidate-null',
+      currency: null,
+    };
+    const savedBatch: ResumableLocalImportBatch = {
+      id: 'saved-batch-ves',
+      spaceId: 'space-ves',
+      sourceType: 'csv',
+      status: 'needs_review',
+      totalItems: 1,
+      reviewItems: 1,
+      duplicateItems: 0,
+      createdAt: '2026-08-08T10:00:00.000Z',
+      updatedAt: '2026-08-08T10:00:00.000Z',
+      candidates: [nullCurrencyCandidate],
+    };
+    (listResumableLocalImportBatches as jest.Mock).mockResolvedValue([
+      savedBatch,
+    ]);
+
+    const screen = await renderWithTheme(
+      <ImportScreen
+        {...baseProps({
+          activeSpaceId: 'space-ves',
+          activeSpaceName: 'Juntos',
+          availableCurrencies: ['VES'],
+          fallbackCurrency: 'VES',
+        })}
+      />,
+    );
+
+    expect(await screen.findByTestId('import-center')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('import-resume-saved-batch-ves'));
+
+    // Persiste la reparación con la moneda del espacio.
+    await waitFor(() =>
+      expect(saveLocalImportBatchReview).toHaveBeenCalledWith(
+        'saved-batch-ves',
+        [expect.objectContaining({ id: 'candidate-null', currency: 'VES' })],
+      ),
+    );
+
+    // La fila se muestra como VES, sin caer al euro por defecto.
+    expect(screen.getByText(formatCurrency(3244, 'VES', 'es-ES'))).toBeTruthy();
+
+    fireEvent.press(await screen.findByTestId('import-confirm'));
+    await waitFor(() =>
+      expect(createLocalTransactions).toHaveBeenCalledWith([
+        expect.objectContaining({ currency: 'VES' }),
+      ]),
     );
   });
 });

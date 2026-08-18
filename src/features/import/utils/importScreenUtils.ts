@@ -24,6 +24,7 @@ export function isCandidateReady(
   return (
     candidate.occurredOn !== null &&
     candidate.amountMinor !== null &&
+    candidate.currency !== null &&
     candidate.type !== 'unknown' &&
     candidate.categoryId !== null
   );

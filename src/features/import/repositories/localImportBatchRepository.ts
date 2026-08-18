@@ -232,14 +232,14 @@ export async function saveLocalImportBatchReview(
     for (const candidate of candidates) {
       const result = await transaction.runAsync(
         `UPDATE import_items
-            SET final_category_id = ?, duplicate_status = ?, item_status = ?,
-                is_selected = ?, issues = ?, updated_at = ?,
+            SET final_category_id = ?, currency = ?, duplicate_status = ?,
+                item_status = ?, is_selected = ?, issues = ?, updated_at = ?,
                 sync_status = CASE
-                  WHEN sync_status = 'local_only' THEN 'local_only'
-                  ELSE 'pending'
+                  WHEN sync_status = 'local_only' THEN 'local_only' ELSE 'pending'
                 END
           WHERE id = ? AND batch_id = ?`,
         candidate.categoryId,
+        candidate.currency,
         candidate.duplicateStatus,
         itemStatus(candidate),
         candidate.selected ? 1 : 0,
