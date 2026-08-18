@@ -30,7 +30,7 @@ release no ha comenzado.
 
 ## 3. Orden de trabajo
 
-### Fase 1 — Limpieza quirúrgica (bajo riesgo, sin cambiar comportamiento)
+### Fase 1 — Limpieza quirúrgica — [x] cerrada
 
 - [x] Imports de librerías: `phosphor-react-native/src/icons/*` se conserva (API
   pública declarada en `exports`); los tipos de `react-native-calendars` se
@@ -55,16 +55,81 @@ anclado en `scripts/check-exhaustive-deps-suppressions.mjs`, integrado en
 `fe069e1` (F3), `e9cd5d5`/`5c19b3b` (F4), `9c4ca15` (helper y umbral),
 `3e83bd7`/`f62d566` (check).
 
-### Fase 2 — Spike: sincronización end-to-end + verificación de correo
+### Fase 2 — Spike: sincronización end-to-end + verificación de correo — [x] cerrada
 
-Verificar (no arreglar) que la sync Supabase y la verificación de correo
-funcionan de punta a punta. El resultado decide si Fase 3 existe y de qué tamaño.
+La sync Supabase y la verificación de correo se comprobaron de punta a punta.
+El spike reprodujo el fallo compartido y dimensionó la Fase 3 (§§6-8).
 
-### Fase 3 — Producto: terminar lo que el spike revele
+### Fase 3 — Producto: terminar lo que el spike reveló — en curso
 
 Implementar lo que el spike demuestre que falta.
 
-### Fase 4 — Descomposición por contacto
+### Fase 4 — Desarrollo funcional del MVP final — pendiente
+
+Esta fase incorpora como **alcance obligatorio de producto** las capacidades
+que Alphonzo propuso en la rama externa: autoría visible, perfiles y avatares de
+miembros, cuentas de dinero y los ajustes visuales que superen revisión. Se
+implementarán desde nuestros contratos y reglas; que una capacidad entre en el
+MVP **no aprueba ni integra su código externo** (§9).
+
+No comienza hasta cerrar la Entrega 2 de monedas. Sus prerrequisitos son:
+
+- Resolver la escala de monedas sin centavos (§8.4.9) antes de almacenar nuevos
+  saldos iniciales.
+- Resolver explícitamente la contradicción de `category_budgets` y decidir, con
+  inventario real, si hace falta reparar el backfill histórico que asumió EUR.
+- Crear migraciones propias desde el siguiente número libre en nuestro
+  repositorio; los números 24-34 de la rama externa no están reservados ni se
+  copian.
+
+#### Fase 4a — Autoría compartida
+
+- Exponer en el modelo local y remoto quién creó cada movimiento.
+- Diferenciar UUID autenticado e identificador de instalación de invitado sin
+  atribuir a la persona equivocada durante la ventana de sincronización.
+- Mostrar autor textual en tarjeta y detalle solo cuando aporte información.
+- Conservar autoría al editar y definir su estado tras abandonar el espacio o
+  eliminar la cuenta.
+- Probar RLS, caché sin conexión y ambos sentidos de sincronización.
+
+#### Fase 4b — Perfiles y avatares compartidos
+
+- Permitir leer únicamente perfiles de miembros que comparten un espacio
+  activo; una invitación pendiente no concede acceso.
+- Diseñar bucket privado, miniaturas, límites, rutas, caché, reintentos,
+  actualización y borrado de cuenta.
+- Separar la identidad textual de la imagen: si Storage falla, el nombre y la
+  autoría siguen funcionando.
+- Verificar privacidad con usuarios ajenos y comportamiento real en iPhone y
+  Honor.
+
+#### Fase 4c — Cuentas de dinero
+
+- Definir mediante ficha y ADR saldo inicial con fecha, saldo actual frente a
+  proyectado, transferencias, propiedad compartida y una o varias monedas por
+  cuenta.
+- Una transferencia entre cuentas propias no puede inflar ingresos y gastos.
+- Nunca cambiar la divisa de un movimiento conservando el mismo importe sin
+  conversión o confirmación explícita.
+- Implementar en entregas separadas: modelo local y migración; SQL/RLS;
+  sincronización y migración de invitado; consumo en movimientos; y UI en
+  Actividad/Inicio.
+- Exigir integridad por espacio, permisos de autor, pgTAP conductual, staging y
+  pruebas financieras multidivisa en dos dispositivos.
+
+#### Fase 4d — Consolidación visual
+
+- Revisar las propuestas externas sobre progreso de onboarding, botón flotante,
+  fondo raíz y presentación de cuentas contra `PRODUCT.md` y el sistema de
+  diseño.
+- Implementar solo las que tengan objetivo y criterio de aceptación; no portar
+  el commit externo de «trabajo en curso».
+- Hacer smoke visual y nativo en iOS y Android.
+
+La Fase 4 termina cuando estas capacidades están implementadas, verificadas y
+documentadas; no cuando existen commits externos que se les parezcan.
+
+### Regla transversal — Descomposición por contacto
 
 No se descompone un god component por estar en una lista: se descompone el día
 que una tarea de producto obliga a entrar en él. `frozenLineDebt` marca qué
@@ -79,11 +144,11 @@ techo y solo puede bajar.
 
 **Candidato prioritario:** `ImportScreen.tsx`. Dos excepciones sobre el mismo
 archivo dejan de ser casualidad: su umbral congelado se elevó (fix del stale
-closure del catálogo, F4) y alberga la única supresión de `exhaustive-deps` que
-permite el check de línea base. Es el siguiente candidato a extracción cuando
-una tarea de producto lo toque.
+closure del catálogo, Fase 1b/F4) y alberga la única supresión de
+`exhaustive-deps` que permite el check de línea base. Es el siguiente candidato
+a extracción cuando una tarea de producto lo toque.
 
-### Fase 5 — Release
+### Fase 5 — Release — no iniciada
 
 - Prueba real en dispositivo iOS y Android (safe areas, teclado, gestos, modo
   oscuro real) — `PROJECT_RULES.md` §10.
@@ -447,22 +512,23 @@ HEAD; no se traerá ni se reescribirá la rama externa actual.
 
 | Grupo externo | Commits observados | Idea | Disposición local |
 |---|---|---|---|
-| Miembros, autoría y avatares | `93a2b7f` a `c949ec3` | Mostrar autor de cada movimiento, leer perfiles de miembros y sincronizar miniaturas mediante un bucket privado. | Candidato futuro; no integrado. Requiere decisión de producto, privacidad, Storage, RLS, pgTAP y smoke en dos dispositivos. |
+| Miembros, autoría y avatares | `93a2b7f` a `c949ec3` | Mostrar autor de cada movimiento, leer perfiles de miembros y sincronizar miniaturas mediante un bucket privado. | Alcance obligatorio de Fase 4a-4b; no integrado. Se rediseña con privacidad, Storage, RLS, pgTAP y smoke en dos dispositivos. |
 | Monedas compartidas | `2d7a5b0`, `3aef261` | Unir moneda del espacio y preferencias de ambos miembros. | No portar: el defecto ya está resuelto localmente mediante el catálogo canónico del espacio (`dcb5d8a`, `b55fbdf`) sin depender de `profiles.default_currency`. |
-| Reparación histórica de presupuestos | migración externa 27 dentro de `cd3abf1` | Reetiquetar como moneda del espacio ciertos presupuestos que la migración 08 asumió EUR. | No aplicar ahora: `category_budgets` sigue dormida y la contradicción 08 vs 18/20 ya está registrada. Se reevaluará al resolver esa deuda con inventario real previo. |
-| Cuentas de dinero | `aec1504`, `23cb5f4`, `a7e9488`, `14de52b` | Cuenta opcional por movimiento, tres tipos visuales y varios saldos monetarios por cuenta, con persistencia y sync local/remota. | Propuesta grande pendiente de decisión; no integrada ni aprobada. |
-| Ajustes visuales en curso | `cd3abf1` | Onboarding, botón flotante y fondo del navegador raíz. | Sin tarea: no hay reporte de producto ni verificación visual que justifique copiarlos. |
+| Reparación histórica de presupuestos | migración externa 27 dentro de `cd3abf1` | Reetiquetar como moneda del espacio ciertos presupuestos que la migración 08 asumió EUR. | Prerrequisito de Fase 4, no aplicado. Se resolverá la deuda con inventario real y migración propia solo si corresponde. |
+| Cuentas de dinero | `aec1504`, `23cb5f4`, `a7e9488`, `14de52b` | Cuenta opcional por movimiento, tres tipos visuales y varios saldos monetarios por cuenta, con persistencia y sync local/remota. | Alcance obligatorio de Fase 4c; el producto está aceptado, pero su diseño e implementación externa no. |
+| Ajustes visuales en curso | `cd3abf1` | Onboarding, botón flotante y fondo del navegador raíz. | Entran en la revisión de Fase 4d; se implementan de forma propia solo con criterio de aceptación. |
 
 ### 9.3 Evaluación de «cuentas de dinero»
 
-La idea puede aportar una segunda dimensión útil —**dónde está el dinero**,
-además de **en qué se gastó**—, pero la solución externa cambió de modelo tres
-veces en menos de un día: cinco tipos, luego tres; una moneda por cuenta, luego
-varias. Su primer commit toca 74 archivos y casi 7.000 líneas. Por tamaño,
-persistencia, SQL, sincronización y cálculo de saldos, cualquier implementación
-propia se clasifica como **tarea grande** y se divide en entregas.
+La cuenta de dinero forma parte del alcance del MVP final y aporta una segunda
+dimensión —**dónde está el dinero**, además de **en qué se gastó**—, pero la
+solución externa cambió de modelo tres veces en menos de un día: cinco tipos,
+luego tres; una moneda por cuenta, luego varias. Su primer commit toca 74
+archivos y casi 7.000 líneas. Por tamaño, persistencia, SQL, sincronización y
+cálculo de saldos, nuestra implementación se clasifica como **tarea grande** y
+se divide en entregas.
 
-Antes de aprobarla hay que resolver estas decisiones de producto:
+Antes de implementarla hay que resolver estas decisiones de producto:
 
 1. **Significado del saldo inicial:** fecha desde la que aplica y tratamiento
    de movimientos anteriores. Un número sin fecha puede duplicar el saldo al
@@ -508,8 +574,8 @@ para servir de referencia directa:
   concurrencia, idempotencia y resolución entre dispositivos antes de usar ese
   enfoque.
 
-Si el responsable aprueba la feature en el futuro, se diseñará desde nuestros
-contratos actuales y en este orden:
+Al comenzar la Fase 4c se diseñará desde nuestros contratos actuales y en este
+orden:
 
 1. Ficha de producto y ADR: saldo, fecha, transferencias, monedas y propiedad.
 2. Modelo local versionado y migración con pruebas de datos previos.
@@ -523,9 +589,9 @@ contratos actuales y en este orden:
 
 ### 9.4 Autoría y avatares
 
-Exponer quién creó un movimiento compartido es coherente con la regla de
-autoría del producto. Subir fotografías es una decisión separada y más
-sensible. Antes de convertir esta propuesta en tarea deben definirse:
+Exponer quién creó un movimiento compartido y mostrar los perfiles de los
+miembros forman parte del MVP final. Subir fotografías sigue siendo una entrega
+separada y más sensible. Antes de implementar deben definirse:
 
 - Qué identidad se muestra mientras el perfil remoto o la imagen no están
   disponibles.
@@ -537,6 +603,6 @@ sensible. Antes de convertir esta propuesta en tarea deben definirse:
 - Actualización y reintento sin convertir una pérdida de red en una foto
   equivocada o permanentemente obsoleta.
 
-Se separará en dos tareas si se prioriza: primero **autoría textual**; después
+La ejecución se separa en dos tareas: primero **autoría textual**; después
 **sincronización de avatares**. Ninguna se inicia durante el cierre actual de
 monedas.
