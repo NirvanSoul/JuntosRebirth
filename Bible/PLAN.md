@@ -184,10 +184,11 @@ a extracción cuando una tarea de producto lo toque.
 - [ ] **Cerrar el consumo multidivisa sin presentar importes como euros por
   defecto.** El modelo y la mayor parte de la interfaz ya están implementados:
   `spaces.currency` es la fuente del espacio, los agregados filtran por moneda
-  y el catálogo visible es común a Inicio y Actividad. La casilla permanece
-  abierta hasta corregir los lotes reanudados con `currency = null`, aportar la
-  evidencia diferencial pendiente y completar los smokes físicos de la
-  Entrega 2 (§8.4).
+  y el catálogo visible es común a Inicio y Actividad. Los lotes reanudados con
+  `currency = null` ya están corregidos (`a0eb3fe`), la evidencia diferencial
+  asimétrica está capturada (rojo en `dcb5d8a` / verde en HEAD) y el reset de
+  staging está ejecutado y verificado. La casilla permanece abierta hasta
+  completar los smokes físicos de la Entrega 2 (§8.4, §6).
 
 - [ ] **Registrarse con un correo ya usado no avisa de nada** y el usuario
   espera un código que nunca llega. El silencio puede ser deliberado: responder
@@ -454,10 +455,24 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
      - Sustitución de los 8 literales `'EUR'` operativos.
      - Commits principales: `c039ae8`, `c915607`, `a30fe41`, `dcb5d8a` y
        `b55fbdf`.
-     - Pendiente de cierre: normalizar y persistir la moneda de lotes antiguos
-       reanudados con `currency = null`; ejecutar la prueba asimétrica contra el
-       estado anterior; y completar los smokes de worklets y moneda del espacio
-       en iPhone y Honor sobre datos de prueba limpios.
+     - Commits de cierre: `a0eb3fe` (fix de lotes reanudados con
+       `currency = null`).
+     - Evidencia diferencial asimétrica capturada (ejecución real, no «por
+       construcción»): fuente fijada en `dcb5d8a` con los tests de HEAD → ROJO
+       en `MainTabsNavigator › propagación multidivisa (Entrega 2) › Actividad
+       arranca en la moneda del espacio (VES)…` (`Unable to find an element
+       with text: No hay movimientos de este tipo`; 1 failed, 20 skipped de
+       21); fuente restaurada a HEAD → VERDE (1 passed; suite
+       `MainTabsNavigator` 21/21).
+     - Reset de staging ejecutado (dirigido y transaccional): inventario
+       confirmado (2 cuentas de prueba + espacio «Juntos» EUR + datos limpios)
+       → borrado del espacio `b69578f8…` y sus datos en orden FK-seguro dentro
+       de una única transacción → verificado a 0 filas. Se conservan
+       `auth.users` y `profiles` (excluido Auth) para que el login siga
+       funcionando; sin tocar migraciones, esquema, Edge Functions,
+       configuración ni secrets.
+     - Pendiente de cierre: completar los smokes de worklets y moneda del
+       espacio en iPhone y Honor sobre datos de prueba limpios (§6).
    - **Fuera de alcance:**
      - `profiles.default_currency` queda fuera de ambas entregas.
      - `category_budgets` (SQLite local y PostgreSQL remota) sigue dormida: con una moneda principal por espacio, el presupuesto por divisa no aporta valor hasta que existan espacios multidivisa habituales.
