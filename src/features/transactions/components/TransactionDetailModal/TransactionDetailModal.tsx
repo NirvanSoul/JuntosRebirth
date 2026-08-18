@@ -21,6 +21,7 @@ import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIco
 import type { MoneyAccount } from '@/features/accounts/types';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { Category } from '@/features/categories/types';
+import { TransactionMoneyAccountPickerModal } from '@/features/transactions/components/CreateTransactionModal/TransactionOptionPickers';
 import { createStyles } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal.styles';
 import { TransactionReminderModal } from '@/features/transactions/components/TransactionReminderModal/TransactionReminderModal';
 import type {
@@ -49,6 +50,12 @@ type TransactionDetailModalProps = {
   category: Category | null;
   /** Cuenta del movimiento; puede estar archivada y se sigue mostrando. */
   moneyAccount?: MoneyAccount | null;
+  /** Cuentas asignables: solo las activas del espacio en esta misma moneda. */
+  assignableMoneyAccounts?: readonly MoneyAccount[];
+  onAssignMoneyAccount?: (
+    transactionId: string,
+    moneyAccountId: string | undefined,
+  ) => void;
   onClose: () => void;
   onCopy: (
     transactionId: string,
@@ -90,8 +97,10 @@ function formatTransactionDate(occurredOn: string): string {
 }
 
 export function TransactionDetailModal({
+  assignableMoneyAccounts = [],
   category,
   moneyAccount,
+  onAssignMoneyAccount,
   onClose,
   onCopy,
   onDelete,
@@ -111,6 +120,8 @@ export function TransactionDetailModal({
   const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
   const [isReminderModalVisible, setReminderModalVisible] = useState(false);
   const [isNoteModalVisible, setNoteModalVisible] = useState(false);
+  const [isMoneyAccountPickerVisible, setMoneyAccountPickerVisible] =
+    useState(false);
   const [isDeleteVisible, setDeleteVisible] = useState(false);
   const [isRecurrenceExpanded, setRecurrenceExpanded] = useState(false);
   const [visibleRecurrenceCount, setVisibleRecurrenceCount] =
@@ -124,6 +135,7 @@ export function TransactionDetailModal({
       setSpacePickerVisible(false);
       setReminderModalVisible(false);
       setNoteModalVisible(false);
+      setMoneyAccountPickerVisible(false);
       setDeleteVisible(false);
       setRecurrenceExpanded(false);
       setVisibleRecurrenceCount(recurrencePageSize);
@@ -374,27 +386,51 @@ export function TransactionDetailModal({
                   />
                 ) : null}
               </Pressable>
-              {moneyAccount ? (
-                <>
-                  <View style={styles.divider} />
-                  <View
-                    style={styles.detailRow}
-                    testID="transaction-detail-money-account-row"
-                  >
-                    <MoneyAccountIcon
-                      color={categoryColors[moneyAccount.colorToken]}
-                      name={moneyAccount.icon}
-                      size={iconSize.sm}
-                    />
-                    <View style={styles.detailCopy}>
-                      <Text tone="secondary" variant="caption">
-                        Cuenta
-                      </Text>
-                      <Text variant="label">{moneyAccount.name}</Text>
-                    </View>
-                  </View>
-                </>
-              ) : null}
+              <View style={styles.divider} />
+              <Pressable
+                accessibilityLabel={
+                  moneyAccount
+                    ? `Cambiar cuenta: ${moneyAccount.name}`
+                    : 'Añadir una cuenta a este movimiento'
+                }
+                accessibilityRole={onAssignMoneyAccount ? 'button' : undefined}
+                disabled={!onAssignMoneyAccount}
+                onPress={() => setMoneyAccountPickerVisible(true)}
+                style={({ pressed }) => [
+                  styles.detailRow,
+                  pressed && styles.pressed,
+                ]}
+                testID="transaction-detail-money-account-row"
+              >
+                {moneyAccount ? (
+                  <MoneyAccountIcon
+                    color={categoryColors[moneyAccount.colorToken]}
+                    name={moneyAccount.icon}
+                    size={iconSize.sm}
+                  />
+                ) : (
+                  <Ionicons
+                    color={colors.textMuted}
+                    name="wallet-outline"
+                    size={iconSize.sm}
+                  />
+                )}
+                <View style={styles.detailCopy}>
+                  <Text tone="secondary" variant="caption">
+                    Cuenta
+                  </Text>
+                  <Text variant="label">
+                    {moneyAccount?.name ?? 'Sin cuenta'}
+                  </Text>
+                </View>
+                {onAssignMoneyAccount ? (
+                  <Ionicons
+                    color={colors.textMuted}
+                    name="chevron-forward"
+                    size={iconSize.sm}
+                  />
+                ) : null}
+              </Pressable>
               <View style={styles.divider} />
               <View style={styles.detailRow}>
                 <Ionicons
@@ -592,6 +628,17 @@ export function TransactionDetailModal({
         transactionOccurredOn={transaction.occurredOn}
         transactionTitle={title}
         visible={isReminderModalVisible}
+      />
+
+      <TransactionMoneyAccountPickerModal
+        accounts={assignableMoneyAccounts}
+        moneyAccountId={transaction.moneyAccountId}
+        onClose={() => setMoneyAccountPickerVisible(false)}
+        onSelectMoneyAccount={(selectedId) => {
+          setMoneyAccountPickerVisible(false);
+          onAssignMoneyAccount?.(transaction.id, selectedId);
+        }}
+        visible={isMoneyAccountPickerVisible}
       />
 
       <NoteEditorModal

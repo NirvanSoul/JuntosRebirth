@@ -348,6 +348,18 @@ moneda se valida entonces en `localTransactionRepository`
 (`assertMoneyAccountAssignment`), y en Postgres, que es la autoridad real, la
 migración 28 sí declara la foránea compuesta.
 
+La versión 23 repara la foránea que dejó colgando la versión 22. Al
+reconstruir `money_accounts` con `ALTER TABLE ... RENAME`, SQLite reescribió
+las referencias de `transactions` y `recurring_transaction_series` para que
+apuntaran a `money_accounts_v20`, que acto seguido se borraba: asignar una
+cuenta a un movimiento fallaba con «no such table». La reparación son dos
+renombrados y ningún copiado —el primero adopta el nombre que la referencia
+rota espera y el segundo devuelve la tabla a su nombre reescribiéndola—, y es
+idempotente.
+
+Es el mismo mecanismo que ya obligaba a no reconstruir `transactions` (ver la
+versión 20), aplicado esta vez a la propia tabla de cuentas.
+
 La versión 22 reduce los tipos de cuenta a tres: efectivo, cuenta bancaria y
 tarjeta. Distinguir débito, crédito y ahorro no aporta nada mientras el saldo
 se calcule igual en todos y no existan límite de crédito ni transferencias, y

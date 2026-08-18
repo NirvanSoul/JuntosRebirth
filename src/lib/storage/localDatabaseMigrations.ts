@@ -4,11 +4,7 @@ import {
   createInitialSchema,
   createRecurringSeriesSchema,
 } from '@/lib/storage/localDatabaseBaseSchema';
-import {
-  createMoneyAccountSchema,
-  recreateRemoteEntityLinksWithMoneyAccounts,
-  reduceMoneyAccountKinds,
-} from '@/lib/storage/localDatabaseMoneyAccountSchema';
+import { applyMoneyAccountMigrations } from '@/lib/storage/localDatabaseMoneyAccountSchema';
 import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabaseSchemaRepair';
 
 /**
@@ -17,7 +13,7 @@ import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabase
  * versión, de modo que la escalera es acumulativa y ningún bloque se
  * reejecuta.
  */
-export const localDatabaseVersion = 22;
+export const localDatabaseVersion = 23;
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -426,17 +422,7 @@ export async function migrateLocalDatabase(
       `);
     }
 
-    if (currentVersion < 20) {
-      await createMoneyAccountSchema(transaction);
-    }
-
-    if (currentVersion < 21) {
-      await recreateRemoteEntityLinksWithMoneyAccounts(transaction);
-    }
-
-    if (currentVersion < 22) {
-      await reduceMoneyAccountKinds(transaction);
-    }
+    await applyMoneyAccountMigrations(transaction, currentVersion);
 
     await transaction.execAsync(
       `PRAGMA user_version = ${localDatabaseVersion}`,

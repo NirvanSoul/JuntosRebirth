@@ -7,6 +7,7 @@ import {
   listLocalTransactions,
   materializeDueRecurringTransactions,
   updateLocalTransaction,
+  updateLocalTransactionMoneyAccount,
   updateLocalTransactionNote,
 } from '@/features/transactions/repositories/localTransactionRepository';
 
@@ -824,6 +825,72 @@ describe('localTransactionRepository', () => {
         expect.any(String),
         expect.any(String),
       );
+    });
+  });
+
+  describe('updateLocalTransactionMoneyAccount', () => {
+    it('asigna una cuenta sin tocar el resto del movimiento', async () => {
+      getFirstAsync
+        .mockResolvedValueOnce({ currency: 'EUR' })
+        .mockResolvedValueOnce({ currency: 'EUR' });
+
+      await updateLocalTransactionMoneyAccount(
+        'transaction-id',
+        'personal',
+        'account-1',
+      );
+
+      const [sql, ...params] = runAsync.mock.calls[0] as unknown as [
+        string,
+        ...unknown[],
+      ];
+      expect(sql).toContain('SET money_account_id = ?');
+      expect(sql).not.toContain('amount_minor');
+      expect(params).toEqual([
+        'account-1',
+        expect.any(String),
+        'transaction-id',
+        'personal',
+      ]);
+    });
+
+    it('retira la cuenta cuando se elige ninguna', async () => {
+      getFirstAsync.mockResolvedValueOnce({ currency: 'EUR' });
+
+      await updateLocalTransactionMoneyAccount(
+        'transaction-id',
+        'personal',
+        null,
+      );
+
+      const [, moneyAccountId] = runAsync.mock.calls[0] as unknown as [
+        string,
+        unknown,
+      ];
+      expect(moneyAccountId).toBeNull();
+    });
+
+    it('rechaza una cuenta en otra moneda que la del movimiento', async () => {
+      getFirstAsync
+        .mockResolvedValueOnce({ currency: 'EUR' })
+        .mockResolvedValueOnce({ currency: 'USD' });
+
+      await expect(
+        updateLocalTransactionMoneyAccount(
+          'transaction-id',
+          'personal',
+          'account-1',
+        ),
+      ).rejects.toThrow('El movimiento debe usar la moneda de su cuenta');
+      expect(runAsync).not.toHaveBeenCalled();
+    });
+
+    it('avisa cuando el movimiento ya no existe', async () => {
+      getFirstAsync.mockResolvedValueOnce(undefined);
+
+      await expect(
+        updateLocalTransactionMoneyAccount('transaction-id', 'personal', null),
+      ).rejects.toThrow('El movimiento local ya no está disponible');
     });
   });
 

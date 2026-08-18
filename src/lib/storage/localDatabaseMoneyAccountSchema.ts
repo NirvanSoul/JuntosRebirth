@@ -157,3 +157,42 @@ export async function reduceMoneyAccountKinds(
       ON money_accounts(sync_status, updated_at);
   `);
 }
+
+/**
+ * Repara la foránea que la versión 22 dejó colgando (versión local 23).
+ *
+ * Al reconstruir `money_accounts` con `ALTER TABLE ... RENAME`, SQLite
+ * reescribe las referencias que apuntaban a esa tabla: `transactions` y
+ * `recurring_transaction_series` pasaron a referenciar `money_accounts_v20`,
+ * que acto seguido se borraba. Con esa referencia rota, asignar una cuenta a
+ * un movimiento fallaba con «no such table: main.money_accounts_v20».
+ *
+ * La reparación son dos renombrados y ningún copiado: el primero deja la tabla
+ * con el nombre que las referencias rotas esperan, y el segundo la devuelve a
+ * su nombre reescribiéndolas de paso. Es idempotente: si las referencias ya
+ * eran correctas, el primer renombrado las mueve y el segundo las devuelve.
+ */
+export async function repairMoneyAccountReferences(
+  transaction: SQLite.SQLiteDatabase,
+): Promise<void> {
+  await transaction.execAsync(`
+    ALTER TABLE money_accounts RENAME TO money_accounts_v20;
+    ALTER TABLE money_accounts_v20 RENAME TO money_accounts;
+  `);
+}
+
+/**
+ * Aplica en orden los peldaños de la escalera que pertenecen a las cuentas.
+ * Agruparlos aquí mantiene el migrador general legible: desde allí las cuentas
+ * son un único paso, y el detalle de cada versión vive junto al esquema.
+ */
+export async function applyMoneyAccountMigrations(
+  transaction: SQLite.SQLiteDatabase,
+  currentVersion: number,
+): Promise<void> {
+  if (currentVersion < 20) await createMoneyAccountSchema(transaction);
+  if (currentVersion < 21)
+    await recreateRemoteEntityLinksWithMoneyAccounts(transaction);
+  if (currentVersion < 22) await reduceMoneyAccountKinds(transaction);
+  if (currentVersion < 23) await repairMoneyAccountReferences(transaction);
+}

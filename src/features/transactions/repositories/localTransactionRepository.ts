@@ -835,3 +835,54 @@ export async function updateLocalTransactionNote(
     throw new Error('El movimiento local ya no está disponible');
   }
 }
+
+/**
+ * Asigna o retira la cuenta de un movimiento ya creado, sin tocar el resto de
+ * sus campos. Es el equivalente a `updateLocalTransactionNote` para la cuenta:
+ * el detalle del movimiento permite corregirla sin reabrir el formulario.
+ *
+ * La moneda del movimiento no cambia nunca aquí, así que solo se admite una
+ * cuenta que ya use esa misma moneda; el resto lo rechaza
+ * `assertMoneyAccountAssignment`.
+ */
+export async function updateLocalTransactionMoneyAccount(
+  transactionId: string,
+  spaceId: string,
+  moneyAccountId: string | null,
+): Promise<void> {
+  const database = await getLocalDatabase();
+  const existing = await database.getFirstAsync<{ currency: string }>(
+    `SELECT currency FROM transactions
+      WHERE id = ? AND space_id = ? AND is_archived = 0`,
+    transactionId,
+    spaceId,
+  );
+  if (!existing) {
+    throw new Error('El movimiento local ya no está disponible');
+  }
+  if (moneyAccountId) {
+    await assertMoneyAccountAssignment(database, {
+      spaceId,
+      currency: existing.currency as CreateTransactionDraft['currency'],
+      moneyAccountId,
+    } as CreateTransactionDraft);
+  }
+
+  const now = new Date().toISOString();
+  const result = await database.runAsync(
+    `UPDATE transactions
+        SET money_account_id = ?, updated_at = ?,
+            sync_status = CASE
+              WHEN sync_status = 'local_only' THEN 'local_only'
+              ELSE 'pending'
+            END
+      WHERE id = ? AND space_id = ? AND is_archived = 0`,
+    moneyAccountId,
+    now,
+    transactionId,
+    spaceId,
+  );
+  if (result.changes !== 1) {
+    throw new Error('El movimiento local ya no está disponible');
+  }
+}

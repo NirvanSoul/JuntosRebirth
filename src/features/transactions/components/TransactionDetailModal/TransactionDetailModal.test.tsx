@@ -426,4 +426,95 @@ describe('TransactionDetailModal', () => {
 
     expect(screen.queryByTestId('transaction-detail-note')).toBeNull();
   });
+  describe('cuenta del movimiento', () => {
+    const bankAccount = {
+      id: 'account-1',
+      spaceId: 'personal',
+      name: 'Cuenta nómina',
+      kind: 'bank' as const,
+      icon: 'bank' as const,
+      colorToken: 'blue' as const,
+      currency: 'EUR' as const,
+      openingBalanceMinor: 0,
+      isArchived: false,
+    };
+
+    const renderDetail = (props = {}) =>
+      render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <TransactionDetailModal
+              category={category}
+              onClose={jest.fn()}
+              onCopy={jest.fn(() => true)}
+              onDelete={jest.fn()}
+              onEdit={jest.fn()}
+              onRemoveReminder={jest.fn(() => true)}
+              onSaveNote={jest.fn()}
+              onSaveReminder={jest.fn(() => true)}
+              reminder={null}
+              shareTargets={[]}
+              transaction={transaction}
+              transactions={[transaction]}
+              visible
+              {...props}
+            />
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+    it('muestra la fila también cuando el movimiento no tiene cuenta', async () => {
+      const screen = await renderDetail();
+
+      expect(
+        screen.getByTestId('transaction-detail-money-account-row'),
+      ).toBeTruthy();
+      expect(screen.getByText('Sin cuenta')).toBeTruthy();
+    });
+
+    it('nombra la cuenta asignada', async () => {
+      const screen = await renderDetail({ moneyAccount: bankAccount });
+
+      expect(screen.getByText('Cuenta nómina')).toBeTruthy();
+    });
+
+    it('permite asignar una cuenta desde el detalle', async () => {
+      const onAssignMoneyAccount = jest.fn();
+      const screen = await renderDetail({
+        assignableMoneyAccounts: [bankAccount],
+        onAssignMoneyAccount,
+      });
+
+      await fireEvent.press(
+        screen.getByLabelText('Añadir una cuenta a este movimiento'),
+      );
+      await fireEvent.press(screen.getByLabelText('Cuenta nómina · EUR'));
+      await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
+
+      expect(onAssignMoneyAccount).toHaveBeenCalledWith('lunch', 'account-1');
+    });
+
+    it('permite retirar la cuenta ya asignada', async () => {
+      const onAssignMoneyAccount = jest.fn();
+      const screen = await renderDetail({
+        assignableMoneyAccounts: [bankAccount],
+        moneyAccount: bankAccount,
+        onAssignMoneyAccount,
+        transaction: { ...transaction, moneyAccountId: 'account-1' },
+      });
+
+      await fireEvent.press(
+        screen.getByLabelText('Cambiar cuenta: Cuenta nómina'),
+      );
+      await fireEvent.press(screen.getByLabelText('Sin cuenta'));
+      await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
+
+      expect(onAssignMoneyAccount).toHaveBeenCalledWith('lunch', undefined);
+    });
+  });
 });

@@ -2,7 +2,6 @@ export const createActionTypes = [
   'income',
   'expense',
   'category',
-  'moneyAccount',
   'import',
 ] as const;
 

@@ -125,7 +125,11 @@ export function useMoneyAccounts({
           );
           notifyRef.current.onChangesPublished();
           closeModal();
-        } catch {
+        } catch (error) {
+          // El aviso al usuario es deliberadamente genérico, pero la causa
+          // real tiene que quedar en el log: sin ella, un fallo de esquema es
+          // indistinguible de uno de validación.
+          console.error('[accounts] No se pudo actualizar la cuenta', error);
           notifyRef.current.onError();
         }
         return;
@@ -139,7 +143,8 @@ export function useMoneyAccounts({
         setMoneyAccounts((current) => [...current, created]);
         notifyRef.current.onChangesPublished();
         setModalVisible(false);
-      } catch {
+      } catch (error) {
+        console.error('[accounts] No se pudo crear la cuenta', error);
         notifyRef.current.onError();
       }
     },
@@ -159,7 +164,8 @@ export function useMoneyAccounts({
         );
         notifyRef.current.onChangesPublished();
         setDetailId(null);
-      } catch {
+      } catch (error) {
+        console.error('[accounts] No se pudo archivar la cuenta', error);
         notifyRef.current.onError();
       }
     },

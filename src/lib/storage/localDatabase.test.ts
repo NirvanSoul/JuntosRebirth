@@ -305,6 +305,30 @@ describe('migrateLocalDatabase', () => {
     expect(migration).toContain('DROP TABLE money_accounts_v20');
   });
 
+  it('repara desde la versión 22 la foránea que quedó apuntando a la tabla temporal', async () => {
+    const transaction = { execAsync: jest.fn(async () => undefined) };
+    const database = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ user_version: 22 })),
+      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    const migration = (transaction.execAsync as jest.Mock).mock.calls
+      .map(([statement]) => statement)
+      .join('\n');
+    // Dos renombrados y ningún copiado: el primero adopta el nombre que la
+    // referencia rota espera y el segundo la devuelve reescribiéndola.
+    expect(migration).toContain(
+      'ALTER TABLE money_accounts RENAME TO money_accounts_v20',
+    );
+    expect(migration).toContain(
+      'ALTER TABLE money_accounts_v20 RENAME TO money_accounts',
+    );
+    expect(migration).not.toContain('DROP TABLE money_accounts_v20');
+  });
+
   it('rechaza una base creada por una versión futura de la app', async () => {
     const database = {
       execAsync: jest.fn(async () => undefined),

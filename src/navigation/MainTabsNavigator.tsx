@@ -84,6 +84,7 @@ import {
   createLocalTransaction,
   listLocalTransactions,
   updateLocalTransaction,
+  updateLocalTransactionMoneyAccount,
   updateLocalTransactionNote,
 } from '@/features/transactions/repositories/localTransactionRepository';
 import {
@@ -628,11 +629,6 @@ export function MainTabsNavigator() {
       return;
     }
 
-    if (action === 'moneyAccount') {
-      moneyAccountsController.openCreation();
-      return;
-    }
-
     setCategoryCreationContext('quick');
     setCategoryPickerVisible(true);
   };
@@ -966,6 +962,41 @@ export function MainTabsNavigator() {
         publishActiveCoupleChanges();
       })
       .catch(showSaveError);
+  };
+
+  /**
+   * Asigna o retira la cuenta desde el detalle del movimiento. Solo se
+   * ofrecen cuentas en la misma moneda, así que el importe no cambia de
+   * significado al entrar en un saldo.
+   */
+  const assignableMoneyAccounts = detailTransaction
+    ? moneyAccountsController.activeSpaceMoneyAccounts.filter(
+        (account) => account.currency === detailTransaction.currency,
+      )
+    : [];
+
+  const handleAssignMoneyAccount = async (
+    transactionId: string,
+    moneyAccountId: string | undefined,
+  ) => {
+    try {
+      await updateLocalTransactionMoneyAccount(
+        transactionId,
+        activeSpace.id,
+        moneyAccountId ?? null,
+      );
+      setTransactions((current) =>
+        current.map((transaction) =>
+          transaction.id === transactionId
+            ? { ...transaction, moneyAccountId }
+            : transaction,
+        ),
+      );
+      publishActiveCoupleChanges();
+    } catch (error) {
+      console.error('[accounts] No se pudo asignar la cuenta', error);
+      showSaveError();
+    }
   };
 
   if (!isReady || !isFinanceReady) {
@@ -1304,8 +1335,10 @@ export function MainTabsNavigator() {
                 transactions={activeSpaceTransactions}
               />
               <TransactionDetailModal
+                assignableMoneyAccounts={assignableMoneyAccounts}
                 category={detailTransactionCategory}
                 moneyAccount={detailTransactionMoneyAccount}
+                onAssignMoneyAccount={handleAssignMoneyAccount}
                 onClose={() => setDetailTransactionId(null)}
                 onCopy={handleCopyTransaction}
                 onDelete={handleDeleteTransaction}

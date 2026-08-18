@@ -61,15 +61,6 @@ function createActions(colors: ColorTokens): readonly {
       backgroundColor: colors.categoryAction,
     },
     {
-      type: 'moneyAccount',
-      label: 'Cuenta',
-      accessibilityLabel: 'Crear cuenta',
-      description: 'Dónde guardas tu dinero',
-      icon: 'wallet-outline',
-      color: colors.onBrand,
-      backgroundColor: colors.brandSoft,
-    },
-    {
       type: 'import',
       label: 'Importar movimientos',
       accessibilityLabel: 'Importar movimientos (beta)',

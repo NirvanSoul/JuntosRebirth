@@ -1363,6 +1363,18 @@ describe('ActivityScreen', () => {
       expect(onOpenMoneyAccountDetail).toHaveBeenCalledWith('account-1');
     });
 
+    it('ofrece añadir otra cuenta cuando ya existe alguna', async () => {
+      const onCreateMoneyAccount = jest.fn();
+      const screen = await renderWithAccounts({
+        moneyAccounts: [account],
+        onCreateMoneyAccount,
+      });
+
+      await fireEvent.press(screen.getByLabelText('Añadir cuenta'));
+
+      expect(onCreateMoneyAccount).toHaveBeenCalled();
+    });
+
     it('propone crear una cuenta cuando no hay ninguna', async () => {
       const onCreateMoneyAccount = jest.fn();
       const screen = await renderWithAccounts({ onCreateMoneyAccount });

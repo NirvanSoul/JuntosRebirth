@@ -5308,6 +5308,40 @@ Las restricciones anteriores no se editan en su migración: la versión local 22
 y la migración 31 reconstruyen el CHECK y reasignan las filas existentes
 —débito y crédito a tarjeta, ahorro a cuenta bancaria—.
 
+## Corrección — la foránea que dejó colgando la reconstrucción de la versión 22
+
+Reconstruir `money_accounts` con `ALTER TABLE ... RENAME` hizo que SQLite
+reescribiera las referencias de `transactions` y
+`recurring_transaction_series` hacia `money_accounts_v20`, la tabla temporal
+que se borraba a continuación. Asignar una cuenta a un movimiento fallaba con
+«no such table: main.money_accounts_v20». Es exactamente la trampa que este
+ADR ya documentaba para `transactions`, repetida sobre la tabla de cuentas.
+
+La versión local 23 lo repara con dos renombrados y ningún copiado: el primero
+deja la tabla con el nombre que la referencia rota espera y el segundo la
+devuelve a su nombre, reescribiéndola de paso. Es idempotente y no toca las
+tablas grandes. Se verificó contra sqlite 3.51 reproduciendo la escalera
+completa: `PRAGMA foreign_key_check` queda limpio y la foránea vuelve a
+rechazar una cuenta inexistente.
+
+Las tres capturas de error de las cuentas registran ahora la causa real con
+`console.error` antes de mostrar el aviso genérico: sin eso, un fallo de
+esquema era indistinguible de uno de validación.
+
+## Corrección — dónde se crea una cuenta y cómo se asigna a un movimiento
+
+Crear una cuenta sale del menú del botón flotante: ese botón sirve para
+registrar dinero, no para configurarlo. La creación vive donde se ven las
+cuentas, en Actividad: el estado vacío cuando no hay ninguna y `Añadir cuenta`
+bajo la lista cuando ya existen.
+
+El detalle del movimiento gana una fila de cuenta permanente —dice «Sin
+cuenta» cuando no la tiene— que abre el selector y permite asignarla o
+retirarla sin reabrir el formulario, del mismo modo que la fila de categoría
+lleva a su detalle. Solo se ofrecen cuentas en la moneda del movimiento:
+`updateLocalTransactionMoneyAccount` no cambia el importe ni la moneda, así
+que aceptar otra divisa rompería el saldo de la cuenta.
+
 ## Pendiente
 
 Transferencias entre cuentas, límite de crédito y fechas de corte, filtro por

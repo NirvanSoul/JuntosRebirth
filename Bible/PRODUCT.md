@@ -416,6 +416,10 @@ muestra el saldo en la moneda de su propia cuenta, así que el selector de
 moneda de los movimientos no las filtra ni mezcla divisas, y no se muestra
 ningún total agregado de todas las cuentas.
 
+Crear una cuenta se hace desde ahí: con el estado vacío cuando no hay ninguna
+y con `Añadir cuenta` bajo la lista cuando ya existen. El botón flotante de
+crear no ofrece cuentas: es para registrar dinero, no para configurarlo.
+
 Inicio repite esa sección debajo de las categorías, pero solo con las
 tarjetas: su enlace `Ver más` lleva a la sección de cuentas de Actividad.
 
@@ -770,6 +774,12 @@ secciones reutilizan la misma lista de vistas previas y el mismo detalle al
 tocar un movimiento.
 
 ### Detalle de movimiento
+
+El bloque de metadatos incluye una fila de cuenta, exista o no: cuando el
+movimiento no tiene ninguna dice «Sin cuenta». Tocarla abre el selector y
+permite asignarla o retirarla sin reabrir el formulario, igual que la fila de
+categoría lleva a su detalle. Solo se ofrecen cuentas en la misma moneda del
+movimiento, porque el importe no cambia al entrar en un saldo.
 
 El detalle de movimiento conserva la distribución general del detalle de
 categoría: una superficie expandida con cierre propio, identidad visual,

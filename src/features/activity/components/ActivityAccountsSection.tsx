@@ -1,10 +1,13 @@
-import { StyleSheet, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
+import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountCarousel } from '@/features/accounts/components/MoneyAccountCarousel/MoneyAccountCarousel';
 import { MoneyAccountRow } from '@/features/accounts/components/MoneyAccountRow/MoneyAccountRow';
 import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
 import { ActivityCollapsibleSection } from '@/features/activity/components/ActivityCollapsibleSection';
+import { iconSize, minTouchTarget } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens, ThemeShadows } from '@/theme/types';
@@ -68,6 +71,22 @@ export function ActivityAccountsSection({
               ))}
             </View>
           </View>
+
+          <Pressable
+            accessibilityLabel="Añadir cuenta"
+            accessibilityRole="button"
+            onPress={onCreateMoneyAccount}
+            style={({ pressed }) => [
+              styles.addAction,
+              pressed && styles.addActionPressed,
+            ]}
+            testID="activity-add-money-account"
+          >
+            <Ionicons color={colors.cta} name="add" size={iconSize.sm} />
+            <Text tone="cta" variant="footnote" weight="semibold">
+              Añadir cuenta
+            </Text>
+          </Pressable>
         </>
       ) : (
         <EmptyState
@@ -102,5 +121,14 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       height: 1,
       backgroundColor: colors.categoryPreviewBorder,
     },
+    addAction: {
+      minHeight: minTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      marginTop: spacing.md,
+    },
+    addActionPressed: { opacity: 0.64 },
   });
 }
