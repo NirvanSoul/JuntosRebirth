@@ -18,9 +18,15 @@ Principios rectores:
 ## 2. Estado
 
 Funcionalmente casi completa (arranque, onboarding, modo oscuro, núcleo
-financiero, autenticación, importación, legal y espacios de pareja). Lo único
-sin confirmar de punta a punta es la **sincronización Supabase** y la
-**verificación de correo**.
+financiero, autenticación, importación, legal y espacios de pareja). La
+**sincronización Supabase** y la **verificación de correo** ya se comprobaron de
+punta a punta en staging con dos cuentas y dos dispositivos físicos (§§6-8).
+
+El trabajo activo está en la **Fase 3**, cerrando el consumo coherente de la
+moneda principal del espacio en Inicio, Actividad, presupuestos, creación e
+importación. La implementación está en revisión; faltan el borde de lotes de
+importación reanudados sin moneda y los smokes físicos finales. La Fase 5 de
+release no ha comenzado.
 
 ## 3. Orden de trabajo
 
@@ -103,23 +109,20 @@ una tarea de producto lo toque.
 
 ### Fase 2 — entran en el alcance del spike
 
-- [ ] **Las categorías y los movimientos compartidos no funcionan.** Es el
-  síntoma principal del espacio de pareja y el motivo por el que la Fase 2
-  existe. El spike debe reproducirlo con dos cuentas reales antes de que nadie
-  proponga una corrección.
+- [x] **Las categorías y los movimientos compartidos no funcionaban.** El spike
+  lo reprodujo con dos cuentas reales y aisló el bloqueo de SQLite en
+  `restoreRemoteAccount`; la corrección quedó verificada en ambos sentidos con
+  iPhone y Honor, sin duplicación (§§6-8, commit `5909098`).
 
 ### Fase 3 — producto, pendientes de dimensionar
 
-- [ ] **Un movimiento en otra moneda se sigue percibiendo como euros.**
-  La persistencia por moneda funciona; el modelo de aplicación está
-  incompleto. El backend ya contiene `spaces.currency` y
-  `profiles.default_currency`: **no se añade ningún campo equivalente**. La
-  tarea consistirá en exponer y propagar los existentes en el cliente,
-  definir cuál es la fuente de verdad y evitar agregaciones entre monedas.
-  Defectos identificados:
-  - Ocho literales `'EUR'` con locale fijo en componentes de actividad y
-    categorías (`CategoryDonutChart` vive en `features/activity`).
-  - `categorySummary.ts:91-93` suma `amountMinor` sin mirar `currency`.
+- [ ] **Cerrar el consumo multidivisa sin presentar importes como euros por
+  defecto.** El modelo y la mayor parte de la interfaz ya están implementados:
+  `spaces.currency` es la fuente del espacio, los agregados filtran por moneda
+  y el catálogo visible es común a Inicio y Actividad. La casilla permanece
+  abierta hasta corregir los lotes reanudados con `currency = null`, aportar la
+  evidencia diferencial pendiente y completar los smokes físicos de la
+  Entrega 2 (§8.4).
 
 - [ ] **Registrarse con un correo ya usado no avisa de nada** y el usuario
   espera un código que nunca llega. El silencio puede ser deliberado: responder
@@ -378,12 +381,18 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
        - Comprobación de historial: `npx supabase migration list --linked` confirmó 01-08 y 10-23 aplicadas (`EXIT=0`).
        - Suite focal pgTAP en staging: `npx supabase test db --linked supabase/tests/guest_space_currency.test.sql` → 17/17 tests PASS (`EXIT=0`).
      - Sin tocar la interfaz.
-   - **Entrega 2 — El Consumo:**
+   - **Entrega 2 — El Consumo (implementada; cierre pendiente):**
      - Agregación con `summarizeCategories(categories, transactions, currency)` donde `currency` es obligatoria y el filtrado ocurre dentro.
      - Pantallas de Inicio y Actividad propagando su moneda visible al modal de detalle de categoría.
      - Presupuesto calculado y comparado exclusivamente contra movimientos en `spaces.currency`.
      - Creación e importación garantizando que `activeSpace.currency` sea la predeterminada.
      - Sustitución de los 8 literales `'EUR'` operativos.
+     - Commits principales: `c039ae8`, `c915607`, `a30fe41`, `dcb5d8a` y
+       `b55fbdf`.
+     - Pendiente de cierre: normalizar y persistir la moneda de lotes antiguos
+       reanudados con `currency = null`; ejecutar la prueba asimétrica contra el
+       estado anterior; y completar los smokes de worklets y moneda del espacio
+       en iPhone y Honor sobre datos de prueba limpios.
    - **Fuera de alcance:**
      - `profiles.default_currency` queda fuera de ambas entregas.
      - `category_budgets` (SQLite local y PostgreSQL remota) sigue dormida: con una moneda principal por espacio, el presupuesto por divisa no aporta valor hasta que existan espacios multidivisa habituales.
@@ -410,3 +419,124 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
     - Forma parte de la internacionalización y no se corrige por separado: la selección del locale debe derivar de la arquitectura de idiomas, no al revés.
 
 *Pendiente aparte, por contacto:* Extracción de `ImportScreen.tsx` y `AppCalendar.tsx` (§4).
+
+---
+
+## 9. Auditoría de propuestas externas de Alphonzo — no integradas
+
+### 9.1 Frontera y procedencia
+
+El 2026-08-18 se inspeccionó mediante la API pública de GitHub, **sin ejecutar
+`git fetch`, `pull`, `merge`, `cherry-pick` ni copiar archivos**, el trabajo que
+Alphonzo añadió después de `ffc87f9` a la rama publicada
+`limpieza/fases-1-y-1b` del repositorio original.
+
+- `upstream/main` permanece en `b4c212a`; no recibió estos cambios.
+- La rama publicada dejó de ser una instantánea limpia de nuestro trabajo y no
+  debe usarse como fuente para continuar ni como base para una integración.
+- El extremo externo observado es `14de52b`. No tiene estados de CI ni checks
+  de GitHub asociados.
+- Los commits externos son **material de investigación**, no implementación del
+  proyecto local. Sus pruebas declaradas no sustituyen Gate 1, pgTAP, staging ni
+  los smokes exigidos por este repositorio.
+
+Para una futura publicación se creará una rama de revisión nueva desde nuestro
+HEAD; no se traerá ni se reescribirá la rama externa actual.
+
+### 9.2 Qué propuso
+
+| Grupo externo | Commits observados | Idea | Disposición local |
+|---|---|---|---|
+| Miembros, autoría y avatares | `93a2b7f` a `c949ec3` | Mostrar autor de cada movimiento, leer perfiles de miembros y sincronizar miniaturas mediante un bucket privado. | Candidato futuro; no integrado. Requiere decisión de producto, privacidad, Storage, RLS, pgTAP y smoke en dos dispositivos. |
+| Monedas compartidas | `2d7a5b0`, `3aef261` | Unir moneda del espacio y preferencias de ambos miembros. | No portar: el defecto ya está resuelto localmente mediante el catálogo canónico del espacio (`dcb5d8a`, `b55fbdf`) sin depender de `profiles.default_currency`. |
+| Reparación histórica de presupuestos | migración externa 27 dentro de `cd3abf1` | Reetiquetar como moneda del espacio ciertos presupuestos que la migración 08 asumió EUR. | No aplicar ahora: `category_budgets` sigue dormida y la contradicción 08 vs 18/20 ya está registrada. Se reevaluará al resolver esa deuda con inventario real previo. |
+| Cuentas de dinero | `aec1504`, `23cb5f4`, `a7e9488`, `14de52b` | Cuenta opcional por movimiento, tres tipos visuales y varios saldos monetarios por cuenta, con persistencia y sync local/remota. | Propuesta grande pendiente de decisión; no integrada ni aprobada. |
+| Ajustes visuales en curso | `cd3abf1` | Onboarding, botón flotante y fondo del navegador raíz. | Sin tarea: no hay reporte de producto ni verificación visual que justifique copiarlos. |
+
+### 9.3 Evaluación de «cuentas de dinero»
+
+La idea puede aportar una segunda dimensión útil —**dónde está el dinero**,
+además de **en qué se gastó**—, pero la solución externa cambió de modelo tres
+veces en menos de un día: cinco tipos, luego tres; una moneda por cuenta, luego
+varias. Su primer commit toca 74 archivos y casi 7.000 líneas. Por tamaño,
+persistencia, SQL, sincronización y cálculo de saldos, cualquier implementación
+propia se clasifica como **tarea grande** y se divide en entregas.
+
+Antes de aprobarla hay que resolver estas decisiones de producto:
+
+1. **Significado del saldo inicial:** fecha desde la que aplica y tratamiento
+   de movimientos anteriores. Un número sin fecha puede duplicar el saldo al
+   importar histórico.
+2. **Saldo actual frente a proyectado:** la propuesta externa incluye
+   ocurrencias futuras del mes. Una cuenta bancaria puede necesitar saldo real,
+   proyección o ambos, pero no debe llamarlos igual.
+3. **Transferencias entre cuentas:** mover dinero propio no puede convertirse
+   en ingreso y gasto que distorsione los agregados. La feature no se aprueba
+   sin contrato explícito, aunque la interfaz de transferencias se difiera.
+4. **Una o varias monedas por cuenta:** validar que el caso real compense la
+   complejidad. Nunca se suman saldos de monedas distintas.
+5. **Cambio de moneda al asignar una cuenta:** está prohibido relabelar el mismo
+   `amountMinor` con otra divisa sin conversión ni confirmación. Si la cuenta no
+   soporta la moneda del movimiento, la app debe bloquear, pedir una decisión o
+   crear el saldo correspondiente.
+6. **Propiedad compartida:** decidir quién puede editar, archivar o heredar una
+   cuenta si su creador abandona el espacio o elimina su usuario.
+7. **Orden con la escala monetaria:** la tarea de JPY/CLP/PYG (§8.4.9) afecta
+   también los saldos iniciales; debe resolverse antes o formar parte del mismo
+   diseño.
+
+La implementación externa tampoco satisface todavía las condiciones técnicas
+para servir de referencia directa:
+
+- `money_account_balances` permite escritura directa a cualquier miembro del
+  espacio, mientras la decisión declarada dice que solo el autor edita.
+- La tabla hija valida por separado `money_account_id` y `space_id`, sin una
+  foránea compuesta que impida asociar una cuenta de otro espacio.
+- El RPC `security definer` de sincronización comprueba membresía, pero puede
+  actualizar una cuenta existente sin comprobar su autoría.
+- La moneda principal vive a la vez en `money_accounts.currency` y en la
+  primera fila ordenada de balances, sin una restricción de base de datos que
+  garantice que coincidan.
+- Al escoger una cuenta incompatible, el formulario externo cambia la moneda
+  del movimiento y conserva el importe numérico; eso altera su significado
+  financiero sin conversión.
+- `money_accounts.test.sql` sigue afirmando que la cuenta es monomoneda y no
+  cubre la tabla multidivisa añadida después. Las migraciones 28-34 no tienen
+  ejecución pgTAP o staging aportada, y GitHub no registra CI para el extremo
+  observado.
+- La sincronización reemplaza todos los balances de una cuenta; deben definirse
+  concurrencia, idempotencia y resolución entre dispositivos antes de usar ese
+  enfoque.
+
+Si el responsable aprueba la feature en el futuro, se diseñará desde nuestros
+contratos actuales y en este orden:
+
+1. Ficha de producto y ADR: saldo, fecha, transferencias, monedas y propiedad.
+2. Modelo local versionado y migración con pruebas de datos previos.
+3. Modelo remoto en migraciones nuevas posteriores a la última aplicada, con
+   foráneas compuestas, RLS y pgTAP conductual.
+4. Sincronización y migración de invitado idempotentes, probadas contra
+   Supabase real.
+5. Consumo en transacciones y UI, sin mezclar divisas ni inflar los componentes
+   congelados.
+6. Smokes financieros y de sincronización en iPhone y Honor.
+
+### 9.4 Autoría y avatares
+
+Exponer quién creó un movimiento compartido es coherente con la regla de
+autoría del producto. Subir fotografías es una decisión separada y más
+sensible. Antes de convertir esta propuesta en tarea deben definirse:
+
+- Qué identidad se muestra mientras el perfil remoto o la imagen no están
+  disponibles.
+- Qué ocurre con la autoría y el avatar cuando alguien abandona un espacio o
+  elimina la cuenta.
+- Consentimiento, retención, borrado y caché local de imágenes.
+- Bucket privado, límites de tamaño, rutas no predecibles, políticas de lectura
+  y pruebas contra usuarios que no comparten espacio.
+- Actualización y reintento sin convertir una pérdida de red en una foto
+  equivocada o permanentemente obsoleta.
+
+Se separará en dos tareas si se prioriza: primero **autoría textual**; después
+**sincronización de avatares**. Ninguna se inicia durante el cierre actual de
+monedas.
