@@ -225,12 +225,15 @@ a extracción cuando una tarea de producto lo toque.
   queda registrada como posible evolución. Exige flujo propio en backend y su
   propia decisión.
 
-  No es tarea pequeña: toca autenticación y navegación (`PROJECT_RULES.md`
-  §4.2). Antes de dimensionar hay que inventariar los tres anfitriones de
-  `VerifyCodeScreen` —acceso, modal de ajustes e invitación—; el de invitación
-  no dispone de recuperación de contraseña completa.
+  Es tarea **grande**: toca autenticación y navegación, y `PROJECT_RULES.md`
+  §4.3 lista ambas como grande. La clasificación previa de mediana fue un error
+  de clasificación del responsable, corregido el 2026-08-18: grande exige
+  **dos verificadores en paralelo** más el smoke físico iPhone/Honor. Antes de
+  dimensionar hay que inventariar los tres anfitriones de `VerifyCodeScreen`
+  —acceso, modal de ajustes e invitación—; el de invitación no dispone de
+  recuperación de contraseña completa.
 
-  **(Implementada la opción A — pendiente de verificador y smoke físico
+  **(Implementada la opción A — pendiente de dos verificadores y smoke físico
   iPhone/Honor.)** Inventario de anfitriones completado: `AccessScreen` y
   `AuthModal` alojan `verify-signup` y `verify-recovery`;
   `AcceptInvitationScreen` solo `verify-signup`. `VerifyCodeScreen` recibe
@@ -238,8 +241,29 @@ a extracción cuando una tarea de producto lo toque.
   siempre la explicación neutral («si no tenía cuenta te llegará un código; si
   ya tenía una, no recibirás uno aquí») con los accesos directos visibles:
   acceso y ajustes ofrecen iniciar sesión y recuperar contraseña; invitación
-  solo iniciar sesión. Evidencia: 3 casos nuevos en `VerifyCodeScreen.test.tsx`;
-  `npm run validate` en verde: 123 suites / 737 tests. Commit `195e916`.
+  solo iniciar sesión.
+
+  **Excepción aprobada por el responsable (2026-08-18): no cablear todavía la
+  recuperación en el anfitrión de invitación.** La excepción no deja el
+  callejón sin salida intacto: cuando un anfitrión de registro no pasa
+  `onGoToRecovery`, `VerifyCodeScreen` añade la salida textual «Si ya tenía una
+  cuenta y no recuerdas la contraseña, abre la app para recuperar tu
+  contraseña». Motivo: el hueco es solo del anfitrión de invitación
+  (`AcceptInvitationScreen` monta `LoginScreen` sin
+  `onNavigateToForgotPassword` y su máquina `authStep` solo tiene
+  `login`/`signup`/`verify-signup`); `AccessScreen` y `AuthModal` ya cablean la
+  cadena completa (`forgot` → `ForgotPasswordScreen` → `verify-recovery` →
+  restablecimiento). El cableado de la recuperación en invitación queda como
+  tarea propia en la cola (§4, ítem 13).
+
+  Evidencia: casos de opción A y de la salida textual en
+  `VerifyCodeScreen.test.tsx`; pruebas de integración del cableado de los tres
+  anfitriones —`AccessScreen.test.tsx`, `AuthModal.test.tsx` (nueva) y
+  `AcceptInvitationScreen.test.tsx` (nueva)— que demuestran que acceso y ajustes
+  llegan a `forgot`/`verify-recovery`/`reset` y que invitación cablea
+  `verify-signup` con iniciar sesión pero sin recuperación.
+  `npm run validate` en verde: 125 suites / 749 tests. Commit `195e916`
+  (implementación inicial).
 
 ### Sin fase asignada — tarea pequeña
 
@@ -249,10 +273,15 @@ a extracción cuando una tarea de producto lo toque.
   smoke físico iPhone/Honor.)** `AuthTextField` (la primitiva existente) gana
   un botón de visibilidad (`Eye`/`EyeSlash`, peso regular) que alterna
   `secureTextEntry`; estado inicial oculto; botón deshabilitado cuando el campo
-  no es editable; sin cambios en los seis puntos de uso. Evidencia roja/verde:
-  `AuthTextField.test.tsx` nueva — ROJO contra el componente original (4 de 6
-  casos fallan, el botón no existe) y VERDE tras el cambio (6/6).
-  `npm run validate` en verde: 123 suites / 734 tests. Commit `f433f4f`.
+  no es editable; sin cambios en los **cinco** campos de contraseña
+  (`LoginScreen` ×1, `SignUpScreen` ×2, `ResetPasswordScreen` ×2). Evidencia
+  roja/verde: `AuthTextField.test.tsx` nueva — ROJO contra el componente
+  original (4 de 6 casos fallan, el botón no existe) y VERDE tras el cambio.
+  Corrección del gate (2026-08-18): eran cinco campos, no seis, y se añaden las
+  dos pruebas de aceptación que faltaban — revelar un campo no revela otro campo
+  de contraseña simultáneo, y al desmontar y volver a montar reaparece oculta
+  (8 casos en total). `npm run validate` en verde: 125 suites / 749 tests.
+  Commit `f433f4f` (implementación inicial).
 
 ---
 
@@ -561,7 +590,7 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
 7. **Actualizar `space_invitations.test.sql`** al nombre de índice vigente `space_invitations_one_pending_per_target_idx` (pequeña).
 8. **Higiene de tests — avisos `act(...)` (reproducida y caracterizada; reclasificada a investigación dedicada, no «pequeña»):**
    - Reproducción en HEAD (`e4fa996`, suite verde exit 0): **33 avisos en 3 suites** — `AddFirstTransactionStep.test.tsx` (19), `ImportScreen.test.tsx` (12), `AwaitingPartnerScreen.test.tsx` (2). Variantes: **31×** «The current testing environment is not configured to support act(...)» y **2×** «You seem to have overlapping act() calls».
-   - Causa: los emite `isConcurrentActEnvironment()` de `react-test-renderer` y del `react-reconciler` empaquetado por `test-renderer` (backend de RTL 14.0.1), cuando `IS_REACT_ACT_ENVIRONMENT` resulta falsy con `ReactSharedInternals.actQueue` no nulo. La bandera global **ya** la fija `react-native/jest/setup.js:11`; volver a fijarla en `src/test/setup.ts` **no** elimina los avisos (verificado empíricamente: 31 antes y 31 después). Apunta a la interacción React 19 + RTL 14 + `jest-expo` a nivel de reconciliador, no a una bandera de entorno.
+   - Zona causal identificada: los emite `isConcurrentActEnvironment()` de `react-test-renderer` y del `react-reconciler` empaquetado por `test-renderer` (backend de RTL 14.0.1), cuando `IS_REACT_ACT_ENVIRONMENT` resulta falsy con `ReactSharedInternals.actQueue` no nulo. La bandera global **ya** la fija `react-native/jest/setup.js:11`; volver a fijarla en `src/test/setup.ts` **no** elimina los avisos (verificado empíricamente: 31 antes y 31 después). Apunta a la interacción React 19 + RTL 14 + `jest-expo` a nivel de reconciliador —la zona causal identificada—, no a una bandera de entorno; la causa raíz definitiva queda pendiente de la investigación dedicada.
    - No provienen de tests que asserten rutas de error a propósito (salen de renders/`setState` asíncrono, p. ej. carga de fuentes de `@expo/vector-icons`), así que el silencio dirigido no aplica; y suprimir `console.error` de manta está prohibido.
    - Pendiente: tarea de investigación propia (alineación de versiones React/RTL/`jest-expo`, posible deduplicación del reconciliador), con su gate. No es un fix acotado.
 9. **Escala y decimales monetarios (tarea grande):**
@@ -583,6 +612,7 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
     - `useEffect` de carga inicial: `listLocalNotificationRules().then(...).catch(() => undefined)` silencia el fallo de lectura de reglas al arrancar. Silencio deliberado (capacidad secundaria: un fallo no debe bloquear ver categorías y movimientos; el código lo justifica en un comentario), pero no registra nada.
     - Familia relacionada con el mismo patrón `.catch(() => undefined)`: `reconcileNotificationRules`/`reconcileDailyReminder` en el gancho de primer plano y en las escrituras/recordatorios de movimientos.
     - Localizado por símbolo, no por línea. Registrado por la tarea 6 del lote; **no se corrige todavía**. Al abordarlo, decidir qué silencios son deliberados (y se documentan) y cuáles pasan a `console.error` estructurado, con evidencia roja/verde.
+13. **Cablear la recuperación en `AcceptInvitationScreen` (tarea grande — no hacer todavía):** Pasar `onNavigateToForgotPassword` a `LoginScreen` y añadir los estados `forgot`, `verify-recovery` y restablecimiento a su máquina `authStep`, replicando lo que ya hace `AccessScreen`. Las tres pantallas (`ForgotPasswordScreen`, `VerifyCodeScreen` en `purpose="recovery"`, `ResetPasswordScreen`) existen y se reutilizan: es cableado, no construcción. Toca navegación y autenticación → grande, **dos verificadores**, con pruebas de navegación del anfitrión. Al cerrarla se retira la salida textual «abre la app para recuperar tu contraseña» del caso sin recuperación. Registrada por la excepción de la tarea 4.
 
 *Pendiente aparte, por contacto:* Extracción de `ImportScreen.tsx` y `AppCalendar.tsx` (§4).
 
