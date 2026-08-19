@@ -341,6 +341,7 @@ export function AcceptInvitationScreen({
             <VerifyCodeScreen
               email={authStep.email}
               onCancel={() => setAuthStep({ screen: 'signup', step: 1 })}
+              onGoToLogin={() => setAuthStep({ screen: 'login' })}
               onSuccess={() => undefined}
               purpose="signup"
             />

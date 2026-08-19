@@ -190,6 +190,8 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
               <VerifyCodeScreen
                 email={step.email}
                 onCancel={onClose}
+                onGoToLogin={() => setStep({ screen: 'login' })}
+                onGoToRecovery={() => setStep({ screen: 'forgot' })}
                 onSuccess={() => void handleAuthenticated()}
                 purpose="signup"
               />

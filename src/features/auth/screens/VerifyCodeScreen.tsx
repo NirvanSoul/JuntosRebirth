@@ -21,6 +21,8 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type VerifyCodeScreenProps = {
   email: string;
   onCancel: () => void;
+  onGoToLogin?: () => void;
+  onGoToRecovery?: () => void;
   onSuccess: () => void;
   purpose: VerifyCodePurpose;
 };
@@ -60,6 +62,8 @@ const purposeCopy: Record<
 export function VerifyCodeScreen({
   email,
   onCancel,
+  onGoToLogin,
+  onGoToRecovery,
   onSuccess,
   purpose,
 }: VerifyCodeScreenProps) {
@@ -242,6 +246,39 @@ export function VerifyCodeScreen({
           Cancelar
         </Text>
       </Pressable>
+
+      {purpose === 'signup' ? (
+        <View style={styles.existingAccountHint}>
+          <Text tone="secondary" variant="footnote">
+            Si este correo no tenía cuenta, te llegará un código. Si ya tenía
+            una, no recibirás uno aquí.
+          </Text>
+          {onGoToLogin ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onGoToLogin}
+              style={styles.linkButton}
+              testID="verify-code-go-to-login"
+            >
+              <Text tone="brand" variant="footnote">
+                Iniciar sesión
+              </Text>
+            </Pressable>
+          ) : null}
+          {onGoToRecovery ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onGoToRecovery}
+              style={styles.linkButton}
+              testID="verify-code-go-to-recovery"
+            >
+              <Text tone="brand" variant="footnote">
+                Recuperar contraseña
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -249,6 +286,10 @@ export function VerifyCodeScreen({
 function createStyles(colors: ColorTokens) {
   return StyleSheet.create({
     container: { gap: spacing.lg },
+    existingAccountHint: {
+      gap: spacing.sm,
+      alignItems: 'center',
+    },
     linkButton: {
       minHeight: layout.minTouchTarget,
       alignItems: 'center',

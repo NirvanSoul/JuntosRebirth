@@ -186,6 +186,8 @@ export function AccessScreen() {
             <VerifyCodeScreen
               email={step.email}
               onCancel={goBack}
+              onGoToLogin={() => setStep({ screen: 'login' })}
+              onGoToRecovery={() => setStep({ screen: 'forgot' })}
               onSuccess={() => void completeAuthenticated()}
               purpose="signup"
             />

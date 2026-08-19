@@ -93,4 +93,63 @@ describe('VerifyCodeScreen', () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('verify-code-success')).toBeNull();
   });
+
+  describe('opción A — cerrar la espera sin revelar si el correo ya estaba registrado', () => {
+    it('en registro muestra la explicación y los accesos a iniciar sesión y recuperar contraseña', async () => {
+      const onGoToLogin = jest.fn();
+      const onGoToRecovery = jest.fn();
+
+      const screen = await renderWithTheme(
+        <VerifyCodeScreen
+          email="ana@ejemplo.com"
+          onCancel={jest.fn()}
+          onGoToLogin={onGoToLogin}
+          onGoToRecovery={onGoToRecovery}
+          onSuccess={jest.fn()}
+          purpose="signup"
+        />,
+      );
+
+      expect(
+        screen.getByText(/no tenía cuenta, te llegará un código/),
+      ).toBeTruthy();
+
+      await fireEvent.press(screen.getByTestId('verify-code-go-to-login'));
+      expect(onGoToLogin).toHaveBeenCalledTimes(1);
+
+      await fireEvent.press(screen.getByTestId('verify-code-go-to-recovery'));
+      expect(onGoToRecovery).toHaveBeenCalledTimes(1);
+    });
+
+    it('en registro muestra solo iniciar sesión cuando el anfitrión no ofrece recuperación', async () => {
+      const screen = await renderWithTheme(
+        <VerifyCodeScreen
+          email="ana@ejemplo.com"
+          onCancel={jest.fn()}
+          onGoToLogin={jest.fn()}
+          onSuccess={jest.fn()}
+          purpose="signup"
+        />,
+      );
+
+      expect(screen.getByTestId('verify-code-go-to-login')).toBeTruthy();
+      expect(screen.queryByTestId('verify-code-go-to-recovery')).toBeNull();
+    });
+
+    it('en recuperación no muestra los accesos directos de cuenta existente', async () => {
+      const screen = await renderWithTheme(
+        <VerifyCodeScreen
+          email="ana@ejemplo.com"
+          onCancel={jest.fn()}
+          onGoToLogin={jest.fn()}
+          onGoToRecovery={jest.fn()}
+          onSuccess={jest.fn()}
+          purpose="recovery"
+        />,
+      );
+
+      expect(screen.queryByTestId('verify-code-go-to-login')).toBeNull();
+      expect(screen.queryByTestId('verify-code-go-to-recovery')).toBeNull();
+    });
+  });
 });
