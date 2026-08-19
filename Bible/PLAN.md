@@ -471,8 +471,25 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
        `auth.users` y `profiles` (excluido Auth) para que el login siga
        funcionando; sin tocar migraciones, esquema, Edge Functions,
        configuración ni secrets.
-     - Pendiente de cierre: completar los smokes de worklets y moneda del
-       espacio en iPhone y Honor sobre datos de prueba limpios (§6).
+     - Bloqueante reproducible hallado en el smoke físico y corregido (sin
+       cerrar la Entrega 2): `CreateTransactionModal` reiniciaba el borrador
+       con el modal abierto —la moneda elegida volvía a la del espacio y se
+       perdía parte de lo escrito— en cada recarga de sincronización, Realtime
+       o sondeo de 15 s. Causa: el efecto de reinicio dependía de
+       `effectiveAvailableCurrencies`, `initialDraft` e `initialDate`, cuya
+       identidad cambia en cada recarga. Arreglo: el reinicio se dispara solo
+       en `[visible, activeSpaceId]` y el payload
+       (`initialDraft`/`initialDate`/`spaceCurrency`) se lee de un ref de
+       snapshot; mismo contrato que el snapshot de `ImportScreen`, sin
+       supresión de `exhaustive-deps`. Prueba diferencial: 6 casos nuevos en
+       `CreateTransactionModal.test.tsx` — 4 ROJO contra `70b0584` (moneda
+       EUR→VES y título borrado, en creación y en edición) y VERDE tras el
+       arreglo (suite 32/32). `npm run validate` completo en verde
+       (122 suites / 727 tests).
+     - Pendiente de cierre: **rehacer** los smokes de worklets y moneda del
+       espacio en iPhone y Honor sobre datos de prueba limpios (§6) para
+       confirmar este arreglo en dispositivo. El smoke NO se registra como
+       aprobado.
    - **Fuera de alcance:**
      - `profiles.default_currency` queda fuera de ambas entregas.
      - `category_budgets` (SQLite local y PostgreSQL remota) sigue dormida: con una moneda principal por espacio, el presupuesto por divisa no aporta valor hasta que existan espacios multidivisa habituales.

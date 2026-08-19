@@ -243,11 +243,18 @@ export function CreateTransactionModal({
     [occurredOn],
   );
 
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
+  // Snapshot del borrador: se reinicia solo al abrir el modal o al cambiar de
+  // espacio, nunca ante reconstrucciones del catálogo de monedas ni recargas de
+  // sincronización/Realtime/sondeo que cambien la identidad de `initialDraft` o
+  // `initialDate` (borrarían lo escrito). El payload se lee de un ref para que
+  // su identidad no sea señal de reinicio: mismo contrato que el snapshot de
+  // ImportScreen, pero sin supresión de exhaustive-deps.
+  const snapshotRef = useRef({ initialDate, initialDraft, spaceCurrency });
+  snapshotRef.current = { initialDate, initialDraft, spaceCurrency };
 
+  useEffect(() => {
+    if (!visible) return;
+    const { initialDate, initialDraft, spaceCurrency } = snapshotRef.current;
     setTitle(initialDraft?.title ?? '');
     setAmountInput(
       initialDraft ? amountMinorToInput(initialDraft.amountMinor) : '0',
@@ -276,14 +283,7 @@ export function CreateTransactionModal({
     setDatePickerVisible(false);
     setRecurrencePickerVisible(false);
     setCurrencyPickerVisible(false);
-  }, [
-    activeSpaceId,
-    effectiveAvailableCurrencies,
-    initialDate,
-    initialDraft,
-    spaceCurrency,
-    visible,
-  ]);
+  }, [visible, activeSpaceId]);
 
   useEffect(() => {
     if (!visible) {
