@@ -169,6 +169,7 @@ a extracción cuando una tarea de producto lo toque.
 
 - Prueba real en dispositivo iOS y Android (safe areas, teclado, gestos, modo
   oscuro real) — `PROJECT_RULES.md` §10.
+- [ ] Smoke test físico (iPhone/Honor) de `AcceptInvitationScreen` (deep link `juntoss://` desde verificación de correo), pendiente de un development build.
 - Build EAS, cuentas de tienda, política de privacidad accesible.
 - Revisar la licencia y las vulnerabilidades de `xlsx`: es de **runtime**
   (importación) y `npm audit` le marca prototype pollution + ReDoS **sin fix**.
