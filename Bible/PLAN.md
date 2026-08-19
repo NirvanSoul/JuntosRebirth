@@ -234,7 +234,14 @@ a extracción cuando una tarea de producto lo toque.
 
 - [ ] **Poder ver la contraseña mientras se escribe.** Aplica a registro,
   inicio de sesión y recuperación; usar la primitiva de campo existente, no un
-  control nuevo por pantalla.
+  control nuevo por pantalla. **(Implementada — pendiente de 1 verificador y
+  smoke físico iPhone/Honor.)** `AuthTextField` (la primitiva existente) gana
+  un botón de visibilidad (`Eye`/`EyeSlash`, peso regular) que alterna
+  `secureTextEntry`; estado inicial oculto; botón deshabilitado cuando el campo
+  no es editable; sin cambios en los seis puntos de uso. Evidencia roja/verde:
+  `AuthTextField.test.tsx` nueva — ROJO contra el componente original (4 de 6
+  casos fallan, el botón no existe) y VERDE tras el cambio (6/6).
+  `npm run validate` en verde: 123 suites / 734 tests. Commit `f433f4f`.
 
 ---
 
