@@ -1387,6 +1387,7 @@ No combinar eliminación destructiva con despliegue de cliente que todavía depe
 - [ ] Se actualizó documentación.
 - [ ] Se definió rollback o mitigación.
 - [ ] Se consideraron versiones antiguas de la app.
+- [ ] Las funciones RPC nuevas revocan explícitamente `PUBLIC EXECUTE` (`REVOKE ALL ON FUNCTION ... FROM PUBLIC`) en la misma migración que las crea, y conceden únicamente a los roles consumidores reales (`GRANT EXECUTE ... TO authenticated`). La única excepción intencional permitida para `anon` es `get_space_invitation_preview`. No se usa `ALTER DEFAULT PRIVILEGES` a nivel global.
 
 ---
 
