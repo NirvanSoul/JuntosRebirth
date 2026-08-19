@@ -21,6 +21,8 @@ describe('VerifyCodeScreen', () => {
       <VerifyCodeScreen
         email="ana@ejemplo.com"
         onCancel={jest.fn()}
+        onGoToLogin={jest.fn()}
+        onGoToRecovery={jest.fn()}
         onSuccess={onSuccess}
         purpose="signup"
       />,
@@ -54,6 +56,8 @@ describe('VerifyCodeScreen', () => {
       <VerifyCodeScreen
         email="ana@ejemplo.com"
         onCancel={jest.fn()}
+        onGoToLogin={jest.fn()}
+        onGoToRecovery={jest.fn()}
         onSuccess={onSuccess}
         purpose="signup"
       />,
@@ -119,28 +123,6 @@ describe('VerifyCodeScreen', () => {
 
       await fireEvent.press(screen.getByTestId('verify-code-go-to-recovery'));
       expect(onGoToRecovery).toHaveBeenCalledTimes(1);
-      // Con recuperación ya cableada no hace falta la salida textual.
-      expect(
-        screen.queryByText(/abre la app para recuperar tu contraseña/),
-      ).toBeNull();
-    });
-
-    it('en registro sin recuperación disponible muestra iniciar sesión y explica cómo recuperar desde la app', async () => {
-      const screen = await renderWithTheme(
-        <VerifyCodeScreen
-          email="ana@ejemplo.com"
-          onCancel={jest.fn()}
-          onGoToLogin={jest.fn()}
-          onSuccess={jest.fn()}
-          purpose="signup"
-        />,
-      );
-
-      expect(screen.getByTestId('verify-code-go-to-login')).toBeTruthy();
-      expect(screen.queryByTestId('verify-code-go-to-recovery')).toBeNull();
-      expect(
-        screen.getByText(/abre la app para recuperar tu contraseña/),
-      ).toBeTruthy();
     });
 
     it('en recuperación no muestra los accesos directos de cuenta existente', async () => {
@@ -148,8 +130,6 @@ describe('VerifyCodeScreen', () => {
         <VerifyCodeScreen
           email="ana@ejemplo.com"
           onCancel={jest.fn()}
-          onGoToLogin={jest.fn()}
-          onGoToRecovery={jest.fn()}
           onSuccess={jest.fn()}
           purpose="recovery"
         />,

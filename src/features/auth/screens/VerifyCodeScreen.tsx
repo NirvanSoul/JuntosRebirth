@@ -18,14 +18,26 @@ import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
-type VerifyCodeScreenProps = {
+type VerifyCodeScreenBaseProps = {
   email: string;
   onCancel: () => void;
-  onGoToLogin?: () => void;
-  onGoToRecovery?: () => void;
   onSuccess: () => void;
-  purpose: VerifyCodePurpose;
 };
+
+/**
+ * Unión discriminada por `purpose`: el caso `signup` exige los dos accesos de
+ * cuenta existente (`onGoToLogin` y `onGoToRecovery`), de modo que ningún
+ * anfitrión pueda montar la verificación de registro sin cablear la
+ * recuperación de contraseña; el que lo olvide falla en typecheck. El caso
+ * `recovery` no los necesita.
+ */
+type VerifyCodeScreenProps =
+  | (VerifyCodeScreenBaseProps & {
+      purpose: 'signup';
+      onGoToLogin: () => void;
+      onGoToRecovery: () => void;
+    })
+  | (VerifyCodeScreenBaseProps & { purpose: 'recovery' });
 
 type VerifyState =
   | { step: 'idle' }
@@ -59,14 +71,8 @@ const purposeCopy: Record<
   },
 };
 
-export function VerifyCodeScreen({
-  email,
-  onCancel,
-  onGoToLogin,
-  onGoToRecovery,
-  onSuccess,
-  purpose,
-}: VerifyCodeScreenProps) {
+export function VerifyCodeScreen(props: VerifyCodeScreenProps) {
+  const { email, onCancel, onSuccess, purpose } = props;
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [code, setCode] = useState('');
@@ -247,42 +253,32 @@ export function VerifyCodeScreen({
         </Text>
       </Pressable>
 
-      {purpose === 'signup' ? (
+      {props.purpose === 'signup' ? (
         <View style={styles.existingAccountHint}>
           <Text tone="secondary" variant="footnote">
             Si este correo no tenía cuenta, te llegará un código. Si ya tenía
             una, no recibirás uno aquí.
           </Text>
-          {!onGoToRecovery ? (
-            <Text tone="secondary" variant="footnote">
-              Si ya tenía una cuenta y no recuerdas la contraseña, abre la app
-              para recuperar tu contraseña.
+          <Pressable
+            accessibilityRole="button"
+            onPress={props.onGoToLogin}
+            style={styles.linkButton}
+            testID="verify-code-go-to-login"
+          >
+            <Text tone="brand" variant="footnote">
+              Iniciar sesión
             </Text>
-          ) : null}
-          {onGoToLogin ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onGoToLogin}
-              style={styles.linkButton}
-              testID="verify-code-go-to-login"
-            >
-              <Text tone="brand" variant="footnote">
-                Iniciar sesión
-              </Text>
-            </Pressable>
-          ) : null}
-          {onGoToRecovery ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onGoToRecovery}
-              style={styles.linkButton}
-              testID="verify-code-go-to-recovery"
-            >
-              <Text tone="brand" variant="footnote">
-                Recuperar contraseña
-              </Text>
-            </Pressable>
-          ) : null}
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={props.onGoToRecovery}
+            style={styles.linkButton}
+            testID="verify-code-go-to-recovery"
+          >
+            <Text tone="brand" variant="footnote">
+              Recuperar contraseña
+            </Text>
+          </Pressable>
         </View>
       ) : null}
     </View>

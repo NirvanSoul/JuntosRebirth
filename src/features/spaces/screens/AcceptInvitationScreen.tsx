@@ -6,7 +6,9 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { StepProgressBar } from '@/components/ui/StepProgressBar/StepProgressBar';
 import { Text } from '@/components/ui/Text/Text';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { ForgotPasswordScreen } from '@/features/auth/screens/ForgotPasswordScreen';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
+import { ResetPasswordScreen } from '@/features/auth/screens/ResetPasswordScreen';
 import {
   SignUpScreen,
   signUpTotalSteps,
@@ -42,7 +44,10 @@ type AcceptState =
 type AuthFlowStep =
   | { screen: 'login' }
   | { screen: 'signup'; step: number }
-  | { screen: 'verify-signup'; email: string };
+  | { screen: 'verify-signup'; email: string }
+  | { screen: 'forgot' }
+  | { screen: 'verify-recovery'; email: string }
+  | { screen: 'reset' };
 
 const terminalCopy: Record<
   'not_found' | 'expired' | 'accepted' | 'revoked',
@@ -304,6 +309,9 @@ export function AcceptInvitationScreen({
           {authStep.screen === 'login' ? (
             <LoginScreen
               onCancel={onFinished}
+              onNavigateToForgotPassword={() =>
+                setAuthStep({ screen: 'forgot' })
+              }
               onNavigateToSignUp={() =>
                 setAuthStep({ screen: 'signup', step: 1 })
               }
@@ -342,8 +350,35 @@ export function AcceptInvitationScreen({
               email={authStep.email}
               onCancel={() => setAuthStep({ screen: 'signup', step: 1 })}
               onGoToLogin={() => setAuthStep({ screen: 'login' })}
+              onGoToRecovery={() => setAuthStep({ screen: 'forgot' })}
               onSuccess={() => undefined}
               purpose="signup"
+            />
+          ) : null}
+
+          {authStep.screen === 'forgot' ? (
+            <ForgotPasswordScreen
+              onCancel={() => setAuthStep({ screen: 'login' })}
+              onNavigateToLogin={() => setAuthStep({ screen: 'login' })}
+              onSuccess={({ email }) =>
+                setAuthStep({ screen: 'verify-recovery', email })
+              }
+            />
+          ) : null}
+
+          {authStep.screen === 'verify-recovery' ? (
+            <VerifyCodeScreen
+              email={authStep.email}
+              onCancel={() => setAuthStep({ screen: 'forgot' })}
+              onSuccess={() => setAuthStep({ screen: 'reset' })}
+              purpose="recovery"
+            />
+          ) : null}
+
+          {authStep.screen === 'reset' ? (
+            <ResetPasswordScreen
+              onCancel={() => setAuthStep({ screen: 'login' })}
+              onSuccess={() => setAuthStep({ screen: 'login' })}
             />
           ) : null}
         </View>

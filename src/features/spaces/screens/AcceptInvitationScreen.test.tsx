@@ -31,6 +31,14 @@ jest.mock('@/features/auth/screens/VerifyCodeScreen', () => ({
   VerifyCodeScreen: jest.requireActual('@/test/authScreenStubs')
     .VerifyCodeScreenStub,
 }));
+jest.mock('@/features/auth/screens/ForgotPasswordScreen', () => ({
+  ForgotPasswordScreen: jest.requireActual('@/test/authScreenStubs')
+    .ForgotPasswordScreenStub,
+}));
+jest.mock('@/features/auth/screens/ResetPasswordScreen', () => ({
+  ResetPasswordScreen: jest.requireActual('@/test/authScreenStubs')
+    .ResetPasswordScreenStub,
+}));
 
 describe('AcceptInvitationScreen — cableado de autenticación', () => {
   async function renderInvitation() {
@@ -56,22 +64,39 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
     expect(await screen.findByText('signup')).toBeTruthy();
   });
 
-  it('en la verificación de registro cablea iniciar sesión pero no recuperación', async () => {
+  it('en la verificación de registro, iniciar sesión vuelve al inicio de sesión', async () => {
     const screen = await renderInvitation();
 
     fireEvent.press(screen.getByTestId('stub-login-signup'));
     fireEvent.press(await screen.findByTestId('stub-signup-complete'));
 
-    expect(await screen.findByTestId('stub-verify-go-login')).toBeTruthy();
-    // El anfitrión de invitación no cablea `onGoToRecovery`; la salida textual
-    // («abre la app para recuperar tu contraseña») la prueba
-    // VerifyCodeScreen.test.tsx para el caso sin recuperación.
-    expect(screen.queryByTestId('stub-verify-go-recovery')).toBeNull();
+    fireEvent.press(await screen.findByTestId('stub-verify-go-login'));
+
+    expect(await screen.findByTestId('stub-login-screen')).toBeTruthy();
   });
 
-  it('el inicio de sesión del anfitrión de invitación no ofrece recuperar contraseña', async () => {
+  it('desde la verificación de registro, recuperar contraseña entra en la recuperación', async () => {
     const screen = await renderInvitation();
 
-    expect(screen.queryByTestId('stub-login-forgot')).toBeNull();
+    fireEvent.press(screen.getByTestId('stub-login-signup'));
+    fireEvent.press(await screen.findByTestId('stub-signup-complete'));
+
+    fireEvent.press(await screen.findByTestId('stub-verify-go-recovery'));
+
+    expect(await screen.findByTestId('stub-forgot-screen')).toBeTruthy();
+  });
+
+  it('desde el inicio de sesión recorre recuperar, verificar y nueva contraseña', async () => {
+    const screen = await renderInvitation();
+
+    fireEvent.press(screen.getByTestId('stub-login-forgot'));
+    expect(await screen.findByTestId('stub-forgot-screen')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('stub-forgot-send'));
+    expect(await screen.findByText('recovery')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('stub-verify-success'));
+
+    expect(await screen.findByTestId('stub-reset-screen')).toBeTruthy();
   });
 });
