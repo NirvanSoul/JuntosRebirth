@@ -1698,6 +1698,102 @@ describe('MainTabsNavigator', () => {
       expect(await screen.findByText('Compra semanal')).toBeTruthy();
       expect(screen.getByText('Alimentación')).toBeTruthy();
     });
+
+    it('registra error estructurado en console.error cuando la publicación en segundo plano falla tras un cambio local, sin propagarlo y conservando los datos locales', async () => {
+      const publishError = new Error('Fallo de red en publicación');
+      mockRestoreRemoteAccount.mockResolvedValueOnce(undefined);
+      (listLocalCategories as jest.Mock).mockResolvedValue([
+        {
+          id: 'category-local-1',
+          spaceId: 'couple-space-1',
+          name: 'Alimentación',
+          icon: 'fork-knife',
+          colorToken: 'orange',
+          isDefault: true,
+          isArchived: false,
+        },
+      ]);
+      (listLocalTransactions as jest.Mock).mockResolvedValue([
+        {
+          id: 'tx-local-1',
+          spaceId: 'couple-space-1',
+          type: 'expense',
+          amountMinor: 2500,
+          currency: 'EUR',
+          title: 'Compra semanal',
+          categoryId: 'category-local-1',
+          occurredOn: dateInCurrentMonth(1),
+          recurrence: 'once',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+        },
+      ]);
+      mockSession = {
+        user: { id: 'user-1', email: 'test@example.com' },
+        access_token: 'fake-token',
+      };
+      mockUseSpaces.mockReturnValue({
+        activeSpace: {
+          currency: 'EUR',
+          id: 'couple-space-1',
+          name: 'Juntos',
+          type: 'couple',
+        },
+        createSpace: jest.fn(),
+        error: null,
+        isReady: true,
+        selectSpace: jest.fn(),
+        spaces: [
+          {
+            currency: 'EUR',
+            id: 'couple-space-1',
+            name: 'Juntos',
+            type: 'couple',
+          },
+        ],
+      });
+
+      const screen = await render(
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, right: 0, bottom: 34, left: 0 },
+          }}
+        >
+          <ThemeProvider initialAppearance="light">
+            <NavigationContainer>
+              <MainTabsNavigator />
+            </NavigationContainer>
+          </ThemeProvider>
+        </SafeAreaProvider>,
+      );
+
+      // El refresco de montaje ya consumió la sincronización esperada y los
+      // datos locales se muestran; el siguiente fallo corresponde a la
+      // publicación en segundo plano disparada por un cambio local.
+      expect(await screen.findByText('Compra semanal')).toBeTruthy();
+      expect(screen.getByText('Alimentación')).toBeTruthy();
+      await waitFor(() => expect(mockSyncCoupleSpaceData).toHaveBeenCalled());
+      mockSyncCoupleSpaceData.mockRejectedValueOnce(publishError);
+
+      // Crear una categoría en el espacio de pareja dispara
+      // `publishActiveCoupleChanges`, que publica en segundo plano.
+      await fireEvent.press(screen.getByTestId('floating-create-button'));
+      await fireEvent.press(screen.getByLabelText('Crear categoría'));
+      await fireEvent.press(screen.getByLabelText('Salario'));
+      await fireEvent.press(screen.getByLabelText('Guardar categorías'));
+
+      await waitFor(() => {
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '[sync] Publicación en segundo plano falló:',
+          publishError,
+        );
+      });
+
+      // Los datos locales siguen visibles: la publicación fallida no los
+      // altera ni propaga el error a la interfaz.
+      expect(await screen.findByText('Compra semanal')).toBeTruthy();
+      expect(screen.getByText('Alimentación')).toBeTruthy();
+    });
   });
 
   describe('suscripción Realtime del espacio de pareja (reentrega)', () => {

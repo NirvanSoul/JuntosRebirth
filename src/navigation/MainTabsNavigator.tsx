@@ -339,9 +339,9 @@ export function MainTabsNavigator() {
       ) {
         return;
       }
-      void syncCoupleSpaceDataForCurrentSession({ spaceId }).catch(
-        () => undefined,
-      );
+      void syncCoupleSpaceDataForCurrentSession({ spaceId }).catch((error) => {
+        console.error('[sync] Publicación en segundo plano falló:', error);
+      });
     },
     [session, spaces],
   );
