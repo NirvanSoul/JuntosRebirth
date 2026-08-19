@@ -534,7 +534,7 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
      - `category_budgets` (SQLite local y PostgreSQL remota) sigue dormida: con una moneda principal por espacio, el presupuesto por divisa no aporta valor hasta que existan espacios multidivisa habituales.
      - Camino heredado `categories.budget_amount_minor` (contradicción migración 08 vs 18/20) registrado como pendiente.
      - `ensure_personal_space` no se invoca desde el cliente.
-4. **Des-silenciar la publicación en segundo plano (implementada — pendiente de Gate 2: dos verificadores):**
+4. **Des-silenciar la publicación en segundo plano (cerrada — aprobada por los dos verificadores (commit dff044b)):**
    - `publishCoupleSpaceChanges` registra el fallo de `syncCoupleSpaceDataForCurrentSession` con `console.error('[sync] Publicación en segundo plano falló:', error)`, el mismo formato estructurado que la subida (`[sync] Subida de espacio compartido falló:`) y la restauración (`[sync] Restauración remota falló:`). Localizado por símbolo, no por línea. Sin propagar la excepción y sin alterar los datos locales.
    - Evidencia roja/verde: regresión nueva en `src/navigation/MainTabsNavigator.test.tsx` — ROJO contra el `catch(() => undefined)` original (`console.error` con 0 llamadas) y VERDE tras el fix (publicación fallida registrada y datos locales intactos).
    - `npm run validate` en verde: 122 suites / 728 tests, typecheck, lint, supresiones y formato.
