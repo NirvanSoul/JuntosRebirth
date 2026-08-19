@@ -210,11 +210,25 @@ a extracción cuando una tarea de producto lo toque.
   presupuestos, sincronización y worklets (§8.4, §6).
 
 - [ ] **Registrarse con un correo ya usado no avisa de nada** y el usuario
-  espera un código que nunca llega. El silencio puede ser deliberado: responder
-  igual ante correo nuevo y ya registrado evita que cualquiera averigüe qué
-  correos tienen cuenta. La corrección no es «decir que ya existe», sino cerrar
-  la espera sin revelar nada — mensaje neutro y un correo real a esa dirección.
-  Requiere decisión del responsable antes de implementar.
+  espera un código que nunca llega. El silencio es deliberado: responder igual
+  ante correo nuevo y ya registrado evita que cualquiera averigüe qué correos
+  tienen cuenta. La corrección no es «decir que ya existe», sino cerrar la
+  espera sin revelar nada.
+
+  **Decisión del responsable (2026-08-17): opción A.** La pantalla de
+  verificación explica que, si ese correo no tenía cuenta, llegará un código, y
+  que si ya la tenía debe iniciar sesión o recuperar la contraseña, con ambos
+  accesos directos y visibles. Solo cliente: no se tocan el gateway, las
+  plantillas de correo ni las Edge Functions.
+
+  La opción B —enviar además un aviso real al titular de la cuenta existente—
+  queda registrada como posible evolución. Exige flujo propio en backend y su
+  propia decisión.
+
+  No es tarea pequeña: toca autenticación y navegación (`PROJECT_RULES.md`
+  §4.2). Antes de dimensionar hay que inventariar los tres anfitriones de
+  `VerifyCodeScreen` —acceso, modal de ajustes e invitación—; el de invitación
+  no dispone de recuperación de contraseña completa.
 
 ### Sin fase asignada — tarea pequeña
 
