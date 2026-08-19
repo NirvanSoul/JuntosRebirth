@@ -22,11 +22,11 @@ financiero, autenticación, importación, legal y espacios de pareja). La
 **sincronización Supabase** y la **verificación de correo** ya se comprobaron de
 punta a punta en staging con dos cuentas y dos dispositivos físicos (§§6-8).
 
-El trabajo activo está en la **Fase 3**, cerrando el consumo coherente de la
-moneda principal del espacio en Inicio, Actividad, presupuestos, creación e
-importación. La implementación está en revisión; faltan el borde de lotes de
-importación reanudados sin moneda y los smokes físicos finales. La Fase 5 de
-release no ha comenzado.
+El trabajo activo sigue en la **Fase 3**, pero la Entrega 2 de consumo coherente
+de la moneda principal del espacio ya está cerrada: implementación, Gate 2 y
+smokes físicos finales completados en iPhone y Honor (§§6 y 8.4). Permanecen
+pendientes de Fase 3 las tareas de producto y preparación enumeradas más abajo;
+la Fase 4 de desarrollo funcional y la Fase 5 de release no han comenzado.
 
 ## 3. Orden de trabajo
 
@@ -72,7 +72,8 @@ miembros, cuentas de dinero y los ajustes visuales que superen revisión. Se
 implementarán desde nuestros contratos y reglas; que una capacidad entre en el
 MVP **no aprueba ni integra su código externo** (§9).
 
-No comienza hasta cerrar la Entrega 2 de monedas. Sus prerrequisitos son:
+La Entrega 2 de monedas ya está cerrada. Antes de comenzar estas entregas
+funcionales deben resolverse sus otros prerrequisitos:
 
 - Resolver la escala de monedas sin centavos (§8.4.9) antes de almacenar nuevos
   saldos iniciales.
@@ -122,6 +123,13 @@ No comienza hasta cerrar la Entrega 2 de monedas. Sus prerrequisitos son:
 - Revisar las propuestas externas sobre progreso de onboarding, botón flotante,
   fondo raíz y presentación de cuentas contra `PRODUCT.md` y el sistema de
   diseño.
+- Resolver la presentación confusa de «Detalle por categoría» en Actividad. El
+  donut mantiene internamente mes y tipo (Gastos/Ingresos), mientras el listado
+  recibe resúmenes distintos; además, la regla vigente muestra el importe de
+  categorías solo de ingreso, pero oculta el gasto de una categoría sin
+  presupuesto aunque el donut sí lo contabilice. No es un fallo de datos ni de
+  moneda: antes de cambiarlo se decide si el listado debe seguir mes/tipo del
+  donut y qué totales debe mostrar siempre.
 - Implementar solo las que tengan objetivo y criterio de aceptación; no portar
   el commit externo de «trabajo en curso».
 - Hacer smoke visual y nativo en iOS y Android.
@@ -181,14 +189,16 @@ a extracción cuando una tarea de producto lo toque.
 
 ### Fase 3 — producto, pendientes de dimensionar
 
-- [ ] **Cerrar el consumo multidivisa sin presentar importes como euros por
+- [x] **Cerrar el consumo multidivisa sin presentar importes como euros por
   defecto.** El modelo y la mayor parte de la interfaz ya están implementados:
   `spaces.currency` es la fuente del espacio, los agregados filtran por moneda
   y el catálogo visible es común a Inicio y Actividad. Los lotes reanudados con
   `currency = null` ya están corregidos (`a0eb3fe`), la evidencia diferencial
   asimétrica está capturada (rojo en `dcb5d8a` / verde en HEAD) y el reset de
-  staging está ejecutado y verificado. La casilla permanece abierta hasta
-  completar los smokes físicos de la Entrega 2 (§8.4, §6).
+  staging está ejecutado y verificado. El reinicio espontáneo del borrador de
+  movimiento quedó corregido y revisado (`326fd07`, `277dc30`, `8249fbc`); los
+  smokes finales en iPhone y Honor confirmaron el comportamiento multidivisa,
+  presupuestos, sincronización y worklets (§8.4, §6).
 
 - [ ] **Registrarse con un correo ya usado no avisa de nada** y el usuario
   espera un código que nunca llega. El silencio puede ser deliberado: responder
@@ -219,6 +229,8 @@ cuando el responsable confirma el resultado.
 | 2026-08-16 | Sincronización en caliente (iPhone 17 → Honor) en espacio «Juntos» tras corrección de restoreRemoteAccount | iPhone 17 físico (iOS) y Honor Android | responsable | correcto (~2 s, inferido por latencia incompatible con sondeo de 15 s; sin duplicación tras ciclo de sondeo y recarga) |
 | 2026-08-16 | Sincronización en caliente (Honor → iPhone 17) en espacio «Juntos» tras corrección de restoreRemoteAccount | Honor Android y iPhone 17 físico (iOS) | responsable | correcto (~2 s, inferido por latencia incompatible con sondeo de 15 s; sin duplicación tras ciclo de sondeo y recarga) |
 | 2026-08-16 | Sincronización tras cambio de espacio (personal → «Juntos») con movimiento pendiente | iPhone 17 físico (iOS) y Honor Android | responsable | correcto (~2 s al cambiar de espacio, sin pérdida de información) |
+| 2026-08-18 | Smoke multidivisa final de Entrega 2: espacio VES con preferencias VES/EUR, borrador de movimiento, creación/importación, presupuesto y sincronización | iPhone 17 físico (iOS) y Honor Android | responsable | correcto; la moneda elegida ya no se reinicia al escribir, borrar o recibir recargas; los gastos EUR no consumen el presupuesto VES y la sincronización conserva monedas sin duplicar |
+| 2026-08-18 | Smoke nativo de gráficas/worklets de Entrega 2 | iPhone 17 físico (iOS) y Honor Android | responsable | correcto en ambas plataformas, sin bloqueos ni parpadeos persistentes atribuibles a los worklets |
 
 ---
 
@@ -447,7 +459,7 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
        - Comprobación de historial: `npx supabase migration list --linked` confirmó 01-08 y 10-23 aplicadas (`EXIT=0`).
        - Suite focal pgTAP en staging: `npx supabase test db --linked supabase/tests/guest_space_currency.test.sql` → 17/17 tests PASS (`EXIT=0`).
      - Sin tocar la interfaz.
-   - **Entrega 2 — El Consumo (implementada; cierre pendiente):**
+   - **Entrega 2 — El Consumo (cerrada):**
      - Agregación con `summarizeCategories(categories, transactions, currency)` donde `currency` es obligatoria y el filtrado ocurre dentro.
      - Pantallas de Inicio y Actividad propagando su moneda visible al modal de detalle de categoría.
      - Presupuesto calculado y comparado exclusivamente contra movimientos en `spaces.currency`.
@@ -456,7 +468,8 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
      - Commits principales: `c039ae8`, `c915607`, `a30fe41`, `dcb5d8a` y
        `b55fbdf`.
      - Commits de cierre: `a0eb3fe` (fix de lotes reanudados con
-       `currency = null`).
+       `currency = null`), `326fd07`/`277dc30` (conservación segura del
+       borrador ante recargas) y `8249fbc` (trinquete exacto de longitud).
      - Evidencia diferencial asimétrica capturada (ejecución real, no «por
        construcción»): fuente fijada en `dcb5d8a` con los tests de HEAD → ROJO
        en `MainTabsNavigator › propagación multidivisa (Entrega 2) › Actividad
@@ -471,8 +484,8 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
        `auth.users` y `profiles` (excluido Auth) para que el login siga
        funcionando; sin tocar migraciones, esquema, Edge Functions,
        configuración ni secrets.
-     - Bloqueante reproducible hallado en el smoke físico y corregido (sin
-       cerrar la Entrega 2): `CreateTransactionModal` reiniciaba el borrador
+     - Bloqueante reproducible hallado en el primer smoke físico y corregido:
+       `CreateTransactionModal` reiniciaba el borrador
        con el modal abierto —la moneda elegida volvía a la del espacio y se
        perdía parte de lo escrito— en cada recarga de sincronización, Realtime
        o sondeo de 15 s. Causa: el catálogo de monedas reconstruido era el
@@ -488,10 +501,11 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
        EUR→VES y título borrado, en creación y en edición) y VERDE tras el
        arreglo (suite 32/32). `npm run validate` completo en verde
        (122 suites / 727 tests).
-     - Pendiente de cierre: **rehacer** los smokes de worklets y moneda del
-       espacio en iPhone y Honor sobre datos de prueba limpios (§6) para
-       confirmar este arreglo en dispositivo. El smoke NO se registra como
-       aprobado.
+     - Cierre manual: los smokes repetidos en iPhone y Honor confirmaron el
+       borrador estable ante escritura, borrado y recargas; moneda principal y
+       moneda visible separadas; presupuesto VES aislado de gastos EUR;
+       sincronización sin duplicados; y worklets correctos en ambas plataformas
+       (§6). Gate 2 aprobado por ambos verificadores.
    - **Fuera de alcance:**
      - `profiles.default_currency` queda fuera de ambas entregas.
      - `category_budgets` (SQLite local y PostgreSQL remota) sigue dormida: con una moneda principal por espacio, el presupuesto por divisa no aporta valor hasta que existan espacios multidivisa habituales.
