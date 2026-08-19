@@ -35,8 +35,6 @@ import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
   defaultCurrencyCode,
-  getCurrencyFlag,
-  getCurrencyName,
   getCurrencyPluralName,
   getCurrencySymbol,
   getCurrencySymbolPosition,
@@ -57,6 +55,7 @@ import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import { TransactionDatePickerModal } from './TransactionDatePickerModal';
 import { TransactionCustomRecurrenceModal } from './TransactionCustomRecurrenceModal';
+import { TransactionCurrencyPickerModal } from './TransactionCurrencyPickerModal';
 
 type CreateTransactionModalProps = {
   activeSpaceId: string;
@@ -244,42 +243,51 @@ export function CreateTransactionModal({
   );
 
   // Snapshot del borrador: se reinicia solo al abrir el modal o al cambiar de
-  // espacio, nunca ante reconstrucciones del catálogo de monedas ni recargas de
-  // sincronización/Realtime/sondeo que cambien la identidad de `initialDraft` o
-  // `initialDate` (borrarían lo escrito). El payload se lee de un ref para que
-  // su identidad no sea señal de reinicio: mismo contrato que el snapshot de
-  // ImportScreen, pero sin supresión de exhaustive-deps.
+  // espacio, nunca ante reconstrucciones del catálogo de monedas
+  // (desencadenante en creación) ni recargas que cambien la identidad de
+  // `initialDraft` (desencadenante en edición). `initialDate` es un primitivo
+  // que se captura al abrir y no cambia legítimamente con el modal abierto.
+  // El payload se lee de un ref para que su identidad no sea señal de reinicio:
+  // mismo contrato que el snapshot de ImportScreen, sin supresión de
+  // exhaustive-deps.
   const snapshotRef = useRef({ initialDate, initialDraft, spaceCurrency });
-  snapshotRef.current = { initialDate, initialDraft, spaceCurrency };
+
+  useEffect(() => {
+    snapshotRef.current = { initialDate, initialDraft, spaceCurrency };
+  }, [initialDate, initialDraft, spaceCurrency]);
 
   useEffect(() => {
     if (!visible) return;
-    const { initialDate, initialDraft, spaceCurrency } = snapshotRef.current;
-    setTitle(initialDraft?.title ?? '');
+    const {
+      initialDate: openingDate,
+      initialDraft: openingDraft,
+      spaceCurrency: openingCurrency,
+    } = snapshotRef.current;
+    setTitle(openingDraft?.title ?? '');
     setAmountInput(
-      initialDraft ? amountMinorToInput(initialDraft.amountMinor) : '0',
+      openingDraft ? amountMinorToInput(openingDraft.amountMinor) : '0',
     );
     setPendingOperations([]);
     setReplaceAmount(false);
     setRecurrenceIndex(
-      initialDraft
+      openingDraft
         ? Math.max(
             recurrenceOptions.findIndex(
-              (option) => option.value === initialDraft.recurrence,
+              (option) => option.value === openingDraft.recurrence,
             ),
             0,
           )
         : 0,
     );
     setOccurredOn(
-      initialDraft?.occurredOn ?? initialDate ?? getLocalTodayKey(),
+      openingDraft?.occurredOn ?? openingDate ?? getLocalTodayKey(),
     );
     setCustomOccurrenceDates(
-      initialDraft?.recurrence === 'custom'
-        ? (initialDraft.customOccurrenceDates ?? [initialDraft.occurredOn])
+      openingDraft?.recurrence === 'custom'
+        ? (openingDraft.customOccurrenceDates ?? [openingDraft.occurredOn])
         : [],
     );
-    setCurrency(initialDraft?.currency ?? spaceCurrency);
+    setCurrency(openingDraft?.currency ?? openingCurrency);
     setDatePickerVisible(false);
     setRecurrencePickerVisible(false);
     setCurrencyPickerVisible(false);
@@ -876,68 +884,6 @@ export function CreateTransactionModal({
         visible={isCurrencyPickerVisible}
       />
     </>
-  );
-}
-
-type TransactionCurrencyPickerModalProps = {
-  availableCurrencies: readonly CurrencyCode[];
-  currency: CurrencyCode;
-  visible: boolean;
-  onClose: () => void;
-  onSelectCurrency: (currency: CurrencyCode) => void;
-};
-
-function TransactionCurrencyPickerModal({
-  availableCurrencies,
-  currency,
-  visible,
-  onClose,
-  onSelectCurrency,
-}: TransactionCurrencyPickerModalProps) {
-  const [draftCurrency, setDraftCurrency] = useState(currency);
-
-  useEffect(() => {
-    if (visible) {
-      setDraftCurrency(currency);
-    }
-  }, [currency, visible]);
-
-  return (
-    <AppModal
-      onClose={onClose}
-      stackBehavior="push"
-      testID="transaction-currency-picker"
-      visible={visible}
-    >
-      <View style={optionPickerStyles.container}>
-        <View style={optionPickerStyles.header}>
-          <ModalCloseButton onPress={onClose} variant="back" />
-          <Text accessibilityRole="header" variant="heading">
-            Elige la moneda
-          </Text>
-        </View>
-
-        <View accessibilityRole="radiogroup" style={optionPickerStyles.list}>
-          {availableCurrencies.map((code) => (
-            <SelectableOption
-              accessibilityLabel={`${getCurrencyFlag(code)} ${getCurrencyName(code)} (${code})`}
-              indicatorTestID={`transaction-currency-${code}-check`}
-              key={code}
-              label={`${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`}
-              onPress={() => setDraftCurrency(code)}
-              selected={draftCurrency === code}
-            />
-          ))}
-        </View>
-
-        <ModalPrimaryAction
-          accessibilityLabel="Guardar moneda"
-          label="Guardar"
-          onPress={() => onSelectCurrency(draftCurrency)}
-          style={optionPickerStyles.saveButton}
-        />
-      </View>
-    </AppModal>
   );
 }
 

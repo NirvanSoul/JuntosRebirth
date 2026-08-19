@@ -475,12 +475,14 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
        cerrar la Entrega 2): `CreateTransactionModal` reiniciaba el borrador
        con el modal abierto —la moneda elegida volvía a la del espacio y se
        perdía parte de lo escrito— en cada recarga de sincronización, Realtime
-       o sondeo de 15 s. Causa: el efecto de reinicio dependía de
-       `effectiveAvailableCurrencies`, `initialDraft` e `initialDate`, cuya
-       identidad cambia en cada recarga. Arreglo: el reinicio se dispara solo
-       en `[visible, activeSpaceId]` y el payload
-       (`initialDraft`/`initialDate`/`spaceCurrency`) se lee de un ref de
-       snapshot; mismo contrato que el snapshot de `ImportScreen`, sin
+       o sondeo de 15 s. Causa: el catálogo de monedas reconstruido era el
+       desencadenante del reinicio en creación y `initialDraft` reconstruido
+       lo era durante la edición; `initialDate` era una dependencia innecesaria
+       que se captura al abrir pero no cambia con el modal abierto. Arreglo:
+       el reinicio se dispara solo en `[visible, activeSpaceId]` y el payload
+       (`initialDraft`/`initialDate`/`spaceCurrency`) se actualiza mediante un
+       efecto dedicado previo sobre un ref de snapshot; mismo contrato que el
+       snapshot de `ImportScreen`, sin escritura de refs durante el render y sin
        supresión de `exhaustive-deps`. Prueba diferencial: 6 casos nuevos en
        `CreateTransactionModal.test.tsx` — 4 ROJO contra `70b0584` (moneda
        EUR→VES y título borrado, en creación y en edición) y VERDE tras el
