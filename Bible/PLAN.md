@@ -233,7 +233,9 @@ a extracción cuando una tarea de producto lo toque.
   —acceso, modal de ajustes e invitación—; el de invitación no disponía de
   recuperación de contraseña completa, hueco cerrado en esta entrega.
 
-  **(Cerrada)** Tarea 3 cerrada con smoke físico iPhone/Honor exitoso.
+  **(Implementada)** Tarea 4 con implementación y Gate 2 aprobados. El smoke test
+  de `AcceptInvitationScreen` ha sido trasladado a la fase de release por requerir
+  development build para el deep link `juntoss://`. No se marca la verificación manual de `AcceptInvitationScreen` como realizada aún.
   Inventario de anfitriones completado: `AccessScreen`,
   `AuthModal` y `AcceptInvitationScreen` alojan `verify-signup` y cablean la
   cadena de recuperación (`forgot` → `ForgotPasswordScreen` →
@@ -271,9 +273,7 @@ a extracción cuando una tarea de producto lo toque.
 
 - [x] **Poder ver la contraseña mientras se escribe.** Aplica a registro,
   inicio de sesión y recuperación; usar la primitiva de campo existente, no un
-  control nuevo por pantalla. **(Cerrada)** Tarea 4 implementada y aprobada. El smoke test
-  de `AcceptInvitationScreen` ha sido trasladado a la fase de release por requerir
-  development build para el deep link `juntoss://`.
+  control nuevo por pantalla. **(Cerrada)** Tarea 3 implementada, verificada y cerrada con smoke iPhone/Honor exitoso.
   `AuthTextField` (la primitiva existente) gana un botón de visibilidad
   (`Eye`/`EyeSlash`, peso regular) que alterna `secureTextEntry`; estado inicial oculto;
   botón deshabilitado cuando el campo no es editable; sin cambios en los **cinco**
