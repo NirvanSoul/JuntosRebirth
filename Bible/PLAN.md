@@ -124,12 +124,21 @@ funcionales deben resolverse sus otros prerrequisitos:
   fondo raíz y presentación de cuentas contra `PRODUCT.md` y el sistema de
   diseño.
 - Resolver la presentación confusa de «Detalle por categoría» en Actividad. El
-  donut mantiene internamente mes y tipo (Gastos/Ingresos), mientras el listado
-  recibe resúmenes distintos; además, la regla vigente muestra el importe de
-  categorías solo de ingreso, pero oculta el gasto de una categoría sin
+  listado y el donut que lo precede aparentan formar una sola vista, pero hoy
+  divergen en tres estados:
+  - **Modo (Gastos/Ingresos):** vive dentro de `CategoryDonutChart`; el listado
+    recibe todos los resúmenes y no aplica ese modo.
+  - **Mes:** el donut mantiene su propio `monthKey` y filtra con
+    `listTransactionsByMonth`; el listado recibe `categorySummaries` calculado
+    con el acumulado hasta el mes actual.
+  - **Periodo efectivo:** como consecuencia, ambos bloques pueden representar
+    rangos temporales distintos simultáneamente.
+  Además, la regla vigente muestra el importe de categorías solo de ingreso,
+  pero conserva una barra vacía y oculta el gasto de una categoría sin
   presupuesto aunque el donut sí lo contabilice. No es un fallo de datos ni de
-  moneda: antes de cambiarlo se decide si el listado debe seguir mes/tipo del
-  donut y qué totales debe mostrar siempre.
+  moneda. La decisión de producto debe cubrir la sincronización de modo, mes y
+  periodo, además de la regla de importes: o ambos bloques comparten estado, o
+  se separan visualmente para que no parezcan una misma vista.
 - Implementar solo las que tengan objetivo y criterio de aceptación; no portar
   el commit externo de «trabajo en curso».
 - Hacer smoke visual y nativo en iOS y Android.
