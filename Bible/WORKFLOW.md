@@ -173,6 +173,10 @@ nada.
 El paquete de revisión es el **resumen obligatorio de `PROJECT_RULES.md` §25**,
 entregado en el Gate 2, más:
 
+- **La identificación del actor que lo produjo, en su primera línea.** Con más
+  de un actor de código activo, un paquete sin firma se devuelve sin revisar:
+  sin ella los hallazgos no se pueden atribuir y el contador del régimen
+  reforzado deja de ser medible.
 - Lista de archivos tocados.
 - Resumen del diff.
 - Resultado del Gate 1.
