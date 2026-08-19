@@ -310,6 +310,7 @@ cuando el responsable confirma el resultado.
 | 2026-08-16 | Sincronización tras cambio de espacio (personal → «Juntos») con movimiento pendiente | iPhone 17 físico (iOS) y Honor Android | responsable | correcto (~2 s al cambiar de espacio, sin pérdida de información) |
 | 2026-08-18 | Smoke multidivisa final de Entrega 2: espacio VES con preferencias VES/EUR, borrador de movimiento, creación/importación, presupuesto y sincronización | iPhone 17 físico (iOS) y Honor Android | responsable | correcto; la moneda elegida ya no se reinicia al escribir, borrar o recibir recargas; los gastos EUR no consumen el presupuesto VES y la sincronización conserva monedas sin duplicar |
 | 2026-08-18 | Smoke nativo de gráficas/worklets de Entrega 2 | iPhone 17 físico (iOS) y Honor Android | responsable | correcto en ambas plataformas, sin bloqueos ni parpadeos persistentes atribuibles a los worklets |
+| 2026-08-19 | Smoke de mostrar/ocultar contraseña en `AuthTextField` (inicio de sesión, registro con dos campos y restablecimiento) | iPhone 17 físico (iOS) y Honor Android | responsable | correcto: empieza oculta, el ojo alterna, el texto se conserva, los campos son independientes entre sí y no hay interferencia de teclado, cursor ni autorrelleno |
 
 ---
 
