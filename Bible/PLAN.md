@@ -230,6 +230,17 @@ a extracción cuando una tarea de producto lo toque.
   `VerifyCodeScreen` —acceso, modal de ajustes e invitación—; el de invitación
   no dispone de recuperación de contraseña completa.
 
+  **(Implementada la opción A — pendiente de verificador y smoke físico
+  iPhone/Honor.)** Inventario de anfitriones completado: `AccessScreen` y
+  `AuthModal` alojan `verify-signup` y `verify-recovery`;
+  `AcceptInvitationScreen` solo `verify-signup`. `VerifyCodeScreen` recibe
+  `onGoToLogin`/`onGoToRecovery` opcionales y, en `purpose="signup"`, muestra
+  siempre la explicación neutral («si no tenía cuenta te llegará un código; si
+  ya tenía una, no recibirás uno aquí») con los accesos directos visibles:
+  acceso y ajustes ofrecen iniciar sesión y recuperar contraseña; invitación
+  solo iniciar sesión. Evidencia: 3 casos nuevos en `VerifyCodeScreen.test.tsx`;
+  `npm run validate` en verde: 123 suites / 737 tests. Commit `195e916`.
+
 ### Sin fase asignada — tarea pequeña
 
 - [ ] **Poder ver la contraseña mientras se escribe.** Aplica a registro,
@@ -567,6 +578,11 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
     - Se completa **antes** de publicar en tiendas para evitar retrabajo transversal y lanzar una experiencia lingüísticamente coherente. Es la tarea más grande restante en el plan.
 11. **El `locale` fijo `'es-ES'`:**
     - Forma parte de la internacionalización y no se corrige por separado: la selección del locale debe derivar de la arquitectura de idiomas, no al revés.
+12. **Deuda — *catches* silenciosos de reglas de notificación en `MainTabsNavigator` (registrar, NO arreglar todavía):**
+    - `reloadLocalFinance`: `reconcileNotificationRules(...).catch(() => undefined)` silencia cualquier fallo de la reconciliación de reglas tras recargar las finanzas locales.
+    - `useEffect` de carga inicial: `listLocalNotificationRules().then(...).catch(() => undefined)` silencia el fallo de lectura de reglas al arrancar. Silencio deliberado (capacidad secundaria: un fallo no debe bloquear ver categorías y movimientos; el código lo justifica en un comentario), pero no registra nada.
+    - Familia relacionada con el mismo patrón `.catch(() => undefined)`: `reconcileNotificationRules`/`reconcileDailyReminder` en el gancho de primer plano y en las escrituras/recordatorios de movimientos.
+    - Localizado por símbolo, no por línea. Registrado por la tarea 6 del lote; **no se corrige todavía**. Al abordarlo, decidir qué silencios son deliberados (y se documentan) y cuáles pasan a `console.error` estructurado, con evidencia roja/verde.
 
 *Pendiente aparte, por contacto:* Extracción de `ImportScreen.tsx` y `AppCalendar.tsx` (§4).
 
