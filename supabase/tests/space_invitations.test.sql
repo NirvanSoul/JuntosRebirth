@@ -1,5 +1,5 @@
 begin;
-select plan(24);
+select plan(32);
 
 select has_table('public', 'space_invitations', 'space_invitations exists');
 select ok(
@@ -39,8 +39,8 @@ select ok(
   'invitations cannot be deleted directly, only revoked via create_space_invitation replacing them'
 );
 select has_index(
-  'public', 'space_invitations', 'space_invitations_one_pending_per_space_idx',
-  'at most one pending invitation per space is enforced at the database level'
+  'public', 'space_invitations', 'space_invitations_one_pending_per_target_idx',
+  'at most one pending invitation per target is enforced at the database level'
 );
 
 select has_function('public', 'create_couple_space', array['text', 'text'], 'create_couple_space exists');
@@ -48,6 +48,7 @@ select has_function('public', 'create_space_invitation', array['uuid', 'text'], 
 select has_function('public', 'get_space_invitation_preview', array['text'], 'get_space_invitation_preview exists');
 select has_function('public', 'accept_space_invitation', array['text'], 'accept_space_invitation exists');
 select has_function('public', 'dissolve_couple_space', array['uuid'], 'dissolve_couple_space exists');
+select has_function('public', 'ensure_personal_space', array['text', 'text'], 'ensure_personal_space exists');
 
 select ok(
   not has_function_privilege('anon', 'public.create_couple_space(text,text)', 'EXECUTE'),
@@ -66,8 +67,32 @@ select ok(
   'authenticated users can accept an invitation'
 );
 select ok(
+  has_function_privilege('authenticated', 'public.create_couple_space(text,text)', 'EXECUTE'),
+  'authenticated users can create a couple space'
+);
+select ok(
+  not has_function_privilege('anon', 'public.create_space_invitation(uuid,text)', 'EXECUTE'),
+  'anonymous users cannot create a space invitation'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.create_space_invitation(uuid,text)', 'EXECUTE'),
+  'authenticated users can create a space invitation'
+);
+select ok(
+  not has_function_privilege('anon', 'public.dissolve_couple_space(uuid)', 'EXECUTE'),
+  'anonymous users cannot dissolve a couple space'
+);
+select ok(
   has_function_privilege('authenticated', 'public.dissolve_couple_space(uuid)', 'EXECUTE'),
   'authenticated users can dissolve a couple space they own'
+);
+select ok(
+  not has_function_privilege('anon', 'public.ensure_personal_space(text,text)', 'EXECUTE'),
+  'anonymous users cannot ensure a personal space'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.ensure_personal_space(text,text)', 'EXECUTE'),
+  'authenticated users can ensure a personal space'
 );
 
 -- Un espacio juntos no existe de verdad hasta que la otra persona acepta
