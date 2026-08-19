@@ -252,6 +252,24 @@ Si un verificador detecta un patrón de error recurrente, se registra en
 añadir burocracia, sino hacer que el cambio correcto sea fácil y el cambio
 incorrecto resulte evidente.
 
+### 8.1 Mocks que congelan el estado verificado
+
+Un mock no puede **congelar** el estado cuya interacción se está verificando:
+debe reproducir las transiciones que la dependencia real garantiza. Un
+`jest.mock` que devuelve un valor fijo durante todo el recorrido vuelve el
+escenario irrelevante y el verde, una falsa confianza. Es la cuarta vez que un
+verde tapa un defecto por esto: el candado de SQLite, la zona horaria en CI, el
+catálogo de monedas y ahora la sesión del OTP.
+
+Caso OTP (2026-08-19): `useAuthSession` se mockeaba con `session: null` fijo.
+El OTP de recuperación crea una sesión a mitad del flujo; al no reproducirse esa
+transición, la prueba no veía que esa sesión disparaba la autoaceptación y
+ocultaba `ResetPasswordScreen`.
+
+Regla práctica: si el mock inmoviliza la señal que la prueba observa, no
+protege. Hay que exponer el setter (o el mecanismo equivalente) y disparar la
+transición real.
+
 ---
 
 ## 9. Modo de trabajo actual
