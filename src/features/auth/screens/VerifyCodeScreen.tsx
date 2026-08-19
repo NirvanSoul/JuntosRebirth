@@ -253,6 +253,12 @@ export function VerifyCodeScreen({
             Si este correo no tenía cuenta, te llegará un código. Si ya tenía
             una, no recibirás uno aquí.
           </Text>
+          {!onGoToRecovery ? (
+            <Text tone="secondary" variant="footnote">
+              Si ya tenía una cuenta y no recuerdas la contraseña, abre la app
+              para recuperar tu contraseña.
+            </Text>
+          ) : null}
           {onGoToLogin ? (
             <Pressable
               accessibilityRole="button"

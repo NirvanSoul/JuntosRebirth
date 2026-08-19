@@ -90,6 +90,75 @@ describe('AuthTextField', () => {
           .accessibilityState,
       ).toEqual({ disabled: true });
     });
+
+    it('revelar un campo no revela otro campo de contraseña simultáneo', async () => {
+      const screen = await render(
+        <ThemeProvider initialAppearance="light">
+          <AuthTextField
+            label="Contraseña"
+            onChangeText={() => undefined}
+            secureTextEntry
+            testID="field-password"
+            value="secreto-a"
+          />
+          <AuthTextField
+            label="Confirmar contraseña"
+            onChangeText={() => undefined}
+            secureTextEntry
+            testID="field-confirm"
+            value="secreto-b"
+          />
+        </ThemeProvider>,
+      );
+
+      await fireEvent.press(
+        screen.getByTestId('field-password-toggle-visibility'),
+      );
+
+      expect(screen.getByTestId('field-password').props.secureTextEntry).toBe(
+        false,
+      );
+      expect(screen.getByTestId('field-confirm').props.secureTextEntry).toBe(
+        true,
+      );
+    });
+
+    it('al desmontar y volver a montar reaparece oculta', async () => {
+      const screen = await render(
+        <ThemeProvider initialAppearance="light">
+          <AuthTextField
+            key="montaje-1"
+            label="Contraseña"
+            onChangeText={() => undefined}
+            secureTextEntry
+            testID="auth-field"
+            value="secret1234"
+          />
+        </ThemeProvider>,
+      );
+
+      await fireEvent.press(screen.getByTestId('auth-field-toggle-visibility'));
+      expect(screen.getByTestId('auth-field').props.secureTextEntry).toBe(
+        false,
+      );
+
+      // Cambiar la key fuerza a React a desmontar el campo y montar uno nuevo,
+      // cuyo estado de visibilidad arranca de nuevo en "oculta".
+      await screen.rerender(
+        <ThemeProvider initialAppearance="light">
+          <AuthTextField
+            key="montaje-2"
+            label="Contraseña"
+            onChangeText={() => undefined}
+            secureTextEntry
+            testID="auth-field"
+            value="secret1234"
+          />
+        </ThemeProvider>,
+      );
+
+      expect(screen.getByTestId('auth-field').props.secureTextEntry).toBe(true);
+    });
   });
 
   it('no muestra el botón de visibilidad en campos que no son de contraseña', async () => {

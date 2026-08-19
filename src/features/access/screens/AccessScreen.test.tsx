@@ -14,20 +14,23 @@ jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
 }));
 
 jest.mock('@/features/auth/screens/LoginScreen', () => ({
-  LoginScreen: () => null,
+  LoginScreen: jest.requireActual('@/test/authScreenStubs').LoginScreenStub,
 }));
 jest.mock('@/features/auth/screens/SignUpScreen', () => ({
-  SignUpScreen: () => null,
+  SignUpScreen: jest.requireActual('@/test/authScreenStubs').SignUpScreenStub,
   signUpTotalSteps: 4,
 }));
 jest.mock('@/features/auth/screens/VerifyCodeScreen', () => ({
-  VerifyCodeScreen: () => null,
+  VerifyCodeScreen: jest.requireActual('@/test/authScreenStubs')
+    .VerifyCodeScreenStub,
 }));
 jest.mock('@/features/auth/screens/ForgotPasswordScreen', () => ({
-  ForgotPasswordScreen: () => null,
+  ForgotPasswordScreen: jest.requireActual('@/test/authScreenStubs')
+    .ForgotPasswordScreenStub,
 }));
 jest.mock('@/features/auth/screens/ResetPasswordScreen', () => ({
-  ResetPasswordScreen: () => null,
+  ResetPasswordScreen: jest.requireActual('@/test/authScreenStubs')
+    .ResetPasswordScreenStub,
 }));
 
 describe('AccessScreen', () => {
@@ -50,5 +53,54 @@ describe('AccessScreen', () => {
     fireEvent.press(screen.getByTestId('access-open-signup'));
 
     expect(screen.getByText('Crear cuenta')).toBeTruthy();
+  });
+
+  describe('cableado de navegación de autenticación', () => {
+    it('del inicio de sesión lleva a recuperar contraseña', async () => {
+      const screen = await renderWithTheme(<AccessScreen />);
+
+      fireEvent.press(screen.getByTestId('access-open-login'));
+      fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+
+      expect(await screen.findByText('Recuperar contraseña')).toBeTruthy();
+      expect(screen.getByTestId('stub-forgot-screen')).toBeTruthy();
+    });
+
+    it('completa la cadena de recuperación hasta nueva contraseña', async () => {
+      const screen = await renderWithTheme(<AccessScreen />);
+
+      fireEvent.press(screen.getByTestId('access-open-login'));
+      fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+      fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+
+      expect(await screen.findByText('recovery')).toBeTruthy();
+
+      fireEvent.press(await screen.findByTestId('stub-verify-success'));
+
+      expect(await screen.findByText('Nueva contraseña')).toBeTruthy();
+      expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
+    });
+
+    it('desde la verificación de registro, recuperar contraseña lleva al flujo de recuperación', async () => {
+      const screen = await renderWithTheme(<AccessScreen />);
+
+      fireEvent.press(screen.getByTestId('access-open-signup'));
+      fireEvent.press(await screen.findByTestId('stub-signup-complete'));
+      expect(await screen.findByText('signup')).toBeTruthy();
+
+      fireEvent.press(await screen.findByTestId('stub-verify-go-recovery'));
+
+      expect(await screen.findByText('Recuperar contraseña')).toBeTruthy();
+    });
+
+    it('desde la verificación de registro, iniciar sesión vuelve al inicio de sesión', async () => {
+      const screen = await renderWithTheme(<AccessScreen />);
+
+      fireEvent.press(screen.getByTestId('access-open-signup'));
+      fireEvent.press(await screen.findByTestId('stub-signup-complete'));
+      fireEvent.press(await screen.findByTestId('stub-verify-go-login'));
+
+      expect(await screen.findByText('Iniciar sesión')).toBeTruthy();
+    });
   });
 });
