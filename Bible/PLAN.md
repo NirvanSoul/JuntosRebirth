@@ -209,7 +209,7 @@ a extracción cuando una tarea de producto lo toque.
   smokes finales en iPhone y Honor confirmaron el comportamiento multidivisa,
   presupuestos, sincronización y worklets (§8.4, §6).
 
-- [ ] **Registrarse con un correo ya usado no avisa de nada** y el usuario
+- [x] **Registrarse con un correo ya usado no avisa de nada** y el usuario
   espera un código que nunca llega. El silencio es deliberado: responder igual
   ante correo nuevo y ya registrado evita que cualquiera averigüe qué correos
   tienen cuenta. La corrección no es «decir que ya existe», sino cerrar la
@@ -233,14 +233,8 @@ a extracción cuando una tarea de producto lo toque.
   —acceso, modal de ajustes e invitación—; el de invitación no disponía de
   recuperación de contraseña completa, hueco cerrado en esta entrega.
 
-  **(Implementada la opción A y cableada la recuperación en los tres
-  anfitriones — pendiente de dos verificadores y smoke físico iPhone/Honor.)**
-  El responsable revocó el 2026-08-19 la excepción que dejaba la recuperación
-  fuera del anfitrión de invitación: la ruta real para recuperar desde la
-  invitación eran seis pasos (Iniciar sesión → Cancelar → menú del espacio →
-  Ajustes → Iniciar sesión o crear cuenta → Iniciar sesión → ¿Olvidaste tu
-  contraseña?), de modo que una salida textual no cerraba el callejón sin
-  salida, lo documentaba. Inventario de anfitriones completado: `AccessScreen`,
+  **(Cerrada)** Tarea 3 cerrada con smoke físico iPhone/Honor exitoso.
+  Inventario de anfitriones completado: `AccessScreen`,
   `AuthModal` y `AcceptInvitationScreen` alojan `verify-signup` y cablean la
   cadena de recuperación (`forgot` → `ForgotPasswordScreen` →
   `verify-recovery` → restablecimiento). En invitación, `LoginScreen` recibe
@@ -275,22 +269,27 @@ a extracción cuando una tarea de producto lo toque.
 
 ### Sin fase asignada — tarea pequeña
 
-- [ ] **Poder ver la contraseña mientras se escribe.** Aplica a registro,
+- [x] **Poder ver la contraseña mientras se escribe.** Aplica a registro,
   inicio de sesión y recuperación; usar la primitiva de campo existente, no un
-  control nuevo por pantalla. **(Implementada — aprobada por los dos
-  verificadores; pendiente de smoke físico iPhone/Honor.)** `AuthTextField`
-  (la primitiva existente) gana
-  un botón de visibilidad (`Eye`/`EyeSlash`, peso regular) que alterna
-  `secureTextEntry`; estado inicial oculto; botón deshabilitado cuando el campo
-  no es editable; sin cambios en los **cinco** campos de contraseña
-  (`LoginScreen` ×1, `SignUpScreen` ×2, `ResetPasswordScreen` ×2). Evidencia
-  roja/verde: `AuthTextField.test.tsx` nueva — ROJO contra el componente
+  control nuevo por pantalla. **(Cerrada)** Tarea 4 implementada y aprobada. El smoke test
+  de `AcceptInvitationScreen` ha sido trasladado a la fase de release por requerir
+  development build para el deep link `juntoss://`.
+  `AuthTextField` (la primitiva existente) gana un botón de visibilidad
+  (`Eye`/`EyeSlash`, peso regular) que alterna `secureTextEntry`; estado inicial oculto;
+  botón deshabilitado cuando el campo no es editable; sin cambios en los **cinco**
+  campos de contraseña (`LoginScreen` ×1, `SignUpScreen` ×2, `ResetPasswordScreen` ×2).
+  Evidencia roja/verde: `AuthTextField.test.tsx` nueva — ROJO contra el componente
   original (4 de 6 casos fallan, el botón no existe) y VERDE tras el cambio.
   Corrección del gate (2026-08-18): eran cinco campos, no seis, y se añaden las
   dos pruebas de aceptación que faltaban — revelar un campo no revela otro campo
   de contraseña simultáneo, y al desmontar y volver a montar reaparece oculta
   (8 casos en total). `npm run validate` en verde: 125 suites / 749 tests.
   Commit `f433f4f` (implementación inicial).
+
+### Fase 3 — Frente SQL final (En curso)
+
+- [ ] **Resolución de la deuda pgTAP de Fase 2a**.
+  **Decisión puntual del responsable (2026-08-19):** Por indisponibilidad temporal de Claude, esta tarea tendrá excepcionalmente un único verificador (GPT). No modifica la regla general de `WORKFLOW.md`. La tarea se clasifica como grande al tocar SQL.
 
 ---
 
