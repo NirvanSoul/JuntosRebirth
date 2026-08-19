@@ -230,47 +230,49 @@ a extracción cuando una tarea de producto lo toque.
   de clasificación del responsable, corregido el 2026-08-18: grande exige
   **dos verificadores en paralelo** más el smoke físico iPhone/Honor. Antes de
   dimensionar hay que inventariar los tres anfitriones de `VerifyCodeScreen`
-  —acceso, modal de ajustes e invitación—; el de invitación no dispone de
-  recuperación de contraseña completa.
+  —acceso, modal de ajustes e invitación—; el de invitación no disponía de
+  recuperación de contraseña completa, hueco cerrado en esta entrega.
 
-  **(Implementada la opción A — pendiente de dos verificadores y smoke físico
-  iPhone/Honor.)** Inventario de anfitriones completado: `AccessScreen` y
-  `AuthModal` alojan `verify-signup` y `verify-recovery`;
-  `AcceptInvitationScreen` solo `verify-signup`. `VerifyCodeScreen` recibe
-  `onGoToLogin`/`onGoToRecovery` opcionales y, en `purpose="signup"`, muestra
-  siempre la explicación neutral («si no tenía cuenta te llegará un código; si
-  ya tenía una, no recibirás uno aquí») con los accesos directos visibles:
-  acceso y ajustes ofrecen iniciar sesión y recuperar contraseña; invitación
-  solo iniciar sesión.
+  **(Implementada la opción A y cableada la recuperación en los tres
+  anfitriones — pendiente de dos verificadores y smoke físico iPhone/Honor.)**
+  El responsable revocó el 2026-08-19 la excepción que dejaba la recuperación
+  fuera del anfitrión de invitación: la ruta real para recuperar desde la
+  invitación eran seis pasos (Iniciar sesión → Cancelar → menú del espacio →
+  Ajustes → Iniciar sesión o crear cuenta → Iniciar sesión → ¿Olvidaste tu
+  contraseña?), de modo que una salida textual no cerraba el callejón sin
+  salida, lo documentaba. Inventario de anfitriones completado: `AccessScreen`,
+  `AuthModal` y `AcceptInvitationScreen` alojan `verify-signup` y cablean la
+  cadena de recuperación (`forgot` → `ForgotPasswordScreen` →
+  `verify-recovery` → restablecimiento). En invitación, `LoginScreen` recibe
+  `onNavigateToForgotPassword` y la máquina `authStep` gana `forgot`,
+  `verify-recovery` y `reset`, reutilizando las tres pantallas existentes según
+  el precedente de `AccessScreen`. `VerifyCodeScreen` declara sus props como
+  unión discriminada por `purpose`: `purpose="signup"` exige `onGoToLogin` y
+  `onGoToRecovery`, y `purpose="recovery"` no los acepta; en registro muestra la
+  explicación neutral («si no tenía cuenta te llegará un código; si ya tenía
+  una, no recibirás uno aquí») con los accesos a iniciar sesión y recuperar
+  contraseña. No queda rama muerta ni salida textual: un anfitrión futuro que
+  monte el registro sin cablear la recuperación falla en typecheck. El ítem 13
+  de la cola queda absorbido por esta tarea.
 
-  **Excepción aprobada por el responsable (2026-08-18): no cablear todavía la
-  recuperación en el anfitrión de invitación.** La excepción no deja el
-  callejón sin salida intacto: cuando un anfitrión de registro no pasa
-  `onGoToRecovery`, `VerifyCodeScreen` añade la salida textual «Si ya tenía una
-  cuenta y no recuerdas la contraseña, abre la app para recuperar tu
-  contraseña». Motivo: el hueco es solo del anfitrión de invitación
-  (`AcceptInvitationScreen` monta `LoginScreen` sin
-  `onNavigateToForgotPassword` y su máquina `authStep` solo tiene
-  `login`/`signup`/`verify-signup`); `AccessScreen` y `AuthModal` ya cablean la
-  cadena completa (`forgot` → `ForgotPasswordScreen` → `verify-recovery` →
-  restablecimiento). El cableado de la recuperación en invitación queda como
-  tarea propia en la cola (§4, ítem 13).
-
-  Evidencia: casos de opción A y de la salida textual en
-  `VerifyCodeScreen.test.tsx`; pruebas de integración del cableado de los tres
-  anfitriones —`AccessScreen.test.tsx`, `AuthModal.test.tsx` (nueva) y
-  `AcceptInvitationScreen.test.tsx` (nueva)— que demuestran que acceso y ajustes
-  llegan a `forgot`/`verify-recovery`/`reset` y que invitación cablea
-  `verify-signup` con iniciar sesión pero sin recuperación.
-  `npm run validate` en verde: 125 suites / 749 tests. Commit `195e916`
-  (implementación inicial).
+  Evidencia: casos de opción A en `VerifyCodeScreen.test.tsx` (registro exige
+  ambos accesos; recuperación no los muestra); pruebas de integración del
+  cableado de los tres anfitriones —`AccessScreen.test.tsx`,
+  `AuthModal.test.tsx` y `AcceptInvitationScreen.test.tsx`— que demuestran que
+  los tres llegan a `forgot`/`verify-recovery`/`reset`: en invitación, iniciar
+  sesión desde la verificación vuelve al login, recuperar desde la verificación
+  entra en `forgot` y recuperar desde el login recorre la cadena completa.
+  `npm run validate` en verde: 125 suites / 749 tests. Commits: `195e916`
+  (implementación inicial), `b99d49c` (correcciones y pruebas), `eafb1ed`
+  (documentación) y `31f4f2f` (unión discriminada y cableado de invitación).
 
 ### Sin fase asignada — tarea pequeña
 
 - [ ] **Poder ver la contraseña mientras se escribe.** Aplica a registro,
   inicio de sesión y recuperación; usar la primitiva de campo existente, no un
-  control nuevo por pantalla. **(Implementada — pendiente de 1 verificador y
-  smoke físico iPhone/Honor.)** `AuthTextField` (la primitiva existente) gana
+  control nuevo por pantalla. **(Implementada — aprobada por los dos
+  verificadores; pendiente de smoke físico iPhone/Honor.)** `AuthTextField`
+  (la primitiva existente) gana
   un botón de visibilidad (`Eye`/`EyeSlash`, peso regular) que alterna
   `secureTextEntry`; estado inicial oculto; botón deshabilitado cuando el campo
   no es editable; sin cambios en los **cinco** campos de contraseña
@@ -612,7 +614,6 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
     - `useEffect` de carga inicial: `listLocalNotificationRules().then(...).catch(() => undefined)` silencia el fallo de lectura de reglas al arrancar. Silencio deliberado (capacidad secundaria: un fallo no debe bloquear ver categorías y movimientos; el código lo justifica en un comentario), pero no registra nada.
     - Familia relacionada con el mismo patrón `.catch(() => undefined)`: `reconcileNotificationRules`/`reconcileDailyReminder` en el gancho de primer plano y en las escrituras/recordatorios de movimientos.
     - Localizado por símbolo, no por línea. Registrado por la tarea 6 del lote; **no se corrige todavía**. Al abordarlo, decidir qué silencios son deliberados (y se documentan) y cuáles pasan a `console.error` estructurado, con evidencia roja/verde.
-13. **Cablear la recuperación en `AcceptInvitationScreen` (tarea grande — no hacer todavía):** Pasar `onNavigateToForgotPassword` a `LoginScreen` y añadir los estados `forgot`, `verify-recovery` y restablecimiento a su máquina `authStep`, replicando lo que ya hace `AccessScreen`. Las tres pantallas (`ForgotPasswordScreen`, `VerifyCodeScreen` en `purpose="recovery"`, `ResetPasswordScreen`) existen y se reutilizan: es cableado, no construcción. Toca navegación y autenticación → grande, **dos verificadores**, con pruebas de navegación del anfitrión. Al cerrarla se retira la salida textual «abre la app para recuperar tu contraseña» del caso sin recuperación. Registrada por la excepción de la tarea 4.
 
 *Pendiente aparte, por contacto:* Extracción de `ImportScreen.tsx` y `AppCalendar.tsx` (§4).
 
