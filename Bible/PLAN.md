@@ -268,8 +268,10 @@ a extracción cuando una tarea de producto lo toque.
   evidencia diferencial corregida.
   `npm run validate` en verde: 125 suites / 757 tests. Commits: `195e916`
   (implementación inicial), `b99d49c` (correcciones y pruebas), `eafb1ed`
-  (documentación), `31f4f2f` (unión discriminada y cableado de invitación) y
-  `c382d0c` (pausa explícita y pruebas corregidas).
+  (documentación), `31f4f2f` (unión discriminada y cableado de invitación),
+  `c382d0c` (pausa explícita, cierre local y pruebas iniciales), `de29858`
+  (corrección del orden temporal sesión → éxito de verificación, más
+  documentación) y el commit resultante de esta actualización documental.
 
 ### Sin fase asignada — tarea pequeña
 
