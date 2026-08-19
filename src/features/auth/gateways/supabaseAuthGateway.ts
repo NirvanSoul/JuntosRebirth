@@ -24,6 +24,15 @@ export class AccountLockedError extends Error {
   }
 }
 
+/**
+ * Alcance del cierre de sesión. `global` revoca la sesión en todos los
+ * dispositivos (comportamiento por defecto, idéntico al histórico); `local`
+ * solo borra la sesión del dispositivo actual sin revocar el resto. La
+ * recuperación de contraseña en anfitriones de invitación usa `local` para no
+ * cerrar la sesión del usuario en sus otros dispositivos al cancelar.
+ */
+export type AuthSignOutScope = 'global' | 'local';
+
 export type AuthGateway = {
   signUp(input: SignUpInput): Promise<void>;
   verifyOtp(input: VerifyCodeInput): Promise<void>;
@@ -32,7 +41,7 @@ export type AuthGateway = {
   signInWithPassword(input: LoginInput): Promise<{ userId: string }>;
   requestPasswordReset(email: string): Promise<void>;
   setNewPassword(password: string): Promise<void>;
-  signOut(): Promise<void>;
+  signOut(scope?: AuthSignOutScope): Promise<void>;
   getSession(): Promise<Session | null>;
   onAuthStateChange(callback: (session: Session | null) => void): {
     unsubscribe: () => void;
@@ -202,8 +211,8 @@ export function createSupabaseAuthGateway(
       }
     },
 
-    async signOut() {
-      const { error } = await client.auth.signOut();
+    async signOut(scope: AuthSignOutScope = 'global') {
+      const { error } = await client.auth.signOut({ scope });
       if (error) {
         throw new Error(describeAuthError(error, 'No pudimos cerrar sesión.'));
       }

@@ -9,6 +9,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 type AnyProps = Record<string, unknown> & {
+  onCancel?: () => void;
   onGoToLogin?: () => void;
   onGoToRecovery?: () => void;
   onNavigateToForgotPassword?: () => void;
@@ -60,6 +61,9 @@ export function VerifyCodeScreenStub(props: AnyProps) {
           testID="stub-verify-go-recovery"
         />
       ) : null}
+      {props.onCancel ? (
+        <Pressable onPress={props.onCancel} testID="stub-verify-cancel" />
+      ) : null}
       <Pressable
         onPress={() => props.onSuccess?.({ email: 'persona@ejemplo.com' })}
         testID="stub-verify-success"
@@ -79,6 +83,18 @@ export function ForgotPasswordScreenStub(props: AnyProps) {
   );
 }
 
-export function ResetPasswordScreenStub() {
-  return <View testID="stub-reset-screen" />;
+export function ResetPasswordScreenStub(props: {
+  onCancel?: () => void;
+  onSuccess?: () => void;
+}) {
+  return (
+    <View testID="stub-reset-screen">
+      {props.onSuccess ? (
+        <Pressable onPress={props.onSuccess} testID="stub-reset-success" />
+      ) : null}
+      {props.onCancel ? (
+        <Pressable onPress={props.onCancel} testID="stub-reset-cancel" />
+      ) : null}
+    </View>
+  );
 }

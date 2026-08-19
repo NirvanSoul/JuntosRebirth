@@ -186,4 +186,36 @@ describe('supabaseAuthGateway', () => {
     expect(onAuthStateChange).toHaveBeenCalledTimes(1);
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
+
+  it('el cierre de sesión por defecto mantiene el alcance global', async () => {
+    const signOut = jest.fn().mockResolvedValue({ error: null });
+    const client = createFakeClient({ signOut });
+    const gateway = createSupabaseAuthGateway(client);
+
+    await gateway.signOut();
+
+    expect(signOut).toHaveBeenCalledWith({ scope: 'global' });
+  });
+
+  it('el cierre local pide a Supabase solo el alcance local', async () => {
+    const signOut = jest.fn().mockResolvedValue({ error: null });
+    const client = createFakeClient({ signOut });
+    const gateway = createSupabaseAuthGateway(client);
+
+    await gateway.signOut('local');
+
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  it('el cierre de sesión traduce el error de Supabase a un mensaje en español', async () => {
+    const signOut = jest.fn().mockResolvedValue({
+      error: { code: 'unexpected_failure', message: 'Raw GoTrue error' },
+    });
+    const client = createFakeClient({ signOut });
+    const gateway = createSupabaseAuthGateway(client);
+
+    await expect(gateway.signOut('local')).rejects.toThrow(
+      'No pudimos cerrar sesión.',
+    );
+  });
 });

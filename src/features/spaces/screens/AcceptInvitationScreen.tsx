@@ -20,6 +20,7 @@ import {
   type AcceptInvitationErrorCode,
   type InvitationPreview,
 } from '@/features/spaces/gateways/supabaseInvitationGateway';
+import { useRecoveryPhase } from '@/features/spaces/hooks/useRecoveryPhase';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -105,6 +106,20 @@ export function AcceptInvitationScreen({
     status: 'idle',
   });
   const [authStep, setAuthStep] = useState<AuthFlowStep>({ screen: 'login' });
+  const {
+    cancelReset,
+    finishRecovery,
+    phase: recoveryPhase,
+    startRecovery,
+  } = useRecoveryPhase();
+  const goToForgot = useCallback(() => {
+    startRecovery();
+    setAuthStep({ screen: 'forgot' });
+  }, [startRecovery]);
+  const goToLogin = useCallback(() => {
+    finishRecovery();
+    setAuthStep({ screen: 'login' });
+  }, [finishRecovery]);
   const hasAutoAcceptedRef = useRef(false);
   const initialSessionCheckedRef = useRef(false);
   const hadSessionOnLoadRef = useRef(false);
@@ -153,6 +168,8 @@ export function AcceptInvitationScreen({
     if (!initialSessionCheckedRef.current || hadSessionOnLoadRef.current)
       return;
     if (!session) return;
+    // Pausa: la sesión del OTP de recuperación no debe autoaceptar.
+    if (recoveryPhase.kind !== 'inactive') return;
     if (
       previewState.status !== 'loaded' ||
       previewState.preview.status !== 'pending'
@@ -163,7 +180,7 @@ export function AcceptInvitationScreen({
 
     hasAutoAcceptedRef.current = true;
     void handleAccept();
-  }, [acceptState.status, handleAccept, previewState, session]);
+  }, [acceptState.status, handleAccept, previewState, recoveryPhase, session]);
 
   if (previewState.status === 'loading') {
     return (
@@ -243,7 +260,8 @@ export function AcceptInvitationScreen({
     );
   }
 
-  if (session) {
+  // La sesión del OTP no cortocircuita mientras haya subflujo de recuperación.
+  if (session && recoveryPhase.kind === 'inactive') {
     const isAccepting = acceptState.status === 'accepting';
     return (
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
@@ -306,12 +324,16 @@ export function AcceptInvitationScreen({
             Inicia sesión o crea una cuenta para aceptarla.
           </Text>
 
+          {recoveryPhase.kind === 'cancelError' ? (
+            <Text tone="expense" variant="footnote">
+              {recoveryPhase.message}
+            </Text>
+          ) : null}
+
           {authStep.screen === 'login' ? (
             <LoginScreen
               onCancel={onFinished}
-              onNavigateToForgotPassword={() =>
-                setAuthStep({ screen: 'forgot' })
-              }
+              onNavigateToForgotPassword={goToForgot}
               onNavigateToSignUp={() =>
                 setAuthStep({ screen: 'signup', step: 1 })
               }
@@ -350,7 +372,7 @@ export function AcceptInvitationScreen({
               email={authStep.email}
               onCancel={() => setAuthStep({ screen: 'signup', step: 1 })}
               onGoToLogin={() => setAuthStep({ screen: 'login' })}
-              onGoToRecovery={() => setAuthStep({ screen: 'forgot' })}
+              onGoToRecovery={goToForgot}
               onSuccess={() => undefined}
               purpose="signup"
             />
@@ -358,8 +380,8 @@ export function AcceptInvitationScreen({
 
           {authStep.screen === 'forgot' ? (
             <ForgotPasswordScreen
-              onCancel={() => setAuthStep({ screen: 'login' })}
-              onNavigateToLogin={() => setAuthStep({ screen: 'login' })}
+              onCancel={goToLogin}
+              onNavigateToLogin={goToLogin}
               onSuccess={({ email }) =>
                 setAuthStep({ screen: 'verify-recovery', email })
               }
@@ -377,8 +399,10 @@ export function AcceptInvitationScreen({
 
           {authStep.screen === 'reset' ? (
             <ResetPasswordScreen
-              onCancel={() => setAuthStep({ screen: 'login' })}
-              onSuccess={() => setAuthStep({ screen: 'login' })}
+              onCancel={() =>
+                void cancelReset(() => setAuthStep({ screen: 'login' }))
+              }
+              onSuccess={finishRecovery}
             />
           ) : null}
         </View>
