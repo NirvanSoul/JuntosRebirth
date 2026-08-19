@@ -114,10 +114,19 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
     await screen.findByTestId('stub-forgot-screen');
     await fireEvent.press(screen.getByTestId('stub-forgot-send'));
     await screen.findByText('recovery');
-    // El OTP de recuperación crea la sesión y lleva al restablecimiento.
-    await fireEvent.press(screen.getByTestId('stub-verify-success'));
+    // La sesión llega antes de devolver el éxito de la verificación.
     await aparecerSesion(createOtpSession('user-recovery'));
+
+    // Comprobar que sigue en verify-recovery, sin autoaceptar
+    expect(screen.getByText('recovery')).toBeTruthy();
+    expect(screen.queryByTestId('stub-reset-screen')).toBeFalsy();
+
+    // Pulsar el éxito de verificación
+    await fireEvent.press(screen.getByTestId('stub-verify-success'));
+
+    // Comprobar que aparece y permanece ResetPasswordScreen
     await screen.findByTestId('stub-reset-screen');
+    expect(screen.queryByText('recovery')).toBeFalsy();
     return screen;
   }
 

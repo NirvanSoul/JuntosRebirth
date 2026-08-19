@@ -266,6 +266,11 @@ El OTP de recuperación crea una sesión a mitad del flujo; al no reproducirse e
 transición, la prueba no veía que esa sesión disparaba la autoaceptación y
 ocultaba `ResetPasswordScreen`.
 
+Tampoco puede alterar el orden en que la dependencia real produce sus
+efectos. Si la dependencia notifica antes de devolver, la prueba debe
+reproducir esa secuencia; simular el mismo estado en distinto momento
+verifica un flujo que no existe.
+
 Regla práctica: si el mock inmoviliza la señal que la prueba observa, no
 protege. Hay que exponer el setter (o el mecanismo equivalente) y disparar la
 transición real.

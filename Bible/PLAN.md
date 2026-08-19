@@ -262,9 +262,14 @@ a extracción cuando una tarea de producto lo toque.
   los tres llegan a `forgot`/`verify-recovery`/`reset`: en invitación, iniciar
   sesión desde la verificación vuelve al login, recuperar desde la verificación
   entra en `forgot` y recuperar desde el login recorre la cadena completa.
-  `npm run validate` en verde: 125 suites / 749 tests. Commits: `195e916`
+  Se corrigió el defecto de la sesión creada por el OTP, con la pausa explícita:
+  éxito → una aceptación, cancelación → `signOut('local')` + login + cero
+  aceptaciones, error al cerrar → subflujo conservado + cero aceptaciones; la
+  evidencia diferencial corregida.
+  `npm run validate` en verde: 125 suites / 757 tests. Commits: `195e916`
   (implementación inicial), `b99d49c` (correcciones y pruebas), `eafb1ed`
-  (documentación) y `31f4f2f` (unión discriminada y cableado de invitación).
+  (documentación), `31f4f2f` (unión discriminada y cableado de invitación) y
+  `c382d0c` (pausa explícita y pruebas corregidas).
 
 ### Sin fase asignada — tarea pequeña
 
