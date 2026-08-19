@@ -1,8 +1,19 @@
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { Eye } from 'phosphor-react-native/src/icons/Eye';
+import { EyeSlash } from 'phosphor-react-native/src/icons/EyeSlash';
+import { useState } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextInputProps,
+  type TextStyle,
+} from 'react-native';
 
 import { Text } from '@/components/ui/Text/Text';
 import { fontFamily } from '@/theme/fonts';
-import { layout } from '@/theme/layout';
+import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import { typography } from '@/theme/typography';
@@ -56,6 +67,34 @@ export function AuthTextField({
 }: AuthTextFieldProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+
+  const isPasswordField = secureTextEntry;
+
+  const renderTextInput = (inputStyle: StyleProp<TextStyle>) => (
+    <TextInput
+      accessibilityLabel={
+        accessibilityLabel ?? label ?? placeholder ?? 'Campo de texto'
+      }
+      autoCapitalize={autoCapitalize}
+      autoComplete={autoComplete}
+      autoCorrect={false}
+      editable={editable}
+      keyboardType={keyboardType}
+      onBlur={onBlur}
+      onChangeText={onChangeText}
+      onFocus={onFocus}
+      onSubmitEditing={onSubmitEditing}
+      placeholder={placeholder}
+      placeholderTextColor={colors.textMuted}
+      returnKeyType={returnKeyType}
+      secureTextEntry={isPasswordField && !passwordVisible}
+      style={inputStyle}
+      testID={testID}
+      textContentType={textContentType}
+      value={value}
+    />
+  );
 
   return (
     <View style={styles.field}>
@@ -64,28 +103,41 @@ export function AuthTextField({
           {label}
         </Text>
       ) : null}
-      <TextInput
-        accessibilityLabel={
-          accessibilityLabel ?? label ?? placeholder ?? 'Campo de texto'
-        }
-        autoCapitalize={autoCapitalize}
-        autoComplete={autoComplete}
-        autoCorrect={false}
-        editable={editable}
-        keyboardType={keyboardType}
-        onBlur={onBlur}
-        onChangeText={onChangeText}
-        onFocus={onFocus}
-        onSubmitEditing={onSubmitEditing}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        returnKeyType={returnKeyType}
-        secureTextEntry={secureTextEntry}
-        style={[styles.input, error ? styles.inputError : null]}
-        testID={testID}
-        textContentType={textContentType}
-        value={value}
-      />
+      {isPasswordField ? (
+        <View style={[styles.inputRow, error ? styles.inputError : null]}>
+          {renderTextInput(styles.inputInner)}
+          <Pressable
+            accessibilityLabel={
+              passwordVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'
+            }
+            accessibilityRole="button"
+            disabled={!editable}
+            hitSlop={spacing.sm}
+            onPress={() => setPasswordVisible((current) => !current)}
+            style={({ pressed }) => [
+              styles.visibilityToggle,
+              pressed ? styles.pressed : null,
+            ]}
+            testID={testID ? `${testID}-toggle-visibility` : undefined}
+          >
+            {passwordVisible ? (
+              <EyeSlash
+                color={colors.textMuted}
+                size={iconSize.md}
+                weight="regular"
+              />
+            ) : (
+              <Eye
+                color={colors.textMuted}
+                size={iconSize.md}
+                weight="regular"
+              />
+            )}
+          </Pressable>
+        </View>
+      ) : (
+        renderTextInput([styles.input, error ? styles.inputError : null])
+      )}
       {error ? (
         <Text tone="expense" variant="footnote">
           {error}
@@ -114,6 +166,33 @@ function createStyles(colors: ColorTokens) {
     },
     inputError: {
       borderColor: colors.expense,
+    },
+    inputRow: {
+      minHeight: layout.minTouchTarget,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      backgroundColor: colors.surface,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    inputInner: {
+      flex: 1,
+      minHeight: layout.minTouchTarget,
+      color: colors.textPrimary,
+      fontFamily: fontFamily.light,
+      fontSize: typography.body.fontSize,
+      paddingLeft: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    pressed: {
+      opacity: 0.68,
+    },
+    visibilityToggle: {
+      width: layout.minTouchTarget,
+      height: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });
 }
