@@ -21,15 +21,22 @@ Orden de autoridad en el trabajo diario:
 
 1. **Responsable del proyecto (humano).** Aprueba prioridades, alcance y
    decisiones. Es la voz final.
-2. **Actor principal de código — actualmente Cline (desde 2026-08-17).**
-   Implementa, ejecuta los checks automáticos y corrige los hallazgos.
+2. **Editores de código — Cline y Gemini (desde 2026-08-18).** Implementan,
+   ejecutan los checks automáticos y corrigen los hallazgos. El responsable
+   asigna uno de ellos como **actor principal de código de cada tarea**; ninguno
+   tiene prioridad permanente sobre el otro.
 3. **Claude — verificador / supervisor de auditorías.** Revisa el trabajo del
    actor principal de código y busca errores, bugs y desviaciones de las reglas.
-4. **ChatGPT — segundo verificador.** Revisión cruzada e independiente.
+4. **GPT (ChatGPT) — segundo verificador.** Revisión cruzada e independiente.
 
 Reglas de la jerarquía:
 
 - El responsable decide **qué** se construye y **qué** se acepta.
+- El responsable asigna cada tarea a Cline o Gemini. Cambiar de editor entre
+  tareas no reduce los gates, la evidencia ni la revisión exigida.
+- Cline y Gemini no trabajan a la vez sobre la misma tarea ni sobre archivos
+  solapados, salvo coordinación explícita del responsable. Un relevo declara el
+  estado, los archivos modificados y los pendientes antes de continuar.
 - El actor principal de código **no declara su propio trabajo «terminado»** sin
   la revisión de al menos un verificador en las tareas que requieren Gate 2. Las
   tareas pequeñas no sensibles se cierran con el Gate 1 en verde.
@@ -82,8 +89,8 @@ Verificadores necesarios según la tarea:
 | Mediana | Dos verificadores durante el régimen reforzado; uno cuando el responsable lo retire. |
 | Grande, o cualquier tarea que toque SQL, permisos, sincronización, migración de invitado o cálculo de importes | Dos verificadores, en paralelo. |
 
-**Régimen reforzado (desde 2026-08-16).** Mientras se consolida el cambio de
-actor principal de código, las tareas medianas van a **dos verificadores en
+**Régimen reforzado (desde 2026-08-16).** Mientras se consolida el trabajo con
+los editores de código, las tareas medianas van a **dos verificadores en
 paralelo** aunque no toquen sincronización. Las pequeñas mantienen solo el
 Gate 1, salvo que toquen datos, dinero, acciones destructivas o
 comportamiento nativo. El régimen puede retirarse tras **cinco tareas medianas
@@ -94,9 +101,9 @@ contador, y solo cuando su primer paquete sea aceptado por ambos verificadores
 sin los defectos indicados. Las reentregas, subtareas y entregas parciales de una
 tarea grande no cuentan como unidades independientes. Los hallazgos menores no
 reinician el contador, que empieza con la próxima tarea mediana posterior a esta
-modificación. Un cambio de actor principal de código **no** reinicia el contador
-(decisión del responsable, 2026-08-17). La decisión final de retirarlo o
-prorrogarlo corresponde al responsable y debe quedar registrada.
+modificación. Un cambio de editor asignado entre Cline y Gemini **no** reinicia
+el contador (decisión del responsable, 2026-08-18). La decisión final de
+retirarlo o prorrogarlo corresponde al responsable y debe quedar registrada.
 
 Cada verificador responde una de dos cosas:
 
