@@ -5251,9 +5251,9 @@ Evidencia diferencial (rojo/verde) obligatoria:
 
 ## División en entregas
 
-1. **Refactor de Dominio e Importación:** Consolidación de la API monetaria, calculadora, catálogo y la normalización de importación (con error `invalid_fraction_for_currency` que deja amountMinor en null).
-2. **Interfaces y Control del Borrador (UI):** Adaptación del componente `AmountInput`, y la validación explícita del borrador y conservación de la moneda anterior en el modal.
-3. **Frontera Remota y Presupuestos (SQL):** Protección de `spaces.currency` (inmutabilidad PostgreSQL, pgTAP) y revisión de comportamiento presupuestario.
+1. **Entrega 1 — Catálogo, formato e importación:** `MinorUnitDigits` y `MinorUnitFactor`. Metadatos y helpers del catálogo. `formatCurrency` (cuya firma ya recibe moneda). `normalizeAmount` (usando unión discriminada) y `normalizeTransactionRow` con el nuevo issue de importación.
+2. **Entrega 2 — Entrada, calculadora y consumidores visuales:** `parseAmountMinor` (con unión discriminada, sin lanzar excepciones), `amountMinorToInput`, `appendAmountKey`, `formatAmountInputForDisplay` (solo si realmente necesita conocer moneda), `applyCalculatorOperation`, `CreateTransactionModal` y `CategoryBudgetModal`. Validación del borrador y cambio de moneda en UI.
+3. **Entrega 3 — Frontera Remota y Presupuestos (SQL):** Protección de `spaces.currency` (inmutabilidad PostgreSQL, pgTAP) y revisión de comportamiento presupuestario.
 
 *Nota:* Ninguna entrega parcial se desplegará en staging ni se probará en los dispositivos. El rollout y la limpieza local ocurrirán únicamente tras aprobar las tres entregas.
 
