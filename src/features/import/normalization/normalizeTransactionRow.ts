@@ -103,7 +103,7 @@ export function normalizeTransactionRow(
     });
   }
 
-  let currency: CurrencyCode | null = options.fallbackCurrency;
+  let currency: CurrencyCode = options.fallbackCurrency;
   if (!isBlank(currencyCellRaw)) {
     const rawCurrency = toRawText(currencyCellRaw).toUpperCase();
     if (isCurrencyCode(rawCurrency)) {
@@ -228,8 +228,15 @@ export function normalizeTransactionRow(
 
     const hasValidDebit = debitParsed?.ok && debitParsed.amountMinor > 0;
     const hasValidCredit = creditParsed?.ok && creditParsed.amountMinor > 0;
+    const hasAnyError =
+      debitInvalid || creditInvalid || debitUnparseable || creditUnparseable;
 
-    if (hasValidDebit && hasValidCredit) {
+    if (hasAnyError) {
+      amountMinor = null;
+      type = 'unknown';
+    } else if (hasValidDebit && hasValidCredit) {
+      amountMinor = null;
+      type = 'unknown';
       issues.push({
         code: 'unknown_type',
         message:

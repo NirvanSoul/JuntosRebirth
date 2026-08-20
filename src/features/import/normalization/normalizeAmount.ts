@@ -62,7 +62,7 @@ export function normalizeAmount(
     const isNegative = rawValue < 0;
     const absValue = Math.abs(rawValue);
 
-    // Check for fractional part on factor 1 currency
+    // Rechaza fracciones en monedas sin decimales (factor 1)
     if (digits === 0 && absValue % 1 !== 0) {
       return {
         ok: false,

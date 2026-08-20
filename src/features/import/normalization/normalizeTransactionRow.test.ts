@@ -1,6 +1,7 @@
 import type { Category } from '@/features/categories/types';
 import { detectColumnMapping } from '@/features/import/normalization/detectColumnMapping';
 import { normalizeTransactionRow } from '@/features/import/normalization/normalizeTransactionRow';
+import { isCandidateReady } from '@/features/import/utils/importScreenUtils';
 
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'candidate-id' }));
 
@@ -313,7 +314,7 @@ describe('normalizeTransactionRow', () => {
       expect(invalidIssues![0]!.message).toContain('El importe');
     });
 
-    it('permite procesar el crédito válido aunque el débito tenga fracción inválida', () => {
+    it('bloquea la fila si el débito tiene fracción inválida aunque el crédito sea válido', () => {
       const mapping = detectColumnMapping([
         'Fecha',
         'Concepto',
@@ -327,8 +328,9 @@ describe('normalizeTransactionRow', () => {
         fallbackJPYOptions,
       );
 
-      expect(candidate?.amountMinor).toBe(6000);
-      expect(candidate?.type).toBe('income');
+      expect(candidate?.amountMinor).toBeNull();
+      expect(candidate?.type).toBe('unknown');
+      expect(isCandidateReady(candidate!)).toBe(false);
       expect(
         candidate?.issues.some(
           (issue) =>
@@ -338,7 +340,33 @@ describe('normalizeTransactionRow', () => {
       ).toBe(true);
     });
 
-    it('permite procesar el crédito válido aunque el débito sea irReconocible (unparseable)', () => {
+    it('bloquea la fila si el crédito tiene fracción inválida aunque el débito sea válido', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', '6000', '50,50'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBeNull();
+      expect(candidate?.type).toBe('unknown');
+      expect(isCandidateReady(candidate!)).toBe(false);
+      expect(
+        candidate?.issues.some(
+          (issue) =>
+            issue.code === 'invalid_fraction_for_currency' &&
+            issue.message.includes('El ingreso'),
+        ),
+      ).toBe(true);
+    });
+
+    it('bloquea la fila si el débito es irreconocible (unparseable) aunque el crédito sea válido', () => {
       const mapping = detectColumnMapping([
         'Fecha',
         'Concepto',
@@ -352,13 +380,40 @@ describe('normalizeTransactionRow', () => {
         fallbackJPYOptions,
       );
 
-      expect(candidate?.amountMinor).toBe(6000);
-      expect(candidate?.type).toBe('income');
+      expect(candidate?.amountMinor).toBeNull();
+      expect(candidate?.type).toBe('unknown');
+      expect(isCandidateReady(candidate!)).toBe(false);
       expect(
         candidate?.issues.some(
           (issue) =>
             issue.code === 'unparseable_amount' &&
             issue.message.includes('el gasto'),
+        ),
+      ).toBe(true);
+    });
+
+    it('bloquea la fila si el crédito es irreconocible (unparseable) aunque el débito sea válido', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', '6000', 'no es numero'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBeNull();
+      expect(candidate?.type).toBe('unknown');
+      expect(isCandidateReady(candidate!)).toBe(false);
+      expect(
+        candidate?.issues.some(
+          (issue) =>
+            issue.code === 'unparseable_amount' &&
+            issue.message.includes('el ingreso'),
         ),
       ).toBe(true);
     });
@@ -378,6 +433,8 @@ describe('normalizeTransactionRow', () => {
       );
 
       expect(candidate?.amountMinor).toBeNull();
+      expect(candidate?.type).toBe('unknown');
+      expect(isCandidateReady(candidate!)).toBe(false);
       expect(
         candidate?.issues.some(
           (issue) =>
