@@ -22,11 +22,7 @@ financiero, autenticación, importación, legal y espacios de pareja). La
 **sincronización Supabase** y la **verificación de correo** ya se comprobaron de
 punta a punta en staging con dos cuentas y dos dispositivos físicos (§§6-8).
 
-El trabajo activo sigue en la **Fase 3**, pero la Entrega 2 de consumo coherente
-de la moneda principal del espacio ya está cerrada: implementación, Gate 2 y
-smokes físicos finales completados en iPhone y Honor (§§6 y 8.4). Permanecen
-pendientes de Fase 3 las tareas de producto y preparación enumeradas más abajo;
-la Fase 4 de desarrollo funcional y la Fase 5 de release no han comenzado.
+La **Fase 3** está oficialmente cerrada tras la resolución del frente SQL y las ACL en staging. El trabajo activo avanza a la **Fase 4** de desarrollo funcional. La Fase 5 de release no ha comenzado.
 
 ## 3. Orden de trabajo
 
@@ -60,11 +56,11 @@ anclado en `scripts/check-exhaustive-deps-suppressions.mjs`, integrado en
 La sync Supabase y la verificación de correo se comprobaron de punta a punta.
 El spike reprodujo el fallo compartido y dimensionó la Fase 3 (§§6-8).
 
-### Fase 3 — Producto: terminar lo que el spike reveló — en curso
+### Fase 3 — Producto: terminar lo que el spike reveló — [x] cerrada
 
 Implementar lo que el spike demuestre que falta.
 
-### Fase 4 — Desarrollo funcional del MVP final — pendiente
+### Fase 4 — Desarrollo funcional del MVP final — en curso
 
 Esta fase incorpora como **alcance obligatorio de producto** las capacidades
 que Alphonzo propuso en la rama externa: autoría visible, perfiles y avatares de
@@ -75,8 +71,8 @@ MVP **no aprueba ni integra su código externo** (§9).
 La Entrega 2 de monedas ya está cerrada. Antes de comenzar estas entregas
 funcionales deben resolverse sus otros prerrequisitos:
 
-- Resolver la escala de monedas sin centavos (§8.4.9) antes de almacenar nuevos
-  saldos iniciales.
+- Auditoría y decisión sobre escala monetaria y decimales (§8.4.9) antes de almacenar nuevos
+  saldos iniciales de cuentas.
 - Resolver explícitamente la contradicción de `category_budgets` y decidir, con
   inventario real, si hace falta reparar el backfill histórico que asumió EUR.
 - Crear migraciones propias desde el siguiente número libre en nuestro
@@ -139,9 +135,17 @@ funcionales deben resolverse sus otros prerrequisitos:
   moneda. La decisión de producto debe cubrir la sincronización de modo, mes y
   periodo, además de la regla de importes: o ambos bloques comparten estado, o
   se separan visualmente para que no parezcan una misma vista.
+- **Indicador de novedades en el selector de espacio:** Un punto cuando hay algo nuevo en un espacio que no estás mirando, calculado con una consulta ligera al abrir la app y al volver a primer plano. Sin suscripciones ni notificaciones flotantes (`JUNTOSS_NOTIFICATIONS.md` §19).
 - Implementar solo las que tengan objetivo y criterio de aceptación; no portar
   el commit externo de «trabajo en curso».
 - Hacer smoke visual y nativo en iOS y Android.
+
+#### Fase 4e — Internacionalización y locale (Obligatorio antes de release)
+
+- Meta inicial español e inglés, con arquitectura extensible.
+- Incluye interfaz, onboarding, categorías predeterminadas, errores, notificaciones, plantillas de correo y textos del backend.
+- El `locale` fijo `'es-ES'` se sustituye; la selección del locale debe derivar de la arquitectura de idiomas, no al revés.
+- Se completa **antes** de publicar en tiendas para evitar retrabajo transversal y lanzar una experiencia lingüísticamente coherente.
 
 La Fase 4 termina cuando estas capacidades están implementadas, verificadas y
 documentadas; no cuando existen commits externos que se les parezcan.
@@ -187,6 +191,11 @@ a extracción cuando una tarea de producto lo toque.
 - Revisar `npm audit` (29: 13 moderadas, 16 altas); el resto son tooling de
   build de Expo (`image-size`, `postcss`, `uuid`, `js-yaml`) y en su mayoría se
   resuelven subiendo de SDK de Expo (cambio mayor, diferido).
+
+### Deuda técnica previa a release (sin corregir todavía)
+
+- **Higiene de tests — avisos `act(...)`:** La investigación apunta a la interacción React 19 + RTL 14 + `jest-expo` a nivel de reconciliador. Requiere alineación de versiones o deduplicación del reconciliador.
+- **Catches silenciosos de reglas de notificación en `MainTabsNavigator`:** Se deben auditar los `.catch(() => undefined)` en la recarga, carga inicial y escrituras/recordatorios. Al abordarlo, decidir qué silencios son deliberados y cuáles pasan a `console.error` estructurado.
 
 ## 4. Reglas
 
@@ -298,50 +307,20 @@ a extracción cuando una tarea de producto lo toque.
   (8 casos en total). `npm run validate` en verde: 125 suites / 749 tests.
   Commit `f433f4f` (implementación inicial).
 
-### Fase 3 — Frente SQL final (En curso)
+### Fase 3 — Frente SQL final — [x] cerrada
 
-- [ ] **Resolución de la deuda pgTAP de Fase 2a**.
+- [x] **Resolución de la deuda pgTAP de Fase 2a**.
   **Decisión puntual del responsable (2026-08-19):** Por indisponibilidad temporal de Claude, esta tarea tendrá excepcionalmente un único verificador (GPT). No modifica la regla general de `WORKFLOW.md`. La tarea se clasifica como grande al tocar SQL.
-  - Se autorizó e impulsó a staging únicamente `24_revoke_public_execute.sql` (código de salida `0`).
-  - La ejecución local de `npm run validate` fue exitosa (código `0`).
-  - **Fallos remotos previos a migración 25:** Al ejecutar nuevamente los test remotos con aserciones portables:
-    - **Falsos negativos (7) resueltos:** `account_deletion` e `import_learning` ahora pasan correctamente en staging.
-    - **Defectos reales de ACL (7):** Permanecen 7 fallos reales: `sync_couple_space_data`, `handle_new_user`, `ensure_personal_space`, `accept_current_user_space_invitation`, `get_current_user_pending_space_invitation`, `is_active_space_member` y privilegios de `legal_acceptances`.
-  - **Salida literal de las pruebas fallidas:**
-    ```text
-    /Projects/JuntosApp/supabase/tests/account_deletion.test.sql .......... 
-    # Failed test 4: "a transaction survives its author leaving: created_by admits null"
-    #     (test result was NULL)
-    # Failed test 5: "a category survives its author leaving: created_by admits null"
-    #     (test result was NULL)
-    # Failed test 6: "a recurring series survives its author leaving: created_by admits null"
-    #     (test result was NULL)
-    # Failed test 13: "a notification rule survives its author leaving: created_by admits null"
-    #     (test result was NULL)
-    # Failed test 14: "a category budget survives its author leaving: created_by admits null"
-    #     (test result was NULL)
-    # Looks like you failed 5 tests of 17
-    Failed 5/17 subtests 
-    /Projects/JuntosApp/supabase/tests/couple_space_sync.test.sql ......... 
-    # Failed test 3: "an anonymous caller cannot invoke the couple-space sync RPC"
-    # Looks like you failed 1 test of 7
-    Failed 1/7 subtests 
-    /Projects/JuntosApp/supabase/tests/import_learning.test.sql ........... 
-    # Failed test 17: "items preserve their local review selection"
-    # Looks like you failed 1 test of 26
-    Failed 1/26 subtests 
-    /Projects/JuntosApp/supabase/tests/legal_acceptances.test.sql ......... 
-    # Failed test 7: "not even the owner can delete acceptance evidence directly"
-    # Looks like you failed 1 test of 7
-    Failed 1/7 subtests 
-    /Projects/JuntosApp/supabase/tests/space_invitations.test.sql ......... 
-    # Failed test 26: "anonymous users cannot ensure a personal space"
-    # Failed test 29: "activated_at admits null: that is exactly what marks a couple space still awaiting acceptance"
-    #     (test result was NULL)
-    # Looks like you failed 2 tests of 32
-    Failed 2/32 subtests
-    ```
-    - Siguiendo las instrucciones de seguridad, el agente detuvo la ejecución y no aplicó reset, repair ni alteraciones manuales. Evidencia entregada al responsable.
+  - Se autorizó e impulsó a staging únicamente `24_revoke_public_execute.sql` y `25_revoke_remaining_public_execute.sql`.
+  - Las aserciones estructurales que fallaban remotamente por limitación de `information_schema` fueron refactorizadas a consultas portables usando `pg_attribute` (`attnum > 0 AND NOT attisdropped`).
+  - Se reconciliaron las seis funciones SECURITY DEFINER auditadas (y explícitamente `authenticated` en funciones críticas como `handle_new_user`). Únicamente `get_space_invitation_preview` conserva ejecución anónima intencional.
+  - Se cerraron los permisos explícitos en `legal_acceptances` concediendo a `authenticated` exclusivamente `SELECT` e `INSERT`.
+  - **Aplicación y Verificación en Staging (`blaanqqxtdezsscdkkvz`):**
+    - Dry-run propuso únicamente la migración 25 (código de salida 0).
+    - `npx supabase db push --linked` aplicado con éxito (código de salida 0).
+    - Suite de validación en staging (`npx supabase test db --linked`) completada con éxito: 12 suites / 174 aserciones PASS.
+    - Validación global (`npm run validate`): EXIT=0, 125 suites / 757 tests; permanecen los avisos conocidos del ítem de investigación act(...).
+  - La deuda pgTAP de Fase 2a queda oficialmente **Cerrada**.
 ---
 
 ## 6. Verificaciones manuales registradas
@@ -645,33 +624,8 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
    - `publishCoupleSpaceChanges` registra el fallo de `syncCoupleSpaceDataForCurrentSession` con `console.error('[sync] Publicación en segundo plano falló:', error)`, el mismo formato estructurado que la subida (`[sync] Subida de espacio compartido falló:`) y la restauración (`[sync] Restauración remota falló:`). Localizado por símbolo, no por línea. Sin propagar la excepción y sin alterar los datos locales.
    - Evidencia roja/verde: regresión nueva en `src/navigation/MainTabsNavigator.test.tsx` — ROJO contra el `catch(() => undefined)` original (`console.error` con 0 llamadas) y VERDE tras el fix (publicación fallida registrada y datos locales intactos).
    - `npm run validate` en verde: 122 suites / 728 tests, typecheck, lint, supresiones y formato.
-5. **Indicador de novedades en el selector de espacio (mediana):** Un punto cuando hay algo nuevo en un espacio que no estás mirando, calculado con una consulta ligera al abrir la app y al volver a primer plano. Sin suscripciones ni notificaciones flotantes (`JUNTOSS_NOTIFICATIONS.md` §19).
-6. **Permisos `PUBLIC EXECUTE`:** Migración **nueva**, jamás reescribir una aplicada (pequeña).
-7. **Actualizar `space_invitations.test.sql`** al nombre de índice vigente `space_invitations_one_pending_per_target_idx` (pequeña).
-8. **Higiene de tests — avisos `act(...)` (reproducida y caracterizada; reclasificada a investigación dedicada, no «pequeña»):**
-   - Reproducción en HEAD (`e4fa996`, suite verde exit 0): **33 avisos en 3 suites** — `AddFirstTransactionStep.test.tsx` (19), `ImportScreen.test.tsx` (12), `AwaitingPartnerScreen.test.tsx` (2). Variantes: **31×** «The current testing environment is not configured to support act(...)» y **2×** «You seem to have overlapping act() calls».
-   - Zona causal identificada: los emite `isConcurrentActEnvironment()` de `react-test-renderer` y del `react-reconciler` empaquetado por `test-renderer` (backend de RTL 14.0.1), cuando `IS_REACT_ACT_ENVIRONMENT` resulta falsy con `ReactSharedInternals.actQueue` no nulo. La bandera global **ya** la fija `react-native/jest/setup.js:11`; volver a fijarla en `src/test/setup.ts` **no** elimina los avisos (verificado empíricamente: 31 antes y 31 después). Apunta a la interacción React 19 + RTL 14 + `jest-expo` a nivel de reconciliador —la zona causal identificada—, no a una bandera de entorno; la causa raíz definitiva queda pendiente de la investigación dedicada.
-   - No provienen de tests que asserten rutas de error a propósito (salen de renders/`setState` asíncrono, p. ej. carga de fuentes de `@expo/vector-icons`), así que el silencio dirigido no aplica; y suprimir `console.error` de manta está prohibido.
-   - Pendiente: tarea de investigación propia (alineación de versiones React/RTL/`jest-expo`, posible deduplicación del reconciliador), con su gate. No es un fix acotado.
-9. **Escala y decimales monetarios (tarea grande):**
-   - `CurrencyCatalogEntry` no declara el número de decimales monetarios, y la entrada, `amountMinorToInput`, `parseAmountMinor` y `formatCurrency` asumen siempre escala 100.
-   - En el catálogo actual, **JPY, CLP y PYG tienen cero decimales**; COP conserva oficialmente dos (los centavos en efectivo son una decisión de presentación, no de almacenamiento).
-   - El formato ya omite `,00` en importes enteros (`omitZeroDecimals` por defecto), por lo que no es un problema visual sino **semántico**: se permiten fracciones que no existen y lo guardado en `amountMinor` no representa unidades menores oficiales.
-   - Antes de implementar debe decidirse entre:
-     - Mantener escala interna 100 para todas y separar los decimales de entrada y presentación.
-     - Usar la escala real de cada moneda y **migrar los importes locales y remotos existentes**.
-   - Regla obligatoria: Comprobar previamente si existen datos en esas monedas consultando staging y los dispositivos antes de darla por trivial.
-10. **Internacionalización (tarea grande, anterior al lanzamiento):**
-    - Meta inicial español e inglés, con arquitectura extensible.
-    - Incluye interfaz, onboarding, categorías predeterminadas, errores, notificaciones, plantillas de correo y textos del backend.
-    - Se completa **antes** de publicar en tiendas para evitar retrabajo transversal y lanzar una experiencia lingüísticamente coherente. Es la tarea más grande restante en el plan.
-11. **El `locale` fijo `'es-ES'`:**
-    - Forma parte de la internacionalización y no se corrige por separado: la selección del locale debe derivar de la arquitectura de idiomas, no al revés.
-12. **Deuda — *catches* silenciosos de reglas de notificación en `MainTabsNavigator` (registrar, NO arreglar todavía):**
-    - `reloadLocalFinance`: `reconcileNotificationRules(...).catch(() => undefined)` silencia cualquier fallo de la reconciliación de reglas tras recargar las finanzas locales.
-    - `useEffect` de carga inicial: `listLocalNotificationRules().then(...).catch(() => undefined)` silencia el fallo de lectura de reglas al arrancar. Silencio deliberado (capacidad secundaria: un fallo no debe bloquear ver categorías y movimientos; el código lo justifica en un comentario), pero no registra nada.
-    - Familia relacionada con el mismo patrón `.catch(() => undefined)`: `reconcileNotificationRules`/`reconcileDailyReminder` en el gancho de primer plano y en las escrituras/recordatorios de movimientos.
-    - Localizado por símbolo, no por línea. Registrado por la tarea 6 del lote; **no se corrige todavía**. Al abordarlo, decidir qué silencios son deliberados (y se documentan) y cuáles pasan a `console.error` estructurado, con evidencia roja/verde.
+5. **Permisos `PUBLIC EXECUTE`:** Migración **nueva**, jamás reescribir una aplicada (pequeña).
+6. **Actualizar `space_invitations.test.sql`** al nombre de índice vigente `space_invitations_one_pending_per_target_idx` (pequeña).
 
 *Pendiente aparte, por contacto:* Extracción de `ImportScreen.tsx` y `AppCalendar.tsx` (§4).
 
