@@ -171,6 +171,17 @@ a extracción cuando una tarea de producto lo toque.
   oscuro real) — `PROJECT_RULES.md` §10.
 - [ ] Smoke test físico (iPhone/Honor) de `AcceptInvitationScreen` (deep link `juntoss://` desde verificación de correo), pendiente de un development build.
 - Build EAS, cuentas de tienda, política de privacidad accesible.
+- [ ] **Definir e implementar el flujo legal previo al release.** Hoy
+  `recordLegalAcceptance` no tiene consumidores: la tabla y el gateway existen,
+  pero la aplicación no registra ninguna aceptación. Antes de conectarlos,
+  decidir con criterio legal y de producto si los Términos requieren una acción
+  afirmativa al crear la cuenta y qué tratamientos, si alguno, requieren un
+  consentimiento separado; no presentar la Política de privacidad completa como
+  consentimiento genérico. Si se aprueba el flujo, registrar la versión exacta
+  del documento, locale, origen y versión real de la app (no el literal actual
+  `0.1.0`), y definir invitados, usuarios autenticados, reintentos y nuevas
+  versiones documentales. Verificar además que App Store Privacy y Google Play
+  Data Safety coincidan con el comportamiento real.
 - Revisar la licencia y las vulnerabilidades de `xlsx`: es de **runtime**
   (importación) y `npm audit` le marca prototype pollution + ReDoS **sin fix**.
 - Revisar `npm audit` (29: 13 moderadas, 16 altas); el resto son tooling de
