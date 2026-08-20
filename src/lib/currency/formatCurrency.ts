@@ -1,7 +1,9 @@
 import {
   applyCurrencySymbol,
-  type CurrencyCode,
+  getCurrencyMinorUnitDigits,
+  getCurrencyMinorUnitFactor,
 } from '@/lib/currency/currencyCatalog';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
 type FormatCurrencyOptions = {
   omitZeroDecimals?: boolean;
@@ -71,12 +73,17 @@ export function formatCurrency(
   options: FormatCurrencyOptions = {},
 ): string {
   if (!Number.isSafeInteger(amountMinor)) {
-    throw new Error('El importe debe ser un entero seguro en unidades menores');
+    throw new Error(
+      'El importe debe ser un entero en la unidad menor de la moneda',
+    );
   }
 
   const omitZeroDecimals = options.omitZeroDecimals ?? true;
-  const omitDecimals = omitZeroDecimals && amountMinor % 100 === 0;
-  const fractionDigits = omitDecimals ? 0 : 2;
+  const digits = getCurrencyMinorUnitDigits(currency);
+  const factor = getCurrencyMinorUnitFactor(currency);
+
+  const fractionDigits =
+    digits === 0 ? 0 : omitZeroDecimals && amountMinor % factor === 0 ? 0 : 2;
 
   const formatter = new Intl.NumberFormat(locale, {
     useGrouping: true,
@@ -85,7 +92,7 @@ export function formatCurrency(
   });
 
   const groupedAmount = enforceGrouping(
-    formatter.format(amountMinor / 100),
+    formatter.format(amountMinor / factor),
     fractionDigits,
     locale,
   );

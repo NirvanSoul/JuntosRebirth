@@ -103,75 +103,6 @@ export function normalizeTransactionRow(
     });
   }
 
-  let amountMinor: number | null = null;
-  let isNegative = false;
-  let type: ImportedTransactionCandidate['type'] = 'unknown';
-  // Cuando cargo y abono llegan a la vez, el importe en realidad sí se
-  // reconoció en ambas columnas; lo único ambiguo es cuál aplica. El aviso
-  // de "unknown_type" ya lo explica, así que no se duplica con un segundo
-  // aviso de "no reconocimos el importe" más abajo.
-  let amountBlockedByBothColumns = false;
-
-  if (!isBlank(amountCellRaw)) {
-    const parsed = normalizeAmount(
-      typeof amountCellRaw === 'number'
-        ? amountCellRaw
-        : toRawText(amountCellRaw),
-    );
-    amountMinor = parsed.amountMinor;
-    isNegative = parsed.isNegative;
-
-    if (amountMinor !== null) {
-      // Un indicador explícito de tipo (columna "Cargo"/"Abono") es más
-      // confiable que el signo del importe (Bible §17): se prioriza sobre
-      // `isNegative` cuando ambos existen.
-      const inferredType = inferTransactionTypeFromText(transactionTypeCellRaw);
-      type = inferredType ?? (isNegative ? 'expense' : 'income');
-    }
-  } else {
-    const debitParsed = isBlank(debitCellRaw)
-      ? null
-      : normalizeAmount(
-          typeof debitCellRaw === 'number'
-            ? debitCellRaw
-            : toRawText(debitCellRaw),
-        );
-    const creditParsed = isBlank(creditCellRaw)
-      ? null
-      : normalizeAmount(
-          typeof creditCellRaw === 'number'
-            ? creditCellRaw
-            : toRawText(creditCellRaw),
-        );
-    const hasDebit = Boolean(debitParsed?.amountMinor);
-    const hasCredit = Boolean(creditParsed?.amountMinor);
-
-    if (hasDebit && hasCredit) {
-      amountBlockedByBothColumns = true;
-      issues.push({
-        code: 'unknown_type',
-        message:
-          'Este movimiento tiene un gasto y un ingreso a la vez; revísalo.',
-      });
-    } else if (hasDebit) {
-      amountMinor = debitParsed!.amountMinor;
-      type = 'expense';
-    } else if (hasCredit) {
-      amountMinor = creditParsed!.amountMinor;
-      type = 'income';
-    }
-  }
-
-  if (
-    !amountBlockedByBothColumns &&
-    (amountMinor === null || amountMinor === 0)
-  ) {
-    issues.push({
-      code: 'unparseable_amount',
-      message: 'No pudimos reconocer el importe de este movimiento.',
-    });
-  }
-
   let currency: CurrencyCode | null = options.fallbackCurrency;
   if (!isBlank(currencyCellRaw)) {
     const rawCurrency = toRawText(currencyCellRaw).toUpperCase();
@@ -183,6 +114,133 @@ export function normalizeTransactionRow(
         message: 'No reconocimos la moneda de este movimiento.',
       });
       currency = options.fallbackCurrency;
+    }
+  }
+
+  let amountMinor: number | null = null;
+  let isNegative = false;
+  let type: ImportedTransactionCandidate['type'] = 'unknown';
+
+  if (!isBlank(amountCellRaw)) {
+    const parsed = normalizeAmount(
+      typeof amountCellRaw === 'number'
+        ? amountCellRaw
+        : toRawText(amountCellRaw),
+      currency,
+    );
+
+    if (parsed.ok) {
+      amountMinor = parsed.amountMinor;
+      isNegative = parsed.isNegative;
+      // Un indicador explícito de tipo (columna "Cargo"/"Abono") es más
+      // confiable que el signo del importe (Bible §17): se prioriza sobre
+      // `isNegative` cuando ambos existen.
+      const inferredType = inferTransactionTypeFromText(transactionTypeCellRaw);
+      type = inferredType ?? (isNegative ? 'expense' : 'income');
+
+      if (amountMinor === 0) {
+        issues.push({
+          code: 'unparseable_amount',
+          message: 'No pudimos reconocer el importe de este movimiento.',
+        });
+      }
+    } else if (parsed.reason === 'invalid_fraction') {
+      issues.push({
+        code: 'invalid_fraction_for_currency',
+        message: 'El importe tiene decimales, pero esta moneda no los admite.',
+      });
+    } else if (parsed.reason === 'unparseable') {
+      issues.push({
+        code: 'unparseable_amount',
+        message: 'No pudimos reconocer el importe de este movimiento.',
+      });
+    }
+  } else {
+    const debitParsed = isBlank(debitCellRaw)
+      ? null
+      : normalizeAmount(
+          typeof debitCellRaw === 'number'
+            ? debitCellRaw
+            : toRawText(debitCellRaw),
+          currency,
+        );
+    const creditParsed = isBlank(creditCellRaw)
+      ? null
+      : normalizeAmount(
+          typeof creditCellRaw === 'number'
+            ? creditCellRaw
+            : toRawText(creditCellRaw),
+          currency,
+        );
+
+    let debitInvalid = false;
+    let creditInvalid = false;
+    let debitUnparseable = false;
+    let creditUnparseable = false;
+
+    if (debitParsed && !debitParsed.ok) {
+      if (debitParsed.reason === 'invalid_fraction') debitInvalid = true;
+      if (debitParsed.reason === 'unparseable') debitUnparseable = true;
+    } else if (debitParsed?.ok && debitParsed.amountMinor === 0) {
+      debitUnparseable = true;
+    }
+
+    if (creditParsed && !creditParsed.ok) {
+      if (creditParsed.reason === 'invalid_fraction') creditInvalid = true;
+      if (creditParsed.reason === 'unparseable') creditUnparseable = true;
+    } else if (creditParsed?.ok && creditParsed.amountMinor === 0) {
+      creditUnparseable = true;
+    }
+
+    if (debitInvalid && creditInvalid) {
+      issues.push({
+        code: 'invalid_fraction_for_currency',
+        message: 'El importe tiene decimales, pero esta moneda no los admite.',
+      });
+    } else if (debitInvalid) {
+      issues.push({
+        code: 'invalid_fraction_for_currency',
+        message: 'El gasto tiene decimales, pero esta moneda no los admite.',
+      });
+    } else if (creditInvalid) {
+      issues.push({
+        code: 'invalid_fraction_for_currency',
+        message: 'El ingreso tiene decimales, pero esta moneda no los admite.',
+      });
+    }
+
+    if (debitUnparseable && creditUnparseable) {
+      issues.push({
+        code: 'unparseable_amount',
+        message: 'No pudimos reconocer el importe de este movimiento.',
+      });
+    } else if (debitUnparseable) {
+      issues.push({
+        code: 'unparseable_amount',
+        message: 'No pudimos reconocer el gasto de este movimiento.',
+      });
+    } else if (creditUnparseable) {
+      issues.push({
+        code: 'unparseable_amount',
+        message: 'No pudimos reconocer el ingreso de este movimiento.',
+      });
+    }
+
+    const hasValidDebit = debitParsed?.ok && debitParsed.amountMinor > 0;
+    const hasValidCredit = creditParsed?.ok && creditParsed.amountMinor > 0;
+
+    if (hasValidDebit && hasValidCredit) {
+      issues.push({
+        code: 'unknown_type',
+        message:
+          'Este movimiento tiene un gasto y un ingreso a la vez; revísalo.',
+      });
+    } else if (hasValidDebit) {
+      amountMinor = debitParsed.amountMinor;
+      type = 'expense';
+    } else if (hasValidCredit) {
+      amountMinor = creditParsed.amountMinor;
+      type = 'income';
     }
   }
 

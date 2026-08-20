@@ -5,8 +5,15 @@ describe('formatCurrency', () => {
     expect(formatCurrency(1050, 'EUR', 'es-ES')).toContain('10,50');
   });
 
-  it('omite por defecto los decimales cuando son cero', () => {
+  it('omite por defecto los decimales cuando son cero en factor 100', () => {
     expect(formatCurrency(1200, 'EUR', 'es-ES')).not.toContain(',00');
+  });
+
+  it('no muestra decimales nunca para factor 1', () => {
+    // Para JPY, 1000 minor son 1000 unidades.
+    const result = formatCurrency(1000, 'JPY', 'es-ES');
+    expect(result).not.toContain(',');
+    expect(result).toBe('¥ 1.000');
   });
 
   it('agrupa los millares con puntos desde cuatro cifras', () => {
@@ -18,13 +25,23 @@ describe('formatCurrency', () => {
   });
 
   it('rechaza unidades menores no enteras', () => {
-    expect(() => formatCurrency(10.5, 'EUR', 'es-ES')).toThrow('entero seguro');
+    expect(() => formatCurrency(10.5, 'EUR', 'es-ES')).toThrow(
+      'entero en la unidad menor de la moneda',
+    );
   });
 
-  it('permite conservar los decimales iguales a cero cuando se solicita', () => {
+  it('permite conservar los decimales iguales a cero cuando se solicita para factor 100', () => {
     expect(
       formatCurrency(1200, 'EUR', 'es-ES', { omitZeroDecimals: false }),
     ).toContain('12,00');
+  });
+
+  it('ignora omitZeroDecimals false para monedas de factor 1 porque la unidad menor es igual a la mayor', () => {
+    const result = formatCurrency(1200, 'JPY', 'es-ES', {
+      omitZeroDecimals: false,
+    });
+    expect(result).not.toContain(',00');
+    expect(result).toBe('¥ 1.200');
   });
 
   it('coloca el símbolo real de cada moneda en el lado que corresponde, separado por NBSP', () => {

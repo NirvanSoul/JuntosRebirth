@@ -20,6 +20,7 @@ export type ImportIssueCode =
   | 'unknown_type'
   | 'unknown_category'
   | 'unknown_currency'
+  | 'invalid_fraction_for_currency'
   | 'probable_duplicate';
 
 export type ImportIssue = {

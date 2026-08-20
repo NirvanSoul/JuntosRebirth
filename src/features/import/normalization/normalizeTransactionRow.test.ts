@@ -205,4 +205,222 @@ describe('normalizeTransactionRow', () => {
       candidate?.issues.some((issue) => issue.code === 'unknown_currency'),
     ).toBe(true);
   });
+
+  describe('validación de fracciones para monedas sin decimales', () => {
+    const fallbackJPYOptions = {
+      ...options,
+      fallbackCurrency: 'JPY' as const,
+    };
+
+    it('acepta un importe sin fracción para moneda JPY', () => {
+      const mapping = detectColumnMapping(['Fecha', 'Concepto', 'Importe']);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', 1000],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBe(1000);
+      expect(candidate?.currency).toBe('JPY');
+      expect(
+        candidate?.issues.some(
+          (issue) => issue.code === 'invalid_fraction_for_currency',
+        ),
+      ).toBe(false);
+    });
+
+    it('emite invalid_fraction_for_currency y anula el importe cuando tiene fracción en moneda JPY', () => {
+      const mapping = detectColumnMapping(['Fecha', 'Concepto', 'Importe']);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', 1000.5],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBeNull();
+      expect(
+        candidate?.issues.some(
+          (issue) => issue.code === 'invalid_fraction_for_currency',
+        ),
+      ).toBe(true);
+      // No debe emitir unparseable_amount para evitar duplicados
+      expect(
+        candidate?.issues.some((issue) => issue.code === 'unparseable_amount'),
+      ).toBe(false);
+    });
+
+    it('maneja fracción inválida en las columnas de débito/crédito', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidateDebit = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', '50,50', null],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidateDebit?.amountMinor).toBeNull();
+      expect(
+        candidateDebit?.issues.some(
+          (issue) =>
+            issue.code === 'invalid_fraction_for_currency' &&
+            issue.message.includes('El gasto'),
+        ),
+      ).toBe(true);
+
+      const candidateCredit = normalizeTransactionRow(
+        ['02/08/2026', 'Ingreso', null, '50,50'],
+        2,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidateCredit?.amountMinor).toBeNull();
+      expect(
+        candidateCredit?.issues.some(
+          (issue) =>
+            issue.code === 'invalid_fraction_for_currency' &&
+            issue.message.includes('El ingreso'),
+        ),
+      ).toBe(true);
+    });
+
+    it('combina fracción inválida en débito y crédito en un solo aviso', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', '50,50', '60.50'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBeNull();
+      const invalidIssues = candidate?.issues.filter(
+        (i) => i.code === 'invalid_fraction_for_currency',
+      );
+      expect(invalidIssues).toHaveLength(1);
+      expect(invalidIssues![0]!.message).toContain('El importe');
+    });
+
+    it('permite procesar el crédito válido aunque el débito tenga fracción inválida', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', '50,50', '6000'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBe(6000);
+      expect(candidate?.type).toBe('income');
+      expect(
+        candidate?.issues.some(
+          (issue) =>
+            issue.code === 'invalid_fraction_for_currency' &&
+            issue.message.includes('El gasto'),
+        ),
+      ).toBe(true);
+    });
+
+    it('permite procesar el crédito válido aunque el débito sea irReconocible (unparseable)', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', 'no es numero', '6000'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBe(6000);
+      expect(candidate?.type).toBe('income');
+      expect(
+        candidate?.issues.some(
+          (issue) =>
+            issue.code === 'unparseable_amount' &&
+            issue.message.includes('el gasto'),
+        ),
+      ).toBe(true);
+    });
+
+    it('emite causas distintas sin solaparse (débito inválido, crédito irreconocible)', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', '50.50', 'bad'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBeNull();
+      expect(
+        candidate?.issues.some(
+          (issue) =>
+            issue.code === 'invalid_fraction_for_currency' &&
+            issue.message.includes('El gasto'),
+        ),
+      ).toBe(true);
+      expect(
+        candidate?.issues.some(
+          (issue) =>
+            issue.code === 'unparseable_amount' &&
+            issue.message.includes('el ingreso'),
+        ),
+      ).toBe(true);
+    });
+
+    it('moneda inválida + fallback JPY + fracción incompatible produce unknown_currency e invalid_fraction_for_currency', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Importe',
+        'Moneda',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'Compra', 10.5, 'ZZZ'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.currency).toBe('JPY'); // Fallback fue usado
+      expect(candidate?.amountMinor).toBeNull(); // Se bloquea por los decimales de JPY
+      expect(
+        candidate?.issues.some((issue) => issue.code === 'unknown_currency'),
+      ).toBe(true);
+      expect(
+        candidate?.issues.some(
+          (issue) => issue.code === 'invalid_fraction_for_currency',
+        ),
+      ).toBe(true);
+      expect(
+        candidate?.issues.some((issue) => issue.code === 'unparseable_amount'),
+      ).toBe(false);
+    });
+  });
 });

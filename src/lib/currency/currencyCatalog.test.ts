@@ -1,6 +1,8 @@
 import {
   currencyCatalog,
   searchCurrencyCatalog,
+  getCurrencyMinorUnitDigits,
+  getCurrencyMinorUnitFactor,
 } from '@/lib/currency/currencyCatalog';
 
 describe('searchCurrencyCatalog', () => {
@@ -37,5 +39,31 @@ describe('searchCurrencyCatalog', () => {
 
   it('no encuentra nada con una búsqueda sin coincidencias', () => {
     expect(searchCurrencyCatalog('atlantida')).toEqual([]);
+  });
+});
+
+describe('metadata de escala monetaria', () => {
+  it('asigna exactamente 0 decimales a JPY, CLP y PYG', () => {
+    const zeroDecimalCurrencies = ['JPY', 'CLP', 'PYG'] as const;
+
+    for (const code of zeroDecimalCurrencies) {
+      expect(getCurrencyMinorUnitDigits(code)).toBe(0);
+      expect(getCurrencyMinorUnitFactor(code)).toBe(1);
+    }
+  });
+
+  it('asigna exactamente 2 decimales a las restantes 28 monedas', () => {
+    const zeroDecimalCurrencies = ['JPY', 'CLP', 'PYG'];
+    const otherCurrencies = currencyCatalog.filter(
+      (c) => !zeroDecimalCurrencies.includes(c.code),
+    );
+
+    // El catálogo tiene 31 divisas en total
+    expect(otherCurrencies.length).toBe(currencyCatalog.length - 3);
+
+    for (const entry of otherCurrencies) {
+      expect(getCurrencyMinorUnitDigits(entry.code)).toBe(2);
+      expect(getCurrencyMinorUnitFactor(entry.code)).toBe(100);
+    }
   });
 });

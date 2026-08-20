@@ -1,15 +1,33 @@
-export type NormalizedAmountResult =
-  | { amountMinor: number; isNegative: boolean }
-  | { amountMinor: null; isNegative: false };
+import {
+  getCurrencyMinorUnitDigits,
+  getCurrencyMinorUnitFactor,
+} from '@/lib/currency/currencyCatalog';
+import type {
+  CurrencyCode,
+  MinorUnitFactor,
+} from '@/lib/currency/currencyCatalog';
 
-function roundToMinor(value: number): number {
-  return Math.round(value * 100);
+export type NormalizeAmountResult =
+  | {
+      ok: true;
+      amountMinor: number;
+      isNegative: boolean;
+    }
+  | {
+      ok: false;
+      amountMinor: null;
+      isNegative: false;
+      reason: 'unparseable' | 'invalid_fraction';
+    };
+
+function roundToMinor(value: number, factor: MinorUnitFactor): number {
+  return Math.round(value * factor);
 }
 
 /**
  * Convierte un importe crudo (número de celda o texto bancario) a unidades
  * menores (enteras). Nunca usa `float` como modelo final (Bible §16):
- * siempre redondea a un entero de céntimos antes de devolverlo.
+ * siempre redondea a un entero en la unidad menor de la moneda antes de devolverlo.
  *
  * Soporta separador decimal coma o punto, separador de miles, espacios como
  * separador de miles, símbolos de moneda, paréntesis negativos, guion en
@@ -18,23 +36,67 @@ function roundToMinor(value: number): number {
  */
 export function normalizeAmount(
   rawValue: string | number | null | undefined,
-): NormalizedAmountResult {
-  if (rawValue === null || rawValue === undefined) {
-    return { amountMinor: null, isNegative: false };
+  currency: CurrencyCode,
+): NormalizeAmountResult {
+  const digits = getCurrencyMinorUnitDigits(currency);
+  const factor = getCurrencyMinorUnitFactor(currency);
+
+  if (rawValue === null || rawValue === undefined || rawValue === '') {
+    return {
+      ok: false,
+      amountMinor: null,
+      isNegative: false,
+      reason: 'unparseable',
+    };
   }
 
   if (typeof rawValue === 'number') {
     if (!Number.isFinite(rawValue)) {
-      return { amountMinor: null, isNegative: false };
+      return {
+        ok: false,
+        amountMinor: null,
+        isNegative: false,
+        reason: 'unparseable',
+      };
+    }
+    const isNegative = rawValue < 0;
+    const absValue = Math.abs(rawValue);
+
+    // Check for fractional part on factor 1 currency
+    if (digits === 0 && absValue % 1 !== 0) {
+      return {
+        ok: false,
+        amountMinor: null,
+        isNegative: false,
+        reason: 'invalid_fraction',
+      };
+    }
+
+    const amountMinor = roundToMinor(absValue, factor);
+    if (!Number.isSafeInteger(amountMinor)) {
+      return {
+        ok: false,
+        amountMinor: null,
+        isNegative: false,
+        reason: 'unparseable',
+      };
     }
     return {
-      amountMinor: Math.abs(roundToMinor(rawValue)),
-      isNegative: rawValue < 0,
+      ok: true,
+      amountMinor,
+      isNegative,
     };
   }
 
   let text = rawValue.trim();
-  if (!text) return { amountMinor: null, isNegative: false };
+  if (!text) {
+    return {
+      ok: false,
+      amountMinor: null,
+      isNegative: false,
+      reason: 'unparseable',
+    };
+  }
 
   let isNegative = false;
 
@@ -67,7 +129,14 @@ export function normalizeAmount(
   // espacios (que a su vez también se descartan a continuación, ya que solo
   // se usan como separador de miles: "1 234,56").
   text = text.replace(/[^\d.,\s]/g, '').replace(/\s+/g, '');
-  if (!text) return { amountMinor: null, isNegative: false };
+  if (!text) {
+    return {
+      ok: false,
+      amountMinor: null,
+      isNegative: false,
+      reason: 'unparseable',
+    };
+  }
 
   const hasDot = text.includes('.');
   const hasComma = text.includes(',');
@@ -99,19 +168,46 @@ export function normalizeAmount(
   }
 
   if (integerPart === '' && fractionPart === '') {
-    return { amountMinor: null, isNegative: false };
+    return {
+      ok: false,
+      amountMinor: null,
+      isNegative: false,
+      reason: 'unparseable',
+    };
   }
   if (!/^\d*$/.test(integerPart) || !/^\d*$/.test(fractionPart)) {
-    return { amountMinor: null, isNegative: false };
+    return {
+      ok: false,
+      amountMinor: null,
+      isNegative: false,
+      reason: 'unparseable',
+    };
+  }
+
+  if (digits === 0 && fractionPart !== '') {
+    if (Number(fractionPart) > 0) {
+      return {
+        ok: false,
+        amountMinor: null,
+        isNegative: false,
+        reason: 'invalid_fraction',
+      };
+    }
   }
 
   const normalizedFraction = `${fractionPart}00`.slice(0, 2);
   const amountMinor =
-    Number(integerPart || '0') * 100 + Number(normalizedFraction);
+    Number(integerPart || '0') * factor +
+    (digits === 0 ? 0 : Number(normalizedFraction));
 
   if (!Number.isSafeInteger(amountMinor)) {
-    return { amountMinor: null, isNegative: false };
+    return {
+      ok: false,
+      amountMinor: null,
+      isNegative: false,
+      reason: 'unparseable',
+    };
   }
 
-  return { amountMinor, isNegative };
+  return { ok: true, amountMinor, isNegative };
 }
