@@ -1,11 +1,12 @@
-# Estado de la rama `limpieza/fase-3`
+# Estado de la rama `main`
 
 > Instantánea del 2026-08-20. Es tu app reorganizada, no reescrita: no se ha
 > quitado ninguna funcionalidad. Este archivo solo orienta; la documentación
 > viva está en `Bible/`.
 >
-> Sustituye a `limpieza/fases-1-y-1b`, que quedó con historia divergente. Esta
-> rama parte del mismo punto y continúa el trabajo.
+> El trabajo venía de `limpieza/fase-3` y continúa aquí, sobre `main`, tras el
+> traspaso del código. Las ramas `limpieza/fase-3` y `limpieza/fases-1-y-1b`
+> quedan como historia y ya no reciben commits.
 
 ## Aviso antes de instalar esta rama
 
