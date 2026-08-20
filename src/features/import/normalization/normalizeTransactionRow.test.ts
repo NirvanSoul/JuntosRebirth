@@ -480,4 +480,148 @@ describe('normalizeTransactionRow', () => {
       ).toBe(false);
     });
   });
+
+  describe('comportamiento con ceros', () => {
+    const fallbackJPYOptions = {
+      ...options,
+      fallbackCurrency: 'JPY' as const,
+    };
+
+    it('EUR: débito 0,00, crédito 6000,00 → ingreso listo', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'SUPERMERCADO', '0,00', '6000,00'],
+        1,
+        mapping,
+        options,
+      );
+
+      expect(candidate?.amountMinor).toBe(600000);
+      expect(candidate?.type).toBe('income');
+      expect(isCandidateReady(candidate!)).toBe(true);
+      expect(
+        candidate?.issues.some((i) => i.code === 'unparseable_amount'),
+      ).toBe(false);
+    });
+
+    it('EUR: débito 6000,00, crédito 0,00 → gasto listo', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'SUPERMERCADO', '6000,00', '0,00'],
+        1,
+        mapping,
+        options,
+      );
+
+      expect(candidate?.amountMinor).toBe(600000);
+      expect(candidate?.type).toBe('expense');
+      expect(isCandidateReady(candidate!)).toBe(true);
+      expect(
+        candidate?.issues.some((i) => i.code === 'unparseable_amount'),
+      ).toBe(false);
+    });
+
+    it('JPY: débito 0, crédito 6000 → ingreso listo', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'SUPERMERCADO', '0', '6000'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBe(6000);
+      expect(candidate?.type).toBe('income');
+      expect(isCandidateReady(candidate!)).toBe(true);
+      expect(
+        candidate?.issues.some((i) => i.code === 'unparseable_amount'),
+      ).toBe(false);
+    });
+
+    it('JPY: débito 6000, crédito 0 → gasto listo', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'SUPERMERCADO', '6000', '0'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBe(6000);
+      expect(candidate?.type).toBe('expense');
+      expect(isCandidateReady(candidate!)).toBe(true);
+      expect(
+        candidate?.issues.some((i) => i.code === 'unparseable_amount'),
+      ).toBe(false);
+    });
+
+    it('Ambas columnas en cero → bloqueada con unparseable_amount', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'SUPERMERCADO', '0', '0'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBeNull();
+      expect(candidate?.type).toBe('unknown');
+      expect(isCandidateReady(candidate!)).toBe(false);
+      expect(
+        candidate?.issues.some((i) => i.code === 'unparseable_amount'),
+      ).toBe(true);
+    });
+
+    it('Cero + invalid_fraction → bloqueada con invalid_fraction_for_currency', () => {
+      const mapping = detectColumnMapping([
+        'Fecha',
+        'Concepto',
+        'Debit',
+        'Credit',
+      ]);
+      const candidate = normalizeTransactionRow(
+        ['01/08/2026', 'SUPERMERCADO', '0', '50.50'],
+        1,
+        mapping,
+        fallbackJPYOptions,
+      );
+
+      expect(candidate?.amountMinor).toBeNull();
+      expect(candidate?.type).toBe('unknown');
+      expect(isCandidateReady(candidate!)).toBe(false);
+      expect(
+        candidate?.issues.some(
+          (i) => i.code === 'invalid_fraction_for_currency',
+        ),
+      ).toBe(true);
+      expect(
+        candidate?.issues.some((i) => i.code === 'unparseable_amount'),
+      ).toBe(false);
+    });
+  });
 });

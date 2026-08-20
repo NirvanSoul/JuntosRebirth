@@ -181,15 +181,11 @@ export function normalizeTransactionRow(
     if (debitParsed && !debitParsed.ok) {
       if (debitParsed.reason === 'invalid_fraction') debitInvalid = true;
       if (debitParsed.reason === 'unparseable') debitUnparseable = true;
-    } else if (debitParsed?.ok && debitParsed.amountMinor === 0) {
-      debitUnparseable = true;
     }
 
     if (creditParsed && !creditParsed.ok) {
       if (creditParsed.reason === 'invalid_fraction') creditInvalid = true;
       if (creditParsed.reason === 'unparseable') creditUnparseable = true;
-    } else if (creditParsed?.ok && creditParsed.amountMinor === 0) {
-      creditUnparseable = true;
     }
 
     if (debitInvalid && creditInvalid) {
@@ -248,6 +244,13 @@ export function normalizeTransactionRow(
     } else if (hasValidCredit) {
       amountMinor = creditParsed.amountMinor;
       type = 'income';
+    } else {
+      amountMinor = null;
+      type = 'unknown';
+      issues.push({
+        code: 'unparseable_amount',
+        message: 'No pudimos reconocer el importe de este movimiento.',
+      });
     }
   }
 
