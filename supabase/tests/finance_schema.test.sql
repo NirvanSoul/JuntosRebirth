@@ -1,5 +1,5 @@
 begin;
-select plan(14);
+select plan(15);
 
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'spaces', 'spaces exists');
@@ -44,6 +44,14 @@ select has_function('public', 'handle_new_user', 'handle_new_user exists');
 select ok(
   not has_function_privilege('anon', 'public.handle_new_user()', 'EXECUTE'),
   'anonymous users cannot execute handle_new_user'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.handle_new_user()',
+    'EXECUTE'
+  ),
+  'authenticated users cannot execute handle_new_user directly'
 );
 
 select * from finish();

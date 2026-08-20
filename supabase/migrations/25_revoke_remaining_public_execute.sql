@@ -19,7 +19,7 @@ grant execute on function public.ensure_personal_space(text, text) to authentica
 revoke all on function public.get_current_user_pending_space_invitation() from public, anon;
 grant execute on function public.get_current_user_pending_space_invitation() to authenticated;
 
-revoke all on function public.handle_new_user() from public, anon;
+revoke all on function public.handle_new_user() from public, anon, authenticated;
 -- Los triggers son ejecutados por el dueño de la base de datos o el que dispara el evento. No requiere EXECUTE manual.
 
 revoke all on function public.is_active_space_member(uuid) from public, anon;
