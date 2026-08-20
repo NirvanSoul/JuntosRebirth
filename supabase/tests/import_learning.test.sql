@@ -85,6 +85,7 @@ select ok(exists (
     join pg_namespace on pg_namespace.oid = pg_class.relnamespace
    where nspname = 'public' and relname = 'import_items'
      and attname = 'is_selected'
+     and attnum > 0 and not attisdropped
 ), 'items preserve their local review selection');
 select ok(
   has_function_privilege(

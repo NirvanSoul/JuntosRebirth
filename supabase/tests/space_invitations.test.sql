@@ -105,6 +105,7 @@ select ok(
       join pg_class on pg_class.oid = pg_attribute.attrelid
       join pg_namespace on pg_namespace.oid = pg_class.relnamespace
      where nspname = 'public' and relname = 'spaces' and attname = 'activated_at'
+       and attnum > 0 and not attisdropped
   ),
   'activated_at admits null: that is exactly what marks a couple space still awaiting acceptance'
 );

@@ -1,5 +1,5 @@
 begin;
-select plan(7);
+select plan(11);
 
 select has_table('public', 'legal_acceptances', 'legal_acceptances exists');
 select ok(
@@ -33,6 +33,22 @@ select ok(
 select ok(
   not has_table_privilege('authenticated', 'public.legal_acceptances', 'DELETE'),
   'not even the owner can delete acceptance evidence directly'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.legal_acceptances', 'UPDATE'),
+  'not even the owner can update acceptance evidence directly'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.legal_acceptances', 'TRUNCATE'),
+  'authenticated users cannot truncate legal_acceptances'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.legal_acceptances', 'REFERENCES'),
+  'authenticated users cannot create references to legal_acceptances'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.legal_acceptances', 'TRIGGER'),
+  'authenticated users cannot create triggers on legal_acceptances'
 );
 
 select * from finish();

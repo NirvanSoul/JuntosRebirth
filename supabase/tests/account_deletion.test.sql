@@ -30,6 +30,7 @@ select ok(
       join pg_class on pg_class.oid = pg_attribute.attrelid
       join pg_namespace on pg_namespace.oid = pg_class.relnamespace
      where nspname = 'public' and relname = 'transactions' and attname = 'created_by'
+       and attnum > 0 and not attisdropped
   ),
   'a transaction survives its author leaving: created_by admits null'
 );
@@ -40,6 +41,7 @@ select ok(
       join pg_class on pg_class.oid = pg_attribute.attrelid
       join pg_namespace on pg_namespace.oid = pg_class.relnamespace
      where nspname = 'public' and relname = 'categories' and attname = 'created_by'
+       and attnum > 0 and not attisdropped
   ),
   'a category survives its author leaving: created_by admits null'
 );
@@ -52,6 +54,7 @@ select ok(
      where nspname = 'public'
        and relname = 'recurring_transaction_series'
        and attname = 'created_by'
+       and attnum > 0 and not attisdropped
   ),
   'a recurring series survives its author leaving: created_by admits null'
 );
@@ -108,6 +111,7 @@ select ok(
      where nspname = 'public'
        and relname = 'transaction_notification_rules'
        and attname = 'created_by'
+       and attnum > 0 and not attisdropped
   ),
   'a notification rule survives its author leaving: created_by admits null'
 );
@@ -120,6 +124,7 @@ select ok(
      where nspname = 'public'
        and relname = 'category_budgets'
        and attname = 'created_by'
+       and attnum > 0 and not attisdropped
   ),
   'a category budget survives its author leaving: created_by admits null'
 );
