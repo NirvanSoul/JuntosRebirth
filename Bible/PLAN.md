@@ -147,6 +147,47 @@ funcionales deben resolverse sus otros prerrequisitos:
 - El `locale` fijo `'es-ES'` se sustituye; la selección del locale debe derivar de la arquitectura de idiomas, no al revés.
 - Se completa **antes** de publicar en tiendas para evitar retrabajo transversal y lanzar una experiencia lingüísticamente coherente.
 
+#### Fase 4f — Inicio de sesión con Google y Apple
+
+Se amplía `supabaseAuthGateway` con los proveedores nativos de Supabase Auth.
+**No se sustituye el proveedor de identidad**: `auth.uid()` sostiene todas las
+políticas RLS, `handle_new_user`, `space_members`, los RPC de invitación y las
+doce suites pgTAP. Clerk, Auth0 o Better Auth resolverían un problema que este
+proyecto no tiene y obligarían a migrar ese cimiento (ADR pendiente).
+
+- Usar el flujo de token nativo (`signInWithIdToken`), no el de navegador: evita
+  el redirect por deep link, que hoy no funciona fuera de un development build.
+- Google y Apple entran **juntos en iOS**: la directriz 4.8 de App Store obliga a
+  ofrecer Sign in with Apple si se ofrece otro login social.
+- Requiere development build (no funciona en Expo Go). Comparte ese bloqueo con
+  el smoke de `AcceptInvitationScreen`: se resuelven en la misma tanda.
+- Credenciales de plataforma: cuenta Apple Developer de pago con Service ID y
+  clave; en Google, client IDs de iOS, Android y web más la huella SHA-1 de la
+  clave de firma. Si EAS gestiona credenciales, fijarla: si cambia, el login cae
+  en release y no en desarrollo.
+
+Decisiones que se toman **antes** de implementar, no durante:
+
+- **Enlace de identidades:** qué ocurre cuando quien se registró con correo y
+  contraseña entra después con Google usando ese mismo correo. Enlazar o tratar
+  como cuenta distinta; se decide y se prueba, no se hereda del comportamiento
+  por defecto.
+- **Nombre y avatar de Apple:** Apple entrega el nombre solo en la **primera**
+  autorización y nunca más. Si no se persiste en ese momento, se pierde. Es
+  prerrequisito real de la Fase 4b, que debe diseñarse con este dato en mano.
+- **Alta y espacio personal:** `handle_new_user` también se dispara en registros
+  por OAuth. Su verificación conductual pendiente tras la migración 25 deja de
+  ser opcional.
+- **Migración de invitado:** el camino invitado → cuenta debe funcionar igual
+  desde un alta por OAuth.
+- **Flujo legal:** pasa a tener **dos** caminos de alta que cubrir, no uno.
+- **Alcance del bloqueo por intentos:** `login-with-lockout` no interviene en
+  OAuth. La protección queda acotada a los inicios con contraseña y así debe
+  declararse.
+
+Toca autenticación: tarea grande, dos verificadores (`PROJECT_RULES.md` §4.3),
+con pruebas en iPhone y Honor sobre un build real.
+
 La Fase 4 termina cuando estas capacidades están implementadas, verificadas y
 documentadas; no cuando existen commits externos que se les parezcan.
 
