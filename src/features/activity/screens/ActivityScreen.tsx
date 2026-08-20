@@ -1,6 +1,5 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -21,6 +20,7 @@ import {
   ActivityCollapsibleSection,
   getActivityLayoutTransition,
 } from '@/features/activity/components/ActivityCollapsibleSection';
+import { ActivityMovementsHeader } from '@/features/activity/components/ActivityMovementsHeader';
 import { CategoryDonutChart } from '@/features/activity/components/CategoryDonutChart';
 import {
   type CategoryFilter,
@@ -58,7 +58,6 @@ import {
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { createStyles } from '@/features/activity/screens/ActivityScreen.styles';
-import { iconSize } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
@@ -78,6 +77,7 @@ type ActivityScreenProps = {
   onCreateMoneyAccount?: () => void;
   onCreateIncome?: () => void;
   onCreateMovement?: () => void;
+  onImport?: () => void;
   onOpenCategoryDetail?: (categoryId: string, currency?: CurrencyCode) => void;
   onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   onOpenTransactionDetail?: (transactionId: string) => void;
@@ -99,6 +99,7 @@ export function ActivityScreen({
   onCreateIncome,
   onCreateMoneyAccount,
   onCreateMovement,
+  onImport,
   onOpenCategoryDetail,
   onOpenMoneyAccountDetail,
   onOpenTransactionDetail,
@@ -422,6 +423,7 @@ export function ActivityScreen({
           onLayout={({ nativeEvent }) =>
             setAccountsOffset(nativeEvent.layout.y)
           }
+          style={{ marginTop: -(spacing.sm * 0.12) }}
           testID="activity-accounts-anchor"
         >
           <ActivityAccountsSection
@@ -433,51 +435,34 @@ export function ActivityScreen({
           />
         </Animated.View>
 
-        <Animated.View
-          layout={getActivityLayoutTransition()}
+        <ActivityMovementsHeader
+          activeFilterCount={activeFilterCount}
           onLayout={({ nativeEvent }) =>
             setMovementsOffset(nativeEvent.layout.y)
           }
-          style={styles.movementsHeader}
-          testID="activity-movements-header"
-        >
-          <Text accessibilityRole="header" variant="subheading">
-            Movimientos
-          </Text>
-          <Pressable
-            accessibilityHint="Abre las opciones de filtrado"
-            accessibilityLabel={
-              activeFilterCount > 0
-                ? `Filtros, ${activeFilterCount} activos`
-                : 'Filtros'
-            }
-            accessibilityRole="button"
-            onPress={() => setFiltersModalVisible(true)}
-            style={({ pressed }) => [
-              styles.filterLink,
-              pressed ? styles.filterLinkPressed : null,
-            ]}
-          >
-            <Ionicons
-              color={colors.textSecondary}
-              name="filter-circle-outline"
-              size={iconSize.xs}
-              testID="activity-filter-icon"
-            />
-            <Text tone="secondary" variant="footnote" weight="light">
-              Filtrar
-            </Text>
-          </Pressable>
-        </Animated.View>
+          onOpenFilters={() => setFiltersModalVisible(true)}
+          onOpenImport={onImport}
+        />
 
+        {/**
+         * Ancla fija del resumen. El relleno superior reserva la safe area para
+         * cuando queda anclada arriba, y el margen negativo lo compensa en
+         * reposo: esa franja transparente se solapa con la cabecera de
+         * Movimientos. `ScrollView` copia este estilo al contenedor que envuelve
+         * al hijo fijo y le añade `zIndex: 10`, así que sin `pointerEvents` la
+         * franja se comería los toques de los botones de Filtros y Doc. Va en el
+         * estilo, y no como prop, porque solo el estilo viaja a ese contenedor.
+         */}
         <View
           onLayout={({ nativeEvent }) => {
             summaryOffsetRef.current = nativeEvent.layout.y;
             updateSummaryPinnedState(scrollOffsetRef.current);
           }}
+          pointerEvents="box-none"
           style={{
             marginTop: -insets.top,
             paddingTop: insets.top + spacing.sm,
+            pointerEvents: 'box-none',
           }}
           testID="activity-summary-anchor"
         >

@@ -48,9 +48,7 @@ import {
 } from '@/lib/currency/currencyCatalog';
 import { iconSize, layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
-import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
-import { useThemedStyles } from '@/theme/useThemedStyles';
 
 export type TransactionTypeFilter = 'all' | 'expense' | 'income';
 export type CategoryFilter = readonly string[];
@@ -124,12 +122,11 @@ function CollapsibleFilterGroup({
   title,
 }: CollapsibleFilterGroupProps) {
   const { colors } = useTheme();
-  const themedStyles = useThemedStyles(createThemedStyles);
 
   return (
     <Animated.View
       layout={getActivityLayoutTransition()}
-      style={themedStyles.filterGroup}
+      style={styles.filterGroup}
     >
       <Pressable
         accessibilityHint={`${expanded ? 'Oculta' : 'Muestra'} las opciones de ${title.toLowerCase()}`}
@@ -374,7 +371,7 @@ export function TransactionFiltersModal({
                 ]}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                style={{ width, marginLeft: -gutter }}
+                style={{ width, marginLeft: -gutter, overflow: 'visible' }}
                 testID="category-filter-scroll"
               >
                 <CategorySelectionCard
@@ -432,7 +429,7 @@ export function TransactionFiltersModal({
                 ]}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                style={{ width, marginLeft: -gutter }}
+                style={{ width, marginLeft: -gutter, overflow: 'visible' }}
                 testID="recurrence-filter-scroll"
               >
                 {recurrenceOptions.map((option) => (
@@ -448,7 +445,6 @@ export function TransactionFiltersModal({
                       }))
                     }
                     selected={draft.recurrence === option.value}
-                    style={styles.horizontalOption}
                     testID={`recurrence-filter-${option.value}`}
                   />
                 ))}
@@ -508,6 +504,9 @@ const styles = StyleSheet.create({
   groups: {
     gap: spacing.md,
   },
+  filterGroup: {
+    paddingBottom: spacing.md,
+  },
   groupHeader: {
     minHeight: layout.minTouchTarget,
     flexDirection: 'row',
@@ -524,14 +523,14 @@ const styles = StyleSheet.create({
   },
   typeOptions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   currencyOptions: {
     gap: spacing.sm,
   },
   typeOption: {
-    minWidth: 0,
-    flex: 1,
+    flexShrink: 0,
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,
   },
@@ -539,9 +538,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     flexWrap: 'wrap',
     gap: spacing.sm,
-  },
-  horizontalOption: {
-    minWidth: 168,
+    overflow: 'visible',
   },
   actions: {
     flexDirection: 'row',
@@ -553,13 +550,3 @@ const styles = StyleSheet.create({
     opacity: 0.64,
   },
 });
-
-function createThemedStyles(colors: ColorTokens) {
-  return StyleSheet.create({
-    filterGroup: {
-      borderBottomColor: colors.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      paddingBottom: spacing.md,
-    },
-  });
-}

@@ -73,11 +73,17 @@ export function ActiveSpaceHeader({
       accessibilityElementsHidden={!visible}
       edges={['top', 'left', 'right']}
       importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
-      pointerEvents={visible ? 'auto' : 'none'}
+      pointerEvents={visible ? 'box-none' : 'none'}
       style={[styles.safeArea, visibilityStyle]}
       testID="persistent-app-header"
     >
+      {/**
+       * La cabecera flota sobre el contenido de la pantalla, así que solo sus
+       * dos botones deben capturar toques: el resto de la franja tiene que
+       * dejarlos pasar al contenido que hay debajo.
+       */}
       <View
+        pointerEvents="box-none"
         style={[
           styles.header,
           { paddingHorizontal: layout.screenGutter[density] },

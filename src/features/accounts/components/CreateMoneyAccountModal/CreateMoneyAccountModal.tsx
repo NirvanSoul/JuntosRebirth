@@ -31,8 +31,8 @@ type CreateMoneyAccountModalProps = {
   accounts: readonly MoneyAccount[];
   availableCurrencies: readonly CurrencyCode[];
   /**
-   * Impide cambiar la moneda de una cuenta que ya tiene movimientos: hacerlo
-   * reinterpretaría importes ya registrados.
+   * Impide alterar las monedas existentes de una cuenta con movimientos. Si
+   * solo tiene una, aún puede añadir una segunda sin reinterpretar importes.
    */
   isCurrencyLocked?: boolean;
   spaceId: string;
@@ -125,7 +125,21 @@ export function CreateMoneyAccountModal({
 
   const handleToggleCurrency = (code: CurrencyCode) => {
     setSelectedCurrencies((current) => {
-      if (!current.includes(code)) return [...current, code];
+      const isExistingCurrency = account?.balances.some(
+        (balance) => balance.currency === code,
+      );
+
+      if (!current.includes(code)) {
+        if (
+          isCurrencyLocked &&
+          (!account || account.balances.length !== 1 || current.length >= 2)
+        ) {
+          return current;
+        }
+        return [...current, code];
+      }
+
+      if (isCurrencyLocked && isExistingCurrency) return current;
       // Nunca se queda sin ninguna: sin moneda no habría saldo que calcular.
       return current.length === 1
         ? current
@@ -141,21 +155,42 @@ export function CreateMoneyAccountModal({
   const handleSubmit = () => {
     if (!validation.valid) return;
 
+    const balances =
+      isCurrencyLocked && account
+        ? [
+            ...account.balances,
+            ...selectedCurrencies
+              .filter(
+                (code) =>
+                  !account.balances.some(
+                    (balance) => balance.currency === code,
+                  ),
+              )
+              .slice(0, account.balances.length === 1 ? 1 : 0)
+              .map((currency) => ({
+                currency,
+                openingBalanceMinor: parseSignedAmountMinor(
+                  balanceInputs[currency] ?? '0',
+                ),
+              })),
+          ]
+        : selectedCurrencies.map((currency) => ({
+            currency,
+            openingBalanceMinor: parseSignedAmountMinor(
+              balanceInputs[currency] ?? '0',
+            ),
+          }));
+
     onSubmit({
       spaceId,
       name: validation.name,
       kind,
       icon,
       colorToken,
-      // Las monedas bloqueadas se respetan también aquí, no solo en la
-      // interfaz: la cuenta conserva exactamente las que ya tenía.
-      balances: (isCurrencyLocked && account
-        ? account.balances.map((balance) => balance.currency)
-        : selectedCurrencies
-      ).map((code) => ({
-        currency: code,
-        openingBalanceMinor: parseSignedAmountMinor(balanceInputs[code] ?? '0'),
-      })),
+      // Las monedas existentes se respetan también aquí, no solo en la
+      // interfaz. Una cuenta bloqueada con una sola moneda puede añadir una
+      // segunda, cuyo saldo inicial sí procede del formulario.
+      balances,
     });
   };
 
@@ -202,6 +237,9 @@ export function CreateMoneyAccountModal({
           <MoneyAccountDetailsStep
             availableCurrencies={availableCurrencies}
             balanceInputs={balanceInputs}
+            existingCurrencies={
+              account?.balances.map((balance) => balance.currency) ?? []
+            }
             selectedCurrencies={selectedCurrencies}
             hasAttemptedSubmit={hasAttemptedSubmit}
             isCurrencyLocked={isCurrencyLocked}

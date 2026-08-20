@@ -37,7 +37,7 @@ function createSelectableOptionStyles(
       minHeight: 56,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.md,
+      gap: spacing.sm,
       borderColor: colors.border,
       borderRadius: radii.md,
       borderWidth: 1,
@@ -46,17 +46,20 @@ function createSelectableOptionStyles(
     },
     compactOption: {
       minHeight: 44,
-      gap: spacing.xs,
-      justifyContent: 'center',
+      gap: spacing.xxs,
       paddingHorizontal: spacing.sm,
     },
     selectedOption: {
-      borderColor: colors.cta,
+      elevation: 0,
+      shadowOpacity: 0,
     },
     disabledOption: {
       opacity: 0.56,
     },
     label: {
+      flexShrink: 1,
+    },
+    labelWithTrailing: {
       flex: 1,
     },
     compactLabel: {
@@ -117,10 +120,14 @@ export function SelectableOption({
       />
       <Text
         numberOfLines={1}
-        style={[styles.label, compact ? styles.compactLabel : null]}
-        tone="primary"
-        variant={compact ? 'label' : 'bodyStrong'}
-        weight={compact ? 'bold' : undefined}
+        style={[
+          styles.label,
+          trailing ? styles.labelWithTrailing : null,
+          compact ? styles.compactLabel : null,
+        ]}
+        tone={selected ? 'cta' : 'primary'}
+        variant={compact ? 'footnote' : 'label'}
+        weight="medium"
       >
         {label}
       </Text>

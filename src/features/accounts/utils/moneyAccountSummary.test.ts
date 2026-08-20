@@ -49,6 +49,7 @@ describe('summarizeMoneyAccounts', () => {
     expect(summary?.balanceByCurrency[0]).toMatchObject({
       currency: 'EUR',
       balanceMinor: 100000 - 2500 + 40000,
+      previousMonthBalanceMinor: 100000,
       expenseMinor: 2500,
       incomeMinor: 40000,
     });
@@ -135,5 +136,30 @@ describe('summarizeMoneyAccounts', () => {
       expect.objectContaining({ currency: 'USD', balanceMinor: 49000 }),
     ]);
     expect(summary?.transactionCount).toBe(2);
+  });
+
+  it('conserva el saldo de cierre del mes anterior para cada divisa', () => {
+    const [summary] = summarizeMoneyAccounts(
+      [account],
+      [
+        createTransaction({
+          id: 'april-income',
+          type: 'income',
+          amountMinor: 10000,
+          occurredOn: '2026-04-20',
+        }),
+        createTransaction({
+          id: 'may-expense',
+          amountMinor: 2500,
+          occurredOn: '2026-05-10',
+        }),
+      ],
+      referenceDate,
+    );
+
+    expect(summary?.balanceByCurrency[0]).toMatchObject({
+      previousMonthBalanceMinor: 110000,
+      balanceMinor: 107500,
+    });
   });
 });

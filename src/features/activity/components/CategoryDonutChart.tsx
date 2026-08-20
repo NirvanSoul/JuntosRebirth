@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   LinearTransition,
   ReduceMotion,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
 } from 'react-native-reanimated';
 import Svg from 'react-native-svg';
 
 import { AnimatedArcSegment } from '@/components/ui/Charts/AnimatedArcSegment';
 import { chartStrokeWidth } from '@/components/ui/Charts/chartTokens';
 import { MonthNavigator } from '@/components/ui/MonthNavigator/MonthNavigator';
+import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
 import {
   getChartContentEntering,
@@ -57,10 +55,6 @@ const minimumSegmentAllocation =
   chartStrokeWidth + segmentVisibleGap + minimumDashLength;
 const legendDotSize = 10;
 const segmentedControlWidth = 216;
-const segmentVisualHeight = 32;
-const segmentControlPadding = spacing.xs;
-const segmentIndicatorWidth =
-  (segmentedControlWidth - segmentControlPadding * 2) / 2;
 
 const chartLayoutTransition = LinearTransition.springify()
   .damping(motion.chartModeSpring.damping)
@@ -124,24 +118,6 @@ export function CategoryDonutChart({
 
   let accumulatedLength = 0;
 
-  const modeIndicatorPosition = useSharedValue(
-    mode === 'expense' ? 0 : segmentIndicatorWidth,
-  );
-
-  useEffect(() => {
-    modeIndicatorPosition.value = withSpring(
-      mode === 'expense' ? 0 : segmentIndicatorWidth,
-      {
-        ...motion.chartModeSpring,
-        reduceMotion: ReduceMotion.System,
-      },
-    );
-  }, [mode, modeIndicatorPosition]);
-
-  const modeIndicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: modeIndicatorPosition.value }],
-  }));
-
   return (
     <View style={styles.card} testID="category-donut-chart">
       <MonthNavigator
@@ -154,43 +130,17 @@ export function CategoryDonutChart({
         style={styles.monthNavigator}
       />
 
-      <View
-        accessibilityRole="tablist"
+      <SegmentedControl
+        indicatorTestID="category-mode-indicator"
+        onChange={setMode}
+        options={[
+          { label: 'Gastos', value: 'expense' },
+          { label: 'Ingresos', value: 'income' },
+        ]}
+        selectedValue={mode}
         style={styles.segmentedControl}
         testID="category-mode-control"
-      >
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.segmentIndicator, modeIndicatorStyle]}
-          testID="category-mode-indicator"
-        />
-        {(['expense', 'income'] as const).map((option) => {
-          const selected = mode === option;
-          const label = option === 'expense' ? 'Gastos' : 'Ingresos';
-
-          return (
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              hitSlop={{ bottom: spacing.sm, top: spacing.sm }}
-              key={option}
-              onPress={() => setMode(option)}
-              style={({ pressed }) => [
-                styles.segment,
-                pressed ? styles.segmentPressed : null,
-              ]}
-            >
-              <Text
-                align="center"
-                tone={selected ? 'primary' : 'secondary'}
-                variant="label"
-              >
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      />
 
       <View
         accessibilityLabel={
@@ -342,30 +292,6 @@ function createStyles(colors: ColorTokens) {
     },
     segmentedControl: {
       width: segmentedControlWidth,
-      flexDirection: 'row',
-      backgroundColor: colors.keypad,
-      borderRadius: radii.round,
-      padding: segmentControlPadding,
-    },
-    segmentIndicator: {
-      position: 'absolute',
-      top: segmentControlPadding,
-      bottom: segmentControlPadding,
-      left: segmentControlPadding,
-      width: segmentIndicatorWidth,
-      backgroundColor: colors.surface,
-      borderRadius: radii.round,
-    },
-    segment: {
-      height: segmentVisualHeight,
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      zIndex: 1,
-    },
-    segmentPressed: {
-      opacity: 0.64,
     },
     chartArea: {
       width: chartSize,

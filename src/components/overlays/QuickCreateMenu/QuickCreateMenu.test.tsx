@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import { colors } from '@/theme/colors';
+import { shadows } from '@/theme/shadows';
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
   AppModal: ({
@@ -17,7 +18,7 @@ jest.mock('@/components/overlays/AppModal/AppModal', () => ({
 }));
 
 describe('QuickCreateMenu', () => {
-  it('expone las cuatro acciones y devuelve la seleccionada', async () => {
+  it('expone las tres acciones de creación sin subtítulos y devuelve la seleccionada', async () => {
     const onSelect = jest.fn();
     const screen = await renderWithTheme(
       <QuickCreateMenu onClose={jest.fn()} onSelect={onSelect} visible />,
@@ -26,11 +27,13 @@ describe('QuickCreateMenu', () => {
     expect(await screen.findByLabelText('Crear ingreso')).toBeTruthy();
     expect(await screen.findByLabelText('Crear gasto')).toBeTruthy();
     expect(await screen.findByLabelText('Crear categoría')).toBeTruthy();
-    expect(
-      await screen.findByLabelText('Importar movimientos (beta)'),
-    ).toBeTruthy();
-    expect(screen.getByTestId('quick-create-import-badge')).toBeTruthy();
-    expect(screen.getByText('BETA')).toBeTruthy();
+    expect(screen.getByText('Crear ingreso')).toBeTruthy();
+    expect(screen.getByText('Crear gasto')).toBeTruthy();
+    expect(screen.getByText('Crear categoría')).toBeTruthy();
+    expect(screen.queryByText('Dinero que entra')).toBeNull();
+    expect(screen.queryByText('Dinero que sale')).toBeNull();
+    expect(screen.queryByText('Organiza tus movimientos')).toBeNull();
+    expect(screen.queryByLabelText('Importar movimientos (beta)')).toBeNull();
     expect(
       screen.getByTestId('quick-create-category-icon').props.children,
     ).toContain(
@@ -46,6 +49,13 @@ describe('QuickCreateMenu', () => {
         screen.getByTestId('quick-create-category-icon').props.style,
       ).color,
     ).toBe(colors.onBrand);
+    expect(
+      StyleSheet.flatten(screen.getByLabelText('Crear ingreso').props.style),
+    ).toMatchObject({
+      ...shadows.subtle,
+      backgroundColor: colors.surface,
+    });
+    expect(screen.getByTestId('quick-create-close-button')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Crear gasto'));
 
@@ -56,7 +66,7 @@ describe('QuickCreateMenu', () => {
     const onSelect = jest.fn();
     const screen = await renderWithTheme(
       <QuickCreateMenu
-        disabledActionTypes={['expense', 'category', 'import']}
+        disabledActionTypes={['expense', 'category']}
         onClose={jest.fn()}
         onSelect={onSelect}
         visible

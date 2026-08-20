@@ -638,7 +638,11 @@ describe('CreateTransactionModal', () => {
       borderColor: colors.border,
       borderWidth: 1,
     });
-    expect(selectedRecurrenceStyle.borderColor).toBe(colors.cta);
+    expect(selectedRecurrenceStyle).toMatchObject({
+      borderColor: colors.border,
+      elevation: 0,
+      shadowOpacity: 0,
+    });
     expect(
       StyleSheet.flatten(
         screen.getByTestId('transaction-recurrence-once-check').props.style,

@@ -113,8 +113,21 @@ export function useMoneyAccounts({
             kind: input.kind,
             icon: input.icon,
             colorToken: input.colorToken,
+            // Los saldos existentes no se reescriben al tener movimientos.
+            // Si la cuenta solo guardaba una divisa, se permite añadir una
+            // segunda con su saldo inicial, sin alterar la original.
             balances: isCurrencyLocked
-              ? currentAccount.balances
+              ? [
+                  ...currentAccount.balances,
+                  ...input.balances
+                    .filter(
+                      (balance) =>
+                        !currentAccount.balances.some(
+                          (existing) => existing.currency === balance.currency,
+                        ),
+                    )
+                    .slice(0, currentAccount.balances.length === 1 ? 1 : 0),
+                ]
               : input.balances,
           });
           setMoneyAccounts((current) =>

@@ -156,6 +156,16 @@ registrar un movimiento solo se ofrecen cuentas que guarden su moneda. El tipo
 solo propone el icono y el color al crearla: los tres calculan el saldo igual y
 cualquiera puede quedar en negativo.
 
+Después de registrar movimientos, las monedas ya guardadas y sus saldos
+iniciales no se pueden alterar. Si la cuenta solo tenía una moneda, el usuario
+puede añadir una segunda con su propio saldo inicial: esa alta no reinterpreta
+los movimientos existentes.
+
+La vista previa de Inicio muestra las divisas de cada cuenta con su color y el
+saldo de su moneda principal. Cuando el saldo de cierre de esa moneda en el mes
+anterior no es cero, enseña su variación porcentual; las divisas nunca se
+agregan para producir un único porcentaje.
+
 El nombre y el icono son libres en los tres tipos, y el tipo se elige en una
 sola fila con las tres opciones. El saldo inicial es opcional y se escribe
 tal cual, con un signo menos delante si se arrastra una deuda: no hay un

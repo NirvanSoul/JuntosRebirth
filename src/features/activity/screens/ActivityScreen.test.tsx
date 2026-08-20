@@ -17,8 +17,10 @@ import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { minTouchTarget } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
+import { radii } from '@/theme/radii';
 import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import { fontFamily } from '@/theme/fonts';
 
 const transactions: SessionTransaction[] = [
   {
@@ -435,11 +437,18 @@ describe('ActivityScreen', () => {
       StyleSheet.flatten(screen.getByTestId('activity-screen').props.style)
         .backgroundColor,
     ).toBe('transparent');
+    // La franja que compensa la safe area se solapa con la cabecera de
+    // Movimientos y el contenedor fijo la eleva con `zIndex`, así que debe
+    // dejar pasar los toques a los botones que quedan debajo.
     expect(
       StyleSheet.flatten(
         screen.getByTestId('activity-summary-anchor').props.style,
       ),
-    ).toMatchObject({ marginTop: -47, paddingTop: 47 + spacing.sm });
+    ).toMatchObject({
+      marginTop: -47,
+      paddingTop: 47 + spacing.sm,
+      pointerEvents: 'box-none',
+    });
   });
 
   it('solicita el detalle al tocar un movimiento', async () => {
@@ -802,6 +811,7 @@ describe('ActivityScreen', () => {
   });
 
   it('abre y cierra el modal de filtros sin aplicar el borrador', async () => {
+    const onImport = jest.fn();
     const screen = await render(
       <SafeAreaProvider
         initialMetrics={{
@@ -810,36 +820,49 @@ describe('ActivityScreen', () => {
         }}
       >
         <ThemeProvider initialAppearance="light">
-          <ActivityScreen categories={categories} transactions={transactions} />
+          <ActivityScreen
+            categories={categories}
+            onImport={onImport}
+            transactions={transactions}
+          />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
     const filterButton = screen.getByRole('button', { name: 'Filtros' });
+    const importButton = screen.getByRole('button', {
+      name: 'Importar documentos bancarios',
+    });
     const filterButtonStyle = StyleSheet.flatten(filterButton.props.style);
-    const filterLabelStyle = StyleSheet.flatten(
-      within(filterButton).getByText('Filtrar').props.style,
-    );
 
     expect(screen.queryByTestId('transaction-filters-modal')).toBeNull();
+    // Botones circulares de solo icono, sin etiqueta ni sombra.
     expect(filterButtonStyle).toMatchObject({
-      minHeight: minTouchTarget,
-      justifyContent: 'center',
-      flexDirection: 'row',
+      width: minTouchTarget,
+      height: minTouchTarget,
       alignItems: 'center',
-      gap: spacing.xs,
-      paddingLeft: spacing.lg,
+      justifyContent: 'center',
+      borderColor: colors.border,
+      borderRadius: radii.round,
+      borderWidth: 1,
+      backgroundColor: colors.keypad,
     });
-    expect(filterButtonStyle).not.toHaveProperty('backgroundColor');
-    expect(filterButtonStyle).not.toHaveProperty('borderWidth');
-    expect(filterLabelStyle).toMatchObject({
-      color: colors.textSecondary,
-      fontFamily: 'Gilroy-Light',
-      fontSize: 13,
+    expect(filterButtonStyle.shadowOpacity).toBeUndefined();
+    expect(filterButtonStyle.elevation).toBeUndefined();
+    // Cada botón cubre media separación hacia el otro: ni queda una franja
+    // muerta entre ambos ni se solapan sus áreas táctiles.
+    expect(filterButton.props.hitSlop).toMatchObject({
+      right: spacing.sm / 2,
+      bottom: spacing.sm,
     });
-    expect(screen.getByTestId('activity-filter-icon').props.children).toContain(
-      String.fromCodePoint(Number(Ionicons.glyphMap['filter-circle-outline'])),
-    );
-    await fireEvent.press(within(filterButton).getByText('Filtrar'));
+    expect(importButton.props.hitSlop).toMatchObject({
+      left: spacing.sm / 2,
+      bottom: spacing.sm,
+    });
+    expect(within(filterButton).queryByText('Filtros')).toBeNull();
+    expect(within(importButton).queryByText('Doc')).toBeNull();
+    await fireEvent.press(importButton);
+    expect(onImport).toHaveBeenCalledTimes(1);
+    await fireEvent.press(filterButton);
     expect(screen.getByTestId('transaction-filters-modal')).toBeTruthy();
     expect(screen.getByText('Filtrar movimientos')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Moneda' })).toBeNull();
@@ -874,10 +897,9 @@ describe('ActivityScreen', () => {
       String.fromCodePoint(Number(Ionicons.glyphMap['sync-outline'])),
     );
 
-    expect(StyleSheet.flatten(dateToggle.parent?.props.style)).toMatchObject({
-      borderBottomColor: colors.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-    });
+    expect(
+      StyleSheet.flatten(dateToggle.parent?.props.style),
+    ).not.toHaveProperty('borderBottomWidth');
 
     expect(typeToggle.props.accessibilityState).toMatchObject({
       expanded: false,
@@ -900,9 +922,16 @@ describe('ActivityScreen', () => {
       ),
     ).toMatchObject({
       backgroundColor: colors.surface,
-      borderColor: colors.cta,
+      borderColor: colors.border,
       minHeight: 56,
     });
+    expect(
+      StyleSheet.flatten(
+        within(
+          screen.getByTestId('activity-date-period-selector-all'),
+        ).getByText('Todos').props.style,
+      ).flex,
+    ).toBeUndefined();
     expect(
       StyleSheet.flatten(
         screen.getByTestId('activity-date-period-selector-options-scroll').props
@@ -924,12 +953,28 @@ describe('ActivityScreen', () => {
       expanded: true,
     });
     expect(StyleSheet.flatten(allType.props.style)).toMatchObject({
-      ...shadows.subtle,
       minHeight: 56,
       backgroundColor: colors.surface,
-      borderColor: colors.cta,
+      borderColor: colors.border,
       borderWidth: 1,
+      elevation: 0,
+      shadowOpacity: 0,
     });
+    expect(within(allType).getByText('Todos')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(within(allType).getByText('Todos').props.style)
+        .fontFamily,
+    ).toBe(fontFamily.medium);
+    expect(
+      StyleSheet.flatten(within(allType).getByText('Todos').props.style)
+        .fontSize,
+    ).toBe(15);
+    expect(
+      StyleSheet.flatten(within(allType).getByText('Todos').props.style).flex,
+    ).toBeUndefined();
+    expect(
+      StyleSheet.flatten(within(allType).getByText('Todos').props.style).color,
+    ).toBe(colors.cta);
     expect(
       StyleSheet.flatten(
         within(allType).getByTestId('type-filter-all-indicator').props.style,
@@ -991,13 +1036,13 @@ describe('ActivityScreen', () => {
       ),
     ).toMatchObject({
       backgroundColor: colors.surface,
-      borderColor: colors.cta,
+      borderColor: colors.border,
     });
     expect(
       StyleSheet.flatten(
         screen.getByTestId('recurrence-filter-scroll').props.style,
       ),
-    ).toMatchObject({ width: 750, marginLeft: -24 });
+    ).toMatchObject({ width: 750, marginLeft: -24, overflow: 'visible' });
     expect(
       StyleSheet.flatten(
         screen.getByTestId('recurrence-filter-scroll').props
@@ -1046,7 +1091,7 @@ describe('ActivityScreen', () => {
     expect(StyleSheet.flatten(reopenedIncomeType.props.style)).toMatchObject({
       minHeight: 56,
       backgroundColor: colors.surface,
-      borderColor: colors.cta,
+      borderColor: colors.border,
     });
     expect(
       StyleSheet.flatten(
@@ -1061,7 +1106,7 @@ describe('ActivityScreen', () => {
     expect(StyleSheet.flatten(expenseType.props.style)).toMatchObject({
       minHeight: 56,
       backgroundColor: colors.surface,
-      borderColor: colors.cta,
+      borderColor: colors.border,
     });
     expect(
       StyleSheet.flatten(

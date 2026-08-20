@@ -6,6 +6,7 @@ import { spacing } from '@/theme/spacing';
 
 type MoneyAccountCarouselProps = {
   accounts: readonly MoneyAccountSummary[];
+  bordered?: boolean;
   /**
    * Compensa el margen lateral de la pantalla para que el carrusel sangre
    * hasta el borde sin que la primera tarjeta pierda su gutter.
@@ -17,6 +18,7 @@ type MoneyAccountCarouselProps = {
 
 export function MoneyAccountCarousel({
   accounts,
+  bordered = false,
   gutter = 0,
   onOpenMoneyAccountDetail,
   testID,
@@ -26,12 +28,13 @@ export function MoneyAccountCarousel({
       contentContainerStyle={[styles.list, { paddingHorizontal: gutter }]}
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={{ marginHorizontal: -gutter }}
+      style={[styles.carousel, { marginHorizontal: -gutter }]}
       testID={testID}
     >
       {accounts.map((account) => (
         <MoneyAccountCard
           account={account}
+          bordered={bordered}
           key={account.id}
           onPress={() => onOpenMoneyAccountDetail?.(account.id)}
         />
@@ -41,5 +44,10 @@ export function MoneyAccountCarousel({
 }
 
 const styles = StyleSheet.create({
-  list: { gap: spacing.md },
+  carousel: { overflow: 'visible' },
+  list: {
+    gap: spacing.md,
+    overflow: 'visible',
+    paddingVertical: spacing.md,
+  },
 });

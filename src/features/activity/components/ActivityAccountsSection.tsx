@@ -47,6 +47,7 @@ export function ActivityAccountsSection({
         <>
           <MoneyAccountCarousel
             accounts={accounts}
+            bordered
             onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
             testID="activity-account-scroller"
           />

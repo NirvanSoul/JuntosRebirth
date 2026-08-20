@@ -145,7 +145,7 @@ describe('CreateMoneyAccountModal', () => {
     ).toBeTruthy();
   });
 
-  it('bloquea la moneda de una cuenta que ya tiene movimientos', async () => {
+  it('permite añadir una segunda moneda sin modificar la original bloqueada', async () => {
     const onSubmit = jest.fn();
     const screen = await renderModal({
       account,
@@ -155,19 +155,29 @@ describe('CreateMoneyAccountModal', () => {
     });
 
     expect(
-      screen.getByText('No se pueden cambiar: la cuenta ya tiene movimientos.'),
+      screen.getByText(
+        'La moneda original no se puede cambiar porque ya tiene movimientos. Puedes añadir una segunda moneda.',
+      ),
     ).toBeTruthy();
 
+    await fireEvent.changeText(screen.getByLabelText('Saldo inicial'), '999');
     await fireEvent.press(
       screen.getByLabelText('🇺🇸 Dólar estadounidense (USD)'),
+    );
+    await fireEvent.changeText(
+      screen.getByLabelText('Saldo inicial en USD'),
+      '50',
     );
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
     await fireEvent.press(screen.getByLabelText('Guardar cambios de cuenta'));
 
-    // La cuenta conserva exactamente las monedas que ya tenía.
+    // El saldo de la moneda original se conserva y solo se añade la nueva.
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        balances: [{ currency: 'EUR', openingBalanceMinor: 125000 }],
+        balances: [
+          { currency: 'EUR', openingBalanceMinor: 125000 },
+          { currency: 'USD', openingBalanceMinor: 5000 },
+        ],
       }),
     );
   });

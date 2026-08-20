@@ -1,7 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
-import { GradientCard } from '@/components/ui/GradientCard/GradientCard';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { CategoryIconName } from '@/features/categories/types';
@@ -9,21 +8,22 @@ import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import {
   categoryColors,
-  getCategoryContentContrast,
   type CategoryColorToken,
 } from '@/theme/categoryColors';
-import { createDiagonalGradient } from '@/theme/gradients';
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const tileScale = 0.9;
 const tileWidth = 132 * tileScale;
 const tileMinHeight = 164 * tileScale;
-const tileIconSize = 52 * tileScale;
-const progressSize = 68 * tileScale;
-const progressStrokeWidth = 7 * tileScale;
-const tileIconGlyphSize = iconSize.xl * tileScale;
+const tileIconSize = 60 * tileScale;
+const progressSize = 78 * tileScale;
+const progressStrokeWidth = 4.6 * tileScale;
+const tileIconGlyphSize = iconSize.xl * tileScale * 1.15;
 const progressRadius = (progressSize - progressStrokeWidth) / 2;
 const progressCircumference = 2 * Math.PI * progressRadius;
 
@@ -55,9 +55,11 @@ export function CategoryTile({
   onPress,
   testID = 'category-preview-card',
 }: CategoryTileProps) {
+  const { colors, shadows } = useTheme();
+  const themedStyles = useThemedStyles((palette) =>
+    createThemedStyles(palette, shadows),
+  );
   const categoryColor = categoryColors[colorToken];
-  const contentContrast = getCategoryContentContrast(colorToken);
-  const gradientColors = createDiagonalGradient(categoryColor);
   const isIncomeOnly = incomeMinor > 0 && expenseMinor === 0;
   const amount = formatCurrency(
     isIncomeOnly ? incomeMinor : expenseMinor,
@@ -76,22 +78,14 @@ export function CategoryTile({
       accessibilityRole="button"
       disabled={!onPress}
       onPress={onPress}
-      style={({ pressed }) => [styles.tile, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        themedStyles.tile,
+        pressed && styles.cardPressed,
+      ]}
       testID={testID}
     >
-      <GradientCard
-        colors={gradientColors}
-        contentStyle={styles.tileContent}
-        style={styles.tileSurface}
-        testID="category-tile-gradient"
-      >
-        <Text
-          numberOfLines={1}
-          style={{ color: contentContrast.color }}
-          tone={contentContrast.tone}
-          variant="footnote"
-          weight="medium"
-        >
+      <View style={styles.tileContent} testID="category-tile-surface">
+        <Text numberOfLines={1} variant="footnote" weight="medium">
           {name}
         </Text>
         <View style={styles.tileIconArea}>
@@ -112,7 +106,7 @@ export function CategoryTile({
               fill="none"
               opacity={0.25}
               r={progressRadius}
-              stroke={contentContrast.color}
+              stroke={categoryColor}
               strokeWidth={progressStrokeWidth}
               testID="category-budget-track"
             />
@@ -124,7 +118,7 @@ export function CategoryTile({
                 origin={`${progressSize / 2}, ${progressSize / 2}`}
                 r={progressRadius}
                 rotation="-90"
-                stroke={contentContrast.color}
+                stroke={categoryColor}
                 strokeDasharray={`${progressCircumference} ${progressCircumference}`}
                 strokeDashoffset={progressCircumference * (1 - progress)}
                 strokeLinecap="round"
@@ -133,9 +127,12 @@ export function CategoryTile({
               />
             ) : null}
           </Svg>
-          <View style={styles.tileIcon} testID="category-tile-icon">
+          <View
+            style={[styles.tileIcon, { backgroundColor: categoryColor }]}
+            testID="category-tile-icon"
+          >
             <CategoryIcon
-              color={contentContrast.color}
+              color={colors.onBrand}
               name={icon}
               size={tileIconGlyphSize}
             />
@@ -144,27 +141,31 @@ export function CategoryTile({
         <Text
           adjustsFontSizeToFit
           numberOfLines={1}
-          style={{ color: contentContrast.color }}
-          tone={contentContrast.tone}
           variant="footnote"
           weight="medium"
         >
           {amount}
         </Text>
-      </GradientCard>
+      </View>
     </Pressable>
   );
 }
 
+function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    tile: {
+      ...shadows.subtle,
+      width: tileWidth,
+      minHeight: tileMinHeight,
+      borderRadius: radii.lg * tileScale,
+      backgroundColor: colors.surface,
+      overflow: 'visible',
+    },
+  });
+}
+
 const styles = StyleSheet.create({
   cardPressed: { opacity: 0.64 },
-  tile: {
-    width: tileWidth,
-    minHeight: tileMinHeight,
-    borderRadius: radii.lg * tileScale,
-    overflow: 'hidden',
-  },
-  tileSurface: { flex: 1 },
   tileContent: {
     width: '100%',
     flex: 1,
@@ -184,6 +185,7 @@ const styles = StyleSheet.create({
     height: tileIconSize,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: radii.round,
   },
   progress: {
     position: 'absolute',

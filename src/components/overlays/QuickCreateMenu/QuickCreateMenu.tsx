@@ -2,12 +2,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
+import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { Text } from '@/components/ui/Text/Text';
 import type { CreateActionType } from '@/navigation/createActions';
-import { iconSize, layout } from '@/theme/layout';
+import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
-import type { ColorTokens } from '@/theme/types';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
@@ -26,49 +27,34 @@ function createActions(colors: ColorTokens): readonly {
   type: CreateActionType;
   label: string;
   accessibilityLabel: string;
-  description: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   backgroundColor: string;
-  badge?: string;
 }[] {
   return [
     {
       type: 'income',
-      label: 'Ingreso',
+      label: 'Crear ingreso',
       accessibilityLabel: 'Crear ingreso',
-      description: 'Dinero que entra',
       icon: 'arrow-up',
       color: colors.onBrand,
       backgroundColor: colors.incomeSoft,
     },
     {
       type: 'expense',
-      label: 'Gasto',
+      label: 'Crear gasto',
       accessibilityLabel: 'Crear gasto',
-      description: 'Dinero que sale',
       icon: 'arrow-down',
       color: colors.onBrand,
       backgroundColor: colors.expenseSoft,
     },
     {
       type: 'category',
-      label: 'Categoría',
+      label: 'Crear categoría',
       accessibilityLabel: 'Crear categoría',
-      description: 'Organiza tus movimientos',
       icon: 'pie-chart-outline',
       color: colors.onBrand,
       backgroundColor: colors.categoryAction,
-    },
-    {
-      type: 'import',
-      label: 'Importar movimientos',
-      accessibilityLabel: 'Importar movimientos (beta)',
-      description: 'Desde un Excel o CSV de tu banco',
-      icon: 'document-text-outline',
-      color: colors.onBrand,
-      backgroundColor: colors.brand,
-      badge: 'BETA',
     },
   ];
 }
@@ -79,8 +65,8 @@ export function QuickCreateMenu({
   onClose,
   onSelect,
 }: QuickCreateMenuProps) {
-  const { colors } = useTheme();
-  const styles = useThemedStyles(createStyles);
+  const { colors, colorScheme, shadows } = useTheme();
+  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const actions = createActions(colors);
 
   return (
@@ -94,22 +80,10 @@ export function QuickCreateMenu({
             Elige una opción para continuar
           </Text>
         </View>
-        <Pressable
-          accessibilityLabel="Cerrar"
-          accessibilityRole="button"
-          hitSlop={spacing.sm}
+        <ModalCloseButton
           onPress={onClose}
-          style={({ pressed }) => [
-            styles.closeButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Ionicons
-            color={colors.textSecondary}
-            name="close"
-            size={iconSize.md}
-          />
-        </Pressable>
+          testID="quick-create-close-button"
+        />
       </View>
 
       <View style={styles.actions}>
@@ -125,6 +99,7 @@ export function QuickCreateMenu({
             onPress={() => onSelect(action.type)}
             style={({ pressed }) => [
               styles.action,
+              colorScheme === 'light' && styles.actionLight,
               disabledActionTypes.includes(action.type) &&
                 styles.actionDisabled,
               pressed && styles.pressed,
@@ -153,22 +128,7 @@ export function QuickCreateMenu({
               </View>
             </View>
             <View style={styles.actionText}>
-              <View style={styles.actionTitleRow}>
-                <Text variant="bodyStrong">{action.label}</Text>
-                {action.badge ? (
-                  <View
-                    style={styles.badge}
-                    testID={`quick-create-${action.type}-badge`}
-                  >
-                    <Text tone="brand" variant="overline">
-                      {action.badge}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text style={styles.subtitle} tone="secondary" variant="footnote">
-                {action.description}
-              </Text>
+              <Text variant="bodyStrong">{action.label}</Text>
             </View>
             <Ionicons
               color={colors.textMuted}
@@ -182,7 +142,7 @@ export function QuickCreateMenu({
   );
 }
 
-function createStyles(colors: ColorTokens) {
+function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
   return StyleSheet.create({
     header: {
       flexDirection: 'row',
@@ -195,14 +155,6 @@ function createStyles(colors: ColorTokens) {
     },
     subtitle: {
       marginTop: spacing.xs,
-    },
-    closeButton: {
-      width: layout.minTouchTarget,
-      height: layout.minTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      backgroundColor: colors.surfaceMuted,
     },
     actions: {
       marginTop: spacing.xl,
@@ -220,6 +172,10 @@ function createStyles(colors: ColorTokens) {
       backgroundColor: colors.surfaceMuted,
       padding: spacing.md,
     },
+    actionLight: {
+      ...shadows.subtle,
+      backgroundColor: colors.surface,
+    },
     actionDisabled: {
       opacity: 0.3,
     },
@@ -235,18 +191,6 @@ function createStyles(colors: ColorTokens) {
     },
     actionText: {
       flex: 1,
-    },
-    actionTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: spacing.sm,
-    },
-    badge: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xxs,
-      borderRadius: radii.round,
-      backgroundColor: colors.brandSoft,
     },
     pressed: {
       opacity: 0.7,

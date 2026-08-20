@@ -10,12 +10,13 @@ import {
 import { DestructiveConfirmationPanel } from '@/components/overlays/DestructiveConfirmationPanel/DestructiveConfirmationPanel';
 import { DetailActionMenu } from '@/components/overlays/DetailActionMenu/DetailActionMenu';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
+import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import { getMoneyAccountKindLabel } from '@/features/accounts/constants/moneyAccountKindDefinitions';
 import type { MoneyAccount } from '@/features/accounts/types';
 import {
-  getPrimaryBalance,
+  type MoneyAccountCurrencyBalance,
   summarizeMoneyAccounts,
 } from '@/features/accounts/utils/moneyAccountSummary';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
@@ -30,7 +31,7 @@ import {
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
-import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
@@ -47,6 +48,53 @@ type MoneyAccountDetailModalProps = {
 
 const heroIconSize = 76;
 
+type AccountTransactionMetricProps = {
+  balance: MoneyAccountCurrencyBalance;
+  type: 'expense' | 'income';
+};
+
+function AccountTransactionMetric({
+  balance,
+  type,
+}: AccountTransactionMetricProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles((palette) => createMetricStyles(palette));
+  const isIncome = type === 'income';
+  const amountMinor = isIncome ? balance.incomeMinor : balance.expenseMinor;
+  const label = `${isIncome ? 'Ingresos' : 'Gastos'} ${balance.currency}`;
+  const amount = formatCurrency(amountMinor, balance.currency, 'es-ES');
+
+  return (
+    <View
+      accessibilityLabel={`${label} en ${balance.currency}: ${amount}`}
+      style={styles.metric}
+      testID={`money-account-${type}-${balance.currency}`}
+    >
+      <View style={styles.metricHeading}>
+        <View
+          style={styles.metricIcon}
+          testID={`money-account-${type}-${balance.currency}-icon`}
+        >
+          <View style={styles.diagonalArrow}>
+            <Ionicons
+              color={isIncome ? colors.income : colors.expense}
+              name={isIncome ? 'arrow-up' : 'arrow-down'}
+              size={iconSize.sm}
+              testID={`money-account-${type}-${balance.currency}-glyph`}
+            />
+          </View>
+        </View>
+        <Text tone="secondary" variant="caption">
+          {label}
+        </Text>
+      </View>
+      <Text numberOfLines={1} variant="label" weight="semibold">
+        {amount}
+      </Text>
+    </View>
+  );
+}
+
 export function MoneyAccountDetailModal({
   account,
   categories,
@@ -57,9 +105,9 @@ export function MoneyAccountDetailModal({
   transactions,
   visible,
 }: MoneyAccountDetailModalProps) {
-  const { colors, shadows } = useTheme();
-  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
+  const styles = useThemedStyles((palette) => createStyles(palette));
   const [isDeletePanelVisible, setDeletePanelVisible] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
   const modalBottomInset = useAppModalBottomInset();
   const summary = useMemo(
     () => (account ? summarizeMoneyAccounts([account], transactions)[0] : null),
@@ -76,8 +124,11 @@ export function MoneyAccountDetailModal({
   );
 
   useEffect(() => {
-    if (!visible) setDeletePanelVisible(false);
-  }, [visible]);
+    if (!visible || !account) return;
+
+    setDeletePanelVisible(false);
+    setSelectedCurrency(account.balances[0]?.currency ?? null);
+  }, [account, visible]);
 
   if (!account || !summary) {
     return null;
@@ -85,12 +136,14 @@ export function MoneyAccountDetailModal({
 
   const accountColor = categoryColors[account.colorToken];
   const contentContrast = getCategoryContentContrast(account.colorToken);
-  const primary = getPrimaryBalance(summary);
-  const balance = formatCurrency(
-    primary.balanceMinor,
-    primary.currency,
-    'es-ES',
-  );
+  const selectedBalance =
+    summary.balanceByCurrency.find(
+      (balance) => balance.currency === selectedCurrency,
+    ) ?? summary.balanceByCurrency[0];
+
+  if (!selectedBalance) return null;
+
+  const hasMultipleCurrencies = summary.balanceByCurrency.length > 1;
 
   return (
     <AppModal
@@ -148,13 +201,6 @@ export function MoneyAccountDetailModal({
               >
                 {account.name}
               </Text>
-              <Text
-                align="center"
-                testID="money-account-detail-balance"
-                variant="amount"
-              >
-                {balance}
-              </Text>
             </View>
           </View>
 
@@ -168,77 +214,60 @@ export function MoneyAccountDetailModal({
             />
           ) : null}
 
-          {summary.balanceByCurrency.map((currencyBalance) => (
-            <View
-              key={currencyBalance.currency}
-              style={styles.metrics}
-              testID={`money-account-metrics-${currencyBalance.currency}`}
-            >
-              <View style={styles.metric}>
-                <Text tone="secondary" variant="caption">
-                  Saldo en {currencyBalance.currency}
-                </Text>
-                <Text numberOfLines={1} variant="label" weight="semibold">
-                  {formatCurrency(
-                    currencyBalance.balanceMinor,
-                    currencyBalance.currency,
-                    'es-ES',
-                  )}
-                </Text>
-              </View>
-              {currencyBalance.incomeMinor > 0 ? (
-                <View style={styles.metric}>
-                  <View style={styles.metricHeading}>
-                    <Ionicons
-                      color={colors.income}
-                      name="arrow-up"
-                      size={iconSize.sm}
-                    />
-                    <Text tone="secondary" variant="caption">
-                      Ingresos
-                    </Text>
-                  </View>
-                  <Text numberOfLines={1} variant="label" weight="semibold">
-                    {formatCurrency(
-                      currencyBalance.incomeMinor,
-                      currencyBalance.currency,
-                      'es-ES',
-                    )}
-                  </Text>
-                </View>
-              ) : null}
-              {currencyBalance.expenseMinor > 0 ? (
-                <View style={styles.metric}>
-                  <View style={styles.metricHeading}>
-                    <Ionicons
-                      color={colors.expense}
-                      name="arrow-down"
-                      size={iconSize.sm}
-                    />
-                    <Text tone="secondary" variant="caption">
-                      Gastos
-                    </Text>
-                  </View>
-                  <Text numberOfLines={1} variant="label" weight="semibold">
-                    {formatCurrency(
-                      currencyBalance.expenseMinor,
-                      currencyBalance.currency,
-                      'es-ES',
-                    )}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          ))}
+          <View style={styles.summary}>
+            {hasMultipleCurrencies ? (
+              <SegmentedControl
+                onChange={(currency) => setSelectedCurrency(currency)}
+                options={summary.balanceByCurrency.map(({ currency }) => ({
+                  label: currency,
+                  value: currency,
+                }))}
+                selectedValue={selectedBalance.currency}
+                style={styles.currencySelector}
+                testID="money-account-currency-selector"
+              />
+            ) : null}
 
-          <Text
-            accessibilityRole="header"
-            style={styles.sectionTitle}
-            variant="label"
-            weight="semibold"
-          >
-            Movimientos
-          </Text>
+            <View
+              accessibilityLabel={`Balance ${selectedBalance.currency}: ${formatCurrency(
+                selectedBalance.balanceMinor,
+                selectedBalance.currency,
+                'es-ES',
+              )}`}
+              style={styles.balanceMetric}
+              testID={`money-account-balance-${selectedBalance.currency}`}
+            >
+              <Text tone="secondary" variant="caption">
+                Balance {selectedBalance.currency}
+              </Text>
+              <Text numberOfLines={1} variant="label" weight="semibold">
+                {formatCurrency(
+                  selectedBalance.balanceMinor,
+                  selectedBalance.currency,
+                  'es-ES',
+                )}
+              </Text>
+            </View>
+            <View style={styles.metricRow}>
+              <AccountTransactionMetric
+                balance={selectedBalance}
+                type="income"
+              />
+              <AccountTransactionMetric
+                balance={selectedBalance}
+                type="expense"
+              />
+            </View>
+          </View>
+
+          <View style={styles.movementsHeader}>
+            <Text accessibilityRole="header" variant="subheading">
+              Movimientos
+            </Text>
+            <Text tone="secondary" variant="footnote">
+              {accountTransactions.length}
+            </Text>
+          </View>
           {accountTransactions.length > 0 ? (
             <TransactionPreviewList
               categories={categories}
@@ -258,7 +287,7 @@ export function MoneyAccountDetailModal({
   );
 }
 
-function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
+function createStyles(colors: ColorTokens) {
   return StyleSheet.create({
     container: { flex: 1 },
     topBar: {
@@ -278,23 +307,52 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: radii.round,
     },
     titleBlock: { alignItems: 'center', gap: spacing.xxs },
-    metrics: {
-      ...shadows.subtle,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.lg,
-      borderColor: colors.border,
-      borderRadius: radii.lg,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      padding: spacing.lg,
+    summary: {
+      gap: spacing.sm,
     },
-    metric: { gap: spacing.xxs },
+    currencySelector: { alignSelf: 'center', width: 216 },
+    balanceMetric: {
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.md,
+    },
+    metricRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    movementsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+      marginTop: spacing.xxl,
+    },
+  });
+}
+
+function createMetricStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    metric: {
+      minWidth: 0,
+      flex: 1,
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.md,
+    },
     metricHeading: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.xs,
     },
-    sectionTitle: { marginTop: spacing.sm },
+    metricIcon: {
+      width: iconSize.lg,
+      height: iconSize.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.round,
+    },
+    diagonalArrow: { transform: [{ rotate: '45deg' }] },
   });
 }

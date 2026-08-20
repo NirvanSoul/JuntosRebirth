@@ -222,11 +222,17 @@ export function HomeScreen({
           <ScrollView
             contentContainerStyle={[
               styles.categoryList,
-              { paddingHorizontal: layout.screenGutter[density] },
+              {
+                paddingHorizontal: layout.screenGutter[density],
+                paddingVertical: spacing.md,
+              },
             ]}
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ marginHorizontal: -layout.screenGutter[density] }}
+            style={[
+              styles.categoryScroller,
+              { marginHorizontal: -layout.screenGutter[density] },
+            ]}
             testID="home-category-scroller"
           >
             {categorySummaries.map(({ id, ...category }) => (
@@ -368,5 +374,7 @@ const styles = StyleSheet.create({
   },
   categoryList: {
     gap: spacing.sm,
+    overflow: 'visible',
   },
+  categoryScroller: { overflow: 'visible' },
 });

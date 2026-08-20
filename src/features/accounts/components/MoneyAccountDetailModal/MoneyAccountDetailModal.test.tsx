@@ -1,10 +1,11 @@
 import { fireEvent, within } from '@testing-library/react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { StyleSheet } from 'react-native';
 
 import { MoneyAccountDetailModal } from '@/features/accounts/components/MoneyAccountDetailModal/MoneyAccountDetailModal';
 import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
@@ -104,13 +105,27 @@ describe('MoneyAccountDetailModal', () => {
     jest.useRealTimers();
   });
 
-  it('muestra el saldo con el inicial ya aplicado', async () => {
+  it('muestra balance, ingresos y gastos por divisa fuera del encabezado', async () => {
     const screen = await renderModal();
 
+    expect(screen.queryByTestId('money-account-detail-balance')).toBeNull();
+    expect(screen.getByText('Balance EUR')).toBeTruthy();
+    expect(screen.getByText('Ingresos EUR')).toBeTruthy();
+    expect(screen.getByText('Gastos EUR')).toBeTruthy();
+    expect(screen.getByTestId('money-account-balance-EUR')).toBeTruthy();
+    expect(screen.getByTestId('money-account-income-EUR')).toBeTruthy();
+    expect(screen.getByTestId('money-account-expense-EUR')).toBeTruthy();
     expect(
-      screen.getByTestId('money-account-detail-balance').props.children,
-    ).toBe(formatCurrency(100000 - 2500, 'EUR', 'es-ES'));
-    expect(screen.getByTestId('money-account-metrics-EUR')).toBeTruthy();
+      StyleSheet.flatten(
+        screen.getByTestId('money-account-income-EUR-icon').props.style,
+      ).backgroundColor,
+    ).toBeUndefined();
+    expect(
+      screen.getByTestId('money-account-income-EUR-glyph').props.children,
+    ).toContain(String.fromCodePoint(Number(Ionicons.glyphMap['arrow-up'])));
+    expect(
+      screen.getByTestId('money-account-expense-EUR-glyph').props.children,
+    ).toContain(String.fromCodePoint(Number(Ionicons.glyphMap['arrow-down'])));
   });
 
   it('lista solo los movimientos asignados a la cuenta', async () => {
@@ -148,7 +163,7 @@ describe('MoneyAccountDetailModal', () => {
     expect(screen.queryByTestId('money-account-detail-modal')).toBeNull();
   });
 
-  it('enseña un bloque de saldo por cada moneda de la cuenta', async () => {
+  it('cambia la divisa del resumen sin filtrar los movimientos de la cuenta', async () => {
     const screen = await renderModal({
       account: {
         ...account,
@@ -159,7 +174,17 @@ describe('MoneyAccountDetailModal', () => {
       },
     });
 
-    expect(screen.getByTestId('money-account-metrics-EUR')).toBeTruthy();
-    expect(screen.getByTestId('money-account-metrics-USD')).toBeTruthy();
+    expect(screen.getByText('Balance EUR')).toBeTruthy();
+    expect(screen.getByTestId('money-account-currency-selector')).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByTestId('money-account-currency-selector-USD'),
+    );
+
+    expect(screen.queryByText('Balance EUR')).toBeNull();
+    expect(screen.getByText('Balance USD')).toBeTruthy();
+    expect(screen.getByText('Ingresos USD')).toBeTruthy();
+    expect(screen.getByText('Gastos USD')).toBeTruthy();
+    expect(screen.getByText('Compra')).toBeTruthy();
   });
 });

@@ -1,7 +1,8 @@
-import { act, fireEvent, render, within } from '@testing-library/react-native';
+import { fireEvent, render, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { moneyAccountCardLayout } from '@/features/accounts/components/MoneyAccountCard/MoneyAccountCard';
 import { HomeScreen } from '@/features/dashboard/screens/HomeScreen';
 import type { Category } from '@/features/categories/types';
 import {
@@ -10,7 +11,9 @@ import {
 } from '@/features/dashboard/utils/transactionPeriod';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
+import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
+import { fontFamily } from '@/theme/fonts';
 import { iconSize } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { shadows } from '@/theme/shadows';
@@ -259,43 +262,45 @@ describe('HomeScreen', () => {
     );
     expect(categoryCardStyle.minHeight).toBeCloseTo(147.6);
     expect(categoryCardStyle.width).toBeCloseTo(118.8);
-    await act(() => {
-      screen.getAllByTestId('category-tile-gradient')[0]!.props.onLayout({
-        nativeEvent: {
-          layout: { height: 147.6, width: 118.8, x: 0, y: 0 },
-        },
-      });
-    });
-    expect(
-      screen.getAllByTestId('gradient-card-background', {
-        includeHiddenElements: true,
-      }),
-    ).toHaveLength(2);
-    const gradientFill = screen.getAllByTestId('gradient-card-fill', {
-      includeHiddenElements: true,
-    })[0]!;
-    expect(gradientFill.props).toMatchObject({
-      height: 147.6,
-      width: 118.8,
-      x: '0',
-      y: '0',
-    });
+    expect(categoryCardStyle.backgroundColor).toBe(colors.surface);
+    expect(categoryCardStyle).toMatchObject(shadows.subtle);
+    expect(categoryCardStyle.overflow).toBe('visible');
+    expect(screen.queryByTestId('gradient-card-background')).toBeNull();
     expect(
       StyleSheet.flatten(
         screen.getByTestId('home-category-scroller').props.style,
-      ).marginHorizontal,
-    ).toBe(-24);
+      ),
+    ).toMatchObject({ marginHorizontal: -24, overflow: 'visible' });
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('home-category-scroller').props
+          .contentContainerStyle,
+      ),
+    ).toMatchObject({ overflow: 'visible', paddingVertical: spacing.md });
     expect(screen.getAllByTestId('category-budget-ring')).toHaveLength(2);
     expect(screen.getAllByTestId('category-budget-track')).toHaveLength(2);
     expect(
       screen.getAllByTestId('category-budget-track')[0]!.props.opacity,
     ).toBe(0.25);
+    expect(
+      screen.getAllByTestId('category-budget-track')[0]!.props.strokeWidth,
+    ).toBeCloseTo(4.14);
     expect(screen.getByTestId('category-budget-value')).toBeTruthy();
     expect(
       StyleSheet.flatten(
         screen.getAllByTestId('category-tile-icon')[0]!.props.style,
-      ),
-    ).not.toHaveProperty('backgroundColor');
+      ).backgroundColor,
+    ).toBe(categoryColors.yellow);
+    expect(
+      StyleSheet.flatten(
+        screen.getAllByTestId('category-tile-icon')[0]!.props.style,
+      ).borderRadius,
+    ).toBe(999);
+    expect(
+      StyleSheet.flatten(
+        screen.getAllByTestId('category-tile-icon')[0]!.props.style,
+      ).width,
+    ).toBeCloseTo(54);
     expect(
       StyleSheet.flatten(screen.getByText('Salario').props.style).color,
     ).toBe(colors.textPrimary);
@@ -303,7 +308,7 @@ describe('HomeScreen', () => {
       within(screen.getAllByTestId('category-preview-card')[0]!).getByTestId(
         'phosphor-react-native-money-fill',
       ).props.color,
-    ).toBe(colors.textPrimary);
+    ).toBe(colors.onBrand);
     expect(screen.getByLabelText(/Vivienda, gastado 500/)).toBeTruthy();
   });
 
@@ -541,10 +546,19 @@ describe('HomeScreen', () => {
       checked: true,
     });
     expect(StyleSheet.flatten(monthlyFilter.props.style)).toMatchObject({
-      ...shadows.subtle,
       backgroundColor: colors.surface,
-      borderColor: colors.cta,
+      borderColor: colors.border,
+      elevation: 0,
+      shadowOpacity: 0,
     });
+    expect(StyleSheet.flatten(monthlyFilter.props.style)).not.toHaveProperty(
+      'minWidth',
+    );
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('income-period-selector-options-scroll').props.style,
+      ).overflow,
+    ).toBe('visible');
     expect(
       StyleSheet.flatten(
         screen.getByTestId('income-period-selector-month-indicator').props
@@ -893,7 +907,61 @@ describe('HomeScreen', () => {
       const screen = await renderHome({ moneyAccounts: [account] });
 
       expect(screen.getByTestId('home-account-scroller')).toBeTruthy();
-      expect(screen.getByTestId('money-account-card-account-1')).toBeTruthy();
+      const card = screen.getByTestId('money-account-card-account-1');
+      expect(card).toBeTruthy();
+      expect(StyleSheet.flatten(card.props.style)).toMatchObject({
+        ...shadows.subtle,
+        backgroundColor: colors.surface,
+        overflow: 'visible',
+        ...moneyAccountCardLayout,
+      });
+      expect(StyleSheet.flatten(card.props.style)).not.toHaveProperty(
+        'borderWidth',
+      );
+      expect(
+        screen.getByTestId('money-account-card-account-1-currencies').props
+          .children,
+      ).toBe('EUR');
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('money-account-card-account-1-currencies').props
+            .style,
+        ).color,
+      ).toBe(categoryColors.blue);
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('money-account-card-account-1-title').props.style,
+        ).fontFamily,
+      ).toBe(fontFamily.bold);
+      expect(
+        StyleSheet.flatten(screen.getByText('Cuenta bancaria').props.style)
+          .fontFamily,
+      ).toBe(fontFamily.light);
+      expect(
+        StyleSheet.flatten(screen.getByText('Cuenta bancaria').props.style)
+          .fontSize,
+      ).toBe(15);
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('money-account-card-account-1-balance').props
+            .style,
+        ).fontFamily,
+      ).toBe(fontFamily.medium);
+      expect(
+        screen.getByTestId('money-account-card-account-1-comparison'),
+      ).toBeTruthy();
+      expect(screen.getByText('0%')).toBeTruthy();
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('home-account-scroller').props.style,
+        ).overflow,
+      ).toBe('visible');
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('home-account-scroller').props
+            .contentContainerStyle,
+        ),
+      ).toMatchObject({ overflow: 'visible', paddingVertical: spacing.md });
       expect(screen.queryByTestId('money-account-row-account-1')).toBeNull();
     });
 

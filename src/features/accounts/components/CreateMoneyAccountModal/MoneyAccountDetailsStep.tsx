@@ -26,6 +26,8 @@ type MoneyAccountDetailsStepProps = {
   availableCurrencies: readonly CurrencyCode[];
   /** Saldo inicial escrito por moneda, indexado por código. */
   balanceInputs: Record<string, string>;
+  /** Monedas ya guardadas antes de abrir la edición. */
+  existingCurrencies: readonly CurrencyCode[];
   selectedCurrencies: readonly CurrencyCode[];
   hasAttemptedSubmit: boolean;
   isCurrencyLocked: boolean;
@@ -40,9 +42,49 @@ type MoneyAccountDetailsStepProps = {
   onSelectKind: (kind: MoneyAccountKind) => void;
 };
 
+type CurrencyOptionProps = {
+  canAddSecondCurrency: boolean;
+  code: CurrencyCode;
+  existingCurrencies: readonly CurrencyCode[];
+  isCurrencyLocked: boolean;
+  onToggleCurrency: (currency: CurrencyCode) => void;
+  selected: boolean;
+};
+
+function CurrencyOption({
+  canAddSecondCurrency,
+  code,
+  existingCurrencies,
+  isCurrencyLocked,
+  onToggleCurrency,
+  selected,
+}: CurrencyOptionProps) {
+  const isExistingCurrency = existingCurrencies.includes(code);
+  const canToggle =
+    !isCurrencyLocked ||
+    (!isExistingCurrency && (selected || canAddSecondCurrency));
+
+  return (
+    <SelectableOption
+      accessibilityLabel={`${getCurrencyFlag(code)} ${getCurrencyName(code)} (${code})`}
+      disabled={!canToggle}
+      indicatorTestID={`money-account-currency-${code}-check`}
+      label={`${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`}
+      // `SelectableOption` atenúa la opción pero sigue siendo pulsable, así
+      // que la condición se comprueba aquí y no se delega en el componente.
+      onPress={() => {
+        if (canToggle) onToggleCurrency(code);
+      }}
+      role="checkbox"
+      selected={selected}
+    />
+  );
+}
+
 export function MoneyAccountDetailsStep({
   availableCurrencies,
   balanceInputs,
+  existingCurrencies,
   selectedCurrencies,
   hasAttemptedSubmit,
   isCurrencyLocked,
@@ -58,6 +100,10 @@ export function MoneyAccountDetailsStep({
 }: MoneyAccountDetailsStepProps) {
   const density = useLayoutDensity();
   const { colors } = useTheme();
+  const canAddSecondCurrency =
+    isCurrencyLocked &&
+    existingCurrencies.length === 1 &&
+    selectedCurrencies.length < 2;
 
   return (
     <View style={styles.step}>
@@ -108,7 +154,6 @@ export function MoneyAccountDetailsStep({
               label={definition.label}
               onPress={() => onSelectKind(definition.kind)}
               selected={kind === definition.kind}
-              style={styles.kindOption}
             />
           ))}
         </View>
@@ -120,7 +165,9 @@ export function MoneyAccountDetailsStep({
             </Text>
             {isCurrencyLocked ? (
               <Text style={styles.hint} tone="secondary" variant="footnote">
-                No se pueden cambiar: la cuenta ya tiene movimientos.
+                {existingCurrencies.length === 1
+                  ? 'La moneda original no se puede cambiar porque ya tiene movimientos. Puedes añadir una segunda moneda.'
+                  : 'No se pueden cambiar: la cuenta ya tiene movimientos.'}
               </Text>
             ) : (
               <Text style={styles.hint} tone="secondary" variant="footnote">
@@ -130,19 +177,13 @@ export function MoneyAccountDetailsStep({
             )}
             <View accessibilityRole="radiogroup" style={styles.list}>
               {availableCurrencies.map((code) => (
-                <SelectableOption
-                  accessibilityLabel={`${getCurrencyFlag(code)} ${getCurrencyName(code)} (${code})`}
-                  disabled={isCurrencyLocked}
-                  indicatorTestID={`money-account-currency-${code}-check`}
+                <CurrencyOption
+                  canAddSecondCurrency={canAddSecondCurrency}
+                  code={code}
+                  existingCurrencies={existingCurrencies}
+                  isCurrencyLocked={isCurrencyLocked}
                   key={code}
-                  label={`${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`}
-                  // `SelectableOption` atenúa la opción pero sigue siendo
-                  // pulsable, así que la condición se comprueba aquí y no se
-                  // delega en el componente.
-                  onPress={() => {
-                    if (!isCurrencyLocked) onToggleCurrency(code);
-                  }}
-                  role="checkbox"
+                  onToggleCurrency={onToggleCurrency}
                   selected={selectedCurrencies.includes(code)}
                 />
               ))}
@@ -174,6 +215,7 @@ export function MoneyAccountDetailsStep({
                 Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'
               }
               maxFontSizeMultiplier={maxFontScale.body}
+              editable={!isCurrencyLocked || !existingCurrencies.includes(code)}
               onChangeText={(value) => onChangeBalance(code, value)}
               placeholder="0"
               placeholderTextColor={colors.textMuted}

@@ -1169,6 +1169,7 @@ export function MainTabsNavigator() {
                         moneyAccountsController.openCreation
                       }
                       onCreateMovement={() => handleCreateAction('expense')}
+                      onImport={() => setImportVisible(true)}
                       onOpenCategoryDetail={(categoryId, currency) =>
                         setDetailRequest({
                           categoryId,

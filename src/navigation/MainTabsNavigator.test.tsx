@@ -426,7 +426,7 @@ describe('MainTabsNavigator', () => {
         screen.getByTestId('persistent-app-header', {
           includeHiddenElements: true,
         }).props.pointerEvents,
-      ).toBe('auto');
+      ).toBe('box-none');
       expect(
         StyleSheet.flatten(
           screen.getByTestId('activity-income-badge').props.style,
@@ -448,7 +448,7 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByRole('tab', { name: 'Mapa' }));
     expect(
       screen.getByTestId('persistent-app-header').props.pointerEvents,
-    ).toBe('auto');
+    ).toBe('box-none');
     expect(screen.queryAllByTestId('activity-summary')).toHaveLength(0);
   });
 

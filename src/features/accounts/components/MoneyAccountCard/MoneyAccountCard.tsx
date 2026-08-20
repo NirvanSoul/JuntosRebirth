@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { GradientCard } from '@/components/ui/GradientCard/GradientCard';
 import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import { getMoneyAccountKindLabel } from '@/features/accounts/constants/moneyAccountKindDefinitions';
@@ -8,136 +7,161 @@ import {
   getPrimaryBalance,
   type MoneyAccountSummary,
 } from '@/features/accounts/utils/moneyAccountSummary';
+import { calculatePeriodComparison } from '@/features/transactions/utils/periodComparison';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
-import {
-  categoryColors,
-  getCategoryContentContrast,
-} from '@/theme/categoryColors';
-import { createDiagonalGradient } from '@/theme/gradients';
+import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 /**
  * Proporción y anchura de la tarjeta. Nace de la relación de una tarjeta
  * física (85,6 × 53,98 mm) para que se lea como tal en el carrusel.
  */
 export const moneyAccountCardLayout = {
-  width: 232,
-  height: 146,
+  width: 232 * 1.08,
+  height: 146 * 1.05,
 } as const;
 
 type MoneyAccountCardProps = {
   account: MoneyAccountSummary;
+  bordered?: boolean;
   onPress?: () => void;
 };
 
-export function MoneyAccountCard({ account, onPress }: MoneyAccountCardProps) {
+export function MoneyAccountCard({
+  account,
+  bordered = false,
+  onPress,
+}: MoneyAccountCardProps) {
+  const { shadows } = useTheme();
+  const themedStyles = useThemedStyles((palette) =>
+    createThemedStyles(palette, shadows),
+  );
   const cardColor = categoryColors[account.colorToken];
-  const contentContrast = getCategoryContentContrast(account.colorToken);
   const primary = getPrimaryBalance(account);
   const balance = formatCurrency(
     primary.balanceMinor,
     primary.currency,
     'es-ES',
   );
-  // Las divisas nunca se suman: las secundarias se enseñan aparte, cada una
-  // con su propio saldo.
-  const secondaryBalances = account.balanceByCurrency.slice(1);
   const kindLabel = getMoneyAccountKindLabel(account.kind);
+  // Una cuenta puede manejar varias divisas, pero no se suman: la variación
+  // compara exclusivamente la moneda principal que encabeza la tarjeta.
+  const comparison = calculatePeriodComparison(
+    primary.balanceMinor,
+    primary.previousMonthBalanceMinor,
+  );
+  const currencies = account.balanceByCurrency
+    .map((balanceByCurrency) => balanceByCurrency.currency)
+    .join(' · ');
+  const comparisonLabel = comparison
+    ? `${comparison.direction === 'up' ? '+' : comparison.direction === 'down' ? '-' : ''}${Math.round(Math.abs(comparison.changePercent))}%`
+    : null;
+  const comparisonDescription = comparison
+    ? comparison.direction === 'up'
+      ? `subió ${Math.round(Math.abs(comparison.changePercent))}%`
+      : comparison.direction === 'down'
+        ? `bajó ${Math.round(Math.abs(comparison.changePercent))}%`
+        : 'sin cambios'
+    : null;
 
   return (
     <Pressable
-      accessibilityLabel={`${account.name}, ${kindLabel}, saldo ${balance}`}
+      accessibilityLabel={`${account.name}, ${kindLabel}, saldo ${balance}${comparisonDescription ? `, ${comparisonDescription} respecto al mes anterior` : ''}`}
       accessibilityRole={onPress ? 'button' : undefined}
       disabled={!onPress}
       onPress={onPress}
-      style={({ pressed }) => [styles.pressable, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        themedStyles.pressable,
+        bordered ? { borderColor: cardColor, borderWidth: 1 } : null,
+        pressed && styles.pressed,
+      ]}
       testID={`money-account-card-${account.id}`}
     >
-      <GradientCard
-        colors={createDiagonalGradient(cardColor)}
-        contentStyle={styles.content}
-        style={styles.card}
-      >
+      <View style={styles.content}>
         <View style={styles.topRow}>
           <MoneyAccountIcon
-            color={contentContrast.color}
+            color={cardColor}
             name={account.icon}
             size={iconSize.md}
           />
           <Text
             numberOfLines={1}
-            style={styles.currency}
-            tone={contentContrast.tone}
-            variant="caption"
-            weight="semibold"
+            style={[styles.currency, { color: cardColor }]}
+            testID={`money-account-card-${account.id}-currencies`}
+            variant="label"
+            weight="medium"
           >
-            {primary.currency}
+            {currencies}
           </Text>
         </View>
 
-        <View style={styles.bottomRow}>
+        <View style={styles.copy}>
           <Text
             numberOfLines={1}
-            tone={contentContrast.tone}
-            variant="caption"
+            testID={`money-account-card-${account.id}-title`}
+            variant="subheading"
+            weight="bold"
+          >
+            {account.name}
+          </Text>
+          <Text
+            numberOfLines={1}
+            tone="secondary"
+            variant="label"
             weight="light"
           >
             {kindLabel}
           </Text>
-          <Text
-            numberOfLines={1}
-            tone={contentContrast.tone}
-            variant="label"
-            weight="semibold"
-          >
-            {account.name}
-          </Text>
+        </View>
+        <View style={styles.bottomRow}>
           <Text
             adjustsFontSizeToFit
             minimumFontScale={0.7}
             numberOfLines={1}
             style={styles.balance}
             testID={`money-account-card-${account.id}-balance`}
-            tone={contentContrast.tone}
             variant="subheading"
+            weight="medium"
           >
             {balance}
           </Text>
-          {secondaryBalances.length > 0 ? (
-            <Text
-              numberOfLines={1}
-              testID={`money-account-card-${account.id}-secondary-balances`}
-              tone={contentContrast.tone}
-              variant="caption"
+          {comparisonLabel ? (
+            <View
+              accessibilityLabel={`Variación respecto al mes anterior: ${comparisonDescription}`}
+              style={[styles.comparisonBadge, { backgroundColor: cardColor }]}
+              testID={`money-account-card-${account.id}-comparison`}
             >
-              {secondaryBalances
-                .map((balanceByCurrency) =>
-                  formatCurrency(
-                    balanceByCurrency.balanceMinor,
-                    balanceByCurrency.currency,
-                    'es-ES',
-                  ),
-                )
-                .join('  ·  ')}
-            </Text>
+              <Text tone="onBrand" variant="label" weight="medium">
+                {comparisonLabel}
+              </Text>
+            </View>
           ) : null}
         </View>
-      </GradientCard>
+      </View>
     </Pressable>
   );
 }
 
+function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
+  return StyleSheet.create({
+    pressable: {
+      ...shadows.subtle,
+      width: moneyAccountCardLayout.width,
+      height: moneyAccountCardLayout.height,
+      borderRadius: radii.lg,
+      backgroundColor: colors.surface,
+      overflow: 'visible',
+    },
+  });
+}
+
 const styles = StyleSheet.create({
-  pressable: {
-    width: moneyAccountCardLayout.width,
-  },
   pressed: { opacity: 0.72 },
-  card: {
-    height: moneyAccountCardLayout.height,
-    borderRadius: radii.lg,
-  },
   content: {
     flex: 1,
     justifyContent: 'space-between',
@@ -149,6 +173,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   currency: { opacity: 0.88 },
-  bottomRow: { gap: spacing.xxs },
-  balance: { marginTop: spacing.xxs },
+  copy: { gap: spacing.none },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  balance: { flexShrink: 1 },
+  comparisonBadge: {
+    borderRadius: radii.round,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
 });

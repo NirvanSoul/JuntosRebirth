@@ -28,7 +28,7 @@ type TransactionPeriodSelectorProps = {
   onSelectPeriod: (period: TransactionPeriod) => void;
   period: TransactionPeriod | null;
   selectedDate: Date;
-  /** Ubica las opciones en una sola fila, reduciendo su tamaño para caber sin scroll. */
+  /** Ubica las opciones en una única fila horizontal desplazable. */
   singleRow?: boolean;
   testID?: string;
 };
@@ -77,7 +77,7 @@ export function TransactionPeriodSelector({
           ]}
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={{ width, marginLeft: -gutter, overflow: 'visible' }}
+          style={[styles.optionsScroll, { width, marginLeft: -gutter }]}
           testID={testID ? `${testID}-options-scroll` : undefined}
         >
           {transactionPeriodOptions.map((option) => {
@@ -94,10 +94,6 @@ export function TransactionPeriodSelector({
                 label={option.label}
                 onPress={() => onSelectPeriod(option.value)}
                 selected={selected}
-                style={[
-                  styles.periodSingleRow,
-                  option.value === 'year' && styles.periodSingleRowCompact,
-                ]}
                 testID={testID ? `${testID}-${option.value}` : undefined}
               />
             );
@@ -112,7 +108,7 @@ export function TransactionPeriodSelector({
           ]}
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={{ width, marginLeft: -gutter }}
+          style={[styles.optionsScroll, { width, marginLeft: -gutter }]}
           testID={testID ? `${testID}-options-scroll` : undefined}
         >
           {includeAllOption ? (
@@ -122,7 +118,6 @@ export function TransactionPeriodSelector({
               label="Todos"
               onPress={() => onSelectAll?.()}
               selected={period === null && !customSelected}
-              style={styles.period}
               testID={testID ? `${testID}-all` : undefined}
             />
           ) : null}
@@ -139,10 +134,6 @@ export function TransactionPeriodSelector({
                 label={option.label}
                 onPress={() => onSelectPeriod(option.value)}
                 selected={selected}
-                style={[
-                  styles.period,
-                  option.value === 'year' && styles.periodCompact,
-                ]}
                 testID={testID ? `${testID}-${option.value}` : undefined}
               />
             );
@@ -156,7 +147,6 @@ export function TransactionPeriodSelector({
               label="Personalizada"
               onPress={() => onSelectCustom?.()}
               selected={customSelected}
-              style={styles.period}
               testID={testID ? `${testID}-custom` : undefined}
             />
           ) : null}
@@ -173,12 +163,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     flexWrap: 'wrap',
     gap: spacing.xs,
-  },
-  period: {
-    minWidth: 168,
-  },
-  periodCompact: {
-    minWidth: 128,
+    overflow: 'visible',
   },
   periodsSingleRow: {
     flexDirection: 'row',
@@ -187,10 +172,5 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     paddingVertical: spacing.sm,
   },
-  periodSingleRow: {
-    minWidth: 108,
-  },
-  periodSingleRowCompact: {
-    minWidth: 84,
-  },
+  optionsScroll: { overflow: 'visible' },
 });
