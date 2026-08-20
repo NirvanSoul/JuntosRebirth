@@ -25,27 +25,33 @@ select ok(
 );
 select ok(
   (
-    select is_nullable = 'YES'
-      from information_schema.columns
-     where table_schema = 'public' and table_name = 'transactions' and column_name = 'created_by'
+    select not attnotnull
+      from pg_attribute
+      join pg_class on pg_class.oid = pg_attribute.attrelid
+      join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+     where nspname = 'public' and relname = 'transactions' and attname = 'created_by'
   ),
   'a transaction survives its author leaving: created_by admits null'
 );
 select ok(
   (
-    select is_nullable = 'YES'
-      from information_schema.columns
-     where table_schema = 'public' and table_name = 'categories' and column_name = 'created_by'
+    select not attnotnull
+      from pg_attribute
+      join pg_class on pg_class.oid = pg_attribute.attrelid
+      join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+     where nspname = 'public' and relname = 'categories' and attname = 'created_by'
   ),
   'a category survives its author leaving: created_by admits null'
 );
 select ok(
   (
-    select is_nullable = 'YES'
-      from information_schema.columns
-     where table_schema = 'public'
-       and table_name = 'recurring_transaction_series'
-       and column_name = 'created_by'
+    select not attnotnull
+      from pg_attribute
+      join pg_class on pg_class.oid = pg_attribute.attrelid
+      join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+     where nspname = 'public'
+       and relname = 'recurring_transaction_series'
+       and attname = 'created_by'
   ),
   'a recurring series survives its author leaving: created_by admits null'
 );
@@ -95,21 +101,25 @@ select ok(
 -- compartido (migración 21).
 select ok(
   (
-    select is_nullable = 'YES'
-      from information_schema.columns
-     where table_schema = 'public'
-       and table_name = 'transaction_notification_rules'
-       and column_name = 'created_by'
+    select not attnotnull
+      from pg_attribute
+      join pg_class on pg_class.oid = pg_attribute.attrelid
+      join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+     where nspname = 'public'
+       and relname = 'transaction_notification_rules'
+       and attname = 'created_by'
   ),
   'a notification rule survives its author leaving: created_by admits null'
 );
 select ok(
   (
-    select is_nullable = 'YES'
-      from information_schema.columns
-     where table_schema = 'public'
-       and table_name = 'category_budgets'
-       and column_name = 'created_by'
+    select not attnotnull
+      from pg_attribute
+      join pg_class on pg_class.oid = pg_attribute.attrelid
+      join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+     where nspname = 'public'
+       and relname = 'category_budgets'
+       and attname = 'created_by'
   ),
   'a category budget survives its author leaving: created_by admits null'
 );

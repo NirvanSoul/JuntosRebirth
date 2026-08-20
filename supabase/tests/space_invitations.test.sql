@@ -1,5 +1,5 @@
 begin;
-select plan(32);
+select plan(41);
 
 select has_table('public', 'space_invitations', 'space_invitations exists');
 select ok(
@@ -100,9 +100,11 @@ select ok(
 select has_column('public', 'spaces', 'activated_at', 'spaces tracks when it became real');
 select ok(
   (
-    select is_nullable = 'YES'
-      from information_schema.columns
-     where table_schema = 'public' and table_name = 'spaces' and column_name = 'activated_at'
+    select not attnotnull
+      from pg_attribute
+      join pg_class on pg_class.oid = pg_attribute.attrelid
+      join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+     where nspname = 'public' and relname = 'spaces' and attname = 'activated_at'
   ),
   'activated_at admits null: that is exactly what marks a couple space still awaiting acceptance'
 );
@@ -117,6 +119,36 @@ select ok(
 select ok(
   (select prosrc from pg_proc where oid = 'public.accept_current_user_space_invitation(uuid)'::regprocedure) ~ 'activated_at = coalesce\(activated_at, now\(\)\)',
   'accepting the in-app invitation is what activates the couple space'
+);
+
+select has_function('public', 'accept_current_user_space_invitation', array['uuid'], 'accept_current_user_space_invitation exists');
+select ok(
+  has_function_privilege('authenticated', 'public.accept_current_user_space_invitation(uuid)', 'EXECUTE'),
+  'authenticated users can execute accept_current_user_space_invitation'
+);
+select ok(
+  not has_function_privilege('anon', 'public.accept_current_user_space_invitation(uuid)', 'EXECUTE'),
+  'anonymous users cannot execute accept_current_user_space_invitation'
+);
+
+select has_function('public', 'get_current_user_pending_space_invitation', 'get_current_user_pending_space_invitation exists');
+select ok(
+  has_function_privilege('authenticated', 'public.get_current_user_pending_space_invitation()', 'EXECUTE'),
+  'authenticated users can execute get_current_user_pending_space_invitation'
+);
+select ok(
+  not has_function_privilege('anon', 'public.get_current_user_pending_space_invitation()', 'EXECUTE'),
+  'anonymous users cannot execute get_current_user_pending_space_invitation'
+);
+
+select has_function('public', 'is_active_space_member', array['uuid'], 'is_active_space_member exists');
+select ok(
+  has_function_privilege('authenticated', 'public.is_active_space_member(uuid)', 'EXECUTE'),
+  'authenticated users can execute is_active_space_member'
+);
+select ok(
+  not has_function_privilege('anon', 'public.is_active_space_member(uuid)', 'EXECUTE'),
+  'anonymous users cannot execute is_active_space_member'
 );
 
 select * from finish();

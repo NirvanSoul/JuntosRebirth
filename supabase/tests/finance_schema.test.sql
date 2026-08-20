@@ -1,5 +1,5 @@
 begin;
-select plan(12);
+select plan(14);
 
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'spaces', 'spaces exists');
@@ -38,6 +38,12 @@ select ok(
     'EXECUTE'
   ),
   'anonymous users cannot migrate guest data'
+);
+
+select has_function('public', 'handle_new_user', 'handle_new_user exists');
+select ok(
+  not has_function_privilege('anon', 'public.handle_new_user()', 'EXECUTE'),
+  'anonymous users cannot execute handle_new_user'
 );
 
 select * from finish();

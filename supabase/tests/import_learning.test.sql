@@ -79,9 +79,12 @@ select has_function(
   'import batch sync RPC exists'
 );
 select ok(exists (
-  select 1 from information_schema.columns
-  where table_schema = 'public' and table_name = 'import_items'
-    and column_name = 'is_selected'
+  select 1
+    from pg_attribute
+    join pg_class on pg_class.oid = pg_attribute.attrelid
+    join pg_namespace on pg_namespace.oid = pg_class.relnamespace
+   where nspname = 'public' and relname = 'import_items'
+     and attname = 'is_selected'
 ), 'items preserve their local review selection');
 select ok(
   has_function_privilege(

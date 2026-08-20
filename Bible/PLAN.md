@@ -293,7 +293,9 @@ a extracción cuando una tarea de producto lo toque.
   **Decisión puntual del responsable (2026-08-19):** Por indisponibilidad temporal de Claude, esta tarea tendrá excepcionalmente un único verificador (GPT). No modifica la regla general de `WORKFLOW.md`. La tarea se clasifica como grande al tocar SQL.
   - Se autorizó e impulsó a staging únicamente `24_revoke_public_execute.sql` (código de salida `0`).
   - La ejecución local de `npm run validate` fue exitosa (código `0`).
-  - **Fallo remoto detectado:** `npx supabase test db --linked` fracasó (código `1`) indicando divergencia de esquema remota en staging previa a la migración 24.
+  - **Fallos remotos detectados:** `npx supabase test db --linked` fracasó (código `1`). La inspección independiente separó los fallos en dos causas:
+    - **Falsos negativos (7):** Pruebas estructurales de columnas `is_nullable` usando `information_schema.columns`, que oculta las columnas al rol limitado del runner remoto. (Afecta a `created_by` en 5 tablas, `import_items.is_selected` y `spaces.activated_at`).
+    - **Defectos reales de ACL (3):** Excesos de privilegios. `anon` ejecuta `ensure_personal_space` y `sync_couple_space_data`; y `authenticated` conserva excesivos permisos (DELETE, etc.) sobre `legal_acceptances`.
   - **Salida literal de las pruebas fallidas:**
     ```text
     /Projects/JuntosApp/supabase/tests/account_deletion.test.sql .......... 
