@@ -1,11 +1,21 @@
 # Estado de la rama `limpieza/fase-3`
 
-> Instantánea del 2026-08-19. Es tu app reorganizada, no reescrita: no se ha
+> Instantánea del 2026-08-20. Es tu app reorganizada, no reescrita: no se ha
 > quitado ninguna funcionalidad. Este archivo solo orienta; la documentación
 > viva está en `Bible/`.
 >
 > Sustituye a `limpieza/fases-1-y-1b`, que quedó con historia divergente. Esta
 > rama parte del mismo punto y continúa el trabajo.
+
+## Aviso antes de instalar esta rama
+
+**No instales esta rama en un teléfono con datos reales.** Está a mitad de un
+cambio en la escala monetaria (ADR-080): el formateo ya usa la unidad menor real
+de cada divisa, pero la entrada por teclado todavía asume dos decimales. Con
+euros, dólares o bolívares el comportamiento es el de siempre; con yenes, pesos
+chilenos o guaraníes los importes se guardarían con un factor equivocado. El
+cambio se despliega completo o no se despliega: es una regla escrita, no un
+descuido.
 
 ## Por dónde empezar
 
@@ -47,19 +57,30 @@ contraseña nueva.
 
 ## Estado del trabajo
 
-**Cerrado:** limpieza de imports y helpers duplicados, optimización de imágenes
+**Cerrado.** Limpieza de imports y helpers duplicados, optimización de imágenes
 (8,70 → 7,04 MiB), auditoría de supresiones de lint, spike de sincronización
 end-to-end, y todo el modelo y consumo de monedas, verificado en dos teléfonos.
+Cerrado también el frente SQL: las migraciones 24 y 25 retiran la ejecución
+anónima de seis funciones —solo la vista previa de invitación la conserva a
+propósito— y dejan `legal_acceptances` con permiso de lectura e inserción y
+nada más. Las doce suites pgTAP pasan contra staging: 174 aserciones.
 
-**En curso:** un lote de seis tareas pequeñas. Dos están implementadas y
-esperando revisión y prueba en dispositivo —ver la contraseña al escribirla, y
-cerrar la espera muerta al registrarse con un correo ya usado—. Una está
-bloqueada esperando autorización para tocar la base de datos.
+**En curso.** La escala monetaria real por divisa (ADR-080), en tres entregas.
+La primera está cerrada y verificada: catálogo con la unidad menor de cada
+moneda, formateo e importación. Quedan la entrada por teclado con su calculadora
+y la protección de la moneda del espacio en PostgreSQL.
 
-**Pendiente y decidido pero sin empezar:** un indicador de novedades en el
-selector de espacio, los decimales de monedas sin céntimos (JPY, CLP, PYG), y la
-internacionalización a español e inglés, que debe completarse antes de publicar
-en tiendas.
+**Pendiente, ya decidido.** La Fase 4 está abierta en seis frentes: autoría
+visible de cada movimiento, perfiles y avatares de miembros, cuentas de dinero,
+consolidación visual, internacionalización a español e inglés, e inicio de
+sesión con Google y Apple. Las tres primeras son capacidades que tú propusiste y
+que entran como alcance obligatorio del MVP, implementadas desde los contratos
+de esta rama.
+
+**Pendiente de decisión.** El flujo de aceptación legal: la tabla existe, tiene
+políticas y pruebas, pero hoy la app no registra ningún consentimiento. Y la
+librería `xlsx`, que se usa en tiempo de ejecución para importar y arrastra
+vulnerabilidades sin versión corregida.
 
 ## Backend
 
@@ -69,7 +90,8 @@ desde cero; se comprobó creando uno limpio y aplicándolas en orden. La migraci
 existentes.
 
 El número 09 no existe: es un hueco heredado, documentado a propósito y no
-rellenado, porque renumerar migraciones ya aplicadas es destructivo.
+rellenado, porque renumerar migraciones ya aplicadas es destructivo. Las
+migraciones nuevas de esta rama siguen desde el 26.
 
 ## Cómo se trabaja aquí
 
