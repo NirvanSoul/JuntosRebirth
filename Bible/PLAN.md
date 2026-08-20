@@ -291,7 +291,44 @@ a extracción cuando una tarea de producto lo toque.
 
 - [ ] **Resolución de la deuda pgTAP de Fase 2a**.
   **Decisión puntual del responsable (2026-08-19):** Por indisponibilidad temporal de Claude, esta tarea tendrá excepcionalmente un único verificador (GPT). No modifica la regla general de `WORKFLOW.md`. La tarea se clasifica como grande al tocar SQL.
-
+  - Se autorizó e impulsó a staging únicamente `24_revoke_public_execute.sql` (código de salida `0`).
+  - La ejecución local de `npm run validate` fue exitosa (código `0`).
+  - **Fallo remoto detectado:** `npx supabase test db --linked` fracasó (código `1`) indicando divergencia de esquema remota en staging previa a la migración 24.
+  - **Salida literal de las pruebas fallidas:**
+    ```text
+    /Projects/JuntosApp/supabase/tests/account_deletion.test.sql .......... 
+    # Failed test 4: "a transaction survives its author leaving: created_by admits null"
+    #     (test result was NULL)
+    # Failed test 5: "a category survives its author leaving: created_by admits null"
+    #     (test result was NULL)
+    # Failed test 6: "a recurring series survives its author leaving: created_by admits null"
+    #     (test result was NULL)
+    # Failed test 13: "a notification rule survives its author leaving: created_by admits null"
+    #     (test result was NULL)
+    # Failed test 14: "a category budget survives its author leaving: created_by admits null"
+    #     (test result was NULL)
+    # Looks like you failed 5 tests of 17
+    Failed 5/17 subtests 
+    /Projects/JuntosApp/supabase/tests/couple_space_sync.test.sql ......... 
+    # Failed test 3: "an anonymous caller cannot invoke the couple-space sync RPC"
+    # Looks like you failed 1 test of 7
+    Failed 1/7 subtests 
+    /Projects/JuntosApp/supabase/tests/import_learning.test.sql ........... 
+    # Failed test 17: "items preserve their local review selection"
+    # Looks like you failed 1 test of 26
+    Failed 1/26 subtests 
+    /Projects/JuntosApp/supabase/tests/legal_acceptances.test.sql ......... 
+    # Failed test 7: "not even the owner can delete acceptance evidence directly"
+    # Looks like you failed 1 test of 7
+    Failed 1/7 subtests 
+    /Projects/JuntosApp/supabase/tests/space_invitations.test.sql ......... 
+    # Failed test 26: "anonymous users cannot ensure a personal space"
+    # Failed test 29: "activated_at admits null: that is exactly what marks a couple space still awaiting acceptance"
+    #     (test result was NULL)
+    # Looks like you failed 2 tests of 32
+    Failed 2/32 subtests
+    ```
+    - Siguiendo las instrucciones de seguridad, el agente detuvo la ejecución y no aplicó reset, repair ni alteraciones manuales. Evidencia entregada al responsable.
 ---
 
 ## 6. Verificaciones manuales registradas
