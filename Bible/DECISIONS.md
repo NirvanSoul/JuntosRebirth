@@ -5185,6 +5185,80 @@ ambos paquetes se comprobó que la premisa era incorrecta.
 
 ---
 
+# ADR-080 — Auditoría y decisión sobre escala monetaria
+
+**Estado:** Aceptada
+
+## Contexto
+
+Actualmente, el sistema asume de forma generalizada una escala 100 (dos decimales) para cualquier divisa en todo el flujo de datos: entrada, formato, calculadora, importación, almacenamiento (local y remoto) y sincronización.
+Monedas como JPY, CLP o PYG tienen oficialmente cero decimales, por lo que su unidad base es igual a su unidad menor. En el modelo actual, un ingreso de "1000 JPY" se codifica con `amount_minor` = 100.000, asumiendo céntimos inexistentes.
+
+Se amplió la auditoría sobre la base de datos remota de staging (`blaanqqxtdezsscdkkvz`). La consulta incluyó: `transactions`, `recurring_transaction_series`, `category_budgets`, `import_items`, `spaces.currency` y `profiles.default_currency`, así como presupuestos heredados de categorías en espacios `JPY`, `CLP` o `PYG`. 
+**Resultado:** `0` filas afectadas.
+Los datos en dispositivos de prueba se declaran descartables, permitiendo su limpieza local al instalar el cambio (política alpha).
+
+## Opciones consideradas
+
+- **Opción A (Escala 100 universal):** Mantener una escala x100 y restringir únicamente la entrada/presentación. Almacena datos distorsionados semánticamente (consolidando deuda técnica), por lo que fue descartada.
+- **Opción B (Escala real por moneda):** Alinear el tipo `amountMinor` para que el entero represente de forma fidedigna la verdadera unidad menor oficial.
+
+## Decisión
+
+Adoptar la **Opción B (Escala real por moneda)**. 
+
+Se implementará una API monetaria segura por construcción que incluye:
+- Tipos de retorno estrictos: `type MinorUnitDigits = 0 | 2;` y `type MinorUnitFactor = 1 | 100;`.
+- Helpers canónicos (`getCurrencyMinorUnitDigits(currency): MinorUnitDigits` y `getCurrencyMinorUnitFactor(currency): MinorUnitFactor`).
+- Las funciones del dominio reciben y exigen obligatoriamente el `CurrencyCode`. No se pasa `decimals: number`.
+
+Adicionalmente, se fijan las siguientes reglas:
+- **Inmutabilidad de la Moneda del Espacio:** La moneda se fija únicamente al crear el espacio o durante su adopción/migración inicial. Después de esta inicialización queda **inmutable**, protegida a nivel de PostgreSQL.
+- **Semántica de cambio de moneda en borrador:** Cambiar a JPY/CLP/PYG con un importe que tenga fracciones **bloquea el cambio**, conserva la moneda anterior y emite un error indicando que la moneda no admite decimales. No se trunca ni redondea silenciosamente. El usuario debe ajustar el importe antes de cambiar. Esto aplica también para operaciones pendientes en la calculadora.
+- **Importación:** Se resuelve primero la moneda; si arroja fracciones incompatibles, se emite el issue `invalid_fraction_for_currency`, el `amountMinor` se establece en `null` y se bloquea la importación de esa fila hasta revisión. No se añade además `unparseable_amount` si solo duplicaría la causa.
+
+## Consecuencias
+
+- Se erradica la deuda técnica de céntimos inexistentes.
+- Las operaciones asumen el factor dinámico de la divisa elegida.
+- La moneda del espacio se consolida como pilar inmutable, sobre la cual se calculan los presupuestos.
+
+## Política de Compatibilidad y Rollback (Alpha)
+
+Un `git revert` no es un mecanismo de rollback seguro (cruza semánticas de enteros).
+- No convivirán clientes viejos y nuevos de manera simultánea en producción.
+- Ambos dispositivos de prueba se actualizarán juntos.
+- Se limpiarán íntegramente sus datos locales descartables.
+- Nunca se reabrirá una build vieja contra bases de datos escritas con la semántica nueva.
+- El esquema continúa usando INTEGER, pero su interpretación depende de `currency`.
+
+## Pruebas Requeridas
+
+Evidencia diferencial (rojo/verde) obligatoria:
+- Catálogo completo y metadatos de unidad menor (`MinorUnitDigits`).
+- Entrada, pegado (paste) y formato con monedas de 0 y 2 decimales.
+- Rechazo explícito de fracciones en monedas sin decimales a nivel de dominio.
+- Calculadora correcta en factor 1 y factor 100.
+- Creación y edición fluida de movimientos.
+- Cambio de moneda al vuelo dentro del modal (validación explícita del borrador y conservación de la moneda anterior).
+- Vueltas de factor 1 a factor 100 en modal comprobadas.
+- Presupuestos vinculados y calculados con la moneda inmutable del espacio.
+- Series recurrentes procesadas con la escala correcta.
+- Importación con moneda válida, vacía, inválida y con fracciones prohibidas.
+- Sincronización preservando exactamente el entero semántico.
+- Agregados multidivisa operando de forma coherente.
+- pgTAP: creación/adopción inicial con la moneda correcta; inmutabilidad de `spaces.currency` (owner no puede cambiarla); preservando otros updates legítimos de la fila del espacio.
+
+## División en entregas
+
+1. **Refactor de Dominio e Importación:** Consolidación de la API monetaria, calculadora, catálogo y la normalización de importación (con error `invalid_fraction_for_currency` que deja amountMinor en null).
+2. **Interfaces y Control del Borrador (UI):** Adaptación del componente `AmountInput`, y la validación explícita del borrador y conservación de la moneda anterior en el modal.
+3. **Frontera Remota y Presupuestos (SQL):** Protección de `spaces.currency` (inmutabilidad PostgreSQL, pgTAP) y revisión de comportamiento presupuestario.
+
+*Nota:* Ninguna entrega parcial se desplegará en staging ni se probará en los dispositivos. El rollout y la limpieza local ocurrirán únicamente tras aprobar las tres entregas.
+
+---
+
 ## 5. Principio final
 
 > Una decisión no documentada se convierte con el tiempo en una suposición.

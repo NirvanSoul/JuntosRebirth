@@ -71,7 +71,7 @@ MVP **no aprueba ni integra su código externo** (§9).
 La Entrega 2 de monedas ya está cerrada. Antes de comenzar estas entregas
 funcionales deben resolverse sus otros prerrequisitos:
 
-- Auditoría y decisión sobre escala monetaria y decimales (§8.4.9) antes de almacenar nuevos
+- Resolución de la escala monetaria y decimales (ADR-080) antes de almacenar nuevos
   saldos iniciales de cuentas.
 - Resolver explícitamente la contradicción de `category_budgets` y decidir, con
   inventario real, si hace falta reparar el backfill histórico que asumió EUR.
