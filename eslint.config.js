@@ -30,9 +30,12 @@ const frozenLineDebt = {
   // `localDatabase.ts` salió de esta lista el 2026-08-17: al extraer el esquema
   // fundacional y la escalera de migraciones bajó de 536 a 62 líneas y ya
   // cumple el umbral general de 400. Sus dos módulos hijos también.
+  // `CategoryDonutChart.tsx` salió de esta lista el 2026-08-21: al extraer el
+  // donut compartido a `components/ui/Charts/DonutBreakdownChart.tsx` bajó de
+  // 325 a 73 líneas y ya cumple el umbral general de 400. El componente
+  // extraído también.
   'src/features/activity/components/TransactionFiltersModal.tsx': 536,
   'src/features/categories/components/CategoryPickerModal/CategoryPickerModal.tsx': 485,
-  'src/features/activity/components/CategoryDonutChart.tsx': 462,
   'src/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal.tsx': 441,
   'src/features/map/components/WeeklyMovementCalendar.tsx': 439,
   'src/features/spaces/components/SpaceSideMenu.tsx': 439,

@@ -3,6 +3,7 @@ import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { toLocalDateKey } from '@/lib/date/localDate';
+import type { CategoryColorToken } from '@/theme/categoryColors';
 
 export type MoneyAccountCurrencyBalance = {
   currency: CurrencyCode;
@@ -106,4 +107,59 @@ export function getPrimaryBalance(
   }
 
   return primary;
+}
+
+export type MoneyAccountTotals = {
+  id: string;
+  name: string;
+  colorToken: CategoryColorToken;
+  incomeMinor: number;
+  expenseMinor: number;
+};
+
+/**
+ * Ingresos y gastos de cada cuenta en una sola moneda, para el conjunto de
+ * movimientos que se le entregue —normalmente los de un mes—. No devuelve un
+ * saldo: responde a qué cuenta entra más dinero y de cuál sale más.
+ *
+ * Los movimientos sin cuenta no se reparten en ninguna: son válidos y no
+ * afectan a ningún saldo (`transactions/types.ts`), así que tampoco pintan
+ * porción.
+ */
+export function summarizeMoneyAccountTotals(
+  accounts: readonly MoneyAccount[],
+  transactions: readonly SessionTransaction[],
+  currency: CurrencyCode,
+): MoneyAccountTotals[] {
+  const totals = new Map<string, MoneyAccountTotals>(
+    accounts.map((account) => [
+      account.id,
+      {
+        id: account.id,
+        name: account.name,
+        colorToken: account.colorToken,
+        incomeMinor: 0,
+        expenseMinor: 0,
+      },
+    ]),
+  );
+
+  transactions.forEach((transaction) => {
+    if (transaction.currency !== currency || !transaction.moneyAccountId) {
+      return;
+    }
+
+    const current = totals.get(transaction.moneyAccountId);
+    if (!current) {
+      return;
+    }
+
+    if (transaction.type === 'income') {
+      current.incomeMinor += transaction.amountMinor;
+    } else {
+      current.expenseMinor += transaction.amountMinor;
+    }
+  });
+
+  return Array.from(totals.values());
 }

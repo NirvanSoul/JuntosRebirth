@@ -5398,6 +5398,74 @@ sobre el número de cuentas.
 
 ---
 
+# ADR-081 — Un solo donut para categorías y cuentas
+
+**Estado:** Aceptada
+
+## Contexto
+
+Actividad necesitaba en `Cuentas` el mismo reparto que ya ofrecía en
+`Categorías`: qué cuenta genera más ingresos y de cuál salen más gastos, con
+los mismos badges de leyenda y la misma navegación por meses.
+
+`CategoryDonutChart` no era un componente de gráfica: era una gráfica más su
+adaptador de datos de categoría, ambos en el mismo archivo de 325 líneas
+(congelado en `frozenLineDebt` a 462).
+
+## Opciones consideradas
+
+1. **Duplicar el componente** cambiando el origen de los datos y los textos. Es
+   exactamente lo que prohíbe `PROJECT_RULES.md` §4.1, y dejaría dos copias de
+   la geometría, las animaciones y la alternativa textual accesible.
+2. **Parametrizar `CategoryDonutChart`** con un modo «cuenta». El archivo
+   congelado crecería y seguiría viviendo en `features/activity` mientras sirve
+   a dos dominios.
+3. **Extraer la gráfica** a `components/ui/Charts/DonutBreakdownChart.tsx` y
+   dejar dos adaptadores finos encima.
+
+## Decisión
+
+La tercera. `DonutBreakdownChart` recibe porciones ya calculadas
+(`{id, label, color, valueMinor}`) y no sabe de dónde salen; descarta los ceros,
+ordena de mayor a menor y reparte. Los dos adaptadores —`CategoryDonutChart` y
+`AccountDonutChart`, ambos en `features/activity/components`— solo traducen su
+dominio a porciones.
+
+- La gráfica es **controlada**: el mes y el modo viven en cada adaptador y
+  llegan como `monthLabel`, `isCurrentMonth` y `mode`. Así `components/ui` no
+  importa nada de `features/`, y cada adaptador conserva su `useMemo` sobre el
+  mes elegido en lugar de recalcular en cada render de Actividad.
+- `idPrefix` prefija los testID (`category-donut-chart`, `account-donut-chart`):
+  las pruebas existentes de Actividad siguieron pasando sin tocarlas, que es la
+  evidencia de que la extracción no cambió comportamiento.
+- `summarizeMoneyAccountTotals` reparte por cuenta **una sola moneda**, la misma
+  que el selector de movimientos: nunca suma divisas (ADR-060, ADR-080). Un
+  movimiento sin cuenta es válido y no afecta a ningún saldo, así que tampoco
+  pinta porción.
+- No hay desempate de color entre cuentas: dos cuentas del mismo tipo comparten
+  `colorToken` por defecto y por tanto color de arco. El nombre en el badge las
+  distingue; inventar tonos derivados añadiría código para un problema que el
+  usuario resuelve cambiando el color de la cuenta.
+
+## Consecuencias positivas
+
+- `CategoryDonutChart` baja de 325 a 73 líneas no vacías y sale de
+  `frozenLineDebt`. `DonutBreakdownChart` queda en 321, bajo el umbral general.
+- La tercera gráfica de reparto que haga falta ya no cuesta una copia.
+
+## Consecuencias negativas
+
+- Los dos adaptadores repiten el par de `useState` del mes y el modo. Es menos
+  código que un hook compartido y mantiene visible dónde vive el estado.
+
+## Validación
+
+`src/features/activity/components/AccountDonutChart.test.tsx` cubre el reparto
+por cuenta con dos divisas y un movimiento sin cuenta, el cambio a ingresos, la
+apertura del detalle desde un badge y el retroceso de mes.
+
+---
+
 ## 5. Principio final
 
 > Una decisión no documentada se convierte con el tiempo en una suposición.

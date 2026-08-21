@@ -4,52 +4,56 @@ import {
   DonutBreakdownChart,
   type DonutBreakdownMode,
 } from '@/components/ui/Charts/DonutBreakdownChart';
-import type { Category } from '@/features/categories/types';
+import type { MoneyAccount } from '@/features/accounts/types';
+import { summarizeMoneyAccountTotals } from '@/features/accounts/utils/moneyAccountSummary';
 import {
   formatMonthKey,
   getCurrentMonthKey,
   listTransactionsByMonth,
   shiftMonthKey,
-  summarizeCategories,
 } from '@/features/categories/utils/categorySummary';
 import type { SessionTransaction } from '@/features/transactions/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { categoryColors } from '@/theme/categoryColors';
 
-type CategoryDonutChartProps = {
-  categories: readonly Category[];
+type AccountDonutChartProps = {
+  accounts: readonly MoneyAccount[];
   currency: CurrencyCode;
-  onOpenCategoryDetail?: (categoryId: string) => void;
+  onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
   resetKey?: number;
   transactions: readonly SessionTransaction[];
 };
 
-/** Reparto por categoría del mes elegido, sobre el donut compartido. */
-export function CategoryDonutChart({
-  categories,
+/**
+ * Reparto por cuenta del mes elegido, sobre el mismo donut que categorías: qué
+ * cuenta genera más ingresos y de cuál salen más gastos. Nunca mezcla divisas,
+ * porque solo reparte los importes de la moneda recibida.
+ */
+export function AccountDonutChart({
+  accounts,
   currency,
-  onOpenCategoryDetail,
+  onOpenMoneyAccountDetail,
   resetKey,
   transactions,
-}: CategoryDonutChartProps) {
+}: AccountDonutChartProps) {
   const [mode, setMode] = useState<DonutBreakdownMode>('expense');
   const currentMonthKey = getCurrentMonthKey();
   const [monthKey, setMonthKey] = useState(currentMonthKey);
   const slices = useMemo(
     () =>
-      summarizeCategories(
-        categories,
+      summarizeMoneyAccountTotals(
+        accounts,
         listTransactionsByMonth(transactions, monthKey),
         currency,
-      ).map((category) => ({
-        color: categoryColors[category.colorToken],
-        id: category.id,
-        label: category.name,
+      ).map((account) => ({
+        color: categoryColors[account.colorToken],
+        id: account.id,
+        label: account.name,
         valueMinor:
-          mode === 'expense' ? category.expenseMinor : category.incomeMinor,
+          mode === 'expense' ? account.expenseMinor : account.incomeMinor,
       })),
-    [categories, currency, mode, monthKey, transactions],
+    [accounts, currency, mode, monthKey, transactions],
   );
 
   return (
@@ -57,10 +61,10 @@ export function CategoryDonutChart({
       currency={currency}
       emptyMessage={`Para ver ${
         mode === 'expense' ? 'gastos' : 'ingresos'
-      } por categoría, registra un ${
+      } por cuenta, registra un ${
         mode === 'expense' ? 'gasto' : 'ingreso'
-      } y asócialo a una categoría.`}
-      idPrefix="category"
+      } y asócialo a una cuenta.`}
+      idPrefix="account"
       isCurrentMonth={monthKey === currentMonthKey}
       mode={mode}
       monthLabel={formatMonthKey(monthKey)}
@@ -68,9 +72,9 @@ export function CategoryDonutChart({
       onMonthChange={(offset) =>
         setMonthKey((current) => shiftMonthKey(current, offset))
       }
-      onSlicePress={onOpenCategoryDetail}
+      onSlicePress={onOpenMoneyAccountDetail}
       resetKey={resetKey}
-      slicePressHint="Abre el detalle de la categoría"
+      slicePressHint="Abre el detalle de la cuenta"
       slices={slices}
     />
   );

@@ -428,10 +428,13 @@ export function ActivityScreen({
         >
           <ActivityAccountsSection
             accounts={moneyAccountSummaries}
+            currency={effectiveCurrency}
             expanded={areAccountsExpanded}
             onCreateMoneyAccount={onCreateMoneyAccount}
             onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
             onToggle={() => setAccountsExpanded((expanded) => !expanded)}
+            resetKey={focusResetKey}
+            transactions={currencyTransactionsThroughCurrentMonth}
           />
         </Animated.View>
 

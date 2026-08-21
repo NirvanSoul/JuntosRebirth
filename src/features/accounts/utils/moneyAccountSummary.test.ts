@@ -1,5 +1,8 @@
 import type { MoneyAccount } from '@/features/accounts/types';
-import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
+import {
+  summarizeMoneyAccounts,
+  summarizeMoneyAccountTotals,
+} from '@/features/accounts/utils/moneyAccountSummary';
 import type { SessionTransaction } from '@/features/transactions/types';
 
 const referenceDate = new Date(2026, 4, 15, 12);
@@ -161,5 +164,75 @@ describe('summarizeMoneyAccounts', () => {
       previousMonthBalanceMinor: 110000,
       balanceMinor: 107500,
     });
+  });
+});
+
+describe('summarizeMoneyAccountTotals', () => {
+  const cash: MoneyAccount = {
+    ...account,
+    id: 'account-2',
+    name: 'Efectivo',
+    kind: 'cash',
+    icon: 'money',
+    colorToken: 'emerald',
+  };
+
+  it('reparte ingresos y gastos por cuenta sin mezclar divisas', () => {
+    const totals = summarizeMoneyAccountTotals(
+      [account, cash],
+      [
+        createTransaction({ id: 'a', amountMinor: 2500 }),
+        createTransaction({ id: 'b', type: 'income', amountMinor: 40000 }),
+        createTransaction({
+          id: 'c',
+          amountMinor: 900000,
+          currency: 'VES',
+        }),
+        createTransaction({
+          id: 'd',
+          amountMinor: 1500,
+          moneyAccountId: 'account-2',
+        }),
+      ],
+      'EUR',
+    );
+
+    expect(totals).toEqual([
+      {
+        id: 'account-1',
+        name: 'Cuenta nómina',
+        colorToken: 'blue',
+        incomeMinor: 40000,
+        expenseMinor: 2500,
+      },
+      {
+        id: 'account-2',
+        name: 'Efectivo',
+        colorToken: 'emerald',
+        incomeMinor: 0,
+        expenseMinor: 1500,
+      },
+    ]);
+  });
+
+  it('no reparte los movimientos sin cuenta ni los de una cuenta ajena', () => {
+    const totals = summarizeMoneyAccountTotals(
+      [account],
+      [
+        createTransaction({ id: 'a', moneyAccountId: undefined }),
+        createTransaction({ id: 'b', moneyAccountId: 'account-borrada' }),
+      ],
+      'EUR',
+    );
+
+    expect(totals).toEqual([
+      {
+        id: 'account-1',
+        name: 'Cuenta nómina',
+        colorToken: 'blue',
+        incomeMinor: 0,
+        expenseMinor: 0,
+      },
+    ]);
   });
 });

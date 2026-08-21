@@ -6,7 +6,10 @@ import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountCarousel } from '@/features/accounts/components/MoneyAccountCarousel/MoneyAccountCarousel';
 import { MoneyAccountRow } from '@/features/accounts/components/MoneyAccountRow/MoneyAccountRow';
 import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
+import { AccountDonutChart } from '@/features/activity/components/AccountDonutChart';
 import { ActivityCollapsibleSection } from '@/features/activity/components/ActivityCollapsibleSection';
+import type { SessionTransaction } from '@/features/transactions/types';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { iconSize, minTouchTarget } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
@@ -16,22 +19,30 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ActivityAccountsSectionProps = {
   accounts: readonly MoneyAccountSummary[];
+  /** Moneda del reparto: la gráfica nunca suma importes de divisas distintas. */
+  currency: CurrencyCode;
   expanded: boolean;
   onCreateMoneyAccount?: () => void;
   onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   onToggle: () => void;
+  resetKey?: number;
+  transactions: readonly SessionTransaction[];
 };
 
 /**
- * Sección «Cuentas» de Actividad: las tarjetas en un carrusel y, debajo, la
- * misma información como lista compacta con icono, nombre y saldo.
+ * Sección «Cuentas» de Actividad: el reparto por cuenta en el donut compartido,
+ * las tarjetas en un carrusel y, debajo, la misma información como lista
+ * compacta con icono, nombre y saldo.
  */
 export function ActivityAccountsSection({
   accounts,
+  currency,
   expanded,
   onCreateMoneyAccount,
   onOpenMoneyAccountDetail,
   onToggle,
+  resetKey,
+  transactions,
 }: ActivityAccountsSectionProps) {
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
@@ -45,12 +56,22 @@ export function ActivityAccountsSection({
     >
       {accounts.length > 0 ? (
         <>
-          <MoneyAccountCarousel
+          <AccountDonutChart
             accounts={accounts}
-            bordered
+            currency={currency}
             onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
-            testID="activity-account-scroller"
+            resetKey={resetKey}
+            transactions={transactions}
           />
+
+          <View style={styles.carousel}>
+            <MoneyAccountCarousel
+              accounts={accounts}
+              bordered
+              onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
+              testID="activity-account-scroller"
+            />
+          </View>
 
           <View style={styles.groupShadow} testID="activity-account-list-group">
             <View style={styles.group}>
@@ -106,6 +127,9 @@ export function ActivityAccountsSection({
 
 function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
   return StyleSheet.create({
+    carousel: {
+      marginTop: spacing.xl,
+    },
     groupShadow: {
       ...shadows.subtle,
       borderRadius: previewCardLayout.borderRadius,

@@ -419,9 +419,16 @@ acción para añadir un ingreso, gasto o movimiento. El conjunto incluye el mes 
 meses posteriores, que continúan accesibles desde Mapa.
 
 Debajo de la sección de categorías aparece la sección `Cuentas`, también
-plegable. Presenta las cuentas del espacio como tarjetas con la forma de una
-tarjeta física, desplazables en horizontal, y debajo la misma información como
-lista compacta con icono, nombre y saldo. Tocar una tarjeta o una fila abre el
+plegable. La encabeza el mismo donut que reparte las categorías, aquí repartido
+por cuenta: el arco de cada una crece con su importe y la leyenda de badges
+lleva su color y su nombre. Su selector alterna entre gastos e ingresos —para
+saber qué cuenta genera más de cada uno— y su encabezado recorre meses
+anteriores sin permitir navegar a meses futuros. Reparte solo la moneda
+seleccionada en los movimientos, nunca suma divisas distintas, y deja fuera los
+movimientos sin cuenta. Tocar un badge abre el detalle de esa cuenta. Debajo,
+presenta las cuentas del espacio como tarjetas con la forma de una tarjeta
+física, desplazables en horizontal, y debajo la misma información como lista
+compacta con icono, nombre y saldo. Tocar una tarjeta o una fila abre el
 detalle de la cuenta, con su saldo, el saldo inicial, los totales de ingresos
 y gastos, sus movimientos y las acciones de editar y eliminar. Cada tarjeta
 muestra el saldo en la moneda de su propia cuenta, así que el selector de
