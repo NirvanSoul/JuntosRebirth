@@ -5,6 +5,30 @@ export type TransactionType = 'expense' | 'income';
 export type TransactionRecurrence =
   'once' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
 
+/** Selector que debe abrir el formulario al llegar desde el detalle. */
+export type TransactionEditorTarget =
+  'category' | 'currency' | 'date' | 'money-account' | 'recurrence';
+
+/**
+ * Campo del detalle que se edita con su propio selector, sin pasar por el
+ * formulario completo. Quien lo cambia se queda en el detalle: el selector se
+ * abre encima y al guardarlo o cerrarlo devuelve el movimiento tal como
+ * estaba, ya actualizado.
+ *
+ * Es una unión y no un objeto de campos opcionales porque retirar la cuenta
+ * de un movimiento es `moneyAccountId: undefined`, que en un objeto parcial no
+ * se distingue de «no toques la cuenta».
+ */
+export type TransactionQuickEdit =
+  | { field: 'category'; categoryId: string }
+  | { field: 'date'; occurredOn: string }
+  | { field: 'money-account'; moneyAccountId: string | undefined }
+  | {
+      field: 'recurrence';
+      customOccurrenceDates?: readonly string[];
+      recurrence: TransactionRecurrence;
+    };
+
 export type CreateTransactionDraft = {
   spaceId: string;
   type: TransactionType;

@@ -33,6 +33,7 @@ import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
 type ExistingTransactionRow = {
   occurred_on: string;
   recurrence: string;
+  recurrence_group_id: string | null;
   recurrence_series_id: string | null;
   created_by: string;
 };
@@ -43,6 +44,49 @@ export type CreateLocalTransactionInput = CreateTransactionDraft & {
   id?: string;
   sourceTransactionId?: string;
 };
+
+/**
+ * Editar una recurrencia cambia lo que viene después, no lo que ya pasó.
+ *
+ * Archiva las ocurrencias posteriores a la fecha del movimiento editado y deja
+ * intactas las anteriores, que ya ocurrieron y forman parte de los saldos y de
+ * los totales que el usuario ya ha visto. Sirve igual a una serie automática
+ * (`recurrence_series_id`) y a un grupo personalizado (`recurrence_group_id`).
+ *
+ * Nunca alcanza al propio movimiento editado: cuando se ejecuta, o su fecha
+ * todavía es la original —y por tanto no es posterior a sí misma— o ya se le
+ * ha asignado otro grupo.
+ */
+async function archiveLaterOccurrences(
+  database: SQLiteDatabase,
+  existing: ExistingTransactionRow,
+  spaceId: string,
+  now: string,
+): Promise<void> {
+  const seriesId = existing.recurrence_series_id;
+  const groupId = existing.recurrence_group_id;
+  if (!seriesId && !groupId) return;
+
+  // La columna sale de un conjunto cerrado de dos literales, no de una entrada:
+  // el resto de la consulta sigue parametrizado.
+  const column = seriesId ? 'recurrence_series_id' : 'recurrence_group_id';
+
+  await database.runAsync(
+    `UPDATE transactions
+        SET is_archived = 1, archived_at = ?, updated_at = ?,
+            sync_status = CASE
+              WHEN sync_status = 'local_only' THEN 'local_only'
+              ELSE 'pending'
+            END
+      WHERE ${column} = ? AND occurred_on > ?
+        AND space_id = ? AND is_archived = 0`,
+    now,
+    now,
+    (seriesId ?? groupId)!,
+    existing.occurred_on,
+    spaceId,
+  );
+}
 
 async function insertTransaction(
   database: SQLiteDatabase,
@@ -327,7 +371,8 @@ export async function updateLocalTransaction(
   const now = new Date().toISOString();
   const existingTransaction =
     await database.getFirstAsync<ExistingTransactionRow>(
-      `SELECT occurred_on, recurrence, recurrence_series_id, created_by
+      `SELECT occurred_on, recurrence, recurrence_group_id,
+              recurrence_series_id, created_by
          FROM transactions
         WHERE id = ? AND space_id = ? AND is_archived = 0`,
       id,
@@ -348,8 +393,6 @@ export async function updateLocalTransaction(
     const occurrenceIds = occurrenceDates.map((_, index) =>
       index === 0 ? id : randomUUID(),
     );
-    const createdBy = await getOrCreateInstallationId(database);
-
     await database.withExclusiveTransactionAsync(async (transaction) => {
       const result = await transaction.runAsync(
         `UPDATE transactions
@@ -379,22 +422,15 @@ export async function updateLocalTransaction(
         throw new Error('El movimiento local ya no está disponible');
       }
 
-      if (existingTransaction?.recurrence_series_id) {
-        await transaction.runAsync(
-          `UPDATE transactions
-              SET is_archived = 1, archived_at = ?, updated_at = ?,
-                  sync_status = CASE
-                    WHEN sync_status = 'local_only' THEN 'local_only'
-                    ELSE 'pending'
-                  END
-            WHERE recurrence_series_id = ? AND occurred_on > ?
-              AND space_id = ? AND is_archived = 0`,
-          now,
-          now,
-          existingTransaction.recurrence_series_id,
-          existingTransaction.occurred_on,
+      if (existingTransaction) {
+        await archiveLaterOccurrences(
+          transaction,
+          existingTransaction,
           draft.spaceId,
+          now,
         );
+      }
+      if (existingTransaction?.recurrence_series_id) {
         await transaction.runAsync(
           `UPDATE recurring_transaction_series
               SET is_archived = 1, archived_at = ?, updated_at = ?,
@@ -450,7 +486,6 @@ export async function updateLocalTransaction(
   if (startsNewAutomaticSeries) {
     const recurrence = draft.recurrence as AutomaticTransactionRecurrence;
     const seriesId = randomUUID();
-    const createdBy = await getOrCreateInstallationId(database);
     const occurrenceDates = [draft.occurredOn];
     let nextOccurrenceOn = getRecurrenceOccurrenceDate(
       draft.occurredOn,
@@ -471,22 +506,15 @@ export async function updateLocalTransaction(
     );
 
     await database.withExclusiveTransactionAsync(async (transaction) => {
-      if (existingTransaction?.recurrence_series_id) {
-        await transaction.runAsync(
-          `UPDATE transactions
-              SET is_archived = 1, archived_at = ?, updated_at = ?,
-                  sync_status = CASE
-                    WHEN sync_status = 'local_only' THEN 'local_only'
-                    ELSE 'pending'
-                  END
-            WHERE recurrence_series_id = ? AND occurred_on > ?
-              AND space_id = ? AND is_archived = 0`,
-          now,
-          now,
-          existingTransaction.recurrence_series_id,
-          existingTransaction.occurred_on,
+      if (existingTransaction) {
+        await archiveLaterOccurrences(
+          transaction,
+          existingTransaction,
           draft.spaceId,
+          now,
         );
+      }
+      if (existingTransaction?.recurrence_series_id) {
         await transaction.runAsync(
           `UPDATE recurring_transaction_series
               SET is_archived = 1, archived_at = ?, updated_at = ?,
@@ -725,20 +753,11 @@ export async function updateLocalTransaction(
       if (result.changes !== 1) {
         throw new Error('El movimiento local ya no está disponible');
       }
-      await transaction.runAsync(
-        `UPDATE transactions
-            SET is_archived = 1, archived_at = ?, updated_at = ?,
-                sync_status = CASE
-                  WHEN sync_status = 'local_only' THEN 'local_only'
-                  ELSE 'pending'
-                END
-          WHERE recurrence_series_id = ? AND occurred_on > ?
-            AND space_id = ? AND is_archived = 0`,
-        now,
-        now,
-        existingTransaction.recurrence_series_id,
-        existingTransaction.occurred_on,
+      await archiveLaterOccurrences(
+        transaction,
+        existingTransaction,
         draft.spaceId,
+        now,
       );
       await transaction.runAsync(
         `UPDATE recurring_transaction_series
@@ -755,33 +774,45 @@ export async function updateLocalTransaction(
       );
     });
   } else {
-    const result = await database.runAsync(
-      `UPDATE transactions
-          SET category_id = ?, money_account_id = ?, type = ?,
-              amount_minor = ?, currency = ?,
-              title = ?, occurred_on = ?, recurrence = ?,
-              recurrence_group_id = NULL, recurrence_series_id = NULL,
-              updated_at = ?,
-              sync_status = CASE
-                WHEN sync_status = 'local_only' THEN 'local_only'
-                ELSE 'pending'
-              END
-        WHERE id = ? AND space_id = ? AND is_archived = 0`,
-      draft.categoryId,
-      draft.moneyAccountId ?? null,
-      draft.type,
-      draft.amountMinor,
-      draft.currency,
-      draft.title,
-      draft.occurredOn,
-      draft.recurrence,
-      now,
-      id,
-      draft.spaceId,
-    );
-    if (result.changes !== 1) {
-      throw new Error('El movimiento local ya no está disponible');
-    }
+    await database.withExclusiveTransactionAsync(async (transaction) => {
+      const result = await transaction.runAsync(
+        `UPDATE transactions
+            SET category_id = ?, money_account_id = ?, type = ?,
+                amount_minor = ?, currency = ?,
+                title = ?, occurred_on = ?, recurrence = ?,
+                recurrence_group_id = NULL, recurrence_series_id = NULL,
+                updated_at = ?,
+                sync_status = CASE
+                  WHEN sync_status = 'local_only' THEN 'local_only'
+                  ELSE 'pending'
+                END
+          WHERE id = ? AND space_id = ? AND is_archived = 0`,
+        draft.categoryId,
+        draft.moneyAccountId ?? null,
+        draft.type,
+        draft.amountMinor,
+        draft.currency,
+        draft.title,
+        draft.occurredOn,
+        draft.recurrence,
+        now,
+        id,
+        draft.spaceId,
+      );
+      if (result.changes !== 1) {
+        throw new Error('El movimiento local ya no está disponible');
+      }
+      // Dejar de repetir también corta hacia adelante: un movimiento que sale
+      // de un grupo personalizado se lleva por delante sus fechas posteriores.
+      if (existingTransaction) {
+        await archiveLaterOccurrences(
+          transaction,
+          existingTransaction,
+          draft.spaceId,
+          now,
+        );
+      }
+    });
   }
 
   return [{ ...draft, id, createdBy, updatedAt: now }];

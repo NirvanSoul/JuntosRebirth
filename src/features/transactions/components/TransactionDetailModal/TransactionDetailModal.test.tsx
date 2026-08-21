@@ -44,6 +44,7 @@ describe('TransactionDetailModal', () => {
   it('distribuye los datos del movimiento sin mostrar presupuesto', async () => {
     const onDelete = jest.fn();
     const onEdit = jest.fn();
+    const onOpenCategoryPicker = jest.fn();
     const screen = await render(
       <SafeAreaProvider
         initialMetrics={{
@@ -58,6 +59,7 @@ describe('TransactionDetailModal', () => {
             onCopy={jest.fn(() => true)}
             onDelete={onDelete}
             onEdit={onEdit}
+            onOpenCategoryPicker={onOpenCategoryPicker}
             onRemoveReminder={jest.fn(() => true)}
             onSaveNote={jest.fn()}
             onSaveReminder={jest.fn(() => true)}
@@ -145,6 +147,26 @@ describe('TransactionDetailModal', () => {
       within(detail).getByRole('button', { name: 'Editar movimiento' }),
     );
     expect(onEdit).toHaveBeenCalledWith('lunch');
+
+    // El importe abre el formulario completo; la categoría, su propio selector.
+    await fireEvent.press(
+      within(detail).getByTestId('transaction-detail-amount'),
+    );
+    expect(onEdit).toHaveBeenCalledTimes(2);
+    expect(onEdit).not.toHaveBeenCalledWith('lunch', 'category');
+
+    await fireEvent.press(
+      within(detail).getByTestId('transaction-detail-category-editor'),
+    );
+    expect(onOpenCategoryPicker).toHaveBeenCalledTimes(1);
+
+    // Fecha y recurrencia no pasan por el formulario: abren su propio
+    // selector encima del detalle.
+    await fireEvent.press(
+      within(detail).getByTestId('transaction-detail-date-row'),
+    );
+    expect(screen.getByTestId('transaction-date-picker')).toBeTruthy();
+    expect(onEdit).not.toHaveBeenCalledWith('lunch', 'date');
 
     await fireEvent.press(
       within(detail).getByRole('button', { name: 'Eliminar movimiento' }),
@@ -482,11 +504,45 @@ describe('TransactionDetailModal', () => {
       expect(screen.getByText('Cuenta nómina')).toBeTruthy();
     });
 
-    it('permite asignar una cuenta desde el detalle', async () => {
-      const onAssignMoneyAccount = jest.fn();
+    it('abre el selector de cuenta sin salir del detalle', async () => {
+      const onEdit = jest.fn();
+      const screen = await renderDetail({ onEdit });
+
+      await fireEvent.press(
+        screen.getByLabelText('Añadir una cuenta a este movimiento'),
+      );
+
+      expect(
+        screen.getByTestId('transaction-money-account-picker'),
+      ).toBeTruthy();
+      expect(onEdit).not.toHaveBeenCalled();
+    });
+
+    it('guarda la recurrencia desde su selector sin abrir el formulario', async () => {
+      const onEdit = jest.fn();
+      const onQuickEdit = jest.fn();
+      const screen = await renderDetail({ onEdit, onQuickEdit });
+
+      await fireEvent.press(
+        screen.getByTestId('transaction-detail-recurrence-row'),
+      );
+      await fireEvent.press(screen.getByLabelText('Semanal'));
+      await fireEvent.press(screen.getByLabelText('Guardar recurrencia'));
+
+      expect(onQuickEdit).toHaveBeenCalledWith('lunch', {
+        customOccurrenceDates: undefined,
+        field: 'recurrence',
+        recurrence: 'weekly',
+      });
+      expect(onEdit).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('transaction-recurrence-picker')).toBeNull();
+    });
+
+    it('guarda la cuenta elegida y vuelve al detalle', async () => {
+      const onQuickEdit = jest.fn();
       const screen = await renderDetail({
         assignableMoneyAccounts: [bankAccount],
-        onAssignMoneyAccount,
+        onQuickEdit,
       });
 
       await fireEvent.press(
@@ -495,25 +551,13 @@ describe('TransactionDetailModal', () => {
       await fireEvent.press(screen.getByLabelText('Cuenta nómina · EUR'));
       await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
 
-      expect(onAssignMoneyAccount).toHaveBeenCalledWith('lunch', 'account-1');
-    });
-
-    it('permite retirar la cuenta ya asignada', async () => {
-      const onAssignMoneyAccount = jest.fn();
-      const screen = await renderDetail({
-        assignableMoneyAccounts: [bankAccount],
-        moneyAccount: bankAccount,
-        onAssignMoneyAccount,
-        transaction: { ...transaction, moneyAccountId: 'account-1' },
+      expect(onQuickEdit).toHaveBeenCalledWith('lunch', {
+        field: 'money-account',
+        moneyAccountId: 'account-1',
       });
-
-      await fireEvent.press(
-        screen.getByLabelText('Cambiar cuenta: Cuenta nómina'),
-      );
-      await fireEvent.press(screen.getByLabelText('Sin cuenta'));
-      await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
-
-      expect(onAssignMoneyAccount).toHaveBeenCalledWith('lunch', undefined);
+      expect(
+        screen.queryByTestId('transaction-money-account-picker'),
+      ).toBeNull();
     });
   });
 });

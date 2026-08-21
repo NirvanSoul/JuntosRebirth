@@ -21,11 +21,16 @@ import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIco
 import type { MoneyAccount } from '@/features/accounts/types';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { Category } from '@/features/categories/types';
-import { TransactionMoneyAccountPickerModal } from '@/features/transactions/components/CreateTransactionModal/TransactionOptionPickers';
 import { createStyles } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal.styles';
+import {
+  TransactionDetailQuickEditors,
+  type TransactionQuickEditField,
+} from '@/features/transactions/components/TransactionDetailModal/TransactionDetailQuickEditors';
 import { TransactionReminderModal } from '@/features/transactions/components/TransactionReminderModal/TransactionReminderModal';
 import type {
   SessionTransaction,
+  TransactionEditorTarget,
+  TransactionQuickEdit,
   TransactionRecurrence,
   TransactionReminder,
 } from '@/features/transactions/types';
@@ -52,18 +57,21 @@ type TransactionDetailModalProps = {
   moneyAccount?: MoneyAccount | null;
   /** Cuentas asignables: solo las activas del espacio en esta misma moneda. */
   assignableMoneyAccounts?: readonly MoneyAccount[];
-  onAssignMoneyAccount?: (
-    transactionId: string,
-    moneyAccountId: string | undefined,
-  ) => void;
   onClose: () => void;
   onCopy: (
     transactionId: string,
     targetSpaceId: string,
   ) => boolean | Promise<boolean>;
   onDelete: (transactionId: string) => void;
-  onEdit: (transactionId: string) => void;
-  onOpenCategoryDetail?: (categoryId: string) => void;
+  onEdit: (
+    transactionId: string,
+    initialEditor?: TransactionEditorTarget,
+  ) => void;
+  onCreateMoneyAccount?: () => void;
+  /** Abre el selector de categoría encima del detalle. */
+  onOpenCategoryPicker?: () => void;
+  /** Guarda un cambio puntual sin salir del detalle. */
+  onQuickEdit?: (transactionId: string, change: TransactionQuickEdit) => void;
   onRemoveReminder: (transactionId: string) => boolean | Promise<boolean>;
   onSaveNote: (transactionId: string, note: string | null) => void;
   onSaveReminder: (
@@ -100,12 +108,13 @@ export function TransactionDetailModal({
   assignableMoneyAccounts = [],
   category,
   moneyAccount,
-  onAssignMoneyAccount,
   onClose,
+  onCreateMoneyAccount,
+  onOpenCategoryPicker,
+  onQuickEdit,
   onCopy,
   onDelete,
   onEdit,
-  onOpenCategoryDetail,
   onRemoveReminder,
   onSaveNote,
   onSaveReminder,
@@ -120,8 +129,8 @@ export function TransactionDetailModal({
   const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
   const [isReminderModalVisible, setReminderModalVisible] = useState(false);
   const [isNoteModalVisible, setNoteModalVisible] = useState(false);
-  const [isMoneyAccountPickerVisible, setMoneyAccountPickerVisible] =
-    useState(false);
+  const [quickEditField, setQuickEditField] =
+    useState<TransactionQuickEditField | null>(null);
   const [isDeleteVisible, setDeleteVisible] = useState(false);
   const [isRecurrenceExpanded, setRecurrenceExpanded] = useState(false);
   const [visibleRecurrenceCount, setVisibleRecurrenceCount] =
@@ -135,7 +144,7 @@ export function TransactionDetailModal({
       setSpacePickerVisible(false);
       setReminderModalVisible(false);
       setNoteModalVisible(false);
-      setMoneyAccountPickerVisible(false);
+      setQuickEditField(null);
       setDeleteVisible(false);
       setRecurrenceExpanded(false);
       setVisibleRecurrenceCount(recurrencePageSize);
@@ -210,15 +219,20 @@ export function TransactionDetailModal({
             testID="transaction-detail-scroll-view"
           >
             <View style={styles.hero}>
-              <View
-                style={[
+              <Pressable
+                accessibilityLabel="Cambiar categoría"
+                accessibilityRole="button"
+                onPress={() => onOpenCategoryPicker?.()}
+                style={({ pressed }) => [
                   styles.heroIcon,
                   {
                     backgroundColor: category
                       ? categoryColors[category.colorToken]
                       : colors.textMuted,
                   },
+                  pressed && styles.pressed,
                 ]}
+                testID="transaction-detail-category-editor"
               >
                 {category ? (
                   <CategoryIcon
@@ -233,8 +247,17 @@ export function TransactionDetailModal({
                     size={iconSize.xl}
                   />
                 )}
-              </View>
-              <View style={styles.titleBlock}>
+              </Pressable>
+              <Pressable
+                accessibilityLabel="Editar título del movimiento"
+                accessibilityRole="button"
+                onPress={() => onEdit(transaction.id)}
+                style={({ pressed }) => [
+                  styles.titleBlock,
+                  pressed && styles.pressed,
+                ]}
+                testID="transaction-detail-title-editor"
+              >
                 <Text
                   align="center"
                   testID="transaction-detail-context"
@@ -252,7 +275,7 @@ export function TransactionDetailModal({
                 >
                   {title}
                 </Text>
-              </View>
+              </Pressable>
             </View>
 
             {isDeleteVisible ? (
@@ -269,10 +292,14 @@ export function TransactionDetailModal({
               />
             ) : null}
 
-            <View
-              accessibilityLabel={`${isIncome ? 'Ingreso' : 'Gasto'} de ${amount}`}
-              accessible
-              style={styles.amountCard}
+            <Pressable
+              accessibilityLabel={`Editar importe: ${isIncome ? 'Ingreso' : 'Gasto'} de ${amount}`}
+              accessibilityRole="button"
+              onPress={() => onEdit(transaction.id)}
+              style={({ pressed }) => [
+                styles.amountCard,
+                pressed && styles.pressed,
+              ]}
               testID="transaction-detail-amount"
             >
               <Text tone="secondary" variant="caption">
@@ -294,7 +321,7 @@ export function TransactionDetailModal({
                   </View>
                 </View>
               </View>
-            </View>
+            </Pressable>
 
             {!isProjected ? (
               <View style={styles.actionsRow}>
@@ -345,12 +372,9 @@ export function TransactionDetailModal({
 
             <View style={styles.detailsCard}>
               <Pressable
-                accessibilityLabel={`Ver categoría: ${category?.name ?? 'Sin categoría'}`}
-                accessibilityRole={
-                  category && onOpenCategoryDetail ? 'button' : undefined
-                }
-                disabled={!category || !onOpenCategoryDetail}
-                onPress={() => category && onOpenCategoryDetail?.(category.id)}
+                accessibilityLabel={`Cambiar categoría: ${category?.name ?? 'Sin categoría'}`}
+                accessibilityRole="button"
+                onPress={() => onOpenCategoryPicker?.()}
                 style={({ pressed }) => [
                   styles.detailRow,
                   pressed && styles.pressed,
@@ -378,13 +402,11 @@ export function TransactionDetailModal({
                     {category?.name ?? 'Sin categoría'}
                   </Text>
                 </View>
-                {category && onOpenCategoryDetail ? (
-                  <Ionicons
-                    color={colors.textMuted}
-                    name="chevron-forward"
-                    size={iconSize.sm}
-                  />
-                ) : null}
+                <Ionicons
+                  color={colors.textMuted}
+                  name="chevron-forward"
+                  size={iconSize.sm}
+                />
               </Pressable>
               <View style={styles.divider} />
               <Pressable
@@ -393,9 +415,8 @@ export function TransactionDetailModal({
                     ? `Cambiar cuenta: ${moneyAccount.name}`
                     : 'Añadir una cuenta a este movimiento'
                 }
-                accessibilityRole={onAssignMoneyAccount ? 'button' : undefined}
-                disabled={!onAssignMoneyAccount}
-                onPress={() => setMoneyAccountPickerVisible(true)}
+                accessibilityRole="button"
+                onPress={() => setQuickEditField('money-account')}
                 style={({ pressed }) => [
                   styles.detailRow,
                   pressed && styles.pressed,
@@ -423,16 +444,23 @@ export function TransactionDetailModal({
                     {moneyAccount?.name ?? 'Sin cuenta'}
                   </Text>
                 </View>
-                {onAssignMoneyAccount ? (
-                  <Ionicons
-                    color={colors.textMuted}
-                    name="chevron-forward"
-                    size={iconSize.sm}
-                  />
-                ) : null}
+                <Ionicons
+                  color={colors.textMuted}
+                  name="chevron-forward"
+                  size={iconSize.sm}
+                />
               </Pressable>
               <View style={styles.divider} />
-              <View style={styles.detailRow}>
+              <Pressable
+                accessibilityLabel={`Cambiar fecha: ${formatTransactionDate(transaction.occurredOn)}`}
+                accessibilityRole="button"
+                onPress={() => setQuickEditField('date')}
+                style={({ pressed }) => [
+                  styles.detailRow,
+                  pressed && styles.pressed,
+                ]}
+                testID="transaction-detail-date-row"
+              >
                 <Ionicons
                   color={colors.textMuted}
                   name="calendar-outline"
@@ -446,7 +474,12 @@ export function TransactionDetailModal({
                     {formatTransactionDate(transaction.occurredOn)}
                   </Text>
                 </View>
-              </View>
+                <Ionicons
+                  color={colors.textMuted}
+                  name="chevron-forward"
+                  size={iconSize.sm}
+                />
+              </Pressable>
               {author ? (
                 <>
                   <View style={styles.divider} />
@@ -468,7 +501,16 @@ export function TransactionDetailModal({
                 </>
               ) : null}
               <View style={styles.divider} />
-              <View style={styles.detailRow}>
+              <Pressable
+                accessibilityLabel={`Cambiar recurrencia: ${recurrenceLabels[transaction.recurrence]}`}
+                accessibilityRole="button"
+                onPress={() => setQuickEditField('recurrence')}
+                style={({ pressed }) => [
+                  styles.detailRow,
+                  pressed && styles.pressed,
+                ]}
+                testID="transaction-detail-recurrence-row"
+              >
                 <Ionicons
                   color={colors.textMuted}
                   name="sync-outline"
@@ -483,7 +525,12 @@ export function TransactionDetailModal({
                     {recurrenceLabels[transaction.recurrence]}
                   </Text>
                 </View>
-              </View>
+                <Ionicons
+                  color={colors.textMuted}
+                  name="chevron-forward"
+                  size={iconSize.sm}
+                />
+              </Pressable>
               <View style={styles.divider} />
               <Pressable
                 accessibilityLabel={`Próxima repetición: ${nextRecurrenceValue}`}
@@ -605,6 +652,18 @@ export function TransactionDetailModal({
         </View>
       </AppModal>
 
+      <TransactionDetailQuickEditors
+        assignableMoneyAccounts={assignableMoneyAccounts}
+        field={quickEditField}
+        onClose={() => setQuickEditField(null)}
+        onCreateMoneyAccount={onCreateMoneyAccount}
+        onSubmit={(change) => {
+          setQuickEditField(null);
+          onQuickEdit?.(transaction.id, change);
+        }}
+        transaction={transaction}
+      />
+
       <CopyToSpaceModal
         description="Elige dónde crear una copia independiente de este movimiento."
         failureMessage={(target) =>
@@ -628,17 +687,6 @@ export function TransactionDetailModal({
         transactionOccurredOn={transaction.occurredOn}
         transactionTitle={title}
         visible={isReminderModalVisible}
-      />
-
-      <TransactionMoneyAccountPickerModal
-        accounts={assignableMoneyAccounts}
-        moneyAccountId={transaction.moneyAccountId}
-        onClose={() => setMoneyAccountPickerVisible(false)}
-        onSelectMoneyAccount={(selectedId) => {
-          setMoneyAccountPickerVisible(false);
-          onAssignMoneyAccount?.(transaction.id, selectedId);
-        }}
-        visible={isMoneyAccountPickerVisible}
       />
 
       <NoteEditorModal

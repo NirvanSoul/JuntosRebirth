@@ -40,6 +40,7 @@ import {
 } from '@/features/categories/repositories/localCategoryRepository';
 import type {
   Category,
+  CategoryEditorTarget,
   CreateCategoryInput,
 } from '@/features/categories/types';
 import {
@@ -76,6 +77,7 @@ import { TransactionDetailModal } from '@/features/transactions/components/Trans
 import type {
   CreateTransactionDraft,
   SessionTransaction,
+  TransactionEditorTarget,
   TransactionNotificationRule,
   TransactionReminder,
   TransactionType,
@@ -84,8 +86,6 @@ import {
   archiveLocalTransaction,
   createLocalTransaction,
   listLocalTransactions,
-  updateLocalTransaction,
-  updateLocalTransactionMoneyAccount,
   updateLocalTransactionNote,
 } from '@/features/transactions/repositories/localTransactionRepository';
 import {
@@ -100,8 +100,8 @@ import {
   getTransactionReminder,
   scheduleTransactionReminder,
 } from '@/features/transactions/services/transactionReminderService';
+import { useTransactionEditing } from '@/features/transactions/hooks/useTransactionEditing';
 import { resolveTransactionForDetail } from '@/features/transactions/utils/transactionDetailResolution';
-import { parseProjectedTransactionId } from '@/features/transactions/utils/transactionRecurrence';
 import { useAppForeground } from '@/hooks/useAppForeground';
 import {
   defaultCurrencyCode,
@@ -120,7 +120,7 @@ const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const drawerWidthRatio = 0.88,
   drawerMaxWidth = 380;
 
-type CategoryCreationContext = 'quick' | 'transaction';
+type CategoryCreationContext = 'quick' | 'transaction' | 'transaction-detail';
 type CategoryDetailRequest = {
   categoryId: string;
   displayCurrency: CurrencyCode;
@@ -184,6 +184,9 @@ export function MainTabsNavigator() {
   const [transactionInitialDate, setTransactionInitialDate] = useState<
     string | undefined
   >();
+  const [transactionInitialEditor, setTransactionInitialEditor] = useState<
+    TransactionEditorTarget | undefined
+  >();
   const [transactions, setTransactions] = useState<SessionTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [notificationRules, setNotificationRules] = useState<
@@ -198,6 +201,9 @@ export function MainTabsNavigator() {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
     null,
   );
+  const [categoryInitialEditor, setCategoryInitialEditor] = useState<
+    CategoryEditorTarget | undefined
+  >();
   const [detailRequest, setDetailRequest] =
     useState<CategoryDetailRequest | null>(null);
   const [detailTransactionId, setDetailTransactionId] = useState<string | null>(
@@ -274,8 +280,7 @@ export function MainTabsNavigator() {
     .filter((space) => space.id !== activeSpace.id)
     .map((space) => ({ id: space.id, name: space.name }));
   const categoryPickerMode =
-    categoryCreationContext === 'transaction' &&
-    activeSpaceCategories.length > 0
+    categoryCreationContext !== 'quick' && activeSpaceCategories.length > 0
       ? 'select'
       : 'create';
 
@@ -286,11 +291,34 @@ export function MainTabsNavigator() {
   });
   const { setMoneyAccounts } = moneyAccountsController;
 
+  const { applyTransactionUpdate, quickEditTransaction } =
+    useTransactionEditing({
+      categories,
+      onChangesPublished: () => publishActiveCoupleChanges(),
+      onError: () => showSaveError(),
+      setDetailTransactionId,
+      setTransactions,
+      spaceTransactions: activeSpaceTransactions,
+    });
+
   const detailTransactionMoneyAccount = detailTransaction
     ? (moneyAccountsController.spaceMoneyAccounts.find(
         (account) => account.id === detailTransaction.moneyAccountId,
       ) ?? null)
     : null;
+  /** Al abrir la cuenta desde detalle, conserva la regla de no cambiar moneda. */
+  const transactionMoneyAccountOptions =
+    transactionInitialEditor === 'money-account' && editingTransaction
+      ? moneyAccountsController.activeSpaceMoneyAccounts.filter((account) =>
+          moneyAccountSupportsCurrency(account, editingTransaction.currency),
+        )
+      : moneyAccountsController.activeSpaceMoneyAccounts;
+  /** Misma regla para el selector que el detalle abre sobre sí mismo. */
+  const detailMoneyAccountOptions = detailTransaction
+    ? moneyAccountsController.activeSpaceMoneyAccounts.filter((account) =>
+        moneyAccountSupportsCurrency(account, detailTransaction.currency),
+      )
+    : [];
 
   const {
     copyCategory: handleShareCategory,
@@ -648,6 +676,7 @@ export function MainTabsNavigator() {
 
     setCustomCategoryVisible(false);
     setEditingCategoryId(null);
+    setCategoryInitialEditor(undefined);
     closeCategoryPicker();
   };
 
@@ -682,6 +711,7 @@ export function MainTabsNavigator() {
         publishActiveCoupleChanges();
         setCustomCategoryVisible(false);
         setEditingCategoryId(null);
+        setCategoryInitialEditor(undefined);
       } catch {
         showSaveError();
       }
@@ -721,6 +751,14 @@ export function MainTabsNavigator() {
 
     if (categoryCreationContext === 'transaction') {
       setSelectedCategoryId(selection.categoryId);
+    }
+    // Desde el detalle no se abre el formulario: la categoría se guarda y el
+    // usuario se queda en el movimiento que estaba mirando.
+    if (categoryCreationContext === 'transaction-detail' && detailTransaction) {
+      void quickEditTransaction(detailTransaction.id, {
+        categoryId: selection.categoryId,
+        field: 'category',
+      });
     }
     closeCategoryPicker();
   };
@@ -762,43 +800,12 @@ export function MainTabsNavigator() {
     }
 
     if (editingTransactionId) {
-      try {
-        const wasProjected = Boolean(
-          parseProjectedTransactionId(editingTransactionId),
-        );
-        const updatedTransactions = await updateLocalTransaction(
-          editingTransactionId,
-          draft,
-        );
-        let nextTransactions: SessionTransaction[] = [];
-        if (wasProjected) {
-          nextTransactions = await listLocalTransactions();
-          setTransactions(nextTransactions);
-        } else {
-          const updatedTransactionIds = new Set(
-            updatedTransactions.map((transaction) => transaction.id),
-          );
-          setTransactions((current) => {
-            nextTransactions = [
-              ...updatedTransactions,
-              ...current.filter(
-                (transaction) => !updatedTransactionIds.has(transaction.id),
-              ),
-            ];
-            return nextTransactions;
-          });
-        }
-        void reconcileNotificationRules({
-          categories,
-          transactions: nextTransactions,
-        }).catch(() => undefined);
-        publishActiveCoupleChanges();
+      const updated = await applyTransactionUpdate(editingTransactionId, draft);
+      if (updated) {
         setEditingTransactionId(null);
+        setTransactionInitialEditor(undefined);
         setTransactionInitialDate(undefined);
         setTransactionModalVisible(false);
-      } catch (error) {
-        console.error('[MainTabsNavigator] updateLocalTransaction', error);
-        showSaveError();
       }
       return;
     }
@@ -963,41 +970,6 @@ export function MainTabsNavigator() {
         publishActiveCoupleChanges();
       })
       .catch(showSaveError);
-  };
-
-  /**
-   * Asigna o retira la cuenta desde el detalle del movimiento. Solo se
-   * ofrecen cuentas en la misma moneda, así que el importe no cambia de
-   * significado al entrar en un saldo.
-   */
-  const assignableMoneyAccounts = detailTransaction
-    ? moneyAccountsController.activeSpaceMoneyAccounts.filter((account) =>
-        moneyAccountSupportsCurrency(account, detailTransaction.currency),
-      )
-    : [];
-
-  const handleAssignMoneyAccount = async (
-    transactionId: string,
-    moneyAccountId: string | undefined,
-  ) => {
-    try {
-      await updateLocalTransactionMoneyAccount(
-        transactionId,
-        activeSpace.id,
-        moneyAccountId ?? null,
-      );
-      setTransactions((current) =>
-        current.map((transaction) =>
-          transaction.id === transactionId
-            ? { ...transaction, moneyAccountId }
-            : transaction,
-        ),
-      );
-      publishActiveCoupleChanges();
-    } catch (error) {
-      console.error('[accounts] No se pudo asignar la cuenta', error);
-      showSaveError();
-    }
   };
 
   if (!isReady || !isFinanceReady) {
@@ -1232,9 +1204,11 @@ export function MainTabsNavigator() {
                 availableCurrencies={spaceCurrencies}
                 initialDate={transactionInitialDate}
                 initialDraft={editingTransaction ?? undefined}
-                moneyAccounts={moneyAccountsController.activeSpaceMoneyAccounts}
+                initialEditor={transactionInitialEditor}
+                moneyAccounts={transactionMoneyAccountOptions}
                 onClose={() => {
                   setEditingTransactionId(null);
+                  setTransactionInitialEditor(undefined);
                   setTransactionInitialDate(undefined);
                   setTransactionModalVisible(false);
                 }}
@@ -1287,9 +1261,11 @@ export function MainTabsNavigator() {
               <CreateCategoryModal
                 categories={categories}
                 category={editingCategory}
+                initialEditor={categoryInitialEditor}
                 onClose={() => {
                   setCustomCategoryVisible(false);
                   setEditingCategoryId(null);
+                  setCategoryInitialEditor(undefined);
                 }}
                 onSubmit={handleCreateCategory}
                 spaceId={activeSpace.id}
@@ -1313,9 +1289,10 @@ export function MainTabsNavigator() {
                   setDetailRequest(null);
                   handleArchiveCategory(categoryId);
                 }}
-                onEdit={(categoryId) => {
+                onEdit={(categoryId, initialEditor) => {
                   setDetailRequest(null);
                   setEditingCategoryId(categoryId);
+                  setCategoryInitialEditor(initialEditor);
                   setCustomCategoryVisible(true);
                 }}
                 onOpenTransactionDetail={setDetailTransactionId}
@@ -1337,14 +1314,14 @@ export function MainTabsNavigator() {
                 transactions={activeSpaceTransactions}
               />
               <TransactionDetailModal
-                assignableMoneyAccounts={assignableMoneyAccounts}
+                assignableMoneyAccounts={detailMoneyAccountOptions}
                 category={detailTransactionCategory}
                 moneyAccount={detailTransactionMoneyAccount}
-                onAssignMoneyAccount={handleAssignMoneyAccount}
                 onClose={() => setDetailTransactionId(null)}
+                onCreateMoneyAccount={moneyAccountsController.openCreation}
                 onCopy={handleCopyTransaction}
                 onDelete={handleDeleteTransaction}
-                onEdit={(transactionId) => {
+                onEdit={(transactionId, initialEditor) => {
                   const transaction = resolveTransactionForDetail(
                     activeSpaceTransactions,
                     transactionId,
@@ -1352,18 +1329,19 @@ export function MainTabsNavigator() {
                   if (!transaction) return;
                   setDetailTransactionId(null);
                   setEditingTransactionId(transaction.id);
+                  setTransactionInitialEditor(initialEditor);
                   setTransactionInitialDate(undefined);
                   setSelectedCategoryId(transaction.categoryId);
                   setTransactionType(transaction.type);
                   setTransactionModalVisible(true);
                 }}
-                onOpenCategoryDetail={(categoryId) =>
-                  setDetailRequest({
-                    categoryId,
-                    displayCurrency:
-                      detailTransaction?.currency ?? effectiveHomeCurrency,
-                  })
-                }
+                onOpenCategoryPicker={() => {
+                  if (!detailTransaction) return;
+                  setSelectedCategoryId(detailTransaction.categoryId);
+                  setCategoryCreationContext('transaction-detail');
+                  setCategoryPickerVisible(true);
+                }}
+                onQuickEdit={quickEditTransaction}
                 onRemoveReminder={handleRemoveTransactionReminder}
                 onSaveNote={handleSaveTransactionNote}
                 onSaveReminder={handleSaveTransactionReminder}

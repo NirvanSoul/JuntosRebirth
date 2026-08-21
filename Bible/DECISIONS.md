@@ -5398,6 +5398,83 @@ sobre el número de cuentas.
 
 ---
 
+# ADR-082 — El detalle de movimiento edita sin pasar por el formulario
+
+**Estado:** Aceptada
+
+## Contexto
+
+Cambiar la cuenta, la fecha o la recurrencia de un movimiento cerraba el
+detalle, abría el formulario completo precargado en ese paso y, al guardar,
+dejaba al usuario sin ningún modal abierto. Quien solo quería corregir una
+fecha atravesaba el editor entero y perdía de vista el movimiento.
+
+## Decisión
+
+Categoría, cuenta, fecha y recurrencia abren **solo** su selector, apilado sobre
+el detalle (`stackBehavior="push"`). Al guardar o cerrar se vuelve al mismo
+movimiento, ya actualizado. El formulario completo queda para lo que de verdad
+lo necesita: el título y el importe.
+
+La categoría es el caso aparte: su selector arrastra la creación de categorías y
+sus plantillas, así que lo sigue poseyendo la navegación y no se apila desde el
+detalle. Lo que cambia es el destino de la selección —un `CategoryCreationContext`
+nuevo, `transaction-detail`— en lugar de abrir el formulario.
+
+- Los selectores son **los mismos componentes** que usa el formulario
+  (`TransactionDatePickerModal`, `TransactionMoneyAccountPickerModal`,
+  `TransactionRecurrencePickerModal`); solo cambia quién recibe la selección.
+  `TransactionDetailQuickEditors` los agrupa para no engordar el detalle.
+- El guardado **no** usa un UPDATE por campo. `applyTransactionQuickEdit`
+  traduce el cambio al borrador completo y lo entrega a
+  `updateLocalTransaction`, el mismo camino del formulario: series recurrentes,
+  ocurrencias proyectadas y autoría se resuelven en un solo sitio. Un
+  `UPDATE money_account_id` suelto ya existía y era exactamente la segunda regla
+  que se desincroniza.
+- `useTransactionEditing` extrae de `MainTabsNavigator` ese guardado compartido.
+  La extracción era además obligatoria: el navegador está congelado en 1372
+  líneas y el cambio lo dejaba en 1387. Ahora cierra en 1338.
+- Si la ocurrencia era proyectada, `updateLocalTransaction` la materializa y le
+  cambia el id; el detalle se reapunta al id devuelto en vez de cerrarse solo.
+- `TransactionQuickEdit` es una unión discriminada y no un objeto de campos
+  opcionales: retirar la cuenta es `moneyAccountId: undefined`, que en un objeto
+  parcial no se distingue de «no toques la cuenta».
+
+## Editar una recurrencia corta hacia adelante, no hacia atrás
+
+Cambiar la recurrencia sustituye las repeticiones **posteriores** a la fecha del
+movimiento editado y conserva las anteriores: ya ocurrieron y forman parte de
+saldos y totales que el usuario ya ha visto.
+
+Para una serie automática (`recurrence_series_id`) esa regla ya existía —el
+archivado se acotaba con `occurred_on > ?`—, pero **no** para una lista de fechas
+personalizada (`recurrence_group_id`), que no se tocaba en absoluto: editar una
+fecha del grupo dejaba vivas todas las demás, también las futuras.
+
+`archiveLaterOccurrences` unifica los dos casos en un solo sitio y se aplica en
+las cuatro transiciones —a personalizada, a automática, a única y entre
+automáticas—. Nunca alcanza al movimiento editado: cuando se ejecuta, o su fecha
+todavía es la original y por tanto no es posterior a sí misma, o ya se le ha
+asignado otro grupo.
+
+## Consecuencias negativas
+
+- Si una fecha de la nueva recurrencia coincide con una ocurrencia anterior que
+  se conserva, quedan dos movimientos ese día. Deduplicar exigiría decidir cuál
+  gana; queda fuera de esta entrega.
+
+## Validación
+
+`TransactionDetailModal.test.tsx` cubre que categoría, cuenta y recurrencia
+abren su selector sin llamar a `onEdit`, y que guardar emite el cambio y cierra
+el selector. `transactionQuickEdit.test.ts` cubre la construcción del borrador,
+incluida la retirada de cuenta y el descarte de fechas personalizadas.
+`localTransactionRepository.test.ts` cubre que un grupo personalizado pierde sus
+fechas posteriores —y solo esas— al cambiar de recurrencia y al dejar de
+repetirse, y que un movimiento que no repetía no archiva nada.
+
+---
+
 # ADR-081 — Un solo donut para categorías y cuentas
 
 **Estado:** Aceptada

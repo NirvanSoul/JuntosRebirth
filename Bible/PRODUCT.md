@@ -795,10 +795,18 @@ tocar un movimiento.
 ### Detalle de movimiento
 
 El bloque de metadatos incluye una fila de cuenta, exista o no: cuando el
-movimiento no tiene ninguna dice «Sin cuenta». Tocarla abre el selector y
-permite asignarla o retirarla sin reabrir el formulario, igual que la fila de
-categoría lleva a su detalle. Solo se ofrecen cuentas en la misma moneda del
-movimiento, porque el importe no cambia al entrar en un saldo.
+movimiento no tiene ninguna dice «Sin cuenta». Las filas de categoría, cuenta,
+fecha y recurrencia abren **solo** su selector, encima del propio detalle: al
+guardar o cerrar se vuelve al movimiento que se estaba mirando, ya actualizado,
+y el formulario completo no llega a aparecer. La categoría ya no navega a su
+detalle desde aquí. Solo se ofrecen cuentas en la misma moneda del movimiento,
+porque el importe no cambia al entrar en un saldo.
+
+Cambiar la recurrencia de un movimiento afecta a lo que viene después, no a lo
+que ya pasó: las repeticiones posteriores a su fecha se sustituyen por la nueva
+recurrencia y las anteriores se conservan intactas, porque ya ocurrieron y
+forman parte de saldos y totales que el usuario ya ha visto. La regla vale igual
+para una recurrencia automática y para una lista de fechas personalizada.
 
 El detalle de movimiento conserva la distribución general del detalle de
 categoría: una superficie expandida con cierre propio, identidad visual,

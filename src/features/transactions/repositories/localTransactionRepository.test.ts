@@ -362,6 +362,12 @@ describe('localTransactionRepository', () => {
   });
 
   it('convierte una edición personalizada en un grupo de ocurrencias', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      occurred_on: '2026-08-01',
+      recurrence: 'once',
+      recurrence_series_id: null,
+      created_by: 'uuid-ana',
+    });
     mockRandomUUID
       .mockReturnValueOnce('edited-custom-group')
       .mockReturnValueOnce('edited-custom-2')
@@ -376,16 +382,19 @@ describe('localTransactionRepository', () => {
     ).resolves.toMatchObject([
       {
         id: 'transaction-id',
+        createdBy: 'uuid-ana',
         occurredOn: '2026-08-05',
         recurrenceGroupId: 'edited-custom-group',
       },
       {
         id: 'edited-custom-2',
+        createdBy: 'uuid-ana',
         occurredOn: '2026-08-12',
         recurrenceGroupId: 'edited-custom-group',
       },
       {
         id: 'edited-custom-3',
+        createdBy: 'uuid-ana',
         occurredOn: '2026-08-20',
         recurrenceGroupId: 'edited-custom-group',
       },
@@ -443,11 +452,95 @@ describe('localTransactionRepository', () => {
     );
   });
 
+  it('archiva solo las ocurrencias posteriores de un grupo personalizado', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      occurred_on: '2026-08-10',
+      recurrence: 'custom',
+      recurrence_group_id: 'old-group',
+      recurrence_series_id: null,
+      created_by: 'installation-id',
+    });
+    mockRandomUUID.mockReturnValueOnce('new-series');
+
+    await updateLocalTransaction('transaction-id', {
+      ...draft,
+      occurredOn: '2026-08-10',
+      recurrence: 'monthly',
+    });
+
+    // La fecha del movimiento editado acota el archivado: lo anterior a ella
+    // ya ocurrió y se conserva.
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE recurrence_group_id = ?'),
+      expect.any(String),
+      expect.any(String),
+      'old-group',
+      '2026-08-10',
+      'personal',
+    );
+    expect(runAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining('WHERE recurrence_series_id = ?'),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('no archiva nada cuando el movimiento editado no repetía', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      occurred_on: '2026-08-10',
+      recurrence: 'once',
+      recurrence_group_id: null,
+      recurrence_series_id: null,
+      created_by: 'installation-id',
+    });
+    mockRandomUUID.mockReturnValueOnce('new-series');
+
+    await updateLocalTransaction('transaction-id', {
+      ...draft,
+      occurredOn: '2026-08-10',
+      recurrence: 'monthly',
+    });
+
+    expect(runAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining('SET is_archived = 1'),
+      ...Array.from({ length: 5 }, () => expect.anything()),
+    );
+  });
+
+  it('al dejar de repetirse, corta las fechas posteriores de su grupo', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      occurred_on: '2026-08-10',
+      recurrence: 'custom',
+      recurrence_group_id: 'old-group',
+      recurrence_series_id: null,
+      created_by: 'installation-id',
+    });
+
+    await updateLocalTransaction('transaction-id', {
+      ...draft,
+      occurredOn: '2026-08-10',
+      recurrence: 'once',
+    });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE recurrence_group_id = ?'),
+      expect.any(String),
+      expect.any(String),
+      'old-group',
+      '2026-08-10',
+      'personal',
+    );
+  });
+
   it('crea una serie real al cambiar un movimiento único a recurrencia automática', async () => {
     getFirstAsync.mockResolvedValueOnce({
       occurred_on: '2026-08-01',
       recurrence: 'once',
       recurrence_series_id: null,
+      created_by: 'uuid-ana',
     });
     mockRandomUUID.mockReturnValueOnce('new-series');
 
@@ -459,6 +552,7 @@ describe('localTransactionRepository', () => {
     ).resolves.toMatchObject([
       {
         id: 'transaction-id',
+        createdBy: 'uuid-ana',
         recurrence: 'monthly',
         recurrenceSeriesId: 'new-series',
         recurrenceStartsOn: '2026-08-01',
@@ -471,7 +565,7 @@ describe('localTransactionRepository', () => {
       'personal',
       'category-id',
       null,
-      'installation-id',
+      'uuid-ana',
       'expense',
       1250,
       'EUR',
