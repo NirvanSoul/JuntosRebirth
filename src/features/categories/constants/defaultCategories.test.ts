@@ -67,6 +67,19 @@ describe('defaultCategories', () => {
     expect(new Set(colorTokens)).toEqual(new Set(Object.keys(categoryColors)));
   });
 
+  it('asocia Salario y Familia a los colores sugeridos', () => {
+    const definitions = defaultCategoryPages.flat();
+
+    expect(definitions.find(({ key }) => key === 'salary')).toMatchObject({
+      colorToken: 'green',
+    });
+    expect(definitions.find(({ key }) => key === 'family')).toMatchObject({
+      colorToken: 'plum',
+    });
+    expect(categoryColors.green).toBe('#00CD5C');
+    expect(categoryColors.plum).toBe('#D642FF');
+  });
+
   it('presenta Salidas con un icono de copas de vino', () => {
     expect(
       defaultCategoryPages.flat().find(({ key }) => key === 'savings'),

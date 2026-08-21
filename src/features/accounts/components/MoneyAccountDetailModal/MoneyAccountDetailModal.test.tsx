@@ -121,9 +121,8 @@ describe('MoneyAccountDetailModal', () => {
       'center',
     );
     expect(
-      StyleSheet.flatten(
-        within(balanceMetric).getByText(/975/).props.style,
-      ).fontSize,
+      StyleSheet.flatten(within(balanceMetric).getByText(/975/).props.style)
+        .fontSize,
     ).toBe(typography.amount.fontSize);
     expect(
       StyleSheet.flatten(

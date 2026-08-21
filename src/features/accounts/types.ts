@@ -15,20 +15,49 @@ export type MoneyAccountKind = (typeof moneyAccountKinds)[number];
  * el dinero y los de cuenta, dónde está guardado. Mezclarlos obligaría a
  * enseñar «paw-print» al elegir una cuenta bancaria.
  */
-export const moneyAccountIconNames = [
-  'wallet',
-  'bank',
-  'credit-card',
-  'piggy-bank',
-  'money',
-  'coins',
-  'vault',
-  'hand-coins',
-  'currency-circle-dollar',
-  'buildings',
+export const moneyAccountIconSections = [
+  {
+    title: 'Dinero',
+    icons: [
+      'money',
+      'coins',
+      'hand-coins',
+      'cash-register',
+      'calculator',
+      'receipt',
+    ],
+  },
+  {
+    title: 'Tarjetas y pagos',
+    icons: [
+      'credit-card',
+      'cardholder',
+      'wallet',
+      'device-mobile',
+      'phone',
+      'barcode',
+    ],
+  },
+  {
+    title: 'Cuentas y ahorro',
+    icons: [
+      'bank',
+      'buildings',
+      'vault',
+      'piggy-bank',
+      'lock-key',
+      'shield-check',
+      'chart-line-up',
+      'trend-up',
+    ],
+  },
 ] as const;
 
-export type MoneyAccountIconName = (typeof moneyAccountIconNames)[number];
+export type MoneyAccountIconName =
+  (typeof moneyAccountIconSections)[number]['icons'][number];
+
+export const moneyAccountIconNames: readonly MoneyAccountIconName[] =
+  moneyAccountIconSections.flatMap(({ icons }) => icons);
 
 export type MoneyAccount = {
   id: string;

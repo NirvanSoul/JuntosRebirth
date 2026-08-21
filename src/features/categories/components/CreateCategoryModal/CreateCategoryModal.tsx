@@ -8,18 +8,24 @@ import { Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
+import {
+  AppearancePicker,
+  type AppearanceColorOption,
+} from '@/components/ui/AppearancePicker/AppearancePicker';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type {
   Category,
+  CategoryEditorTarget,
   CategoryIconName,
   CreateCategoryInput,
 } from '@/features/categories/types';
-import { categoryIconNames } from '@/features/categories/types';
+import { categoryIconSections } from '@/features/categories/types';
 import { validateCategoryName } from '@/features/categories/utils/categoryCatalog';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import {
   categoryColors,
+  categoryColorTokens,
   type CategoryColorToken,
 } from '@/theme/categoryColors';
 import { iconSize, layout } from '@/theme/layout';
@@ -33,6 +39,7 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type CreateCategoryModalProps = {
   categories: readonly Category[];
   category?: Category | null;
+  initialEditor?: CategoryEditorTarget;
   spaceId: string;
   spaceName: string;
   visible: boolean;
@@ -40,13 +47,18 @@ type CreateCategoryModalProps = {
   onSubmit: (input: CreateCategoryInput) => void;
 };
 
-const colorOptions = Object.keys(categoryColors) as CategoryColorToken[];
+const colorOptions: readonly AppearanceColorOption<CategoryColorToken>[] =
+  categoryColorTokens.map((value) => ({
+    color: categoryColors[value],
+    value,
+  }));
 const defaultIcon: CategoryIconName = 'shopping-bag';
 const defaultColor: CategoryColorToken = 'violet';
 
 export function CreateCategoryModal({
   categories,
   category = null,
+  initialEditor,
   spaceId,
   spaceName,
   visible,
@@ -90,7 +102,7 @@ export function CreateCategoryModal({
 
   useEffect(() => {
     if (visible) {
-      setStep('name');
+      setStep(initialEditor ?? 'name');
       setName(category?.name ?? '');
       setIcon(category?.icon ?? defaultIcon);
       setColorToken(category?.colorToken ?? defaultColor);
@@ -98,7 +110,7 @@ export function CreateCategoryModal({
     } else {
       setKeyboardVisible(false);
     }
-  }, [category, visible]);
+  }, [category, initialEditor, visible]);
 
   const handleContinue = () => {
     setHasAttemptedSubmit(true);
@@ -215,6 +227,7 @@ export function CreateCategoryModal({
                     styles.previewIcon,
                     { backgroundColor: categoryColors[colorToken] },
                   ]}
+                  testID="category-appearance-preview-icon"
                 >
                   <CategoryIcon
                     color={colors.onBrand}
@@ -225,75 +238,22 @@ export function CreateCategoryModal({
                 <Text variant="subheading">{name.trim()}</Text>
               </View>
 
-              <Text
-                style={styles.sectionTitle}
-                variant="label"
-                weight="semibold"
-              >
-                Color
-              </Text>
-              <View accessibilityRole="radiogroup" style={styles.optionsGrid}>
-                {colorOptions.map((option) => (
-                  <Pressable
-                    accessibilityLabel={`Color ${option}`}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: colorToken === option }}
-                    key={option}
-                    onPress={() => setColorToken(option)}
-                    style={[
-                      styles.colorOption,
-                      { backgroundColor: categoryColors[option] },
-                      colorToken === option && styles.selectedOption,
-                    ]}
-                  >
-                    {colorToken === option && (
-                      <Ionicons
-                        color={colors.onBrand}
-                        name="checkmark"
-                        size={iconSize.md}
-                      />
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text
-                style={styles.sectionTitle}
-                variant="label"
-                weight="semibold"
-              >
-                Icono
-              </Text>
-              <View accessibilityRole="radiogroup" style={styles.optionsGrid}>
-                {categoryIconNames.map((option) => {
-                  const selected = icon === option;
-
-                  return (
-                    <Pressable
-                      accessibilityLabel={`Icono ${option}`}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: selected }}
-                      key={option}
-                      onPress={() => setIcon(option)}
-                      style={[
-                        styles.iconOption,
-                        selected && styles.selectedIconOption,
-                        selected && {
-                          backgroundColor: categoryColors[colorToken],
-                        },
-                      ]}
-                    >
-                      <CategoryIcon
-                        color={
-                          selected ? colors.onBrand : categoryColors[colorToken]
-                        }
-                        name={option}
-                        size={iconSize.md}
-                      />
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <AppearancePicker
+                colorOptions={colorOptions}
+                iconSections={categoryIconSections}
+                onSelectColor={setColorToken}
+                onSelectIcon={setIcon}
+                renderIcon={(option, color) => (
+                  <CategoryIcon
+                    color={color}
+                    name={option}
+                    size={iconSize.md}
+                  />
+                )}
+                selectedColor={colorToken}
+                selectedIcon={icon}
+                testID="category-appearance"
+              />
             </BottomSheetScrollView>
 
             <ModalPrimaryAction
@@ -342,9 +302,9 @@ function createStyles(colors: ColorTokens) {
     keyboardAction: { flex: 0, justifyContent: 'flex-start' },
     keyboardPrimaryButton: { marginTop: spacing.md },
     primaryButtonLayout: { marginTop: spacing.xl },
-    appearanceStep: { flex: 1 },
-    appearanceScroll: { flex: 1 },
-    appearanceContent: { paddingTop: spacing.xl, paddingBottom: spacing.md },
+    appearanceStep: { flex: 1, overflow: 'visible' },
+    appearanceScroll: { flex: 1, overflow: 'visible' },
+    appearanceContent: { paddingTop: spacing.xxxl, paddingBottom: spacing.md },
     preview: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -356,30 +316,6 @@ function createStyles(colors: ColorTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radii.round,
-    },
-    sectionTitle: { marginBottom: spacing.md, marginTop: spacing.xl },
-    optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-    colorOption: {
-      width: layout.minTouchTarget,
-      height: layout.minTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-    },
-    selectedOption: { borderColor: colors.textPrimary, borderWidth: 3 },
-    iconOption: {
-      width: layout.minTouchTarget,
-      height: layout.minTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-    },
-    selectedIconOption: {
-      borderColor: colors.textPrimary,
-      borderWidth: 3,
     },
   });
 }

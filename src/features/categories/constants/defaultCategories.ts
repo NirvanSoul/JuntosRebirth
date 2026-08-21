@@ -11,7 +11,7 @@ export type DefaultCategoryDefinition = {
 export const defaultCategoryPages: readonly (readonly DefaultCategoryDefinition[])[] =
   [
     [
-      { key: 'salary', name: 'Salario', icon: 'money', colorToken: 'emerald' },
+      { key: 'salary', name: 'Salario', icon: 'money', colorToken: 'green' },
       {
         key: 'groceries',
         name: 'Supermercado',
@@ -57,13 +57,13 @@ export const defaultCategoryPages: readonly (readonly DefaultCategoryDefinition[
         key: 'family',
         name: 'Familia',
         icon: 'users-three',
-        colorToken: 'green',
+        colorToken: 'plum',
       },
       {
         key: 'leisure',
         name: 'Ocio',
         icon: 'game-controller',
-        colorToken: 'plum',
+        colorToken: 'emerald',
       },
       {
         key: 'education',

@@ -133,6 +133,68 @@ describe('CreateTransactionModal', () => {
     );
   });
 
+  it('abre el selector de fecha con la fecha del movimiento al llegar desde el detalle', async () => {
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="personal"
+        initialDraft={{
+          spaceId: 'personal',
+          type: 'expense',
+          amountMinor: 1250,
+          currency: 'EUR',
+          title: 'Almuerzo',
+          categoryId: category.id,
+          occurredOn: '2026-07-30',
+          recurrence: 'monthly',
+        }}
+        initialEditor="date"
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={jest.fn()}
+        selectedCategory={category}
+        visible
+      />,
+    );
+
+    expect(
+      screen.getByRole('header', { name: 'Elige una fecha' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('transaction-date-calendar.day_2026-07-30'),
+    ).toBeTruthy();
+  });
+
+  it('abre el selector de recurrencia con el valor del movimiento', async () => {
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="personal"
+        initialDraft={{
+          spaceId: 'personal',
+          type: 'expense',
+          amountMinor: 1250,
+          currency: 'EUR',
+          title: 'Almuerzo',
+          categoryId: category.id,
+          occurredOn: '2026-07-30',
+          recurrence: 'monthly',
+        }}
+        initialEditor="recurrence"
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={jest.fn()}
+        selectedCategory={category}
+        visible
+      />,
+    );
+
+    expect(
+      screen.getByRole('header', { name: 'Elige la recurrencia' }),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Recurrencia: Mensual')).toBeTruthy();
+  });
+
   it('permite introducir un importe y devuelve un gasto en unidades menores', async () => {
     const onSubmit = jest.fn();
     const screen = await renderWithTheme(
@@ -1046,6 +1108,40 @@ describe('CreateTransactionModal', () => {
       expect(
         screen.queryByTestId('transaction-money-account-button'),
       ).toBeNull();
+    });
+
+    it('abre la cuenta precargada al llegar desde el detalle', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          initialDraft={{
+            spaceId: 'personal',
+            type: 'expense',
+            amountMinor: 1250,
+            currency: 'USD',
+            title: 'Almuerzo',
+            categoryId: category.id,
+            moneyAccountId: bankAccount.id,
+            occurredOn: '2026-07-30',
+            recurrence: 'once',
+          }}
+          initialEditor="money-account"
+          initialType="expense"
+          moneyAccounts={[bankAccount]}
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      expect(
+        screen.getByRole('header', { name: 'Elige la cuenta' }),
+      ).toBeTruthy();
+      expect(
+        screen.getByLabelText('Cuenta nómina · USD').props.accessibilityState,
+      ).toMatchObject({ checked: true });
     });
 
     it('deja fuera las cuentas archivadas y las de otro espacio', async () => {

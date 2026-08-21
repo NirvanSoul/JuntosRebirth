@@ -1,27 +1,49 @@
 import { lightColors } from '@/theme/colors';
 
 export const categoryColors = {
-  emerald: '#00C968',
-  orange: '#F15A0A',
-  slate: '#4B5C73',
-  yellow: '#FFC515',
-  violet: '#7A35F2',
-  blue: '#098FCC',
-  pink: '#DE1D6A',
-  red: '#ED123F',
-  amber: '#E87900',
-  teal: '#009E91',
-  indigo: '#4F46D8',
-  brown: '#9A5B32',
-  green: '#24843C',
-  coral: '#C94232',
-  plum: '#A134C4',
-  rose: '#C92F75',
-  cyan: '#0087A8',
-  steel: '#60758F',
+  violet: '#842FFB',
+  plum: '#D642FF',
+  rose: '#FF93FD',
+  pink: '#FF0084',
+  slate: '#AFBEC3',
+  steel: '#617D8B',
+  green: '#00CD5C',
+  teal: '#14BAA9',
+  emerald: '#27E9B5',
+  cyan: '#44E9FF',
+  blue: '#2E95F0',
+  indigo: '#295BAB',
+  yellow: '#FFC200',
+  orange: '#FF8725',
+  coral: '#FF4000',
+  red: '#FF0004',
+  brown: '#BC6128',
+  amber: '#6C300B',
 } as const;
 
 export type CategoryColorToken = keyof typeof categoryColors;
+
+/** Orden visual compartido por los selectores de categoría y cuenta. */
+export const categoryColorTokens = [
+  'violet',
+  'plum',
+  'rose',
+  'pink',
+  'slate',
+  'steel',
+  'green',
+  'teal',
+  'emerald',
+  'cyan',
+  'blue',
+  'indigo',
+  'yellow',
+  'orange',
+  'coral',
+  'red',
+  'brown',
+  'amber',
+] as const satisfies readonly CategoryColorToken[];
 
 /**
  * Los fondos de categoría son colores fijos, ajenos al tema claro/oscuro, así
@@ -30,11 +52,21 @@ export type CategoryColorToken = keyof typeof categoryColors;
  */
 export const categoryContentContrast = {
   default: { color: lightColors.onBrand, tone: 'onBrand' },
-  yellow: { color: lightColors.textPrimary, tone: 'primary' },
+  dark: { color: lightColors.textPrimary, tone: 'primary' },
 } as const;
 
 export function getCategoryContentContrast(colorToken: CategoryColorToken) {
-  return colorToken === 'yellow'
-    ? categoryContentContrast.yellow
+  return [
+    'rose',
+    'slate',
+    'green',
+    'teal',
+    'emerald',
+    'cyan',
+    'blue',
+    'yellow',
+    'orange',
+  ].includes(colorToken)
+    ? categoryContentContrast.dark
     : categoryContentContrast.default;
 }

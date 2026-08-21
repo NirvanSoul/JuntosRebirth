@@ -21,9 +21,9 @@ export function createStyles(colors: ColorTokens) {
     },
     headerText: { flex: 1 },
     subtitle: { marginTop: spacing.xs },
-    step: { flex: 1 },
-    stepScroll: { flex: 1 },
-    stepContent: { paddingTop: spacing.xl, paddingBottom: spacing.md },
+    step: { flex: 1, overflow: 'visible' },
+    stepScroll: { flex: 1, overflow: 'visible' },
+    stepContent: { paddingTop: spacing.xxxl, paddingBottom: spacing.md },
     input: {
       borderColor: colors.border,
       borderWidth: 1,
@@ -56,29 +56,6 @@ export function createStyles(colors: ColorTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radii.round,
-    },
-    optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-    colorOption: {
-      width: layout.minTouchTarget,
-      height: layout.minTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-    },
-    selectedOption: { borderColor: colors.textPrimary, borderWidth: 3 },
-    iconOption: {
-      width: layout.minTouchTarget,
-      height: layout.minTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-    },
-    selectedIconOption: {
-      borderColor: colors.textPrimary,
-      borderWidth: 3,
     },
   });
 }

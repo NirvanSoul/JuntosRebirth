@@ -117,6 +117,11 @@ describe('HomeScreen', () => {
     expect(screen.getByText('Aún no hay categorías')).toBeTruthy();
     expect(screen.getByText('Aún no hay movimientos')).toBeTruthy();
     expect(screen.getByText('Aún no hay cuentas')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('home-empty-accounts-icon').props.style,
+      ).backgroundColor,
+    ).toBe(colors.cta);
     expect(screen.getByText('Movimientos Recientes')).toBeTruthy();
     // Categorías, Cuentas y Movimientos Recientes.
     expect(screen.getAllByText('Ver más')).toHaveLength(3);

@@ -4,7 +4,7 @@ import { DeviceEventEmitter, Platform, StyleSheet } from 'react-native';
 import { CreateCategoryModal } from '@/features/categories/components/CreateCategoryModal/CreateCategoryModal';
 import type { Category } from '@/features/categories/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
-import { categoryColors } from '@/theme/categoryColors';
+import { categoryColors, categoryColorTokens } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -178,10 +178,107 @@ describe('CreateCategoryModal', () => {
     );
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
 
+    expect(categoryColorTokens).toEqual([
+      'violet',
+      'plum',
+      'rose',
+      'pink',
+      'slate',
+      'steel',
+      'green',
+      'teal',
+      'emerald',
+      'cyan',
+      'blue',
+      'indigo',
+      'yellow',
+      'orange',
+      'coral',
+      'red',
+      'brown',
+      'amber',
+    ]);
+    expect(categoryColorTokens.map((token) => categoryColors[token])).toEqual([
+      '#842FFB',
+      '#D642FF',
+      '#FF93FD',
+      '#FF0084',
+      '#AFBEC3',
+      '#617D8B',
+      '#00CD5C',
+      '#14BAA9',
+      '#27E9B5',
+      '#44E9FF',
+      '#2E95F0',
+      '#295BAB',
+      '#FFC200',
+      '#FF8725',
+      '#FF4000',
+      '#FF0004',
+      '#BC6128',
+      '#6C300B',
+    ]);
     expect(Object.keys(categoryColors)).toHaveLength(18);
-    Object.keys(categoryColors).forEach((colorToken) => {
+    categoryColorTokens.forEach((colorToken) => {
       expect(screen.getByLabelText(`Color ${colorToken}`)).toBeTruthy();
     });
+    expect(
+      StyleSheet.flatten(screen.getByLabelText('Color violet').props.style),
+    ).toMatchObject({ borderRadius: radii.md });
+    expect(screen.queryByText('Color')).toBeNull();
+    expect(screen.queryByText('Icono')).toBeNull();
+  });
+
+  it('agrupa los iconos de categoría en tres filas de un único carrusel horizontal', async () => {
+    const screen = await renderWithTheme(
+      <CreateCategoryModal
+        categories={[]}
+        onClose={jest.fn()}
+        onSubmit={jest.fn()}
+        spaceId="personal"
+        spaceName="Personal"
+        visible
+      />,
+    );
+
+    await fireEvent.changeText(
+      screen.getByLabelText('Nombre de la categoría'),
+      'Escapada',
+    );
+    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
+
+    expect(screen.getByText('Transporte')).toBeTruthy();
+    expect(screen.getByText('Comida')).toBeTruthy();
+    expect(screen.getByText('Finanzas')).toBeTruthy();
+    expect(screen.getByText('Salud y hogar')).toBeTruthy();
+    expect(
+      screen.getByTestId('category-appearance-icons-scroll').props.horizontal,
+    ).toBe(true);
+    const iconScrollerStyle = StyleSheet.flatten(
+      screen.getByTestId('category-appearance-icons-scroll').props.style,
+    );
+    expect(iconScrollerStyle.marginLeft).toBe(-layout.screenGutter.regular);
+    expect(iconScrollerStyle.width).toBeGreaterThan(layout.minTouchTarget);
+    expect(iconScrollerStyle.overflow).toBe('visible');
+    expect(screen.getByLabelText('Icono bus')).toBeTruthy();
+    expect(screen.getByLabelText('Icono bread')).toBeTruthy();
+    expect(screen.getByLabelText('Icono ice-cream')).toBeTruthy();
+    expect(screen.getByLabelText('Icono storefront')).toBeTruthy();
+    expect(screen.getByLabelText('Icono handbag')).toBeTruthy();
+    expect(screen.getByLabelText('Icono basket')).toBeTruthy();
+    expect(screen.queryByLabelText('Icono money-wavy')).toBeNull();
+    expect(screen.queryByLabelText('Icono currency-circle-dollar')).toBeNull();
+    expect(screen.queryByLabelText('Icono chart-line-up')).toBeNull();
+    expect(screen.queryByLabelText('Icono trend-up')).toBeNull();
+    expect(screen.getByLabelText('Icono syringe')).toBeTruthy();
+    expect(screen.getByLabelText('Icono hospital')).toBeTruthy();
+    expect(screen.getByLabelText('Icono television')).toBeTruthy();
+    expect(screen.getByLabelText('Icono microphone-stage')).toBeTruthy();
+    expect(screen.queryByLabelText('Icono device-mobile')).toBeNull();
+    expect(
+      screen.getByTestId('category-appearance-preview-icon').props.children
+        .props.color,
+    ).toBe(colors.onBrand);
   });
 
   it('reutiliza el editor para actualizar una categoría existente', async () => {

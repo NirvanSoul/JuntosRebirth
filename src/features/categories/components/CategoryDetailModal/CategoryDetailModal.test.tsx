@@ -94,6 +94,14 @@ describe('CategoryDetailModal', () => {
     expect(
       within(detail).getByTestId('category-detail-title').props.children,
     ).toBe('Comida');
+    await fireEvent.press(
+      within(detail).getByLabelText('Editar nombre de categoría'),
+    );
+    await fireEvent.press(
+      within(detail).getByLabelText('Editar apariencia de categoría'),
+    );
+    expect(onEdit).toHaveBeenCalledWith('food', 'name');
+    expect(onEdit).toHaveBeenCalledWith('food', 'appearance');
     expect(within(detail).queryByText('1 movimiento')).toBeNull();
     expect(within(detail).getByText('Almuerzo')).toBeTruthy();
     await fireEvent.press(
@@ -273,7 +281,7 @@ describe('CategoryDetailModal', () => {
     );
 
     await fireEvent.press(
-      screen.getByRole('button', { name: 'Editar presupuesto' }),
+      screen.getByRole('button', { name: 'Abrir presupuesto' }),
     );
     const budgetModal = screen.getByTestId('category-budget-modal');
     const removeButton = within(budgetModal).getByRole('button', {

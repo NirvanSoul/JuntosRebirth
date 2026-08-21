@@ -1,6 +1,6 @@
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   ReduceMotion,
@@ -24,6 +24,7 @@ import {
 import type { Category } from '@/features/categories/types';
 import type {
   CreateTransactionDraft,
+  TransactionEditorTarget,
   TransactionType,
 } from '@/features/transactions/types';
 import {
@@ -70,6 +71,7 @@ type CreateTransactionModalProps = {
   availableCurrencies?: readonly CurrencyCode[];
   initialDate?: string;
   initialDraft?: CreateTransactionDraft;
+  initialEditor?: TransactionEditorTarget;
   /** Cuentas activas del espacio; sin ninguna, el selector no aparece. */
   moneyAccounts?: readonly MoneyAccount[];
   /** Abre la creación de una cuenta desde el propio selector. */
@@ -145,6 +147,7 @@ export function CreateTransactionModal({
   hideTypeToggle = false,
   initialDate,
   initialDraft,
+  initialEditor,
   moneyAccounts = defaultMoneyAccounts,
   onClose,
   onCreateMoneyAccount,
@@ -186,6 +189,9 @@ export function CreateTransactionModal({
     useState(false);
   const [segmentedControlWidth, setSegmentedControlWidth] = useState(0);
   const wasVisible = useRef(false);
+  const openedInitialEditor = useRef<TransactionEditorTarget | undefined>(
+    undefined,
+  );
   const typeProgress = useSharedValue(type === 'income' ? 1 : 0);
   const amountScale = useSharedValue(1);
   const amountTranslateY = useSharedValue(0);
@@ -265,7 +271,7 @@ export function CreateTransactionModal({
     [occurredOn],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!visible) {
       return;
     }
@@ -308,6 +314,29 @@ export function CreateTransactionModal({
     spaceCurrency,
     visible,
   ]);
+
+  useEffect(() => {
+    if (!visible) {
+      openedInitialEditor.current = undefined;
+      return;
+    }
+    if (!initialEditor || openedInitialEditor.current === initialEditor) {
+      return;
+    }
+
+    openedInitialEditor.current = initialEditor;
+    if (initialEditor === 'category') {
+      onOpenCategoryPicker();
+    } else if (initialEditor === 'date') {
+      setDatePickerVisible(true);
+    } else if (initialEditor === 'recurrence') {
+      setRecurrencePickerVisible(true);
+    } else if (initialEditor === 'currency') {
+      setCurrencyPickerVisible(true);
+    } else {
+      setMoneyAccountPickerVisible(true);
+    }
+  }, [initialEditor, onOpenCategoryPicker, visible]);
 
   useEffect(() => {
     if (!visible) {

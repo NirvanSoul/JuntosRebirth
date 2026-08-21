@@ -125,10 +125,13 @@ visualmente desactivadas, no muestran una marca de selección y explican «Ya
 creaste esta categoría» al volver a tocarlas. Las 18 plantillas usan 18 colores
 distintos, construidos como variaciones de la misma identidad visual. El usuario
 también puede usar esa paleta completa al añadir categorías personalizadas con
-nombre, color e icono. Ninguna categoría de plantilla o personalizada existe
-implícitamente en otro espacio. Los iconos de
-categoría usan siempre su variante rellena para mantener una identidad visual
-consistente.
+nombre, color e icono. El selector de color de categorías y cuentas comparte
+la misma paleta, en su orden visual definido en `src/theme/categoryColors.ts`,
+con muestras cuadradas de radio 16 y una separación visible entre ellas. El
+selector de iconos agrupa opciones relacionadas bajo subtítulos, en tres filas
+dentro de un único carrusel horizontal. Ninguna categoría de plantilla o personalizada existe
+implícitamente en otro espacio. Los iconos de categoría usan siempre su
+variante rellena para mantener una identidad visual consistente.
 
 Una categoría puede tener un presupuesto simple opcional. Cuando existe, las
 vistas previas pueden mostrar el progreso del gasto frente a ese límite; cuando

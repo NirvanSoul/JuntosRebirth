@@ -115,7 +115,7 @@ export function ActivityAccountsSection({
           accessibilityLabel="Crear primera cuenta"
           description="Crea una cuenta para saber cuánto te queda en cada sitio."
           icon="wallet-outline"
-          iconBackgroundColor={colors.brand}
+          iconBackgroundColor={colors.cta}
           onPress={onCreateMoneyAccount}
           testID="activity-empty-accounts"
           title="Aún no hay cuentas"

@@ -14,10 +14,10 @@ LogBox.ignoreLogs([
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <AppProviders>
+    <AppProviders>
+      <ErrorBoundary>
         <AppBootstrap />
-      </AppProviders>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </AppProviders>
   );
 }

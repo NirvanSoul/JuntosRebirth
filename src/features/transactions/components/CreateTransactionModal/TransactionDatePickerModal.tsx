@@ -46,6 +46,7 @@ export function TransactionDatePickerModal({
 
         <AppCalendar
           currentDate={draftDate}
+          key={draftDate}
           onSelectDate={setDraftDate}
           selectedDate={draftDate}
           testID="transaction-date-calendar"

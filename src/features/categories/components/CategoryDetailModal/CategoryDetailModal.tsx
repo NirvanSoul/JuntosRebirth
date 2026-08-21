@@ -19,6 +19,7 @@ import { CategoryDetailActionButton as ActionButton } from '@/features/categorie
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type {
   Category,
+  CategoryEditorTarget,
   CategoryShareTarget,
 } from '@/features/categories/types';
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
@@ -48,7 +49,7 @@ type CategoryDetailModalProps = {
   onAddTransaction: (categoryId: string) => void;
   onClose: () => void;
   onDelete: (categoryId: string) => void;
-  onEdit: (categoryId: string) => void;
+  onEdit: (categoryId: string, initialEditor?: CategoryEditorTarget) => void;
   onOpenTransactionDetail: (transactionId: string) => void;
   onSaveBudget: (categoryId: string, budgetMinor?: number) => void;
   onSaveNote: (categoryId: string, note: string | null) => void;
@@ -183,9 +184,7 @@ export function CategoryDetailModal({
   const budgetProgress = category.budgetMinor
     ? Math.min(budgetExpenseMinor / category.budgetMinor, 1)
     : 0;
-  const openDeletePanel = () => {
-    setPanel('delete');
-  };
+  const openDeletePanel = () => setPanel('delete');
 
   return (
     <>
@@ -220,7 +219,10 @@ export function CategoryDetailModal({
             testID="category-detail-scroll-view"
           >
             <View style={styles.hero}>
-              <View
+              <Pressable
+                accessibilityLabel="Editar apariencia de categoría"
+                accessibilityRole="button"
+                onPress={() => onEdit(category.id, 'appearance')}
                 style={[
                   styles.heroIcon,
                   { backgroundColor: categoryColors[category.colorToken] },
@@ -231,8 +233,13 @@ export function CategoryDetailModal({
                   name={category.icon}
                   size={iconSize.xl}
                 />
-              </View>
-              <View style={styles.titleBlock}>
+              </Pressable>
+              <Pressable
+                accessibilityLabel="Editar nombre de categoría"
+                accessibilityRole="button"
+                onPress={() => onEdit(category.id, 'name')}
+                style={styles.titleBlock}
+              >
                 <Text
                   align="center"
                   testID="category-detail-context"
@@ -250,7 +257,7 @@ export function CategoryDetailModal({
                 >
                   {category.name}
                 </Text>
-              </View>
+              </Pressable>
             </View>
 
             {panel === 'delete' ? (
@@ -344,7 +351,13 @@ export function CategoryDetailModal({
             </Pressable>
 
             {category.budgetMinor && budget && availableBudget ? (
-              <View style={styles.budgetCard} testID="category-budget-summary">
+              <Pressable
+                accessibilityLabel="Abrir presupuesto"
+                accessibilityRole="button"
+                onPress={() => setBudgetModalVisible(true)}
+                style={styles.budgetCard}
+                testID="category-budget-summary"
+              >
                 <View style={styles.budgetHeader}>
                   <View>
                     <Text tone="secondary" variant="caption">
@@ -366,7 +379,7 @@ export function CategoryDetailModal({
                   color={categoryColors[category.colorToken]}
                   progress={budgetProgress}
                 />
-              </View>
+              </Pressable>
             ) : null}
 
             <View style={styles.actions} testID="category-detail-actions">

@@ -3,6 +3,7 @@ import { fireEvent } from '@testing-library/react-native';
 import { CreateMoneyAccountModal } from '@/features/accounts/components/CreateMoneyAccountModal/CreateMoneyAccountModal';
 import type { MoneyAccount } from '@/features/accounts/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
+import { colors } from '@/theme/colors';
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
   AppModal: ({
@@ -242,5 +243,34 @@ describe('CreateMoneyAccountModal', () => {
 
     // Sin moneda no habría saldo que calcular, así que la última no se quita.
     expect(screen.getByLabelText('Saldo inicial')).toBeTruthy();
+  });
+
+  it('permite elegir los iconos ampliados de una cuenta por categoría', async () => {
+    const onSubmit = jest.fn();
+    const screen = await renderModal({ onSubmit });
+
+    await fireEvent.changeText(
+      screen.getByLabelText('Nombre de la cuenta'),
+      'Tarjeta de viajes',
+    );
+    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
+
+    expect(screen.getByText('Tarjetas y pagos')).toBeTruthy();
+    expect(screen.getByText('Cuentas y ahorro')).toBeTruthy();
+    expect(
+      screen.getByTestId('money-account-appearance-icons-scroll').props
+        .horizontal,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('money-account-appearance-preview-icon').props.children
+        .props.color,
+    ).toBe(colors.onBrand);
+
+    await fireEvent.press(screen.getByLabelText('Icono cardholder'));
+    await fireEvent.press(screen.getByLabelText('Crear cuenta'));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ icon: 'cardholder' }),
+    );
   });
 });
