@@ -8,3 +8,4 @@ ios/
 package-lock.json
 Bible/
 supabase/.temp/
+docs/setup/GPU_AI_SERVER_SETUP.md

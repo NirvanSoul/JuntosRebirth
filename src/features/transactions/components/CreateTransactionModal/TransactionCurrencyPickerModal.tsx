@@ -6,6 +6,7 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
 import { Text } from '@/components/ui/Text/Text';
+import type { CurrencySwitchReason } from '@/features/transactions/utils/transactionAmount';
 import {
   getCurrencyFlag,
   getCurrencyName,
@@ -14,10 +15,16 @@ import {
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 
+const currencySwitchErrorMessages: Record<CurrencySwitchReason, string> = {
+  fraction_not_allowed:
+    'La moneda elegida no admite decimales. Ajusta el importe antes de cambiar.',
+  unsafe_integer: 'El importe es demasiado grande para esta moneda.',
+};
+
 export type TransactionCurrencyPickerModalProps = {
   availableCurrencies: readonly CurrencyCode[];
   currency: CurrencyCode;
-  error?: string | null;
+  error?: CurrencySwitchReason | null;
   visible: boolean;
   onClose: () => void;
   onSelectCurrency: (currency: CurrencyCode) => void;
@@ -69,7 +76,7 @@ export function TransactionCurrencyPickerModal({
 
         {error ? (
           <Text tone="expense" variant="footnote">
-            {error}
+            {currencySwitchErrorMessages[error]}
           </Text>
         ) : null}
 

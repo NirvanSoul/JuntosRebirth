@@ -23,7 +23,10 @@ begin
 end;
 $$;
 
-revoke all on function public.prevent_space_currency_change() from public, anon;
+revoke all on function public.prevent_space_currency_change()
+  from public, anon, authenticated;
+-- Los triggers son ejecutados por el dueño de la base de datos o el que
+-- dispara el evento. No requiere EXECUTE manual.
 
 create trigger spaces_currency_immutable
 before update on public.spaces

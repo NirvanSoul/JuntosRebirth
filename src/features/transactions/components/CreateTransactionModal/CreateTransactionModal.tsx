@@ -14,24 +14,23 @@ import Animated, {
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
-import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { Category } from '@/features/categories/types';
 import type {
   CreateTransactionDraft,
-  TransactionRecurrence,
   TransactionType,
 } from '@/features/transactions/types';
 import {
   amountMinorToInput,
   appendAmountKey,
   type CalculatorOperator,
+  convertCurrencySwitch,
+  type CurrencySwitchReason,
   evaluatePendingOperations,
   formatAmountInputForDisplay,
   type PendingOperationStep,
   parseAmountMinor,
-  validateCurrencySwitch,
 } from '@/features/transactions/utils/transactionAmount';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { getLocalTodayKey } from '@/lib/date/localDate';
@@ -56,7 +55,11 @@ import { maxFontScale, typography } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import { TransactionDatePickerModal } from './TransactionDatePickerModal';
-import { TransactionCustomRecurrenceModal } from './TransactionCustomRecurrenceModal';
+import {
+  defaultRecurrence,
+  recurrenceOptions,
+  TransactionRecurrencePickerModal,
+} from './TransactionRecurrencePickerModal';
 import { TransactionCurrencyPickerModal } from './TransactionCurrencyPickerModal';
 
 type CreateTransactionModalProps = {
@@ -81,19 +84,6 @@ type CreateTransactionModalProps = {
   onSubmit: (draft: CreateTransactionDraft) => void;
   onTypeChange: (type: TransactionType) => void;
 };
-
-const defaultRecurrence: {
-  value: TransactionRecurrence;
-  label: string;
-} = { value: 'once', label: 'Único' };
-
-const recurrenceOptions: readonly (typeof defaultRecurrence)[] = [
-  defaultRecurrence,
-  { value: 'weekly', label: 'Semanal' },
-  { value: 'biweekly', label: 'Quincenal' },
-  { value: 'monthly', label: 'Mensual' },
-  { value: 'custom', label: 'Personalizada' },
-];
 
 const keypadRows = [
   ['7', '8', '9', 'divide'],
@@ -168,13 +158,16 @@ export function CreateTransactionModal({
   const [isRecurrencePickerVisible, setRecurrencePickerVisible] =
     useState(false);
   const [isCurrencyPickerVisible, setCurrencyPickerVisible] = useState(false);
-  const [currencyError, setCurrencyError] = useState<string | null>(null);
+  const [currencyError, setCurrencyError] =
+    useState<CurrencySwitchReason | null>(null);
   const [segmentedControlWidth, setSegmentedControlWidth] = useState(0);
   const wasVisible = useRef(false);
   const typeProgress = useSharedValue(type === 'income' ? 1 : 0);
   const amountScale = useSharedValue(1);
   const amountTranslateY = useSharedValue(0);
-  const amountMinor = parseAmountMinor(amountInput, currency);
+  const amountParse = parseAmountMinor(amountInput, currency);
+  const amountMinor = amountParse.ok ? amountParse.amountMinor : 0;
+  const isAmountInvalid = !amountParse.ok;
   const recurrence = recurrenceOptions[recurrenceIndex] ?? defaultRecurrence;
   const isCalculationPending = pendingOperations.length > 0;
   const lastPendingOperation =
@@ -406,7 +399,7 @@ export function CreateTransactionModal({
   };
 
   const handleSubmit = () => {
-    if (amountMinor <= 0 || !selectedCategory) {
+    if (isAmountInvalid || amountMinor <= 0 || !selectedCategory) {
       return;
     }
 
@@ -426,7 +419,8 @@ export function CreateTransactionModal({
     });
   };
 
-  const isSubmitDisabled = amountMinor <= 0 || !selectedCategory;
+  const isSubmitDisabled =
+    isAmountInvalid || amountMinor <= 0 || !selectedCategory;
   const primaryActionLabel = isCalculationPending
     ? '='
     : initialDraft
@@ -437,6 +431,25 @@ export function CreateTransactionModal({
     : initialDraft
       ? 'Guardar cambios'
       : 'Agregar movimiento';
+
+  const handleCurrencySelect = (code: CurrencyCode) => {
+    const result = convertCurrencySwitch(
+      currency,
+      code,
+      amountMinor,
+      pendingOperations,
+    );
+    if (!result.ok) {
+      setCurrencyError(result.reason);
+      return;
+    }
+
+    setCurrencyError(null);
+    setAmountInput(amountMinorToInput(result.amountMinor, code));
+    setPendingOperations(result.pendingOperations);
+    setCurrency(code);
+    setCurrencyPickerVisible(false);
+  };
 
   return (
     <>
@@ -859,119 +872,8 @@ export function CreateTransactionModal({
         currency={currency}
         error={currencyError}
         onClose={() => setCurrencyPickerVisible(false)}
-        onSelectCurrency={(code) => {
-          const error = validateCurrencySwitch(
-            currency,
-            code,
-            amountMinor,
-            pendingOperations.map((op) => op.valueMinor),
-          );
-          if (error) {
-            setCurrencyError(error);
-            return;
-          }
-          setCurrencyError(null);
-          setCurrency(code);
-          setCurrencyPickerVisible(false);
-        }}
+        onSelectCurrency={handleCurrencySelect}
         visible={isCurrencyPickerVisible}
-      />
-    </>
-  );
-}
-
-type TransactionRecurrencePickerModalProps = {
-  customOccurrenceDates: readonly string[];
-  initialDate: string;
-  recurrenceIndex: number;
-  visible: boolean;
-  onClose: () => void;
-  onSelectRecurrence: (index: number) => void;
-  onSelectCustomDates: (dates: readonly string[]) => void;
-};
-
-function TransactionRecurrencePickerModal({
-  customOccurrenceDates,
-  initialDate,
-  recurrenceIndex,
-  visible,
-  onClose,
-  onSelectRecurrence,
-  onSelectCustomDates,
-}: TransactionRecurrencePickerModalProps) {
-  const [draftRecurrenceIndex, setDraftRecurrenceIndex] =
-    useState(recurrenceIndex);
-  const [isCustomPickerVisible, setCustomPickerVisible] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setDraftRecurrenceIndex(recurrenceIndex);
-      setCustomPickerVisible(false);
-    }
-  }, [recurrenceIndex, visible]);
-
-  return (
-    <>
-      <AppModal
-        onClose={onClose}
-        stackBehavior="push"
-        testID="transaction-recurrence-picker"
-        visible={visible}
-      >
-        <View style={optionPickerStyles.container}>
-          <View style={optionPickerStyles.header}>
-            <ModalCloseButton onPress={onClose} variant="back" />
-            <Text accessibilityRole="header" variant="heading">
-              Elige la recurrencia
-            </Text>
-          </View>
-
-          <View accessibilityRole="radiogroup" style={optionPickerStyles.list}>
-            {recurrenceOptions.map((option, index) => {
-              const selected = index === draftRecurrenceIndex;
-
-              return (
-                <SelectableOption
-                  accessibilityLabel={option.label}
-                  indicatorTestID={`transaction-recurrence-${option.value}-check`}
-                  key={option.value}
-                  label={option.label}
-                  onPress={() => {
-                    setDraftRecurrenceIndex(index);
-                    if (option.value === 'custom') {
-                      setCustomPickerVisible(true);
-                    }
-                  }}
-                  selected={selected}
-                />
-              );
-            })}
-          </View>
-
-          <ModalPrimaryAction
-            accessibilityLabel="Guardar recurrencia"
-            disabled={
-              recurrenceOptions[draftRecurrenceIndex]?.value === 'custom' &&
-              customOccurrenceDates.length === 0
-            }
-            label="Guardar"
-            onPress={() => onSelectRecurrence(draftRecurrenceIndex)}
-            style={optionPickerStyles.saveButton}
-          />
-        </View>
-      </AppModal>
-      <TransactionCustomRecurrenceModal
-        initialDate={initialDate}
-        onClose={() => setCustomPickerVisible(false)}
-        onSelect={(dates) => {
-          onSelectCustomDates(dates);
-          setDraftRecurrenceIndex(
-            recurrenceOptions.findIndex((option) => option.value === 'custom'),
-          );
-          setCustomPickerVisible(false);
-        }}
-        selectedDates={customOccurrenceDates}
-        visible={isCustomPickerVisible}
       />
     </>
   );
@@ -1135,20 +1037,3 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
     },
   });
 }
-
-const optionPickerStyles = StyleSheet.create({
-  container: {
-    gap: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  header: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  list: {
-    gap: spacing.sm,
-  },
-  saveButton: { marginTop: spacing.md },
-});

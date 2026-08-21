@@ -2,6 +2,7 @@ import {
   amountMinorToInput,
   appendAmountKey,
   applyCalculatorOperation,
+  convertAmountMinor,
   evaluatePendingOperations,
   formatAmountInputForDisplay,
   parseAmountMinor,
@@ -9,54 +10,105 @@ import {
 } from '@/features/transactions/utils/transactionAmount';
 
 describe('transactionAmount', () => {
-  describe('factor 100 (EUR)', () => {
+  describe('parseAmountMinor (factor 100, EUR)', () => {
     it('convierte la entrada decimal a unidades menores sin float como fuente', () => {
-      expect(parseAmountMinor('10,50', 'EUR')).toBe(1050);
-      expect(parseAmountMinor('1000', 'EUR')).toBe(100000);
-      expect(parseAmountMinor('0', 'EUR')).toBe(0);
-      expect(parseAmountMinor('', 'EUR')).toBe(0);
+      expect(parseAmountMinor('10,50', 'EUR')).toEqual({
+        ok: true,
+        amountMinor: 1050,
+      });
+      expect(parseAmountMinor('1000', 'EUR')).toEqual({
+        ok: true,
+        amountMinor: 100000,
+      });
+      expect(parseAmountMinor('0', 'EUR')).toEqual({
+        ok: true,
+        amountMinor: 0,
+      });
+      expect(parseAmountMinor('', 'EUR')).toEqual({ ok: true, amountMinor: 0 });
     });
 
-    it('convierte unidades menores a texto de entrada', () => {
+    it('rechaza formatos inválidos sin lanzar', () => {
+      expect(parseAmountMinor('abc', 'EUR')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'invalid_format',
+      });
+      expect(parseAmountMinor('1,2,3', 'EUR')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'invalid_format',
+      });
+      expect(parseAmountMinor('10,ab', 'EUR')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'invalid_format',
+      });
+    });
+  });
+
+  describe('parseAmountMinor (factor 1, JPY)', () => {
+    it('convierte la entrada entera a unidades menores', () => {
+      expect(parseAmountMinor('1000', 'JPY')).toEqual({
+        ok: true,
+        amountMinor: 1000,
+      });
+      expect(parseAmountMinor('0', 'JPY')).toEqual({
+        ok: true,
+        amountMinor: 0,
+      });
+      expect(parseAmountMinor('', 'JPY')).toEqual({ ok: true, amountMinor: 0 });
+    });
+
+    it('rechaza fracciones sin truncar silenciosamente', () => {
+      expect(parseAmountMinor('10,50', 'JPY')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'invalid_fraction_for_currency',
+      });
+      expect(parseAmountMinor('1000,', 'JPY')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'invalid_fraction_for_currency',
+      });
+    });
+  });
+
+  describe('amountMinorToInput', () => {
+    it('factor 100', () => {
       expect(amountMinorToInput(1050, 'EUR')).toBe('10,5');
       expect(amountMinorToInput(100000, 'EUR')).toBe('1000');
       expect(amountMinorToInput(0, 'EUR')).toBe('0');
     });
 
-    it('limita la entrada a dos decimales', () => {
+    it('factor 1', () => {
+      expect(amountMinorToInput(1000, 'JPY')).toBe('1000');
+      expect(amountMinorToInput(50, 'JPY')).toBe('50');
+      expect(amountMinorToInput(0, 'JPY')).toBe('0');
+    });
+  });
+
+  describe('appendAmountKey', () => {
+    it('limita la entrada a dos decimales (factor 100)', () => {
       expect(appendAmountKey('10,50', '4', 'EUR')).toBe('10,50');
       expect(appendAmountKey('0', '7', 'EUR')).toBe('7');
       expect(appendAmountKey('10', ',', 'EUR')).toBe('10,');
       expect(appendAmountKey('10,', '5', 'EUR')).toBe('10,5');
     });
 
+    it('ignora la coma al teclear (factor 1)', () => {
+      expect(appendAmountKey('100', ',', 'JPY')).toBe('100');
+      expect(appendAmountKey('0', ',', 'JPY')).toBe('0');
+      expect(appendAmountKey('100', '5', 'JPY')).toBe('1005');
+    });
+  });
+
+  describe('applyCalculatorOperation', () => {
     it('calcula operaciones con factor 100', () => {
       expect(applyCalculatorOperation(1000, 250, 'add', 'EUR')).toBe(1250);
       expect(applyCalculatorOperation(1000, 250, 'subtract', 'EUR')).toBe(750);
       expect(applyCalculatorOperation(1000, 200, 'multiply', 'EUR')).toBe(2000);
       expect(applyCalculatorOperation(1000, 200, 'divide', 'EUR')).toBe(500);
       expect(applyCalculatorOperation(1000, 0, 'divide', 'EUR')).toBe(1000);
-    });
-  });
-
-  describe('factor 1 (JPY)', () => {
-    it('convierte la entrada entera a unidades menores', () => {
-      expect(parseAmountMinor('1000', 'JPY')).toBe(1000);
-      expect(parseAmountMinor('50', 'JPY')).toBe(50);
-      expect(parseAmountMinor('0', 'JPY')).toBe(0);
-      expect(parseAmountMinor('', 'JPY')).toBe(0);
-    });
-
-    it('convierte unidades menores a texto sin decimales', () => {
-      expect(amountMinorToInput(1000, 'JPY')).toBe('1000');
-      expect(amountMinorToInput(50, 'JPY')).toBe('50');
-      expect(amountMinorToInput(0, 'JPY')).toBe('0');
-    });
-
-    it('ignora la coma al teclear', () => {
-      expect(appendAmountKey('100', ',', 'JPY')).toBe('100');
-      expect(appendAmountKey('0', ',', 'JPY')).toBe('0');
-      expect(appendAmountKey('100', '5', 'JPY')).toBe('1005');
     });
 
     it('calcula operaciones con factor 1', () => {
@@ -81,24 +133,77 @@ describe('transactionAmount', () => {
 
   describe('validateCurrencySwitch', () => {
     it('permite cambiar de EUR a JPY con importe entero', () => {
-      expect(validateCurrencySwitch('EUR', 'JPY', 100000, [])).toBeNull();
+      expect(validateCurrencySwitch('EUR', 'JPY', 100000, [])).toEqual({
+        ok: true,
+      });
     });
 
     it('bloquea cambiar de EUR a JPY con fracciones', () => {
-      expect(validateCurrencySwitch('EUR', 'JPY', 1050, [])).not.toBeNull();
+      expect(validateCurrencySwitch('EUR', 'JPY', 1050, [])).toEqual({
+        ok: false,
+        reason: 'fraction_not_allowed',
+      });
     });
 
     it('bloquea cambiar de EUR a JPY con operaciones pendientes fraccionadas', () => {
-      expect(validateCurrencySwitch('EUR', 'JPY', 1000, [1050])).not.toBeNull();
+      expect(validateCurrencySwitch('EUR', 'JPY', 1000, [1050])).toEqual({
+        ok: false,
+        reason: 'fraction_not_allowed',
+      });
     });
 
     it('permite cambiar de JPY a EUR', () => {
-      expect(validateCurrencySwitch('JPY', 'EUR', 1000, [])).toBeNull();
+      expect(validateCurrencySwitch('JPY', 'EUR', 1000, [])).toEqual({
+        ok: true,
+      });
     });
 
     it('permite cambiar entre monedas del mismo factor', () => {
-      expect(validateCurrencySwitch('EUR', 'USD', 1050, [])).toBeNull();
-      expect(validateCurrencySwitch('JPY', 'CLP', 1000, [])).toBeNull();
+      expect(validateCurrencySwitch('EUR', 'USD', 1050, [])).toEqual({
+        ok: true,
+      });
+      expect(validateCurrencySwitch('JPY', 'CLP', 1000, [])).toEqual({
+        ok: true,
+      });
+    });
+  });
+
+  describe('convertAmountMinor', () => {
+    it('convierte factor 100 → 1 dividiendo entre 100 cuando es exacto', () => {
+      expect(convertAmountMinor(100000, 'EUR', 'JPY')).toEqual({
+        ok: true,
+        amountMinor: 1000,
+      });
+      expect(convertAmountMinor(1000, 'EUR', 'JPY')).toEqual({
+        ok: true,
+        amountMinor: 10,
+      });
+    });
+
+    it('rechaza factor 100 → 1 con fracción', () => {
+      expect(convertAmountMinor(1050, 'EUR', 'JPY')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'fraction_not_allowed',
+      });
+    });
+
+    it('convierte factor 1 → 100 multiplicando por 100', () => {
+      expect(convertAmountMinor(1000, 'JPY', 'EUR')).toEqual({
+        ok: true,
+        amountMinor: 100000,
+      });
+    });
+
+    it('conserva el valor en el mismo factor', () => {
+      expect(convertAmountMinor(1050, 'EUR', 'USD')).toEqual({
+        ok: true,
+        amountMinor: 1050,
+      });
+      expect(convertAmountMinor(1000, 'JPY', 'CLP')).toEqual({
+        ok: true,
+        amountMinor: 1000,
+      });
     });
   });
 

@@ -1,6 +1,13 @@
-import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+import type {
+  CurrencyCode,
+  MinorUnitFactor,
+} from '@/lib/currency/currencyCatalog';
 import { getCurrencyMinorUnitFactor } from '@/lib/currency/currencyCatalog';
-import type { MinorUnitFactor } from '@/lib/currency/currencyCatalogData';
+import {
+  convertAmountMinor,
+  validateCurrencySwitch,
+} from '@/lib/currency/amountInput';
+import type { CurrencySwitchReason } from '@/lib/currency/amountInput';
 
 export type CalculatorOperator = 'add' | 'subtract' | 'multiply' | 'divide';
 
@@ -12,9 +19,17 @@ export type PendingOperationStep = {
 export {
   amountMinorToInput,
   appendAmountKey,
+  convertAmountMinor,
   formatAmountInputForDisplay,
   parseAmountMinor,
   validateCurrencySwitch,
+} from '@/lib/currency/amountInput';
+export type {
+  AmountParseReason,
+  ConvertAmountMinorResult,
+  CurrencySwitchReason,
+  CurrencySwitchValidation,
+  ParseAmountMinorResult,
 } from '@/lib/currency/amountInput';
 
 export function applyCalculatorOperation(
@@ -67,4 +82,62 @@ export function evaluatePendingOperations(
     pendingOperations[pendingOperations.length - 1]!.operator,
     currency,
   );
+}
+
+/** Resultado discriminado de convertir un borrador completo entre monedas. */
+export type CurrencySwitchConversion =
+  | { ok: true; amountMinor: number; pendingOperations: PendingOperationStep[] }
+  | { ok: false; reason: CurrencySwitchReason };
+
+/**
+ * Valida y convierte atómicamente un borrador (importe + operaciones
+ * pendientes) de una moneda a otra. Si cualquier conversión falla, no
+ * devuelve ningún valor parcial.
+ */
+export function convertCurrencySwitch(
+  currentCurrency: CurrencyCode,
+  targetCurrency: CurrencyCode,
+  amountMinor: number,
+  pendingOperations: readonly PendingOperationStep[],
+): CurrencySwitchConversion {
+  const validation = validateCurrencySwitch(
+    currentCurrency,
+    targetCurrency,
+    amountMinor,
+    pendingOperations.map((op) => op.valueMinor),
+  );
+  if (!validation.ok) {
+    return { ok: false, reason: validation.reason };
+  }
+
+  const convertedAmount = convertAmountMinor(
+    amountMinor,
+    currentCurrency,
+    targetCurrency,
+  );
+  if (!convertedAmount.ok) {
+    return { ok: false, reason: convertedAmount.reason };
+  }
+
+  const convertedOperations: PendingOperationStep[] = [];
+  for (const operation of pendingOperations) {
+    const converted = convertAmountMinor(
+      operation.valueMinor,
+      currentCurrency,
+      targetCurrency,
+    );
+    if (!converted.ok) {
+      return { ok: false, reason: converted.reason };
+    }
+    convertedOperations.push({
+      valueMinor: converted.amountMinor,
+      operator: operation.operator,
+    });
+  }
+
+  return {
+    ok: true,
+    amountMinor: convertedAmount.amountMinor,
+    pendingOperations: convertedOperations,
+  };
 }

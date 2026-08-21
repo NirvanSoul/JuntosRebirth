@@ -56,7 +56,9 @@ export function CategoryBudgetModal({
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [amountInput, setAmountInput] = useState('0');
-  const budgetMinor = parseAmountMinor(amountInput, spaceCurrency);
+  const budgetParse = parseAmountMinor(amountInput, spaceCurrency);
+  const budgetMinor = budgetParse.ok ? budgetParse.amountMinor : 0;
+  const isBudgetInvalid = !budgetParse.ok;
   const displayAmount = formatAmountInputForDisplay(amountInput);
   const currencySymbol = getCurrencySymbol(spaceCurrency);
   const contentHeight = useMemo(
@@ -175,16 +177,19 @@ export function CategoryBudgetModal({
           <Pressable
             accessibilityLabel="Guardar presupuesto"
             accessibilityRole="button"
-            accessibilityState={{ disabled: budgetMinor <= 0 }}
-            disabled={budgetMinor <= 0}
+            accessibilityState={{
+              disabled: isBudgetInvalid || budgetMinor <= 0,
+            }}
+            disabled={isBudgetInvalid || budgetMinor <= 0}
             onPress={() => onSave(budgetMinor)}
             style={[
               styles.saveButton,
               { minHeight: layout.actionHeight[density] },
-              budgetMinor <= 0 && styles.saveButtonDisabled,
+              (isBudgetInvalid || budgetMinor <= 0) &&
+                styles.saveButtonDisabled,
             ]}
           >
-            {budgetMinor > 0 ? (
+            {!isBudgetInvalid && budgetMinor > 0 ? (
               <GradientCard
                 colors={createDiagonalGradient(categoryColor)}
                 contentStyle={styles.saveGradientContent}

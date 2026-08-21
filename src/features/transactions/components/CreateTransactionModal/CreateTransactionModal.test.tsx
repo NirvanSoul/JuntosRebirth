@@ -1326,4 +1326,125 @@ describe('CreateTransactionModal', () => {
       );
     });
   });
+
+  describe('conversión de escala al cambiar de moneda', () => {
+    const amountLabel = (screen: Awaited<ReturnType<typeof renderWithTheme>>) =>
+      screen.getByTestId('transaction-amount').props.accessibilityLabel;
+
+    const selectCurrency = async (
+      screen: Awaited<ReturnType<typeof renderWithTheme>>,
+      optionLabel: string,
+    ) => {
+      await fireEvent.press(screen.getByLabelText(/^Moneda:/));
+      await fireEvent.press(screen.getByLabelText(optionLabel));
+      await fireEvent.press(screen.getByLabelText('Guardar moneda'));
+    };
+
+    it('10,00 EUR → JPY muestra 10, no 10,00 ni 1000', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          availableCurrencies={['EUR', 'JPY']}
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      for (const key of ['1', '0', ',', '0', '0']) {
+        await fireEvent.press(screen.getByLabelText(key));
+      }
+
+      await selectCurrency(screen, '🇯🇵 Yen japonés (JPY)');
+
+      expect(amountLabel(screen)).toBe('10 yenes');
+    });
+
+    it('operación pendiente EUR→JPY conserva la magnitud y el resultado', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          availableCurrencies={['EUR', 'JPY']}
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByLabelText('1'));
+      await fireEvent.press(screen.getByLabelText('0'));
+      await fireEvent.press(screen.getByLabelText('Sumar'));
+      await fireEvent.press(screen.getByLabelText('5'));
+
+      await selectCurrency(screen, '🇯🇵 Yen japonés (JPY)');
+      await fireEvent.press(screen.getByLabelText('Calcular resultado'));
+
+      expect(amountLabel(screen)).toBe('15 yenes');
+    });
+
+    it('operación pendiente JPY→EUR conserva la magnitud y el resultado', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          availableCurrencies={['JPY', 'EUR']}
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          spaceCurrency="JPY"
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByLabelText('1'));
+      await fireEvent.press(screen.getByLabelText('0'));
+      await fireEvent.press(screen.getByLabelText('0'));
+      await fireEvent.press(screen.getByLabelText('0'));
+      await fireEvent.press(screen.getByLabelText('Sumar'));
+      await fireEvent.press(screen.getByLabelText('5'));
+      await fireEvent.press(screen.getByLabelText('0'));
+      await fireEvent.press(screen.getByLabelText('0'));
+
+      await selectCurrency(screen, '🇪🇺 Euro (EUR)');
+      await fireEvent.press(screen.getByLabelText('Calcular resultado'));
+
+      expect(amountLabel(screen)).toBe('1.500 euros');
+    });
+
+    it('una fracción real bloquea el cambio y conserva íntegro el borrador', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          availableCurrencies={['EUR', 'JPY']}
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      for (const key of ['1', '0', ',', '5', '0']) {
+        await fireEvent.press(screen.getByLabelText(key));
+      }
+
+      await selectCurrency(screen, '🇯🇵 Yen japonés (JPY)');
+
+      expect(
+        screen.getByText(
+          'La moneda elegida no admite decimales. Ajusta el importe antes de cambiar.',
+        ),
+      ).toBeTruthy();
+      expect(screen.getByLabelText('Moneda: EUR')).toBeTruthy();
+      expect(amountLabel(screen)).toBe('10,50 euros');
+    });
+  });
 });

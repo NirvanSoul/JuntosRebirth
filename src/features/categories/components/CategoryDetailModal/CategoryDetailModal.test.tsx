@@ -225,6 +225,105 @@ describe('CategoryDetailModal', () => {
     expect(onDelete).toHaveBeenCalledWith('food');
   });
 
+  it('presupuesto JPY se guarda sin decimales y la coma se ignora', async () => {
+    const onSaveBudget = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={category}
+            displayCurrency="JPY"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={onSaveBudget}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            spaceCurrency="JPY"
+            transactions={[]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+    const detail = screen.getByTestId('category-detail-modal');
+
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Añadir presupuesto' }),
+    );
+    const budgetModal = screen.getByTestId('category-budget-modal');
+
+    for (const key of ['1', '0', '0', '0']) {
+      await fireEvent.press(
+        within(budgetModal).getByRole('button', { name: key }),
+      );
+    }
+    await fireEvent.press(
+      within(budgetModal).getByRole('button', { name: ',' }),
+    );
+    await fireEvent.press(
+      within(budgetModal).getByRole('button', { name: 'Guardar presupuesto' }),
+    );
+
+    expect(onSaveBudget).toHaveBeenCalledWith('food', 1000);
+  });
+
+  it('presupuesto EUR conserva dos decimales', async () => {
+    const onSaveBudget = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={category}
+            displayCurrency="EUR"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={onSaveBudget}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            spaceCurrency="EUR"
+            transactions={[]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+    const detail = screen.getByTestId('category-detail-modal');
+
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Añadir presupuesto' }),
+    );
+    const budgetModal = screen.getByTestId('category-budget-modal');
+
+    for (const key of ['1', '0', ',', '5', '0']) {
+      await fireEvent.press(
+        within(budgetModal).getByRole('button', { name: key }),
+      );
+    }
+    await fireEvent.press(
+      within(budgetModal).getByRole('button', { name: 'Guardar presupuesto' }),
+    );
+
+    expect(onSaveBudget).toHaveBeenCalledWith('food', 1050);
+  });
+
   it('muestra el presupuesto existente como progreso y saldo disponible', async () => {
     const onSaveBudget = jest.fn();
     const screen = await render(
