@@ -56,7 +56,7 @@ export function CategoryBudgetModal({
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [amountInput, setAmountInput] = useState('0');
-  const budgetMinor = parseAmountMinor(amountInput);
+  const budgetMinor = parseAmountMinor(amountInput, spaceCurrency);
   const displayAmount = formatAmountInputForDisplay(amountInput);
   const currencySymbol = getCurrencySymbol(spaceCurrency);
   const contentHeight = useMemo(
@@ -73,8 +73,11 @@ export function CategoryBudgetModal({
   );
 
   useEffect(() => {
-    if (visible) setAmountInput(amountMinorToInput(initialBudgetMinor ?? 0));
-  }, [initialBudgetMinor, visible]);
+    if (visible)
+      setAmountInput(
+        amountMinorToInput(initialBudgetMinor ?? 0, spaceCurrency),
+      );
+  }, [initialBudgetMinor, visible, spaceCurrency]);
 
   const handleKey = (key: (typeof budgetKeys)[number][number]) => {
     if (key === 'backspace') {
@@ -84,7 +87,7 @@ export function CategoryBudgetModal({
       return;
     }
 
-    setAmountInput((current) => appendAmountKey(current, key));
+    setAmountInput((current) => appendAmountKey(current, key, spaceCurrency));
   };
 
   return (

@@ -26,10 +26,12 @@ import type {
 import {
   amountMinorToInput,
   appendAmountKey,
-  applyCalculatorOperation,
   type CalculatorOperator,
+  evaluatePendingOperations,
   formatAmountInputForDisplay,
+  type PendingOperationStep,
   parseAmountMinor,
+  validateCurrencySwitch,
 } from '@/features/transactions/utils/transactionAmount';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { getLocalTodayKey } from '@/lib/date/localDate';
@@ -80,11 +82,6 @@ type CreateTransactionModalProps = {
   onTypeChange: (type: TransactionType) => void;
 };
 
-type PendingOperationStep = {
-  valueMinor: number;
-  operator: CalculatorOperator;
-};
-
 const defaultRecurrence: {
   value: TransactionRecurrence;
   label: string;
@@ -130,12 +127,7 @@ const keypadRowGap = { compact: spacing.md, regular: spacing.lg } as const;
 const categoryIconSize = 44;
 /** Anchura compacta del selector; conserva dos objetivos táctiles holgados. */
 const typeSelectorWidth = { compact: 216, regular: 240 } as const;
-/**
- * Anchura relativa de la columna de operadores.
- *
- * Con márgenes de 16 pt en la pantalla más estrecha admitida (320 pt) la
- * columna sigue midiendo más de 48 pt, el objetivo táctil mínimo.
- */
+/** Anchura relativa de la columna de operadores; >48 pt en la pantalla más estrecha (320 pt). */
 const operatorColumnRatio = 0.72;
 
 export function CreateTransactionModal({
@@ -176,12 +168,13 @@ export function CreateTransactionModal({
   const [isRecurrencePickerVisible, setRecurrencePickerVisible] =
     useState(false);
   const [isCurrencyPickerVisible, setCurrencyPickerVisible] = useState(false);
+  const [currencyError, setCurrencyError] = useState<string | null>(null);
   const [segmentedControlWidth, setSegmentedControlWidth] = useState(0);
   const wasVisible = useRef(false);
   const typeProgress = useSharedValue(type === 'income' ? 1 : 0);
   const amountScale = useSharedValue(1);
   const amountTranslateY = useSharedValue(0);
-  const amountMinor = parseAmountMinor(amountInput);
+  const amountMinor = parseAmountMinor(amountInput, currency);
   const recurrence = recurrenceOptions[recurrenceIndex] ?? defaultRecurrence;
   const isCalculationPending = pendingOperations.length > 0;
   const lastPendingOperation =
@@ -194,10 +187,9 @@ export function CreateTransactionModal({
   const expressionPrefix = pendingOperations
     .map(
       (step) =>
-        `${formatAmountInputForDisplay(amountMinorToInput(step.valueMinor))} ${operatorPresentation[step.operator].symbol}`,
+        `${formatAmountInputForDisplay(amountMinorToInput(step.valueMinor, currency))} ${operatorPresentation[step.operator].symbol}`,
     )
     .join(' ');
-  const resolvedAmountMinor = amountMinor;
   const displayAmount = [
     expressionPrefix,
     showCurrentOperand ? formatAmountInputForDisplay(amountInput) : '',
@@ -265,7 +257,12 @@ export function CreateTransactionModal({
     } = snapshotRef.current;
     setTitle(openingDraft?.title ?? '');
     setAmountInput(
-      openingDraft ? amountMinorToInput(openingDraft.amountMinor) : '0',
+      openingDraft
+        ? amountMinorToInput(
+            openingDraft.amountMinor,
+            openingDraft.currency ?? openingCurrency,
+          )
+        : '0',
     );
     setPendingOperations([]);
     setReplaceAmount(false);
@@ -291,6 +288,7 @@ export function CreateTransactionModal({
     setDatePickerVisible(false);
     setRecurrencePickerVisible(false);
     setCurrencyPickerVisible(false);
+    setCurrencyError(null);
   }, [visible, activeSpaceId]);
 
   useEffect(() => {
@@ -351,7 +349,7 @@ export function CreateTransactionModal({
 
   const handleDigit = (key: string) => {
     setAmountInput((current) =>
-      appendAmountKey(replaceAmount ? '0' : current, key),
+      appendAmountKey(replaceAmount ? '0' : current, key, currency),
     );
     setReplaceAmount(false);
     animateAmountInput();
@@ -382,7 +380,7 @@ export function CreateTransactionModal({
       (replaceAmount || amountInput === '0')
     ) {
       const lastOperation = pendingOperations[pendingOperations.length - 1]!;
-      setAmountInput(amountMinorToInput(lastOperation.valueMinor));
+      setAmountInput(amountMinorToInput(lastOperation.valueMinor, currency));
       setPendingOperations((current) => current.slice(0, -1));
       setReplaceAmount(false);
       animateAmountInput();
@@ -395,37 +393,20 @@ export function CreateTransactionModal({
     animateAmountInput();
   };
 
-  const evaluateExpression = (): number => {
-    if (pendingOperations.length === 0) {
-      return amountMinor;
-    }
-
-    let accumulator = pendingOperations[0]!.valueMinor;
-    for (let index = 1; index < pendingOperations.length; index += 1) {
-      accumulator = applyCalculatorOperation(
-        accumulator,
-        pendingOperations[index]!.valueMinor,
-        pendingOperations[index - 1]!.operator,
-      );
-    }
-
-    return applyCalculatorOperation(
-      accumulator,
-      amountMinor,
-      pendingOperations[pendingOperations.length - 1]!.operator,
-    );
-  };
-
   const handleEquals = () => {
-    const result = evaluateExpression();
-    setAmountInput(amountMinorToInput(result));
+    const result = evaluatePendingOperations(
+      pendingOperations,
+      amountMinor,
+      currency,
+    );
+    setAmountInput(amountMinorToInput(result, currency));
     setPendingOperations([]);
     setReplaceAmount(true);
     animateAmountInput();
   };
 
   const handleSubmit = () => {
-    if (resolvedAmountMinor <= 0 || !selectedCategory) {
+    if (amountMinor <= 0 || !selectedCategory) {
       return;
     }
 
@@ -434,7 +415,7 @@ export function CreateTransactionModal({
     onSubmit({
       spaceId: activeSpaceId,
       type,
-      amountMinor: resolvedAmountMinor,
+      amountMinor: amountMinor,
       currency,
       title: title.trim(),
       categoryId: selectedCategory.id,
@@ -445,7 +426,7 @@ export function CreateTransactionModal({
     });
   };
 
-  const isSubmitDisabled = resolvedAmountMinor <= 0 || !selectedCategory;
+  const isSubmitDisabled = amountMinor <= 0 || !selectedCategory;
   const primaryActionLabel = isCalculationPending
     ? '='
     : initialDraft
@@ -588,7 +569,7 @@ export function CreateTransactionModal({
                   return (
                     <Text key={index} variant={amountTextVariant}>
                       {formatAmountInputForDisplay(
-                        amountMinorToInput(step.valueMinor),
+                        amountMinorToInput(step.valueMinor, currency),
                       )}{' '}
                       <Text
                         testID={
@@ -876,8 +857,20 @@ export function CreateTransactionModal({
       <TransactionCurrencyPickerModal
         availableCurrencies={effectiveAvailableCurrencies}
         currency={currency}
+        error={currencyError}
         onClose={() => setCurrencyPickerVisible(false)}
         onSelectCurrency={(code) => {
+          const error = validateCurrencySwitch(
+            currency,
+            code,
+            amountMinor,
+            pendingOperations.map((op) => op.valueMinor),
+          );
+          if (error) {
+            setCurrencyError(error);
+            return;
+          }
+          setCurrencyError(null);
           setCurrency(code);
           setCurrencyPickerVisible(false);
         }}

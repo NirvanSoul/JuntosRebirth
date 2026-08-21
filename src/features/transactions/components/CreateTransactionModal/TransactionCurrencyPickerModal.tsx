@@ -17,6 +17,7 @@ import { spacing } from '@/theme/spacing';
 export type TransactionCurrencyPickerModalProps = {
   availableCurrencies: readonly CurrencyCode[];
   currency: CurrencyCode;
+  error?: string | null;
   visible: boolean;
   onClose: () => void;
   onSelectCurrency: (currency: CurrencyCode) => void;
@@ -25,6 +26,7 @@ export type TransactionCurrencyPickerModalProps = {
 export function TransactionCurrencyPickerModal({
   availableCurrencies,
   currency,
+  error,
   visible,
   onClose,
   onSelectCurrency,
@@ -64,6 +66,12 @@ export function TransactionCurrencyPickerModal({
             />
           ))}
         </View>
+
+        {error ? (
+          <Text tone="expense" variant="footnote">
+            {error}
+          </Text>
+        ) : null}
 
         <ModalPrimaryAction
           accessibilityLabel="Guardar moneda"
