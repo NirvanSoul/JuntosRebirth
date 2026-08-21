@@ -283,11 +283,73 @@ describe('migrateLocalDatabase', () => {
     );
   });
 
-  it('reduce los tipos de cuenta y reasigna los antiguos desde la versión 21', async () => {
-    const transaction = { execAsync: jest.fn(async () => undefined) };
+  it('repara una base marcada como versión 20 sin el esquema de cuentas', async () => {
+    const execAsync = jest.fn(async (_statement: string) => undefined);
+    const database = {
+      execAsync,
+      getFirstAsync: jest.fn(async (statement: string) =>
+        statement === 'PRAGMA user_version' ? { user_version: 20 } : null,
+      ),
+      getAllAsync: jest.fn(async () => []),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    const migration = execAsync.mock.calls
+      .map(([statement]) => statement)
+      .join('\n');
+    expect(migration).toContain('CREATE TABLE money_accounts');
+    expect(migration).toContain(
+      'ALTER TABLE transactions ADD COLUMN money_account_id TEXT',
+    );
+    expect(migration).toContain(
+      'ALTER TABLE recurring_transaction_series ADD COLUMN money_account_id',
+    );
+    expect(migration).toContain(
+      'CREATE TABLE IF NOT EXISTS money_account_balances',
+    );
+    expect(migration).toContain(
+      `PRAGMA user_version = ${localDatabaseVersion}`,
+    );
+  });
+
+  it('repara una tabla de cuentas ausente sin repetir columnas ya creadas', async () => {
+    const execAsync = jest.fn(async (_statement: string) => undefined);
+    const database = {
+      execAsync,
+      getFirstAsync: jest.fn(async (statement: string) =>
+        statement === 'PRAGMA user_version' ? { user_version: 20 } : null,
+      ),
+      getAllAsync: jest
+        .fn()
+        .mockResolvedValueOnce([{ name: 'money_account_id' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    const migration = execAsync.mock.calls
+      .map(([statement]) => statement)
+      .join('\n');
+    expect(migration).toContain('CREATE TABLE money_accounts');
+    expect(migration).not.toContain(
+      'ALTER TABLE transactions ADD COLUMN money_account_id TEXT',
+    );
+    expect(migration).toContain(
+      'ALTER TABLE recurring_transaction_series ADD COLUMN money_account_id',
+    );
+  });
+
+  it('añade columnas de cuenta ausentes sin reconstruir movimientos ni series', async () => {
+    const transaction = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ name: 'money_accounts' })),
+      getAllAsync: jest.fn(async () => []),
+    };
     const database = {
       execAsync: jest.fn(async () => undefined),
-      getFirstAsync: jest.fn(async () => ({ user_version: 21 })),
+      getFirstAsync: jest.fn(async () => ({ user_version: 24 })),
       withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
     } as unknown as SQLiteDatabase;
 
@@ -296,17 +358,93 @@ describe('migrateLocalDatabase', () => {
     const migration = (transaction.execAsync as jest.Mock).mock.calls
       .map(([statement]) => statement)
       .join('\n');
+    expect(migration).toContain(
+      'ALTER TABLE transactions ADD COLUMN money_account_id TEXT',
+    );
+    expect(migration).toContain(
+      'ALTER TABLE recurring_transaction_series ADD COLUMN money_account_id',
+    );
+    expect(migration).toContain(
+      'CREATE INDEX IF NOT EXISTS transactions_money_account_idx',
+    );
+    expect(migration).not.toContain('ALTER TABLE transactions RENAME TO');
+    expect(migration).not.toContain(
+      'ALTER TABLE recurring_transaction_series RENAME TO',
+    );
+  });
+
+  it('reduce los tipos de cuenta y reasigna los antiguos desde la versión 21', async () => {
+    const execAsync = jest.fn(async (_statement: string) => undefined);
+    const getAllAsync = jest.fn(async (statement: string) =>
+      statement === 'PRAGMA foreign_key_check'
+        ? []
+        : [{ name: 'money_account_id' }],
+    );
+    const database = {
+      execAsync,
+      getFirstAsync: jest.fn(async (statement: string) =>
+        statement === 'PRAGMA user_version'
+          ? { user_version: 21 }
+          : { name: 'money_accounts' },
+      ),
+      getAllAsync,
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    const migration = execAsync.mock.calls
+      .map(([statement]) => statement)
+      .join('\n');
     expect(migration).toContain("CHECK (kind IN ('cash', 'bank', 'card'))");
     expect(migration).toContain("WHEN 'debit' THEN 'card'");
     expect(migration).toContain("WHEN 'credit' THEN 'card'");
     expect(migration).toContain("WHEN 'savings' THEN 'bank'");
-    // Ninguna cuenta se pierde por el camino.
     expect(migration).toContain('INSERT INTO money_accounts');
     expect(migration).toContain('DROP TABLE money_accounts_v20');
+    expect(getAllAsync).toHaveBeenCalledWith('PRAGMA foreign_key_check');
+    expect(database.execAsync).toHaveBeenCalledWith(
+      'PRAGMA foreign_keys = OFF',
+    );
+    expect(database.execAsync).toHaveBeenCalledWith(
+      'PRAGMA legacy_alter_table = ON',
+    );
+    expect(database.execAsync).toHaveBeenCalledWith(
+      'PRAGMA legacy_alter_table = OFF',
+    );
+    expect(database.execAsync).toHaveBeenCalledWith('PRAGMA foreign_keys = ON');
+  });
+
+  it('aborta una actualización de cuentas si foreign_key_check detecta una violación', async () => {
+    const execAsync = jest.fn(async () => undefined);
+    const database = {
+      execAsync,
+      getFirstAsync: jest.fn(async (statement: string) =>
+        statement === 'PRAGMA user_version'
+          ? { user_version: 21 }
+          : { name: 'money_accounts' },
+      ),
+      getAllAsync: jest.fn(async (statement: string) =>
+        statement === 'PRAGMA foreign_key_check'
+          ? [{ table: 'transactions' }]
+          : [{ name: 'money_account_id' }],
+      ),
+    } as unknown as SQLiteDatabase;
+
+    await expect(migrateLocalDatabase(database)).rejects.toThrow(
+      'La migración local dejó 1 foránea(s) sin resolver',
+    );
+    expect(database.execAsync).toHaveBeenCalledWith(
+      'PRAGMA legacy_alter_table = OFF',
+    );
+    expect(database.execAsync).toHaveBeenCalledWith('PRAGMA foreign_keys = ON');
   });
 
   it('repara desde la versión 22 la foránea que quedó apuntando a la tabla temporal', async () => {
-    const transaction = { execAsync: jest.fn(async () => undefined) };
+    const transaction = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ name: 'money_accounts' })),
+      getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
+    };
     const database = {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 22 })),
@@ -365,7 +503,7 @@ describe('migrateLocalDatabase', () => {
     expect(execAsync).toHaveBeenCalledWith(
       'ALTER TABLE local_profile ADD COLUMN display_name TEXT',
     );
-    expect(database.withExclusiveTransactionAsync).not.toHaveBeenCalled();
+    expect(database.withExclusiveTransactionAsync).toHaveBeenCalledTimes(1);
   });
 
   it('no repite el ALTER si local_profile.display_name ya existe en la versión actual', async () => {
@@ -388,6 +526,33 @@ describe('migrateLocalDatabase', () => {
 
     expect(execAsync).not.toHaveBeenCalledWith(
       'ALTER TABLE local_profile ADD COLUMN display_name TEXT',
+    );
+  });
+
+  it('repara el esquema de cuentas aunque la base ya indique la versión actual', async () => {
+    const transaction = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
+      getAllAsync: jest.fn(async () => []),
+    };
+    const database = {
+      execAsync: jest.fn(async () => undefined),
+      getAllAsync: jest.fn(async () => [{ name: 'display_name' }]),
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    expect(transaction.execAsync).toHaveBeenCalledWith(
+      expect.stringContaining('CREATE TABLE money_accounts'),
+    );
+    expect(transaction.execAsync).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'CREATE TABLE IF NOT EXISTS money_account_balances',
+      ),
     );
   });
 });
@@ -416,7 +581,11 @@ describe('getLocalDatabase', () => {
       })),
       getAllAsync: jest.fn(async () => [{ name: 'display_name' }]),
       withExclusiveTransactionAsync: jest.fn(async (task) =>
-        task({ execAsync: jest.fn(async () => undefined) }),
+        task({
+          execAsync: jest.fn(async () => undefined),
+          getFirstAsync: jest.fn(async () => ({ name: 'money_accounts' })),
+          getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
+        }),
       ),
     } as unknown as SQLiteDatabase;
     openDatabaseAsync.mockResolvedValueOnce(workingDatabase);
@@ -425,10 +594,9 @@ describe('getLocalDatabase', () => {
     expect(openDatabaseAsync).toHaveBeenCalledTimes(2);
   });
 
-  it('si la migración falla, borra la base y reintenta una vez con un archivo nuevo', async () => {
+  it('si la migración falla, conserva la base y propaga el error', async () => {
     const deleteDatabaseAsync = SQLite.deleteDatabaseAsync as jest.Mock;
     deleteDatabaseAsync.mockReset();
-    deleteDatabaseAsync.mockResolvedValueOnce(undefined);
 
     const brokenDatabase = {
       execAsync: jest.fn(async () => undefined),
@@ -436,20 +604,13 @@ describe('getLocalDatabase', () => {
         user_version: localDatabaseVersion + 1,
       })),
     } as unknown as SQLiteDatabase;
-    const freshDatabase = {
-      execAsync: jest.fn(async () => undefined),
-      getFirstAsync: jest.fn(async () => ({ user_version: 0 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) =>
-        task({ execAsync: jest.fn(async () => undefined) }),
-      ),
-    } as unknown as SQLiteDatabase;
-    openDatabaseAsync
-      .mockResolvedValueOnce(brokenDatabase)
-      .mockResolvedValueOnce(freshDatabase);
+    openDatabaseAsync.mockResolvedValueOnce(brokenDatabase);
 
-    await expect(getLocalDatabase()).resolves.toBe(freshDatabase);
-    expect(deleteDatabaseAsync).toHaveBeenCalledWith(localDatabaseName);
-    expect(openDatabaseAsync).toHaveBeenCalledTimes(2);
+    await expect(getLocalDatabase()).rejects.toThrow(
+      'La base local pertenece a una versión más reciente',
+    );
+    expect(deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(openDatabaseAsync).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -475,7 +636,11 @@ describe('resetLocalDatabase', () => {
       })),
       getAllAsync: jest.fn(async () => [{ name: 'display_name' }]),
       withExclusiveTransactionAsync: jest.fn(async (task) =>
-        task({ execAsync: jest.fn(async () => undefined) }),
+        task({
+          execAsync: jest.fn(async () => undefined),
+          getFirstAsync: jest.fn(async () => ({ name: 'money_accounts' })),
+          getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
+        }),
       ),
     } as unknown as SQLiteDatabase;
     openDatabaseAsync.mockResolvedValue(workingDatabase);

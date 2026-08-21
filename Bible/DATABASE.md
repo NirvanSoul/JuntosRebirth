@@ -343,8 +343,9 @@ Esa columna usa una foránea de una sola columna, no la compuesta
 de dos columnas en `ALTER TABLE ADD COLUMN`, y reconstruir `transactions`
 reescribiría de paso la foránea de `transaction_reminders` —el procedimiento
 seguro que documenta SQLite exige `PRAGMA foreign_keys = OFF` fuera de la
-transacción, algo que el migrador no hace—. La coincidencia de espacio y de
-moneda se valida entonces en `localTransactionRepository`
+transacción, una reconstrucción que el migrador no hace sobre
+`transactions`—. La coincidencia de espacio y de moneda se valida entonces en
+`localTransactionRepository`
 (`assertMoneyAccountAssignment`), y en Postgres, que es la autoridad real, la
 migración 28 sí declara la foránea compuesta.
 
@@ -355,6 +356,15 @@ principal —la que encabeza la tarjeta y se propone al registrar un
 movimiento—, pero `money_accounts.opening_balance_minor` deja de leerse: el
 saldo inicial vive siempre en la tabla hija, incluida la moneda principal, para
 no mantener dos fuentes del mismo dato.
+
+La versión 25 repara de forma no destructiva instalaciones de desarrollo que
+quedaron marcadas como versión 20 sin que `money_accounts` ni las columnas
+opcionales de movimientos y series llegaran a crearse. Antes de avanzar por la
+escalera, comprueba la tabla y esas dos columnas; si faltan, las crea dentro de
+la misma transacción y deja los movimientos existentes con cuenta nula. La
+base no se borra automáticamente ante otro error de migración: conservar los
+datos permite repararlos o exportarlos sin convertir un fallo de esquema en
+pérdida de información.
 
 La versión 23 repara la foránea que dejó colgando la versión 22. Al
 reconstruir `money_accounts` con `ALTER TABLE ... RENAME`, SQLite reescribió
@@ -371,9 +381,12 @@ versión 20), aplicado esta vez a la propia tabla de cuentas.
 La versión 22 reduce los tipos de cuenta a tres: efectivo, cuenta bancaria y
 tarjeta. Distinguir débito, crédito y ahorro no aporta nada mientras el saldo
 se calcule igual en todos y no existan límite de crédito ni transferencias, y
-sí obliga a elegir entre opciones que para el usuario son la misma. Como el
-CHECK no se puede alterar, la tabla se reconstruye y las filas anteriores se
-reasignan: débito y crédito pasan a tarjeta, ahorro a cuenta bancaria.
+sí obliga a elegir entre opciones que para el usuario son la misma. Las filas
+anteriores se reasignan en la misma tabla —débito y crédito a tarjeta, ahorro
+a cuenta bancaria—. La reconstrucción local se hace con las foráneas
+temporalmente desactivadas y `legacy_alter_table` activo antes de la
+transacción; así las tablas hijas conservan su referencia al nombre final y
+`PRAGMA foreign_key_check` debe quedar limpio antes del `COMMIT`.
 
 La versión 21 añade `money_account` a los valores admitidos por
 `remote_entity_links.entity_type`. Como un CHECK de SQLite no se puede

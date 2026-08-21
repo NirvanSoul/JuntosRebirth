@@ -9,8 +9,9 @@ import type * as SQLite from 'expo-sqlite';
  * protege a `category_id`. SQLite no admite una foránea de dos columnas en
  * `ALTER TABLE ADD COLUMN`, y reconstruir `transactions` reescribiría de paso
  * la foránea de `transaction_reminders`: el procedimiento seguro documentado
- * por SQLite exige `PRAGMA foreign_keys = OFF` fuera de la transacción, algo
- * que el migrador no hace. La coincidencia de espacio se valida entonces en
+ * por SQLite exige `PRAGMA foreign_keys = OFF` fuera de la transacción, una
+ * reconstrucción que el migrador no hace sobre `transactions`. La coincidencia
+ * de espacio se valida entonces en
  * `localTransactionRepository`, y en Postgres —la autoridad real— la
  * migración 28 sí declara la foránea compuesta.
  */
@@ -22,8 +23,7 @@ export async function createMoneyAccountSchema(
       id TEXT PRIMARY KEY NOT NULL,
       space_id TEXT NOT NULL,
       name TEXT NOT NULL,
-      kind TEXT NOT NULL
-        CHECK (kind IN ('cash', 'bank', 'debit', 'credit', 'savings')),
+      kind TEXT NOT NULL CHECK (kind IN ('cash', 'bank', 'card')),
       icon TEXT NOT NULL,
       color_token TEXT NOT NULL,
       currency TEXT NOT NULL,
@@ -46,15 +46,89 @@ export async function createMoneyAccountSchema(
     CREATE INDEX money_accounts_sync_idx
       ON money_accounts(sync_status, updated_at);
 
-    ALTER TABLE transactions ADD COLUMN money_account_id TEXT
-      REFERENCES money_accounts(id) ON DELETE RESTRICT;
-    ALTER TABLE recurring_transaction_series ADD COLUMN money_account_id
-      TEXT REFERENCES money_accounts(id) ON DELETE RESTRICT;
+  `);
+}
 
-    CREATE INDEX transactions_money_account_idx
+async function ensureMoneyAccountColumns(
+  transaction: SQLite.SQLiteDatabase,
+  transactionHasMoneyAccountId: boolean,
+  seriesHasMoneyAccountId: boolean,
+): Promise<void> {
+  if (!transactionHasMoneyAccountId) {
+    await transaction.execAsync(
+      `ALTER TABLE transactions ADD COLUMN money_account_id TEXT
+        REFERENCES money_accounts(id) ON DELETE RESTRICT`,
+    );
+  }
+  if (!seriesHasMoneyAccountId) {
+    await transaction.execAsync(
+      `ALTER TABLE recurring_transaction_series ADD COLUMN money_account_id
+        TEXT REFERENCES money_accounts(id) ON DELETE RESTRICT`,
+    );
+  }
+  await transaction.execAsync(`
+    CREATE INDEX IF NOT EXISTS transactions_money_account_idx
       ON transactions(money_account_id, is_archived, occurred_on DESC)
       WHERE money_account_id IS NOT NULL;
   `);
+}
+
+type SqliteTableRow = {
+  name: string;
+};
+
+/**
+ * Repara el esquema de cuentas que una build de desarrollo dejó en algunos
+ * dispositivos con `user_version = 20` pero sin haber creado la tabla ni las
+ * columnas. La versión por sí sola no basta como prueba de que el peldaño se
+ * aplicó: antes de continuar con la escalera comprobamos la pieza que ese
+ * peldaño debía haber dejado.
+ *
+ * Si la tabla existe pero falta alguna de las dos columnas opcionales, se
+ * añaden de forma independiente. Así nunca se reconstruyen las tablas grandes
+ * de movimientos o series y sus filas conservan `NULL`, que sigue significando
+ * correctamente «sin cuenta».
+ */
+export async function ensureMoneyAccountSchema(
+  transaction: SQLite.SQLiteDatabase,
+): Promise<{
+  moneyAccountBalancesWereMissing: boolean;
+  moneyAccountsWereCreated: boolean;
+}> {
+  const moneyAccounts = await transaction.getFirstAsync<SqliteTableRow>(
+    `SELECT name FROM sqlite_master
+      WHERE type = 'table' AND name = 'money_accounts'`,
+  );
+  const moneyAccountBalances = await transaction.getFirstAsync<SqliteTableRow>(
+    `SELECT name FROM sqlite_master
+      WHERE type = 'table' AND name = 'money_account_balances'`,
+  );
+
+  const [transactionColumns, seriesColumns] = await Promise.all([
+    transaction.getAllAsync<SqliteTableRow>('PRAGMA table_info(transactions)'),
+    transaction.getAllAsync<SqliteTableRow>(
+      'PRAGMA table_info(recurring_transaction_series)',
+    ),
+  ]);
+  const transactionHasMoneyAccountId = transactionColumns.some(
+    (column) => column.name === 'money_account_id',
+  );
+  const seriesHasMoneyAccountId = seriesColumns.some(
+    (column) => column.name === 'money_account_id',
+  );
+
+  if (!moneyAccounts) {
+    await createMoneyAccountSchema(transaction);
+  }
+  await ensureMoneyAccountColumns(
+    transaction,
+    transactionHasMoneyAccountId,
+    seriesHasMoneyAccountId,
+  );
+  return {
+    moneyAccountBalancesWereMissing: !moneyAccountBalances,
+    moneyAccountsWereCreated: !moneyAccounts,
+  };
 }
 
 /**
@@ -103,7 +177,11 @@ export async function recreateRemoteEntityLinksWithMoneyAccounts(
  *
  * Un CHECK de SQLite no se puede alterar, así que la tabla se reconstruye. Las
  * filas existentes se reasignan: débito y crédito pasan a tarjeta, y ahorro a
- * cuenta bancaria, que es donde suele estar guardado ese dinero.
+ * cuenta bancaria, que es donde suele estar guardado ese dinero. El migrador
+ * prepara esta operación con las foráneas temporalmente desactivadas y
+ * `legacy_alter_table` activo fuera de la transacción; así SQLite no redirige
+ * las tablas hijas al nombre temporal. Antes de confirmar comprueba la
+ * integridad referencial completa.
  */
 export async function reduceMoneyAccountKinds(
   transaction: SQLite.SQLiteDatabase,
@@ -190,12 +268,29 @@ export async function applyMoneyAccountMigrations(
   transaction: SQLite.SQLiteDatabase,
   currentVersion: number,
 ): Promise<void> {
-  if (currentVersion < 20) await createMoneyAccountSchema(transaction);
+  let moneyAccountBalancesWereMissing: boolean;
+  let moneyAccountsWereCreated: boolean;
+  if (currentVersion < 20) {
+    await createMoneyAccountSchema(transaction);
+    await ensureMoneyAccountColumns(transaction, false, false);
+    moneyAccountBalancesWereMissing = true;
+    moneyAccountsWereCreated = true;
+  } else {
+    ({ moneyAccountBalancesWereMissing, moneyAccountsWereCreated } =
+      await ensureMoneyAccountSchema(transaction));
+  }
   if (currentVersion < 21)
     await recreateRemoteEntityLinksWithMoneyAccounts(transaction);
-  if (currentVersion < 22) await reduceMoneyAccountKinds(transaction);
-  if (currentVersion < 23) await repairMoneyAccountReferences(transaction);
-  if (currentVersion < 24) await createMoneyAccountBalancesSchema(transaction);
+  if (currentVersion < 22 || moneyAccountsWereCreated)
+    await reduceMoneyAccountKinds(transaction);
+  if (currentVersion < 23 || moneyAccountsWereCreated)
+    await repairMoneyAccountReferences(transaction);
+  if (
+    currentVersion < 24 ||
+    moneyAccountBalancesWereMissing ||
+    moneyAccountsWereCreated
+  )
+    await createMoneyAccountBalancesSchema(transaction);
 }
 
 /**

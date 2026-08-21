@@ -4,7 +4,9 @@ import {
   createInitialSchema,
   createRecurringSeriesSchema,
 } from '@/lib/storage/localDatabaseBaseSchema';
+import { withLegacyMoneyAccountRebuildTransaction } from '@/lib/storage/localDatabaseLegacyMoneyAccountMigration';
 import { applyMoneyAccountMigrations } from '@/lib/storage/localDatabaseMoneyAccountSchema';
+import { applyLocalProfileMigrations } from '@/lib/storage/localDatabaseProfileMigrations';
 import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabaseSchemaRepair';
 
 /**
@@ -13,7 +15,7 @@ import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabase
  * versión, de modo que la escalera es acumulativa y ningún bloque se
  * reejecuta.
  */
-export const localDatabaseVersion = 24;
+export const localDatabaseVersion = 25;
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -30,11 +32,16 @@ export async function migrateLocalDatabase(
     throw new Error('La base local pertenece a una versión más reciente');
   }
   if (currentVersion === localDatabaseVersion) {
+    await database.withExclusiveTransactionAsync(async (transaction) => {
+      await applyMoneyAccountMigrations(transaction, currentVersion);
+    });
     await ensureLocalProfileDisplayNameColumn(database);
     return;
   }
 
-  await database.withExclusiveTransactionAsync(async (transaction) => {
+  const needsLegacyMoneyAccountRebuild =
+    currentVersion >= 20 && currentVersion < 22;
+  const runMigrations = async (transaction: SQLite.SQLiteDatabase) => {
     if (currentVersion < 1) {
       await createInitialSchema(transaction);
     }
@@ -363,69 +370,17 @@ export async function migrateLocalDatabase(
       `);
     }
 
-    // La versión 17 guarda el perfil de las demás personas de un espacio
-    // compartido. `local_profile` no vale: es una fila única y describe a quien
-    // usa el móvil. Sin esta tabla la interfaz solo puede atribuir un
-    // movimiento a un uuid.
-    if (currentVersion < 17) {
-      await transaction.execAsync(`
-        CREATE TABLE space_member_profiles (
-          space_id TEXT NOT NULL,
-          user_id TEXT NOT NULL,
-          display_name TEXT,
-          avatar_url TEXT,
-          updated_at TEXT NOT NULL,
-          PRIMARY KEY (space_id, user_id)
-        );
-      `);
-    }
-
-    // La versión 18 añade el circuito de subida de la foto de perfil.
-    // `local_profile` gana el estado de sincronización de su avatar —con el
-    // mismo juego de valores que el resto de tablas— y la ruta que ocupa en
-    // Supabase Storage.
-    //
-    // `space_member_profiles` se recrea en vez de alterarse: es una caché de
-    // lectura que se repuebla entera en cada sincronización, así que tirarla
-    // no pierde nada y evita arrastrar la columna `avatar_url`, que guardaba
-    // una url que nunca existió.
-    if (currentVersion < 18) {
-      await transaction.execAsync(`
-        ALTER TABLE local_profile ADD COLUMN avatar_sync_status TEXT NOT NULL
-          DEFAULT 'local_only'
-          CHECK (avatar_sync_status IN (
-            'local_only', 'pending', 'syncing', 'synced', 'failed', 'conflict'
-          ));
-        ALTER TABLE local_profile ADD COLUMN avatar_remote_path TEXT;
-
-        DROP TABLE IF EXISTS space_member_profiles;
-        CREATE TABLE space_member_profiles (
-          space_id TEXT NOT NULL,
-          user_id TEXT NOT NULL,
-          display_name TEXT,
-          avatar_path TEXT,
-          avatar_updated_at TEXT,
-          avatar_cached_uri TEXT,
-          updated_at TEXT NOT NULL,
-          PRIMARY KEY (space_id, user_id)
-        );
-      `);
-    }
-
-    // La versión 19 guarda la moneda preferida de cada miembro del espacio.
-    // Un espacio compartido tiene que ofrecer las monedas de las dos personas:
-    // si Ana trabaja en VES y Beto en EUR, cada uno necesita ver y poder
-    // elegir la del otro, o los movimientos ajenos quedan invisibles.
-    if (currentVersion < 19) {
-      await transaction.execAsync(`
-        ALTER TABLE space_member_profiles ADD COLUMN default_currency TEXT;
-      `);
-    }
+    await applyLocalProfileMigrations(transaction, currentVersion);
 
     await applyMoneyAccountMigrations(transaction, currentVersion);
 
     await transaction.execAsync(
       `PRAGMA user_version = ${localDatabaseVersion}`,
     );
-  });
+  };
+  if (needsLegacyMoneyAccountRebuild) {
+    await withLegacyMoneyAccountRebuildTransaction(database, runMigrations);
+  } else {
+    await database.withExclusiveTransactionAsync(runMigrations);
+  }
 }

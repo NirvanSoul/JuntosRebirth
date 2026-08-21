@@ -11,12 +11,10 @@ export { localDatabaseVersion, migrateLocalDatabase };
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 /**
- * Abre la base y migra. Si la migración falla (p. ej. `user_version` quedó
- * por delante de `localDatabaseVersion` porque el dispositivo corrió una
- * build de desarrollo con un esquema distinto, o el archivo quedó a medio
- * migrar por un cierre abrupto), el archivo local no contiene nada que no
- * se pueda regenerar: se borra y se reintenta una sola vez con una base
- * nueva en vez de dejar la app rota hasta que alguien la reinstale a mano.
+ * Abre la base y migra sin borrar datos ante un fallo. Los datos locales son
+ * la fuente de verdad para invitados y la caché de trabajo para una sesión;
+ * ante una migración inesperada deben conservarse para poder repararlos o
+ * exportarlos, nunca sustituirse silenciosamente por un archivo vacío.
  */
 async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   const database = await SQLite.openDatabaseAsync(localDatabaseName);
@@ -25,13 +23,10 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
     return database;
   } catch (error) {
     console.error(
-      '[localDatabase] La migración falló, reiniciando la base local',
+      '[localDatabase] La migración falló; se conservó la base local',
       error,
     );
-    await resetLocalDatabase();
-    const freshDatabase = await SQLite.openDatabaseAsync(localDatabaseName);
-    await migrateLocalDatabase(freshDatabase);
-    return freshDatabase;
+    throw error;
   }
 }
 

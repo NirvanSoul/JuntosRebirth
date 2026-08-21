@@ -5368,6 +5368,28 @@ alcance desde ADR-060.
 - El saldo inicial se titula «Saldo inicial (opcional)»: nadie tiene que
   inventarse una cifra para crear una cuenta.
 
+## Corrección — instalación marcada como v20 sin el esquema de cuentas
+
+Una build de desarrollo dejó una instalación con `PRAGMA user_version = 20`
+sin llegar a crear `money_accounts`, sus saldos ni las columnas opcionales de
+movimientos y series. La siguiente escalera asumía erróneamente que el número
+de versión demostraba la presencia del esquema, de modo que cualquier acceso
+a SQLite fallaba y afectaba también a perfiles, sincronización y guardados no
+relacionados con cuentas.
+
+La versión local 25 comprueba esas piezas antes de avanzar. Si faltan, las
+crea en la misma transacción, conserva todas las filas existentes con cuenta
+nula y después reutiliza las migraciones 21–24 para terminar en el esquema
+actual. Una migración inesperada ya no borra ni recrea la base automática e
+indistintamente: los datos locales son la fuente de verdad del invitado y
+deben quedar disponibles para reparación o exportación.
+
+La normalización de los tipos históricos reconstruye el CHECK solo durante una
+transacción controlada: antes se desactivan temporalmente las foráneas y se
+activa `legacy_alter_table`, evitando que SQLite apunte movimientos o series a
+la tabla temporal. `PRAGMA foreign_key_check` debe quedar vacío antes de
+confirmar y los PRAGMA se restauran después.
+
 ## Pendiente
 
 Transferencias entre cuentas, límite de crédito y fechas de corte, filtro por
