@@ -281,7 +281,7 @@ export function CategoryDetailModal({
                         Gastos
                       </Text>
                     </View>
-                    <Text numberOfLines={1} variant="label" weight="semibold">
+                    <Text numberOfLines={1} variant="body" weight="semibold">
                       {expense}
                     </Text>
                   </View>
@@ -302,7 +302,7 @@ export function CategoryDetailModal({
                         Ingresos
                       </Text>
                     </View>
-                    <Text numberOfLines={1} variant="label" weight="semibold">
+                    <Text numberOfLines={1} variant="body" weight="semibold">
                       {income}
                     </Text>
                   </View>

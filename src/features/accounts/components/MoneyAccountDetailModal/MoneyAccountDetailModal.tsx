@@ -88,7 +88,7 @@ function AccountTransactionMetric({
           {label}
         </Text>
       </View>
-      <Text numberOfLines={1} variant="label" weight="semibold">
+      <Text numberOfLines={1} variant="body" weight="semibold">
         {amount}
       </Text>
     </View>
@@ -240,7 +240,7 @@ export function MoneyAccountDetailModal({
               <Text tone="secondary" variant="caption">
                 Balance {selectedBalance.currency}
               </Text>
-              <Text numberOfLines={1} variant="label" weight="semibold">
+              <Text numberOfLines={1} variant="body" weight="semibold">
                 {formatCurrency(
                   selectedBalance.balanceMinor,
                   selectedBalance.currency,
