@@ -7,6 +7,7 @@ import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
+import { typography } from '@/theme/typography';
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
   AppModal: ({
@@ -115,6 +116,15 @@ describe('MoneyAccountDetailModal', () => {
     expect(screen.getByTestId('money-account-balance-EUR')).toBeTruthy();
     expect(screen.getByTestId('money-account-income-EUR')).toBeTruthy();
     expect(screen.getByTestId('money-account-expense-EUR')).toBeTruthy();
+    const balanceMetric = screen.getByTestId('money-account-balance-EUR');
+    expect(StyleSheet.flatten(balanceMetric.props.style).alignItems).toBe(
+      'center',
+    );
+    expect(
+      StyleSheet.flatten(
+        within(balanceMetric).getByText(/975/).props.style,
+      ).fontSize,
+    ).toBe(typography.amount.fontSize);
     expect(
       StyleSheet.flatten(
         screen.getByTestId('money-account-income-EUR-icon').props.style,

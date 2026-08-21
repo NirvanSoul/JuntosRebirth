@@ -240,7 +240,7 @@ export function MoneyAccountDetailModal({
               <Text tone="secondary" variant="caption">
                 Balance {selectedBalance.currency}
               </Text>
-              <Text numberOfLines={1} variant="body" weight="semibold">
+              <Text variant="amount">
                 {formatCurrency(
                   selectedBalance.balanceMinor,
                   selectedBalance.currency,
@@ -312,6 +312,7 @@ function createStyles(colors: ColorTokens) {
     },
     currencySelector: { alignSelf: 'center', width: 216 },
     balanceMetric: {
+      alignItems: 'center',
       gap: spacing.xs,
       backgroundColor: colors.surface,
       borderRadius: radii.md,
