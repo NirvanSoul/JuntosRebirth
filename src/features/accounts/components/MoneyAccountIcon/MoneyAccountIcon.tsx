@@ -15,8 +15,6 @@ import { PiggyBank } from 'phosphor-react-native/src/icons/PiggyBank';
 import { Phone } from 'phosphor-react-native/src/icons/Phone';
 import { Receipt } from 'phosphor-react-native/src/icons/Receipt';
 import { ShieldCheck } from 'phosphor-react-native/src/icons/ShieldCheck';
-import { ChartLineUp } from 'phosphor-react-native/src/icons/ChartLineUp';
-import { TrendUp } from 'phosphor-react-native/src/icons/TrendUp';
 import { Vault } from 'phosphor-react-native/src/icons/Vault';
 import { Wallet } from 'phosphor-react-native/src/icons/Wallet';
 
@@ -47,8 +45,6 @@ const icons: Record<MoneyAccountIconName, Icon> = {
   'piggy-bank': PiggyBank,
   'lock-key': LockKey,
   'shield-check': ShieldCheck,
-  'chart-line-up': ChartLineUp,
-  'trend-up': TrendUp,
 };
 
 export function MoneyAccountIcon({

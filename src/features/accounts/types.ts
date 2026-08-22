@@ -17,6 +17,17 @@ export type MoneyAccountKind = (typeof moneyAccountKinds)[number];
  */
 export const moneyAccountIconSections = [
   {
+    title: 'Cuentas y ahorro',
+    icons: [
+      'bank',
+      'buildings',
+      'vault',
+      'piggy-bank',
+      'lock-key',
+      'shield-check',
+    ],
+  },
+  {
     title: 'Dinero',
     icons: [
       'money',
@@ -36,19 +47,6 @@ export const moneyAccountIconSections = [
       'device-mobile',
       'phone',
       'barcode',
-    ],
-  },
-  {
-    title: 'Cuentas y ahorro',
-    icons: [
-      'bank',
-      'buildings',
-      'vault',
-      'piggy-bank',
-      'lock-key',
-      'shield-check',
-      'chart-line-up',
-      'trend-up',
     ],
   },
 ] as const;

@@ -1,7 +1,10 @@
 import { fireEvent } from '@testing-library/react-native';
 
 import { CreateMoneyAccountModal } from '@/features/accounts/components/CreateMoneyAccountModal/CreateMoneyAccountModal';
-import type { MoneyAccount } from '@/features/accounts/types';
+import {
+  moneyAccountIconSections,
+  type MoneyAccount,
+} from '@/features/accounts/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import { colors } from '@/theme/colors';
 
@@ -255,8 +258,12 @@ describe('CreateMoneyAccountModal', () => {
     );
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
 
-    expect(screen.getByText('Tarjetas y pagos')).toBeTruthy();
     expect(screen.getByText('Cuentas y ahorro')).toBeTruthy();
+    expect(moneyAccountIconSections[0]?.title).toBe('Cuentas y ahorro');
+    expect(screen.getByText('Dinero')).toBeTruthy();
+    expect(screen.getByText('Tarjetas y pagos')).toBeTruthy();
+    expect(screen.queryByLabelText('Icono chart-line-up')).toBeNull();
+    expect(screen.queryByLabelText('Icono trend-up')).toBeNull();
     expect(
       screen.getByTestId('money-account-appearance-icons-scroll').props
         .horizontal,
