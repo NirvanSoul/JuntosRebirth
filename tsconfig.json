@@ -19,6 +19,7 @@
     "ios",
     "scripts",
     "supabase/functions",
-    "services"
+    "services",
+    "JuntosRebirth-fase3"
   ]
 }

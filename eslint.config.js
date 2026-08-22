@@ -50,6 +50,7 @@ module.exports = defineConfig([
     'ios/*',
     '.expo/*',
     'supabase/.temp/*',
+    'JuntosRebirth-fase3/*',
   ]),
   expoConfig,
   {

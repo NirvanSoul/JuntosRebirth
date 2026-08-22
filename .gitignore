@@ -38,6 +38,12 @@ yarn-debug.*
 yarn-error.*
 .git-commit-*.txt
 
+# Copia anidada y obsoleta del proyecto entero. No es codigo fuente de esta
+# rama: aporta sus propios errores de tipos y pruebas a los checks. Se excluye
+# aqui y en tsconfig, eslint, prettier y jest para que `npm run validate` mida
+# solo `src/`.
+/JuntosRebirth-fase3/
+
 # Editors and operating systems
 .DS_Store
 .idea/

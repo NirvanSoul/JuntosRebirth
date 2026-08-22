@@ -81,6 +81,10 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/JuntosRebirth-fase3/"
+    ],
     "setupFilesAfterEnv": [
       "<rootDir>/src/test/setup.ts"
     ],
