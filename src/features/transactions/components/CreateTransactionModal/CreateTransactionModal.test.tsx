@@ -6,7 +6,10 @@ import { CreateTransactionModal as ControlledCreateTransactionModal } from '@/fe
 import type { Category } from '@/features/categories/types';
 import type { TransactionType } from '@/features/transactions/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
-import { categoryColors } from '@/theme/categoryColors';
+import {
+  categoryColors,
+  getCategoryContentContrast,
+} from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { minTouchTarget } from '@/theme/layout';
 import { shadows } from '@/theme/shadows';
@@ -618,7 +621,7 @@ describe('CreateTransactionModal', () => {
     ).toBe(categoryColors.orange);
   });
 
-  it('usa texto oscuro en el CTA de una categoría amarilla', async () => {
+  it('toma del contraste de categoría el color del texto del CTA', async () => {
     const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
@@ -635,7 +638,7 @@ describe('CreateTransactionModal', () => {
 
     expect(
       StyleSheet.flatten(screen.getByText('Agregar').props.style).color,
-    ).toBe(colors.textPrimary);
+    ).toBe(getCategoryContentContrast('yellow').color);
   });
 
   it('permite escoger la fecha y la recurrencia desde sus iconos', async () => {

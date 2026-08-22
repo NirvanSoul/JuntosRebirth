@@ -47,26 +47,12 @@ export const categoryColorTokens = [
 
 /**
  * Los fondos de categoría son colores fijos, ajenos al tema claro/oscuro, así
- * que su contraste también debe serlo: `yellow` siempre necesita texto e
- * iconografía oscuros, sin importar si la app está en modo oscuro.
+ * que su contenido también debe serlo: texto e iconografía siempre blancos.
  */
 export const categoryContentContrast = {
   default: { color: lightColors.onBrand, tone: 'onBrand' },
-  dark: { color: lightColors.textPrimary, tone: 'primary' },
 } as const;
 
-export function getCategoryContentContrast(colorToken: CategoryColorToken) {
-  return [
-    'rose',
-    'slate',
-    'green',
-    'teal',
-    'emerald',
-    'cyan',
-    'blue',
-    'yellow',
-    'orange',
-  ].includes(colorToken)
-    ? categoryContentContrast.dark
-    : categoryContentContrast.default;
+export function getCategoryContentContrast(_colorToken: CategoryColorToken) {
+  return categoryContentContrast.default;
 }

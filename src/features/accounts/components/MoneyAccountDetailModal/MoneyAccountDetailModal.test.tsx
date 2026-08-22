@@ -7,6 +7,7 @@ import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
+import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
@@ -142,6 +143,16 @@ describe('MoneyAccountDetailModal', () => {
 
     expect(screen.getByText('Compra')).toBeTruthy();
     expect(screen.queryByText('Sin cuenta')).toBeNull();
+  });
+
+  it('mantiene blanco el icono de la cuenta sobre colores claros', async () => {
+    const screen = await renderModal({
+      account: { ...account, colorToken: 'slate' },
+    });
+
+    expect(
+      screen.getByTestId('phosphor-react-native-bank-fill').props.color,
+    ).toBe(colors.onBrand);
   });
 
   it('avisa de que los movimientos se conservan antes de eliminarla', async () => {

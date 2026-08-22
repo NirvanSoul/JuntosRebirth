@@ -30,10 +30,7 @@ import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import { triggerHaptic } from '@/lib/haptics/haptics';
-import {
-  categoryColors,
-  getCategoryContentContrast,
-} from '@/theme/categoryColors';
+import { categoryColors } from '@/theme/categoryColors';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
@@ -483,7 +480,7 @@ export function CategoryDetailModal({
           setNoteModalVisible(false);
         }}
         saveColor={categoryColors[category.colorToken]}
-        saveTone={getCategoryContentContrast(category.colorToken).tone}
+        saveTone="onBrand"
         subtitle={category.name}
         testID="category-note-modal"
         value={category.note}

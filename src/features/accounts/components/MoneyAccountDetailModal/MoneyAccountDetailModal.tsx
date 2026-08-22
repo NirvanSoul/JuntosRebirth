@@ -24,10 +24,7 @@ import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
-import {
-  categoryColors,
-  getCategoryContentContrast,
-} from '@/theme/categoryColors';
+import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
@@ -105,6 +102,7 @@ export function MoneyAccountDetailModal({
   transactions,
   visible,
 }: MoneyAccountDetailModalProps) {
+  const { colors } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette));
   const [isDeletePanelVisible, setDeletePanelVisible] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
@@ -135,7 +133,6 @@ export function MoneyAccountDetailModal({
   }
 
   const accountColor = categoryColors[account.colorToken];
-  const contentContrast = getCategoryContentContrast(account.colorToken);
   const selectedBalance =
     summary.balanceByCurrency.find(
       (balance) => balance.currency === selectedCurrency,
@@ -178,7 +175,7 @@ export function MoneyAccountDetailModal({
           <View style={styles.hero}>
             <View style={[styles.heroIcon, { backgroundColor: accountColor }]}>
               <MoneyAccountIcon
-                color={contentContrast.color}
+                color={colors.onBrand}
                 name={account.icon}
                 size={iconSize.xl}
               />
