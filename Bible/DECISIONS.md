@@ -2956,6 +2956,34 @@ desglose por moneda pendiente antes de poder mostrar un símbolo correcto.
 - `npm run typecheck`, `npm run lint`, `prettier --check` y las pruebas de
   `currencyCatalog`, `formatCurrency` y `localTransactionRepository`.
 
+## Corrección — la moneda se elige junto al título, no sobre el teclado
+
+El botón de moneda vivía en la fila que hay sobre el teclado numérico, junto a
+fecha y recurrencia. Al añadirse ahí el botón de cuenta (ADR-080), esa fila
+pasó a acumular cuatro controles y quedó apretada, mientras la fila del título
+ocupaba todo el ancho para un campo que rara vez lo necesita.
+
+La moneda pasa a un botón cuadrado situado a la derecha del campo de título,
+que muestra **solo la bandera** de la moneda actual. La bandera desambigua
+donde el símbolo no puede: en el catálogo, `$` lo comparten USD, MXN, COP,
+ARS, CLP y UYU, y `Bs.` lo comparten VES y BOB, justo con dos o tres monedas
+activas que es cuando el control existe. El código ISO sigue disponible para
+tecnologías de asistencia mediante `accessibilityLabel` (`Moneda: EUR`), y el
+importe hero continúa mostrando el símbolo según ADR-060.
+
+No cambia ninguna regla anterior: el control sigue apareciendo solo con más de
+una moneda activa, sigue desapareciendo cuando una cuenta fija la moneda
+(ADR-080) y abre el mismo `TransactionCurrencyPickerModal`.
+
+### Validación de la corrección
+
+- `CreateTransactionModal.test.tsx` cubre que el botón está dentro de la fila
+  del título y no dentro de la fila de metadatos, que respeta el objetivo
+  táctil mínimo y que la bandera refleja la moneda elegida.
+- Las pruebas existentes de preselección, edición y cambio de espacio siguen
+  localizando el control por su `testID` y su `accessibilityLabel`, sin
+  cambios.
+
 ---
 
 # ADR-061 — «Movimientos recientes» ordena por creación o modificación, no por fecha económica

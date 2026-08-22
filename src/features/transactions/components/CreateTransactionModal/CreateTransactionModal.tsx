@@ -39,6 +39,7 @@ import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
   defaultCurrencyCode,
+  getCurrencyFlag,
   getCurrencyPluralName,
   getCurrencySymbol,
   getCurrencySymbolPosition,
@@ -240,6 +241,14 @@ export function CreateTransactionModal({
     () => moneyAccounts.find((account) => account.id === moneyAccountId),
     [moneyAccountId, moneyAccounts],
   );
+  /**
+   * La moneda solo se elige cuando hay más de una y ninguna cuenta la fija:
+   * con cuenta elegida es la suya, y cambiarla dejaría el importe fuera de
+   * su saldo.
+   */
+  const isCurrencySelectable =
+    effectiveAvailableCurrencies.length > 1 && !selectedMoneyAccount;
+  const currencyFlag = getCurrencyFlag(currency);
   const currencySymbol = getCurrencySymbol(currency);
   const currencySymbolPosition = getCurrencySymbolPosition(currency);
   const currencyPluralName = getCurrencyPluralName(currency);
@@ -598,17 +607,36 @@ export function CreateTransactionModal({
             <ModalCloseButton onPress={onClose} />
           </View>
 
-          <BottomSheetTextInput
-            accessibilityLabel="Título del movimiento"
-            maxFontSizeMultiplier={maxFontScale.body}
-            maxLength={80}
-            onChangeText={setTitle}
-            placeholder="Agrega un título"
-            placeholderTextColor={colors.textMuted}
-            returnKeyType="done"
-            style={styles.titleInput}
-            value={title}
-          />
+          <View style={styles.titleRow} testID="transaction-title-row">
+            <BottomSheetTextInput
+              accessibilityLabel="Título del movimiento"
+              maxFontSizeMultiplier={maxFontScale.body}
+              maxLength={80}
+              onChangeText={setTitle}
+              placeholder="Agrega un título"
+              placeholderTextColor={colors.textMuted}
+              returnKeyType="done"
+              style={styles.titleInput}
+              value={title}
+            />
+            {isCurrencySelectable ? (
+              <Pressable
+                accessibilityHint="Abre las opciones de moneda"
+                accessibilityLabel={`Moneda: ${currency}`}
+                accessibilityRole="button"
+                onPress={() => setCurrencyPickerVisible(true)}
+                style={({ pressed }) => [
+                  styles.currencyButton,
+                  pressed && styles.pressed,
+                ]}
+                testID="transaction-currency-button"
+              >
+                <Text testID="transaction-currency-flag" variant="subheading">
+                  {currencyFlag}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
 
           <Animated.View
             accessibilityLabel={
@@ -761,40 +789,6 @@ export function CreateTransactionModal({
                   weight="semibold"
                 >
                   {selectedMoneyAccount?.name ?? 'Cuenta'}
-                </Text>
-              </Pressable>
-            ) : null}
-            {/*
-              Con una cuenta elegida la moneda ya no se puede tocar: es la de
-              la cuenta, y cambiarla dejaría el importe fuera de su saldo.
-            */}
-            {effectiveAvailableCurrencies.length > 1 &&
-            !selectedMoneyAccount ? (
-              <Pressable
-                accessibilityHint="Abre las opciones de moneda"
-                accessibilityLabel={`Moneda: ${currency}`}
-                accessibilityRole="button"
-                onPress={() => setCurrencyPickerVisible(true)}
-                style={({ pressed }) => [
-                  styles.metadataButton,
-                  pressed && styles.pressed,
-                ]}
-                testID="transaction-currency-button"
-              >
-                <Ionicons
-                  color={colors.textPrimary}
-                  name="cash-outline"
-                  size={iconSize.md}
-                  testID="transaction-currency-icon"
-                />
-                <Text
-                  numberOfLines={1}
-                  style={styles.metadataLabel}
-                  tone="secondary"
-                  variant="label"
-                  weight="semibold"
-                >
-                  {currency}
                 </Text>
               </Pressable>
             ) : null}
@@ -1047,7 +1041,13 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
       borderRadius: radii.lg,
       paddingHorizontal: spacing.lg,
     },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: layout.controlGap[density],
+    },
     titleInput: {
+      flex: 1,
       minHeight: layout.controlHeight[density],
       borderRadius: radii.md,
       borderColor: colors.border,
@@ -1058,6 +1058,16 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
       fontSize: typography.body.fontSize,
       letterSpacing: typography.body.letterSpacing,
       paddingHorizontal: spacing.lg,
+    },
+    currencyButton: {
+      width: layout.controlHeight[density],
+      height: layout.controlHeight[density],
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.md,
+      borderColor: colors.border,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
     },
     amountArea: {
       minHeight: amountAreaMinHeight[density],

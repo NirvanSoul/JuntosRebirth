@@ -160,9 +160,11 @@ solo propone el icono y el color al crearla: los tres calculan el saldo igual y
 cualquiera puede quedar en negativo.
 
 Después de registrar movimientos, las monedas ya guardadas y sus saldos
-iniciales no se pueden alterar. Si la cuenta solo tenía una moneda, el usuario
-puede añadir una segunda con su propio saldo inicial: esa alta no reinterpreta
-los movimientos existentes.
+iniciales no se pueden alterar. Una cuenta nueva nace solo con la moneda
+principal del espacio y el usuario indica su saldo inicial en el segundo paso.
+Al asignarle por primera vez un movimiento de otra moneda, esa divisa se añade
+automáticamente con saldo inicial cero: no reinterpreta los movimientos
+existentes.
 
 La vista previa de Inicio muestra las divisas de cada cuenta con su color y el
 saldo de su moneda principal. Cuando el saldo de cierre de esa moneda en el mes
@@ -671,10 +673,15 @@ Contenido base:
 - Recurrencia opcional.
 - Guardar.
 
-El botón de cuenta acompaña a los de recurrencia y moneda, y solo aparece
-cuando el espacio activo ya tiene alguna cuenta. Al elegir una, el movimiento
-adopta su moneda y el selector de moneda desaparece; al quitarla, vuelve a la
-moneda del espacio. Desde el propio selector se puede crear una cuenta sin
+El botón de cuenta acompaña a los de fecha y recurrencia, y solo aparece
+cuando el espacio activo ya tiene alguna cuenta. La moneda no vive en esa
+fila: cuando el espacio tiene dos o más monedas activas se elige desde un
+botón situado junto al campo de título, que muestra la bandera de la moneda
+actual. Así la fila que hay sobre el teclado numérico queda para fecha,
+recurrencia y cuenta, y la información se reparte mejor. Al elegir una cuenta
+el movimiento conserva su moneda y, si es nueva para esa cuenta, se añade con
+saldo inicial cero; ese botón desaparece. Al quitarla, vuelve a la moneda del
+espacio. Desde el propio selector se puede crear una cuenta sin
 salir del flujo.
 
 El espacio se deriva del contexto activo y no se pregunta de nuevo por defecto.

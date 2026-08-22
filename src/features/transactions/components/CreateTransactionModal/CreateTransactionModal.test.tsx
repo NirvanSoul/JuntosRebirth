@@ -1,4 +1,4 @@
-import { act, fireEvent } from '@testing-library/react-native';
+import { act, fireEvent, within } from '@testing-library/react-native';
 import { type ComponentProps, useState } from 'react';
 import { Keyboard, StyleSheet } from 'react-native';
 
@@ -904,6 +904,39 @@ describe('CreateTransactionModal', () => {
     expect(screen.queryByTestId('transaction-currency-button')).toBeNull();
   });
 
+  it('coloca la moneda junto al título y la retira de la fila de metadatos', async () => {
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="personal"
+        availableCurrencies={['EUR', 'USD']}
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={jest.fn()}
+        selectedCategory={category}
+        visible
+      />,
+    );
+
+    const currencyButton = within(
+      screen.getByTestId('transaction-title-row'),
+    ).getByTestId('transaction-currency-button');
+
+    expect(currencyButton).toBeTruthy();
+    expect(
+      within(screen.getByTestId('transaction-metadata-row')).queryByTestId(
+        'transaction-currency-button',
+      ),
+    ).toBeNull();
+    expect(screen.getByTestId('transaction-currency-flag').props.children).toBe(
+      '🇪🇺',
+    );
+
+    const style = StyleSheet.flatten(currencyButton.props.style);
+    expect(style.height).toBeGreaterThanOrEqual(minTouchTarget);
+    expect(style.width).toBeGreaterThanOrEqual(minTouchTarget);
+  });
+
   it('permite elegir la moneda del movimiento cuando hay varias activas', async () => {
     const onSubmit = jest.fn();
     const screen = await renderWithTheme(
@@ -930,6 +963,9 @@ describe('CreateTransactionModal', () => {
     expect(
       screen.getByTestId('transaction-amount-currency').props.children,
     ).toBe('$ ');
+    expect(screen.getByTestId('transaction-currency-flag').props.children).toBe(
+      '🇺🇸',
+    );
 
     await fireEvent.press(screen.getByLabelText('1'));
     await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
