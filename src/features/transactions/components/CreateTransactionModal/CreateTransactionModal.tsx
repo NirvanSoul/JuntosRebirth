@@ -540,12 +540,13 @@ export function CreateTransactionModal({
                 ]}
                 testID={`transaction-type-indicator-${type}`}
               >
-                <Ionicons
-                  color={colors.onBrand}
-                  name={type === 'income' ? 'arrow-up' : 'arrow-down'}
-                  size={iconSize.sm}
-                  style={styles.diagonalArrow}
-                />
+                <View style={styles.diagonalArrow}>
+                  <Ionicons
+                    color={colors.onBrand}
+                    name={type === 'income' ? 'arrow-up' : 'arrow-down'}
+                    size={iconSize.sm}
+                  />
+                </View>
                 <Text tone="onBrand" variant="label" weight="semibold">
                   {type === 'income' ? 'Ingreso' : 'Gasto'}
                 </Text>
@@ -586,12 +587,16 @@ export function CreateTransactionModal({
                         pressed && styles.pressed,
                       ]}
                     >
-                      <Ionicons
-                        color={selected ? colors.onBrand : colors.textMuted}
-                        name={isIncome ? 'arrow-up' : 'arrow-down'}
-                        size={iconSize.sm}
+                      <View
                         style={styles.diagonalArrow}
-                      />
+                        testID={`transaction-type-arrow-${option}`}
+                      >
+                        <Ionicons
+                          color={selected ? colors.onBrand : colors.textMuted}
+                          name={isIncome ? 'arrow-up' : 'arrow-down'}
+                          size={iconSize.sm}
+                        />
+                      </View>
                       <Text
                         tone={selected ? 'onBrand' : 'muted'}
                         variant="label"

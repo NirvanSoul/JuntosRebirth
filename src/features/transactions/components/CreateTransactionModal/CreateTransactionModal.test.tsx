@@ -469,6 +469,31 @@ describe('CreateTransactionModal', () => {
     ).toBe(colors.expense);
   });
 
+  it('rota las flechas de gasto e ingreso como el resto de la app', async () => {
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="personal"
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={jest.fn()}
+        selectedCategory={category}
+        visible
+      />,
+    );
+
+    // La rotación vive en un View que envuelve el glifo, no en el propio
+    // icono: rotar el texto lo gira sobre la caja de la fuente y descentra la
+    // punta de la flecha respecto a las de Inicio, Actividad y los detalles.
+    (['expense', 'income'] as const).forEach((option) => {
+      const arrow = screen.getByTestId(`transaction-type-arrow-${option}`);
+
+      expect(StyleSheet.flatten(arrow.props.style).transform).toEqual([
+        { rotate: '45deg' },
+      ]);
+    });
+  });
+
   it('mantiene compactos y alineados a la izquierda los controles superiores', async () => {
     const screen = await renderWithTheme(
       <CreateTransactionModal
