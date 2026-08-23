@@ -872,18 +872,13 @@ Principios:
 - Unirse no fusiona espacios personales.
 - Los datos personales permanecen aislados.
 - Los movimientos compartidos conservan autor.
-- La salida no borra silenciosamente información.
+- Salir revoca solo el acceso de quien lo solicita.
+- Mientras quede otra persona dentro, quien salió puede volver a entrar con una nueva invitación.
+- Cuando ya no queda nadie dentro, el espacio y sus datos se eliminan automáticamente.
 - Las acciones sensibles requieren confirmación.
 
-Debe diferenciarse entre:
-
-- Abandonar.
-- Expulsar.
-- Disolver.
-- Archivar.
-- Copiar categorías.
-- Conservar historial.
-- Revocar acceso.
+La interfaz inicial ofrece únicamente la salida del propio usuario; no permite
+expulsar a la otra persona ni disolver o archivar el espacio manualmente.
 
 ---
 

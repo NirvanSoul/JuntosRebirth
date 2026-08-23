@@ -10,7 +10,6 @@ import { Text } from '@/components/ui/Text/Text';
 import type { MoneyAccountModalStyles } from '@/features/accounts/components/CreateMoneyAccountModal/CreateMoneyAccountModal.styles';
 import { moneyAccountKindDefinitions } from '@/features/accounts/constants/moneyAccountKindDefinitions';
 import type { MoneyAccountKind } from '@/features/accounts/types';
-import type { MoneyAccountNameValidation } from '@/features/accounts/utils/moneyAccountCatalog';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { formatAmountInputForDisplay } from '@/lib/currency/amountInput';
 import {
@@ -23,20 +22,17 @@ import { maxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 
 type MoneyAccountDetailsStepProps = {
+  allowCurrencySelection: boolean;
   availableCurrencies: readonly CurrencyCode[];
   /** Saldo inicial escrito por moneda, indexado por código. */
   balanceInputs: Record<string, string>;
   /** Monedas ya guardadas antes de abrir la edición. */
   existingCurrencies: readonly CurrencyCode[];
   selectedCurrencies: readonly CurrencyCode[];
-  hasAttemptedSubmit: boolean;
   isCurrencyLocked: boolean;
   kind: MoneyAccountKind;
-  name: string;
   styles: MoneyAccountModalStyles;
-  validation: MoneyAccountNameValidation;
   onChangeBalance: (currency: CurrencyCode, value: string) => void;
-  onChangeName: (value: string) => void;
   onContinue: () => void;
   onToggleCurrency: (currency: CurrencyCode) => void;
   onSelectKind: (kind: MoneyAccountKind) => void;
@@ -82,18 +78,15 @@ function CurrencyOption({
 }
 
 export function MoneyAccountDetailsStep({
+  allowCurrencySelection,
   availableCurrencies,
   balanceInputs,
   existingCurrencies,
   selectedCurrencies,
-  hasAttemptedSubmit,
   isCurrencyLocked,
   kind,
-  name,
   styles,
-  validation,
   onChangeBalance,
-  onChangeName,
   onContinue,
   onToggleCurrency,
   onSelectKind,
@@ -113,37 +106,6 @@ export function MoneyAccountDetailsStep({
         style={styles.stepScroll}
         testID="money-account-details-step"
       >
-        <BottomSheetTextInput
-          accessibilityLabel="Nombre de la cuenta"
-          autoFocus
-          maxFontSizeMultiplier={maxFontScale.body}
-          maxLength={40}
-          onChangeText={onChangeName}
-          onSubmitEditing={onContinue}
-          placeholder="Por ejemplo, Cuenta nómina"
-          placeholderTextColor={colors.textMuted}
-          returnKeyType="next"
-          style={[
-            styles.input,
-            { minHeight: layout.controlHeight[density] },
-            hasAttemptedSubmit && !validation.valid && styles.inputError,
-          ]}
-          value={name}
-        />
-        {hasAttemptedSubmit && !validation.valid && (
-          <Text
-            accessibilityLiveRegion="polite"
-            style={styles.error}
-            tone="expense"
-            variant="footnote"
-          >
-            {validation.error}
-          </Text>
-        )}
-
-        <Text style={styles.sectionTitle} variant="label" weight="semibold">
-          Tipo
-        </Text>
         <View accessibilityRole="radiogroup" style={styles.kindRow}>
           {moneyAccountKindDefinitions.map((definition) => (
             <SelectableOption
@@ -158,7 +120,7 @@ export function MoneyAccountDetailsStep({
           ))}
         </View>
 
-        {availableCurrencies.length > 1 ? (
+        {allowCurrencySelection && availableCurrencies.length > 1 ? (
           <>
             <Text style={styles.sectionTitle} variant="label" weight="semibold">
               Monedas
@@ -221,6 +183,7 @@ export function MoneyAccountDetailsStep({
               placeholderTextColor={colors.textMuted}
               style={[
                 styles.input,
+                styles.balanceInput,
                 { minHeight: layout.controlHeight[density] },
               ]}
               value={formatAmountInputForDisplay(balanceInputs[code] ?? '0')}
@@ -235,7 +198,6 @@ export function MoneyAccountDetailsStep({
 
       <ModalPrimaryAction
         accessibilityLabel="Continuar personalización"
-        disabled={!validation.valid}
         label="Continuar"
         onPress={onContinue}
         style={styles.primaryButtonLayout}

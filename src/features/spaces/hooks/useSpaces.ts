@@ -34,7 +34,7 @@ type SpacesController = {
   activeSpace: Space;
   createCoupleSpace: (name?: string) => Promise<Space>;
   createSpace: (name: string) => Promise<Space>;
-  dissolveCoupleSpace: () => Promise<void>;
+  leaveCoupleSpace: () => Promise<void>;
   error: string | null;
   isReady: boolean;
   refreshCoupleSpace: () => Promise<void>;
@@ -369,24 +369,24 @@ export function useSpaces(): SpacesController {
     [session, state],
   );
 
-  const dissolveCoupleSpace = useCallback(async (): Promise<void> => {
+  const leaveCoupleSpace = useCallback(async (): Promise<void> => {
     const coupleSpaceEntry = state.spaces.find(
       (space) => space.type === 'couple',
     );
     if (!coupleSpaceEntry) return;
 
     if (!session) {
-      throw new Error('Inicia sesión para eliminar el espacio de pareja.');
+      throw new Error('Inicia sesión para salir del espacio de pareja.');
     }
 
     const gateway = createSupabaseInvitationGateway();
     try {
-      await gateway.dissolveCoupleSpace(coupleSpaceEntry.id);
+      await gateway.leaveCoupleSpace(coupleSpaceEntry.id);
     } catch (caught) {
       const message =
         caught instanceof Error
           ? caught.message
-          : 'No pudimos eliminar el espacio de pareja.';
+          : 'No pudimos salir del espacio de pareja.';
       setError(message);
       throw new Error(message);
     }
@@ -407,7 +407,7 @@ export function useSpaces(): SpacesController {
       await saveSpaces(nextState);
     } catch {
       const message =
-        'Eliminamos el espacio, pero no pudimos actualizar tus espacios locales. Cierra y vuelve a abrir Juntos.';
+        'Saliste del espacio, pero no pudimos actualizar tus espacios locales. Cierra y vuelve a abrir Juntos.';
       setError(message);
       throw new Error(message);
     }
@@ -419,7 +419,7 @@ export function useSpaces(): SpacesController {
     activeSpace,
     createCoupleSpace,
     createSpace,
-    dissolveCoupleSpace,
+    leaveCoupleSpace,
     error,
     isReady,
     refreshCoupleSpace,

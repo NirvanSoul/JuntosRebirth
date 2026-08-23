@@ -12,10 +12,12 @@ import { DestructiveConfirmationPanel } from '@/components/overlays/DestructiveC
 import { DetailActionMenu } from '@/components/overlays/DetailActionMenu/DetailActionMenu';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal';
+import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
 import { CategoryDetailActionButton as ActionButton } from '@/features/categories/components/CategoryDetailModal/CategoryDetailActionButton';
+import { CategoryTransactionMetrics } from '@/features/categories/components/CategoryDetailModal/CategoryTransactionMetrics';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type {
   Category,
@@ -84,26 +86,39 @@ export function CategoryDetailModal({
   const [isBudgetModalVisible, setBudgetModalVisible] = useState(false);
   const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] =
+    useState<CurrencyCode>(displayCurrency);
   const modalBottomInset = useAppModalBottomInset();
+  const detailCurrencies = useMemo<readonly CurrencyCode[]>(() => {
+    if (!category) return [];
+
+    return Array.from(
+      new Set(
+        transactions
+          .filter((transaction) => transaction.categoryId === category.id)
+          .map((transaction) => transaction.currency),
+      ),
+    );
+  }, [category, transactions]);
   const categoryTransactions = useMemo(
     () =>
       category
         ? listTransactionsThroughCurrentMonth(transactions).filter(
             (t) =>
-              t.categoryId === category.id && t.currency === displayCurrency,
+              t.categoryId === category.id && t.currency === selectedCurrency,
           )
         : [],
-    [category, displayCurrency, transactions],
+    [category, selectedCurrency, transactions],
   );
   const allCategoryTransactions = useMemo(
     () =>
       category
         ? transactions.filter(
             (t) =>
-              t.categoryId === category.id && t.currency === displayCurrency,
+              t.categoryId === category.id && t.currency === selectedCurrency,
           )
         : [],
-    [category, displayCurrency, transactions],
+    [category, selectedCurrency, transactions],
   );
   const todayKey = getLocalTodayKey();
   const pastCategoryTransactions = useMemo(
@@ -129,9 +144,9 @@ export function CategoryDetailModal({
   const summary = useMemo(
     () =>
       category
-        ? summarizeCategories([category], transactions, displayCurrency)[0]
+        ? summarizeCategories([category], transactions, selectedCurrency)[0]
         : undefined,
-    [category, displayCurrency, transactions],
+    [category, selectedCurrency, transactions],
   );
   const budgetExpenseMinor = useMemo(() => {
     if (!category) return 0;
@@ -152,7 +167,12 @@ export function CategoryDetailModal({
     setBudgetModalVisible(false);
     setNoteModalVisible(false);
     setSpacePickerVisible(false);
-  }, [category, visible]);
+    setSelectedCurrency(
+      detailCurrencies.includes(displayCurrency)
+        ? displayCurrency
+        : (detailCurrencies[0] ?? displayCurrency),
+    );
+  }, [category, detailCurrencies, displayCurrency, visible]);
 
   useEffect(() => {
     if (visible) {
@@ -164,10 +184,10 @@ export function CategoryDetailModal({
 
   const expense = formatCurrency(
     summary.expenseMinor,
-    displayCurrency,
+    selectedCurrency,
     'es-ES',
   );
-  const income = formatCurrency(summary.incomeMinor, displayCurrency, 'es-ES');
+  const income = formatCurrency(summary.incomeMinor, selectedCurrency, 'es-ES');
   const budget = category.budgetMinor
     ? formatCurrency(category.budgetMinor, spaceCurrency, 'es-ES')
     : null;
@@ -267,52 +287,25 @@ export function CategoryDetailModal({
               />
             ) : null}
 
-            {summary.expenseMinor > 0 || summary.incomeMinor > 0 ? (
-              <View style={styles.metrics}>
-                {summary.expenseMinor > 0 ? (
-                  <View style={styles.metric} testID="category-expense-metric">
-                    <View style={styles.metricHeading}>
-                      <View style={styles.metricIcon}>
-                        <View style={styles.diagonalArrow}>
-                          <Ionicons
-                            color={colors.expense}
-                            name="arrow-down"
-                            size={iconSize.sm}
-                          />
-                        </View>
-                      </View>
-                      <Text tone="secondary" variant="caption">
-                        Gastos
-                      </Text>
-                    </View>
-                    <Text numberOfLines={1} variant="body" weight="semibold">
-                      {expense}
-                    </Text>
-                  </View>
-                ) : null}
-                {summary.incomeMinor > 0 ? (
-                  <View style={styles.metric} testID="category-income-metric">
-                    <View style={styles.metricHeading}>
-                      <View style={styles.metricIcon}>
-                        <View style={styles.diagonalArrow}>
-                          <Ionicons
-                            color={colors.income}
-                            name="arrow-up"
-                            size={iconSize.sm}
-                          />
-                        </View>
-                      </View>
-                      <Text tone="secondary" variant="caption">
-                        Ingresos
-                      </Text>
-                    </View>
-                    <Text numberOfLines={1} variant="body" weight="semibold">
-                      {income}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
+            {detailCurrencies.length > 1 ? (
+              <SegmentedControl
+                onChange={setSelectedCurrency}
+                options={detailCurrencies.map((currency) => ({
+                  label: currency,
+                  value: currency,
+                }))}
+                selectedValue={selectedCurrency}
+                style={styles.currencySelector}
+                testID="category-currency-selector"
+              />
             ) : null}
+
+            <CategoryTransactionMetrics
+              expense={expense}
+              expenseMinor={summary.expenseMinor}
+              income={income}
+              incomeMinor={summary.incomeMinor}
+            />
 
             <Pressable
               accessibilityLabel={
@@ -530,32 +523,11 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: radii.round,
       marginBottom: spacing.xs,
     },
-    metrics: {
-      flexDirection: 'row',
-      gap: spacing.sm,
+    currencySelector: {
+      alignSelf: 'center',
       marginTop: spacing.xl,
+      width: 216,
     },
-    metric: {
-      minWidth: 0,
-      flex: 1,
-      gap: spacing.xs,
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      padding: spacing.md,
-    },
-    metricHeading: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-    },
-    metricIcon: {
-      width: iconSize.lg,
-      height: iconSize.lg,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-    },
-    diagonalArrow: { transform: [{ rotate: '45deg' }] },
     noteButton: {
       minHeight: layout.controlHeight.regular,
       flexDirection: 'row',

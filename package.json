@@ -13,7 +13,8 @@
     "upload": "sh scripts/git-upload.sh",
     "download": "sh scripts/git-download.sh",
     "android": "expo start --go --android",
-    "ios": "expo start --go --ios",
+    "ios": "expo start --go --tunnel",
+    "ios:sim": "xcrun simctl openurl booted",
     "prebuild:ios": "sh scripts/ios-development-build.sh prebuild",
     "ios:dev": "sh scripts/ios-development-build.sh simulator",
     "ios:device": "sh scripts/ios-development-build.sh device",
@@ -75,7 +76,7 @@
     "eslint": "^9.39.5",
     "eslint-config-expo": "~10.0.0",
     "jest": "~29.7.0",
-    "jest-expo": "~54.0.17",
+    "jest-expo": "~54.0.18",
     "prettier": "^3.9.6",
     "typescript": "~5.9.2"
   },

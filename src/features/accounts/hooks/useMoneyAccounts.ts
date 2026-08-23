@@ -10,6 +10,7 @@ import type {
   CreateMoneyAccountInput,
   MoneyAccount,
 } from '@/features/accounts/types';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import {
   listMoneyAccountsBySpace,
   validateMoneyAccountName,
@@ -184,11 +185,47 @@ export function useMoneyAccounts({
     [activeSpaceId],
   );
 
+  /** Añade una divisa con saldo inicial cero al asignar el primer movimiento. */
+  const ensureCurrency = useCallback(
+    async (
+      moneyAccountId: string,
+      currency: CurrencyCode,
+    ): Promise<boolean> => {
+      const account = moneyAccounts.find(
+        (candidate) => candidate.id === moneyAccountId,
+      );
+      if (!account || account.spaceId !== activeSpaceId) return false;
+      if (account.balances.some((balance) => balance.currency === currency)) {
+        return true;
+      }
+
+      try {
+        const updated = await updateLocalMoneyAccount({
+          ...account,
+          balances: [...account.balances, { currency, openingBalanceMinor: 0 }],
+        });
+        setMoneyAccounts((current) =>
+          current.map((candidate) =>
+            candidate.id === updated.id ? updated : candidate,
+          ),
+        );
+        notifyRef.current.onChangesPublished();
+        return true;
+      } catch (error) {
+        console.error('[accounts] No se pudo añadir la moneda', error);
+        notifyRef.current.onError();
+        return false;
+      }
+    },
+    [activeSpaceId, moneyAccounts],
+  );
+
   return {
     activeSpaceMoneyAccounts,
     archive,
     closeModal,
     detailAccount,
+    ensureCurrency,
     editingAccount,
     isCurrencyLocked,
     isModalVisible,

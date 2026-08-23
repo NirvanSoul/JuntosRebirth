@@ -417,10 +417,12 @@ describe('CreateTransactionModal', () => {
     expect(
       StyleSheet.flatten(screen.getByLabelText('Sumar').props.style)
         .backgroundColor,
-    ).toBe(colors.keypad);
+    ).toBe(colors.surface);
     expect(StyleSheet.flatten(screen.getByText('+').props.style).color).toBe(
-      colors.expense,
+      colors.textPrimary,
     );
+
+    await fireEvent.press(screen.getByLabelText('1'));
 
     await fireEvent.press(screen.getByLabelText('Ingreso'));
 
@@ -440,14 +442,14 @@ describe('CreateTransactionModal', () => {
     expect(
       StyleSheet.flatten(screen.getByLabelText('Sumar').props.style)
         .backgroundColor,
-    ).toBe(colors.keypad);
+    ).toBe(colors.surface);
     expect(StyleSheet.flatten(screen.getByText('+').props.style).color).toBe(
-      colors.income,
+      colors.textPrimary,
     );
     for (const symbol of ['÷', '×', '−', '+']) {
       expect(
         StyleSheet.flatten(screen.getByText(symbol).props.style).color,
-      ).toBe(colors.income);
+      ).toBe(colors.textPrimary);
     }
     expect(
       StyleSheet.flatten(
@@ -460,7 +462,7 @@ describe('CreateTransactionModal', () => {
     for (const symbol of ['÷', '×', '−', '+']) {
       expect(
         StyleSheet.flatten(screen.getByText(symbol).props.style).color,
-      ).toBe(colors.expense);
+      ).toBe(colors.textPrimary);
     }
     expect(
       StyleSheet.flatten(
@@ -517,8 +519,19 @@ describe('CreateTransactionModal', () => {
         screen.getByTestId('transaction-metadata-row').props.style,
       ).justifyContent,
     ).toBe('flex-start');
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('transaction-metadata-row').props.style,
+      ),
+    ).toMatchObject(shadows.subtle);
     expect(screen.getByTestId('transaction-date-icon')).toBeTruthy();
     expect(screen.getByTestId('transaction-recurrence-icon')).toBeTruthy();
+    expect(
+      screen.getByTestId('transaction-metadata-date-divider'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId('transaction-metadata-account-divider'),
+    ).toBeNull();
   });
 
   it('agrupa los millares mientras se introduce el importe', async () => {
@@ -566,6 +579,67 @@ describe('CreateTransactionModal', () => {
     ).toBe(colors.expense);
   });
 
+  it('muestra un cursor semántico hasta que se introduce el importe', async () => {
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="personal"
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={jest.fn()}
+        selectedCategory={category}
+        visible
+      />,
+    );
+
+    expect(screen.getByLabelText('Introduce un importe')).toBeTruthy();
+    expect(screen.queryByTestId('transaction-amount-value')).toBeNull();
+    expect(screen.queryByTestId('transaction-amount-currency')).toBeNull();
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('transaction-amount-cursor').props.style,
+      ).backgroundColor,
+    ).toBe(colors.expense);
+
+    await fireEvent.press(screen.getByLabelText('Ingreso'));
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('transaction-amount-cursor').props.style,
+      ).backgroundColor,
+    ).toBe(colors.income);
+
+    await fireEvent.press(screen.getByLabelText('1'));
+
+    expect(screen.queryByTestId('transaction-amount-cursor')).toBeNull();
+    expect(screen.getByTestId('transaction-amount-value')).toHaveTextContent(
+      '1 €',
+    );
+    expect(screen.getByTestId('transaction-amount-currency')).toBeTruthy();
+  });
+
+  it('da a todas las teclas superficie y sombra, también a los operadores', async () => {
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="personal"
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={jest.fn()}
+        selectedCategory={category}
+        visible
+      />,
+    );
+
+    for (const label of ['7', 'Dividir', 'Borrar']) {
+      expect(
+        StyleSheet.flatten(screen.getByLabelText(label).props.style),
+      ).toMatchObject({
+        ...shadows.subtle,
+        backgroundColor: colors.surface,
+      });
+    }
+  });
+
   it('no permite agregar un movimiento sin una categoría seleccionada', async () => {
     const onSubmit = jest.fn();
     const screen = await renderWithTheme(
@@ -589,7 +663,7 @@ describe('CreateTransactionModal', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('mantiene gris la categoría y aplica su color al borde, icono y CTA', async () => {
+  it('muestra Agregar categoría como CTA y conserva el estado visual seleccionado', async () => {
     const screen = await renderWithTheme(
       <CreateTransactionModal
         activeSpaceId="personal"
@@ -602,9 +676,22 @@ describe('CreateTransactionModal', () => {
       />,
     );
 
-    expect(
-      screen.getByText('Agregar categoría').props.numberOfLines,
-    ).toBeUndefined();
+    const emptyCategoryButtonStyle = StyleSheet.flatten(
+      screen.getByTestId('transaction-category-button').props.style,
+    );
+    const emptyCategoryLabelStyle = StyleSheet.flatten(
+      screen.getByText('Agregar categoría').props.style,
+    );
+    const emptyCategoryIcon = screen.getByTestId('transaction-category-icon');
+    const emptyCategoryChevronStyle = StyleSheet.flatten(
+      screen.getByTestId('transaction-category-chevron').props.style,
+    );
+
+    expect(emptyCategoryButtonStyle.backgroundColor).toBe(colors.cta);
+    expect(emptyCategoryButtonStyle.borderColor).toBe(colors.cta);
+    expect(emptyCategoryLabelStyle.color).toBe(colors.onBrand);
+    expect(emptyCategoryIcon.props.children.props.color).toBe(colors.onBrand);
+    expect(emptyCategoryChevronStyle.color).toBe(colors.onBrand);
 
     await screen.rerender(
       <CreateTransactionModal
@@ -904,12 +991,16 @@ describe('CreateTransactionModal', () => {
     ];
 
     labels.forEach((label) => {
-      const style = StyleSheet.flatten(
-        screen.getByLabelText(label).props.style,
-      );
+      const control = screen.getByLabelText(label);
+      const style = StyleSheet.flatten(control.props.style);
       const height = style.height ?? style.minHeight;
 
-      expect(height).toBeGreaterThanOrEqual(minTouchTarget);
+      const verticalHitSlop =
+        (control.props.hitSlop?.top ?? 0) +
+        (control.props.hitSlop?.bottom ?? 0);
+      expect((height ?? 0) + verticalHitSlop).toBeGreaterThanOrEqual(
+        minTouchTarget,
+      );
     });
   });
 
@@ -960,6 +1051,18 @@ describe('CreateTransactionModal', () => {
     const style = StyleSheet.flatten(currencyButton.props.style);
     expect(style.height).toBeGreaterThanOrEqual(minTouchTarget);
     expect(style.width).toBeGreaterThanOrEqual(minTouchTarget);
+    expect(style).toMatchObject(shadows.subtle);
+    expect(style.borderWidth).toBeUndefined();
+
+    const titleStyle = StyleSheet.flatten(
+      screen.getByLabelText('Título del movimiento').props.style,
+    );
+    expect(titleStyle).toMatchObject({
+      ...shadows.subtle,
+      paddingVertical: 0,
+      textAlignVertical: 'center',
+    });
+    expect(titleStyle.borderWidth).toBeUndefined();
   });
 
   it('permite elegir la moneda del movimiento cuando hay varias activas', async () => {
@@ -984,6 +1087,7 @@ describe('CreateTransactionModal', () => {
       screen.getByLabelText('🇺🇸 Dólar estadounidense (USD)'),
     );
     await fireEvent.press(screen.getByLabelText('Guardar moneda'));
+    await fireEvent.press(screen.getByLabelText('1'));
 
     expect(
       screen.getByTestId('transaction-amount-currency').props.children,
@@ -992,7 +1096,6 @@ describe('CreateTransactionModal', () => {
       '🇺🇸',
     );
 
-    await fireEvent.press(screen.getByLabelText('1'));
     await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
 
     expect(onSubmit).toHaveBeenCalledWith(
@@ -1206,6 +1309,9 @@ describe('CreateTransactionModal', () => {
       expect(
         screen.getByLabelText('Cuenta nómina · USD').props.accessibilityState,
       ).toMatchObject({ checked: true });
+      expect(
+        screen.getByTestId('transaction-metadata-account-divider'),
+      ).toBeTruthy();
     });
 
     it('deja fuera las cuentas archivadas y las de otro espacio', async () => {
@@ -1230,7 +1336,7 @@ describe('CreateTransactionModal', () => {
       ).toBeNull();
     });
 
-    it('envía la cuenta elegida y adopta su moneda', async () => {
+    it('envía la cuenta elegida conservando la moneda del movimiento', async () => {
       const onSubmit = jest.fn();
       const screen = await renderWithTheme(
         <CreateTransactionModal
@@ -1249,20 +1355,20 @@ describe('CreateTransactionModal', () => {
       await fireEvent.press(screen.getByLabelText('Cuenta: ninguna'));
       await fireEvent.press(screen.getByLabelText('Cuenta nómina · USD'));
       await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
+      await fireEvent.press(screen.getByLabelText('1'));
 
-      // La moneda pasa a ser la de la cuenta y su selector desaparece: el
-      // importe pertenece al saldo de esa cuenta.
+      // La moneda del movimiento se conserva; al guardarlo, el controlador
+      // añade esa divisa a la cuenta con saldo inicial cero si aún no existe.
       expect(
         screen.getByTestId('transaction-amount-currency').props.children,
-      ).toBe('$ ');
+      ).toBe(' €');
       expect(screen.queryByTestId('transaction-currency-button')).toBeNull();
 
-      await fireEvent.press(screen.getByLabelText('1'));
       await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
 
       expect(onSubmit).toHaveBeenCalledWith(
         expect.objectContaining({
-          currency: 'USD',
+          currency: 'EUR',
           moneyAccountId: 'account-1',
         }),
       );

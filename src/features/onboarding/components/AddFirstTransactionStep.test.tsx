@@ -81,6 +81,9 @@ describe('AddFirstTransactionStep', () => {
     await waitFor(() => {
       expect(screen.getByTestId('create-transaction-modal')).toBeTruthy();
     });
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('1'));
+    });
 
     expect(screen.getByText('Bs.')).toBeTruthy();
     expect(screen.queryByText('€')).toBeNull();
@@ -153,6 +156,9 @@ describe('AddFirstTransactionStep', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('create-transaction-modal')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('1'));
     });
 
     expect(screen.getByText('Bs.')).toBeTruthy();

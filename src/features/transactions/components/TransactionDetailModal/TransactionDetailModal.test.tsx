@@ -44,7 +44,7 @@ describe('TransactionDetailModal', () => {
   it('distribuye los datos del movimiento sin mostrar presupuesto', async () => {
     const onDelete = jest.fn();
     const onEdit = jest.fn();
-    const onOpenCategoryPicker = jest.fn();
+    const onOpenCategoryDetail = jest.fn();
     const screen = await render(
       <SafeAreaProvider
         initialMetrics={{
@@ -59,7 +59,7 @@ describe('TransactionDetailModal', () => {
             onCopy={jest.fn(() => true)}
             onDelete={onDelete}
             onEdit={onEdit}
-            onOpenCategoryPicker={onOpenCategoryPicker}
+            onOpenCategoryDetail={onOpenCategoryDetail}
             onRemoveReminder={jest.fn(() => true)}
             onSaveNote={jest.fn()}
             onSaveReminder={jest.fn(() => true)}
@@ -148,7 +148,7 @@ describe('TransactionDetailModal', () => {
     );
     expect(onEdit).toHaveBeenCalledWith('lunch');
 
-    // El importe abre el formulario completo; la categoría, su propio selector.
+    // El importe abre el formulario completo; la categoría, su detalle.
     await fireEvent.press(
       within(detail).getByTestId('transaction-detail-amount'),
     );
@@ -158,7 +158,12 @@ describe('TransactionDetailModal', () => {
     await fireEvent.press(
       within(detail).getByTestId('transaction-detail-category-editor'),
     );
-    expect(onOpenCategoryPicker).toHaveBeenCalledTimes(1);
+    expect(onOpenCategoryDetail).toHaveBeenCalledWith('food');
+
+    await fireEvent.press(
+      within(detail).getByTestId('transaction-detail-category-row'),
+    );
+    expect(onOpenCategoryDetail).toHaveBeenCalledTimes(2);
 
     // Fecha y recurrencia no pasan por el formulario: abren su propio
     // selector encima del detalle.

@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import {
   Pressable,
@@ -13,25 +14,35 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { Text } from '@/components/ui/Text/Text';
+import { Text, type TextTone } from '@/components/ui/Text/Text';
+import { iconSize } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type SegmentedControlOption<Value extends string> = {
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconRotation?: string;
+  iconTestID?: string;
   label: string;
   value: Value;
 };
 
 type SegmentedControlProps<Value extends string> = {
+  indicatorColor?: string;
   onChange: (value: Value) => void;
   options: readonly SegmentedControlOption<Value>[];
+  selectedIconColor?: string;
+  selectedTextTone?: TextTone;
   selectedValue: Value;
   style?: StyleProp<ViewStyle>;
   testID?: string;
   indicatorTestID?: string;
+  unselectedIconColor?: string;
+  unselectedTextTone?: TextTone;
 };
 
 const controlPadding = spacing.xs;
@@ -39,13 +50,19 @@ const segmentHeight = 32;
 
 /** Selector segmentado reutilizable para alternar entre dos opciones. */
 export function SegmentedControl<Value extends string>({
+  indicatorColor,
   indicatorTestID,
   onChange,
   options,
+  selectedIconColor,
+  selectedTextTone = 'primary',
   selectedValue,
   style,
   testID,
+  unselectedIconColor,
+  unselectedTextTone = 'secondary',
 }: SegmentedControlProps<Value>) {
+  const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [controlWidth, setControlWidth] = useState(0);
   const selectedIndex = Math.max(
@@ -78,7 +95,12 @@ export function SegmentedControl<Value extends string>({
     >
       <Animated.View
         pointerEvents="none"
-        style={[styles.indicator, { width: segmentWidth }, indicatorStyle]}
+        style={[
+          styles.indicator,
+          { width: segmentWidth },
+          indicatorColor ? { backgroundColor: indicatorColor } : null,
+          indicatorStyle,
+        ]}
         testID={indicatorTestID}
       />
       {options.map((option) => {
@@ -86,6 +108,7 @@ export function SegmentedControl<Value extends string>({
 
         return (
           <Pressable
+            accessibilityLabel={option.label}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             hitSlop={{ bottom: spacing.sm, top: spacing.sm }}
@@ -97,9 +120,29 @@ export function SegmentedControl<Value extends string>({
             ]}
             testID={testID ? `${testID}-${option.value}` : undefined}
           >
+            {option.icon ? (
+              <View
+                style={
+                  option.iconRotation
+                    ? { transform: [{ rotate: option.iconRotation }] }
+                    : null
+                }
+                testID={option.iconTestID}
+              >
+                <Ionicons
+                  color={
+                    selected
+                      ? (selectedIconColor ?? colors.textPrimary)
+                      : (unselectedIconColor ?? colors.textSecondary)
+                  }
+                  name={option.icon}
+                  size={iconSize.sm}
+                />
+              </View>
+            ) : null}
             <Text
               align="center"
-              tone={selected ? 'primary' : 'secondary'}
+              tone={selected ? selectedTextTone : unselectedTextTone}
               variant="label"
             >
               {option.label}
@@ -130,8 +173,10 @@ function createStyles(colors: ColorTokens) {
     segment: {
       height: segmentHeight,
       flex: 1,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: spacing.sm,
       borderRadius: radii.round,
       zIndex: 1,
     },

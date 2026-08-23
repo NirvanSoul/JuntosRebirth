@@ -6,6 +6,7 @@ import Animated, {
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withSequence,
   withSpring,
   withTiming,
@@ -14,13 +15,10 @@ import Animated, {
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
+import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
-import {
-  getPrimaryMoneyAccountCurrency,
-  moneyAccountSupportsCurrency,
-  type MoneyAccount,
-} from '@/features/accounts/types';
+import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
 import type {
   CreateTransactionDraft,
@@ -54,7 +52,7 @@ import { iconSize, type LayoutDensity, layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
-import type { ColorTokens } from '@/theme/types';
+import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { maxFontScale, typography } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -161,14 +159,17 @@ export function CreateTransactionModal({
   visible,
 }: CreateTransactionModalProps) {
   const density = useLayoutDensity();
-  const { colors } = useTheme();
-  const styles = useThemedStyles((palette) => createStyles(palette, density));
+  const { colors, shadows } = useTheme();
+  const styles = useThemedStyles((palette) =>
+    createStyles(palette, density, shadows),
+  );
   const effectiveAvailableCurrencies = useMemo(() => {
     const list = availableCurrencies ?? defaultAvailableCurrencies;
     return list.includes(spaceCurrency) ? list : [spaceCurrency, ...list];
   }, [availableCurrencies, spaceCurrency]);
   const [title, setTitle] = useState('');
   const [amountInput, setAmountInput] = useState('0');
+  const [hasEnteredAmount, setHasEnteredAmount] = useState(false);
   const [pendingOperations, setPendingOperations] = useState<
     readonly PendingOperationStep[]
   >([]);
@@ -188,14 +189,12 @@ export function CreateTransactionModal({
   );
   const [isMoneyAccountPickerVisible, setMoneyAccountPickerVisible] =
     useState(false);
-  const [segmentedControlWidth, setSegmentedControlWidth] = useState(0);
-  const wasVisible = useRef(false);
   const openedInitialEditor = useRef<TransactionEditorTarget | undefined>(
     undefined,
   );
-  const typeProgress = useSharedValue(type === 'income' ? 1 : 0);
   const amountScale = useSharedValue(1);
   const amountTranslateY = useSharedValue(0);
+  const amountCursorOpacity = useSharedValue(1);
   const amountMinor = parseAmountMinor(amountInput);
   const recurrence = recurrenceOptions[recurrenceIndex] ?? defaultRecurrence;
   const isCalculationPending = pendingOperations.length > 0;
@@ -206,6 +205,7 @@ export function CreateTransactionModal({
     : null;
   /** El operando en curso se oculta justo tras elegir un operador, mientras se espera el siguiente número. */
   const showCurrentOperand = !isCalculationPending || !replaceAmount;
+  const isAmountEmpty = !hasEnteredAmount && pendingOperations.length === 0;
   const expressionPrefix = pendingOperations
     .map(
       (step) =>
@@ -213,12 +213,14 @@ export function CreateTransactionModal({
     )
     .join(' ');
   const resolvedAmountMinor = amountMinor;
-  const displayAmount = [
-    expressionPrefix,
-    showCurrentOperand ? formatAmountInputForDisplay(amountInput) : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const displayAmount = isAmountEmpty
+    ? ''
+    : [
+        expressionPrefix,
+        showCurrentOperand ? formatAmountInputForDisplay(amountInput) : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
   const amountTextVariant =
     displayAmount.length > amountMaxLength
       ? 'heading'
@@ -289,6 +291,7 @@ export function CreateTransactionModal({
     setAmountInput(
       initialDraft ? amountMinorToInput(initialDraft.amountMinor) : '0',
     );
+    setHasEnteredAmount(Boolean(initialDraft?.amountMinor));
     setPendingOperations([]);
     setReplaceAmount(false);
     setRecurrenceIndex(
@@ -347,38 +350,34 @@ export function CreateTransactionModal({
     }
   }, [initialEditor, onOpenCategoryPicker, visible]);
 
-  useEffect(() => {
-    if (!visible) {
-      wasVisible.current = false;
-      return;
-    }
-
-    const nextProgress = type === 'income' ? 1 : 0;
-    if (!wasVisible.current) {
-      wasVisible.current = true;
-      typeProgress.value = nextProgress;
-      return;
-    }
-
-    typeProgress.value = withSpring(nextProgress, {
-      ...motion.transactionTypeSpring,
-      reduceMotion: ReduceMotion.System,
-    });
-  }, [type, typeProgress, visible]);
-
-  const typeIndicatorStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: typeProgress.value * (segmentedControlWidth / 2) },
-    ],
-    width: segmentedControlWidth / 2,
-  }));
-
   const amountAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateY: amountTranslateY.value },
       { scale: amountScale.value },
     ],
   }));
+
+  const amountCursorAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: amountCursorOpacity.value,
+  }));
+
+  useEffect(() => {
+    if (!visible || !isAmountEmpty) {
+      amountCursorOpacity.value = 1;
+      return;
+    }
+
+    amountCursorOpacity.value = withRepeat(
+      withTiming(0.24, {
+        duration: 680,
+        reduceMotion: ReduceMotion.System,
+      }),
+      -1,
+      true,
+      undefined,
+      ReduceMotion.System,
+    );
+  }, [amountCursorOpacity, isAmountEmpty, visible]);
 
   const animateAmountInput = () => {
     amountScale.value = withSequence(
@@ -404,6 +403,7 @@ export function CreateTransactionModal({
   };
 
   const handleDigit = (key: string) => {
+    setHasEnteredAmount(true);
     setAmountInput((current) =>
       appendAmountKey(replaceAmount ? '0' : current, key),
     );
@@ -472,6 +472,7 @@ export function CreateTransactionModal({
 
   const handleEquals = () => {
     const result = evaluateExpression();
+    setHasEnteredAmount(true);
     setAmountInput(amountMinorToInput(result));
     setPendingOperations([]);
     setReplaceAmount(true);
@@ -552,62 +553,36 @@ export function CreateTransactionModal({
                 </Text>
               </View>
             ) : (
-              <View
-                accessibilityRole="tablist"
-                onLayout={(event) =>
-                  setSegmentedControlWidth(event.nativeEvent.layout.width)
+              <SegmentedControl
+                indicatorColor={
+                  type === 'income' ? colors.income : colors.expense
                 }
+                indicatorTestID={`transaction-type-indicator-${type}`}
+                onChange={onTypeChange}
+                options={[
+                  {
+                    icon: 'arrow-down',
+                    iconRotation: '45deg',
+                    iconTestID: 'transaction-type-arrow-expense',
+                    label: 'Gasto',
+                    value: 'expense',
+                  },
+                  {
+                    icon: 'arrow-up',
+                    iconRotation: '45deg',
+                    iconTestID: 'transaction-type-arrow-income',
+                    label: 'Ingreso',
+                    value: 'income',
+                  },
+                ]}
+                selectedIconColor={colors.onBrand}
+                selectedTextTone="onBrand"
+                selectedValue={type}
                 style={styles.segmentedControl}
                 testID="transaction-type-selector"
-              >
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.segmentIndicator,
-                    {
-                      backgroundColor:
-                        type === 'income' ? colors.income : colors.expense,
-                    },
-                    typeIndicatorStyle,
-                  ]}
-                  testID={`transaction-type-indicator-${type}`}
-                />
-                {(['expense', 'income'] as const).map((option) => {
-                  const selected = type === option;
-                  const isIncome = option === 'income';
-                  return (
-                    <Pressable
-                      accessibilityLabel={isIncome ? 'Ingreso' : 'Gasto'}
-                      accessibilityRole="tab"
-                      accessibilityState={{ selected }}
-                      key={option}
-                      onPress={() => onTypeChange(option)}
-                      style={({ pressed }) => [
-                        styles.segment,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <View
-                        style={styles.diagonalArrow}
-                        testID={`transaction-type-arrow-${option}`}
-                      >
-                        <Ionicons
-                          color={selected ? colors.onBrand : colors.textMuted}
-                          name={isIncome ? 'arrow-up' : 'arrow-down'}
-                          size={iconSize.sm}
-                        />
-                      </View>
-                      <Text
-                        tone={selected ? 'onBrand' : 'muted'}
-                        variant="label"
-                        weight="semibold"
-                      >
-                        {isIncome ? 'Ingreso' : 'Gasto'}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                unselectedIconColor={colors.textMuted}
+                unselectedTextTone="muted"
+              />
             )}
             <ModalCloseButton onPress={onClose} />
           </View>
@@ -645,70 +620,86 @@ export function CreateTransactionModal({
 
           <Animated.View
             accessibilityLabel={
-              activeOperatorPresentation
-                ? `${displayAmount} ${currencyPluralName}, operación ${activeOperatorPresentation.label} seleccionada`
-                : `${displayAmount} ${currencyPluralName}`
+              isAmountEmpty
+                ? 'Introduce un importe'
+                : activeOperatorPresentation
+                  ? `${displayAmount} ${currencyPluralName}, operación ${activeOperatorPresentation.label} seleccionada`
+                  : `${displayAmount} ${currencyPluralName}`
             }
             accessibilityLiveRegion="polite"
             style={[styles.amountArea, amountAnimatedStyle]}
             testID="transaction-amount"
           >
-            <View style={styles.amountRow}>
-              <Text
-                numberOfLines={1}
-                style={styles.amount}
-                testID="transaction-amount-value"
-                variant={amountTextVariant}
-              >
-                {pendingOperations.map((step, index) => {
-                  const isLastOperation =
-                    index === pendingOperations.length - 1;
+            {isAmountEmpty ? (
+              <Animated.View
+                style={[
+                  styles.amountCursor,
+                  { backgroundColor: colors[transactionTone] },
+                  amountCursorAnimatedStyle,
+                ]}
+                testID="transaction-amount-cursor"
+              />
+            ) : (
+              <View style={styles.amountRow}>
+                <Text
+                  numberOfLines={1}
+                  style={styles.amount}
+                  testID="transaction-amount-value"
+                  variant={amountTextVariant}
+                  weight="medium"
+                >
+                  {pendingOperations.map((step, index) => {
+                    const isLastOperation =
+                      index === pendingOperations.length - 1;
 
-                  return (
-                    <Text key={index} variant={amountTextVariant}>
-                      {formatAmountInputForDisplay(
-                        amountMinorToInput(step.valueMinor),
-                      )}{' '}
-                      <Text
-                        testID={
-                          isLastOperation
-                            ? 'transaction-active-operator'
-                            : undefined
-                        }
-                        tone="primary"
-                        variant={amountTextVariant}
-                        weight="medium"
-                      >
-                        {operatorPresentation[step.operator].symbol}
-                      </Text>{' '}
-                    </Text>
-                  );
-                })}
-                {showCurrentOperand ? (
-                  <>
-                    {currencySymbolPosition === 'before' ? (
-                      <Text
-                        testID="transaction-amount-currency"
-                        tone={transactionTone}
-                        variant={amountTextVariant}
-                      >
-                        {`${currencySymbol} `}
+                    return (
+                      <Text key={index} variant={amountTextVariant}>
+                        {formatAmountInputForDisplay(
+                          amountMinorToInput(step.valueMinor),
+                        )}{' '}
+                        <Text
+                          testID={
+                            isLastOperation
+                              ? 'transaction-active-operator'
+                              : undefined
+                          }
+                          tone="primary"
+                          variant={amountTextVariant}
+                          weight="medium"
+                        >
+                          {operatorPresentation[step.operator].symbol}
+                        </Text>{' '}
                       </Text>
-                    ) : null}
-                    {formatAmountInputForDisplay(amountInput)}
-                    {currencySymbolPosition === 'after' ? (
-                      <Text
-                        testID="transaction-amount-currency"
-                        tone={transactionTone}
-                        variant={amountTextVariant}
-                      >
-                        {` ${currencySymbol}`}
-                      </Text>
-                    ) : null}
-                  </>
-                ) : null}
-              </Text>
-            </View>
+                    );
+                  })}
+                  {showCurrentOperand ? (
+                    <>
+                      {currencySymbolPosition === 'before' ? (
+                        <Text
+                          testID="transaction-amount-currency"
+                          tone={transactionTone}
+                          variant={amountTextVariant}
+                          weight="medium"
+                        >
+                          {`${currencySymbol} `}
+                        </Text>
+                      ) : null}
+                      {formatAmountInputForDisplay(amountInput)}
+                      {currencySymbolPosition === 'after' ? (
+                        <Text
+                          testID="transaction-amount-currency"
+                          tone={transactionTone}
+                          variant={amountTextVariant}
+                          weight="medium"
+                        >
+                          {` ${currencySymbol}`}
+                        </Text>
+                      ) : null}
+                    </>
+                  ) : null}
+                </Text>
+              </View>
+            )}
           </Animated.View>
 
           <View style={styles.metadataRow} testID="transaction-metadata-row">
@@ -738,6 +729,10 @@ export function CreateTransactionModal({
                 {dateLabel}
               </Text>
             </Pressable>
+            <View
+              style={styles.metadataDivider}
+              testID="transaction-metadata-date-divider"
+            />
             <Pressable
               accessibilityHint="Abre las opciones de recurrencia"
               accessibilityLabel={`Recurrencia: ${recurrence.label}`}
@@ -765,37 +760,43 @@ export function CreateTransactionModal({
               </Text>
             </Pressable>
             {selectableMoneyAccounts.length > 0 ? (
-              <Pressable
-                accessibilityHint="Elige la cuenta del movimiento"
-                accessibilityLabel={
-                  selectedMoneyAccount
-                    ? `Cuenta: ${selectedMoneyAccount.name}`
-                    : 'Cuenta: ninguna'
-                }
-                accessibilityRole="button"
-                onPress={() => setMoneyAccountPickerVisible(true)}
-                style={({ pressed }) => [
-                  styles.metadataButton,
-                  pressed && styles.pressed,
-                ]}
-                testID="transaction-money-account-button"
-              >
-                <Ionicons
-                  color={colors.textPrimary}
-                  name="wallet-outline"
-                  size={iconSize.md}
-                  testID="transaction-money-account-icon"
+              <>
+                <View
+                  style={styles.metadataDivider}
+                  testID="transaction-metadata-account-divider"
                 />
-                <Text
-                  numberOfLines={1}
-                  style={styles.metadataLabel}
-                  tone="secondary"
-                  variant="label"
-                  weight="semibold"
+                <Pressable
+                  accessibilityHint="Elige la cuenta del movimiento"
+                  accessibilityLabel={
+                    selectedMoneyAccount
+                      ? `Cuenta: ${selectedMoneyAccount.name}`
+                      : 'Cuenta: ninguna'
+                  }
+                  accessibilityRole="button"
+                  onPress={() => setMoneyAccountPickerVisible(true)}
+                  style={({ pressed }) => [
+                    styles.metadataButton,
+                    pressed && styles.pressed,
+                  ]}
+                  testID="transaction-money-account-button"
                 >
-                  {selectedMoneyAccount?.name ?? 'Cuenta'}
-                </Text>
-              </Pressable>
+                  <Ionicons
+                    color={colors.textPrimary}
+                    name="wallet-outline"
+                    size={iconSize.md}
+                    testID="transaction-money-account-icon"
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={styles.metadataLabel}
+                    tone="secondary"
+                    variant="label"
+                    weight="semibold"
+                  >
+                    {selectedMoneyAccount?.name ?? 'Cuenta'}
+                  </Text>
+                </Pressable>
+              </>
             ) : null}
           </View>
 
@@ -832,11 +833,7 @@ export function CreateTransactionModal({
                       ]}
                     >
                       {presentation ? (
-                        <Text
-                          tone={transactionTone}
-                          variant="title"
-                          weight="medium"
-                        >
+                        <Text tone="primary" variant="title" weight="medium">
                           {presentation.symbol}
                         </Text>
                       ) : key === 'backspace' ? (
@@ -871,6 +868,7 @@ export function CreateTransactionModal({
               onPress={onOpenCategoryPicker}
               style={({ pressed }) => [
                 styles.categoryButton,
+                !selectedCategory && styles.categoryButtonCta,
                 selectedCategoryColor && {
                   borderColor: selectedCategoryColor,
                 },
@@ -881,6 +879,7 @@ export function CreateTransactionModal({
               <View
                 style={[
                   styles.categoryIcon,
+                  !selectedCategory && styles.categoryIconCta,
                   selectedCategory && styles.selectedCategoryIcon,
                 ]}
                 testID="transaction-category-icon"
@@ -893,7 +892,7 @@ export function CreateTransactionModal({
                   />
                 ) : (
                   <Ionicons
-                    color={colors.textSecondary}
+                    color={colors.onBrand}
                     name="add"
                     size={iconSize.md}
                   />
@@ -901,14 +900,14 @@ export function CreateTransactionModal({
               </View>
               <Text
                 style={styles.categoryLabel}
-                tone="secondary"
+                tone={selectedCategory ? 'secondary' : 'onBrand'}
                 variant="label"
                 weight="semibold"
               >
                 {selectedCategory?.name ?? 'Agregar categoría'}
               </Text>
               <Ionicons
-                color={colors.textSecondary}
+                color={selectedCategory ? colors.textSecondary : colors.onBrand}
                 name="chevron-forward"
                 size={iconSize.sm}
                 testID="transaction-category-chevron"
@@ -979,14 +978,10 @@ export function CreateTransactionModal({
                 (candidate) => candidate.id === selectedId,
               )
             : undefined;
-          // El movimiento tiene que quedar en una moneda que la cuenta
-          // guarde. Si ya está en una de ellas se conserva —una cuenta con
-          // varias divisas no debe cambiar lo que el usuario eligió—; si no,
-          // se adopta la principal. Sin cuenta vuelve la del espacio.
+          // Una cuenta adopta una moneda con saldo inicial cero al registrar
+          // su primer movimiento en ella. Sin cuenta vuelve la del espacio.
           if (!account) {
             setCurrency(spaceCurrency);
-          } else if (!moneyAccountSupportsCurrency(account, currency)) {
-            setCurrency(getPrimaryMoneyAccountCurrency(account));
           }
           setMoneyAccountPickerVisible(false);
         }}
@@ -996,7 +991,11 @@ export function CreateTransactionModal({
   );
 }
 
-function createStyles(colors: ColorTokens, density: LayoutDensity) {
+function createStyles(
+  colors: ColorTokens,
+  density: LayoutDensity,
+  shadows: ThemeShadows,
+) {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -1011,28 +1010,6 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
     },
     segmentedControl: {
       width: typeSelectorWidth[density],
-      height: layout.minTouchTarget,
-      flexDirection: 'row',
-      borderRadius: radii.lg,
-      backgroundColor: colors.keypad,
-      overflow: 'hidden',
-    },
-    segment: {
-      flex: 1,
-      minHeight: layout.minTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      borderRadius: radii.lg,
-      zIndex: 1,
-    },
-    segmentIndicator: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      top: 0,
-      borderRadius: radii.lg,
     },
     diagonalArrow: {
       transform: [{ rotate: '45deg' }],
@@ -1052,26 +1029,26 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
       gap: layout.controlGap[density],
     },
     titleInput: {
+      ...shadows.subtle,
       flex: 1,
       minHeight: layout.controlHeight[density],
       borderRadius: radii.md,
-      borderColor: colors.border,
-      borderWidth: 1,
       backgroundColor: colors.surface,
       color: colors.textPrimary,
       fontFamily: typography.body.fontFamily,
       fontSize: typography.body.fontSize,
       letterSpacing: typography.body.letterSpacing,
       paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.none,
+      textAlignVertical: 'center',
     },
     currencyButton: {
+      ...shadows.subtle,
       width: layout.controlHeight[density],
       height: layout.controlHeight[density],
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: radii.md,
-      borderColor: colors.border,
-      borderWidth: 1,
+      borderRadius: radii.round,
       backgroundColor: colors.surface,
     },
     amountArea: {
@@ -1090,25 +1067,37 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
       alignItems: 'baseline',
       justifyContent: 'center',
     },
+    amountCursor: {
+      width: spacing.xxs,
+      height: spacing.xxxl,
+      borderRadius: radii.round,
+    },
     metadataRow: {
+      ...shadows.subtle,
+      height: layout.controlHeight[density],
       flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'flex-start',
-      gap: layout.controlGap[density],
+      borderRadius: radii.md,
+      backgroundColor: colors.surface,
+      overflow: 'hidden',
     },
     metadataButton: {
-      minWidth: layout.controlHeight[density],
-      height: layout.controlHeight[density],
+      flex: 1,
+      minWidth: 0,
+      height: '100%',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing.sm,
-      borderRadius: radii.round,
-      borderColor: colors.border,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.sm,
     },
     metadataLabel: { flexShrink: 1 },
+    metadataDivider: {
+      width: StyleSheet.hairlineWidth,
+      height: layout.controlHeight[density] - spacing.xl,
+      backgroundColor: colors.border,
+    },
     keypad: {
       rowGap: keypadRowGap[density],
     },
@@ -1117,12 +1106,13 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
       columnGap: layout.controlGap[density],
     },
     key: {
+      ...shadows.subtle,
       flex: 1,
       height: layout.keypadKeyHeight[density],
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radii.md,
-      backgroundColor: colors.keypad,
+      backgroundColor: colors.surface,
     },
     operatorKey: {
       flex: operatorColumnRatio,
@@ -1148,6 +1138,10 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
       backgroundColor: colors.surface,
       paddingHorizontal: spacing.md,
     },
+    categoryButtonCta: {
+      borderColor: colors.cta,
+      backgroundColor: colors.cta,
+    },
     categoryIcon: {
       width: categoryIconSize,
       height: categoryIconSize,
@@ -1159,14 +1153,15 @@ function createStyles(colors: ColorTokens, density: LayoutDensity) {
     selectedCategoryIcon: {
       backgroundColor: 'transparent',
     },
+    categoryIconCta: {
+      backgroundColor: 'transparent',
+    },
     categoryLabel: {
       flex: 1,
     },
     submitButton: {
       flex: 1,
     },
-    pressed: {
-      opacity: 0.72,
-    },
+    pressed: { opacity: 0.72 },
   });
 }

@@ -63,7 +63,7 @@ describe('SettingsScreen', () => {
       currencyPreferences,
       notificationRules: [],
       onBack: jest.fn(),
-      onDissolveCoupleSpace: jest.fn().mockResolvedValue(undefined),
+      onLeaveCoupleSpace: jest.fn().mockResolvedValue(undefined),
       onSaveCurrencyPreferences: jest.fn(),
       onSaveNotificationRule: jest.fn().mockResolvedValue(true),
       onToggleHomeComparisonIndicators: jest.fn(),
@@ -415,39 +415,39 @@ describe('SettingsScreen', () => {
     alertSpy.mockRestore();
   });
 
-  it('no muestra "Eliminar espacio juntos" fuera de un espacio de pareja', async () => {
+  it('no muestra "Salir del espacio de pareja" fuera de un espacio de pareja', async () => {
     const { screen } = await renderScreen();
 
-    expect(screen.queryByText('Eliminar espacio juntos')).toBeNull();
+    expect(screen.queryByText('Salir del espacio de pareja')).toBeNull();
   });
 
-  it('elimina el espacio juntos tras confirmar en un espacio de pareja', async () => {
+  it('sale del espacio tras confirmar en un espacio de pareja', async () => {
     jest.useFakeTimers();
     const { props, screen } = await renderScreen(undefined, undefined, {
       activeSpaceType: 'couple',
     });
 
     await act(async () => {
-      fireEvent.press(screen.getByText('Eliminar espacio juntos'));
+      fireEvent.press(screen.getByText('Salir del espacio de pareja'));
     });
     expect(
-      screen.getByTestId('confirm-couple-space-dissolution').props
-        .accessibilityState.disabled,
+      screen.getByTestId('confirm-couple-space-exit').props.accessibilityState
+        .disabled,
     ).toBe(true);
 
     await act(async () => {
       jest.advanceTimersByTime(5000);
     });
     expect(
-      screen.getByTestId('confirm-couple-space-dissolution').props
-        .accessibilityState.disabled,
+      screen.getByTestId('confirm-couple-space-exit').props.accessibilityState
+        .disabled,
     ).toBe(false);
 
     await act(async () => {
-      fireEvent.press(screen.getByTestId('confirm-couple-space-dissolution'));
+      fireEvent.press(screen.getByTestId('confirm-couple-space-exit'));
     });
 
-    expect(props.onDissolveCoupleSpace).toHaveBeenCalledTimes(1);
+    expect(props.onLeaveCoupleSpace).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
   });
 });

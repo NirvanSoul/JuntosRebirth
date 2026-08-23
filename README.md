@@ -33,7 +33,7 @@ Expo levanta un túnel público con ngrok (`@expo/ngrok` ya está instalado como
 
 El túnel gratuito de Expo es compartido y a veces rechaza la conexión con `failed to start tunnel / remote gone away`. Es un fallo transitorio: `scripts/tunnel.sh` libera el puerto 8081, protege el cliente de ngrok frente a respuestas locales incompletas y reintenta hasta 5 veces. Puedes ajustarlo con `TUNNEL_ATTEMPTS`, `TUNNEL_RETRY_DELAY` y `RCT_METRO_PORT`. Si aun así no arranca, revisa [el estado de ngrok](https://status.ngrok.com/) y usa `npm run start:lan` mientras tanto.
 
-`ios` y `android` mantienen el acceso rápido con Expo Go. Para las capacidades nativas que Expo Go no incorpora, utiliza la development build propia descrita a continuación.
+`ios` y `android` mantienen el acceso rápido con Expo Go. `npm run ios` crea un túnel con el CLI del proyecto y muestra un QR que pueden usar los dispositivos físicos. En Xcode 27, abre primero el iPhone simulado desde Device Hub y pasa la URL `exp://…exp.direct` mostrada por Metro a `npm run ios:sim -- 'exp://…exp.direct'`; así el simulador y los dispositivos físicos cargan el mismo bundle de Expo Go sin actualizar el SDK 54. Para las capacidades nativas que Expo Go no incorpora, utiliza la development build propia descrita a continuación.
 
 ## Development build para iPhone y Xcode
 
@@ -61,6 +61,8 @@ npm run dev          # alias de start
 npm run start:lan    # Expo Go mediante red local
 npm run tunnel       # Expo Go mediante ngrok (acceso desde fuera de tu wifi)
 npm run start:tunnel # alias de tunnel
+npm run ios          # Expo Go por túnel y QR para dispositivos físicos
+npm run ios:sim -- 'exp://…' # abre esa misma URL en el simulador arrancado
 npm run start:dev-client # servidor Metro para la development build propia
 npm run prebuild:ios # genera el proyecto iOS de Xcode mediante Expo CNG
 npm run ios:dev      # compila y abre la development build en un simulador

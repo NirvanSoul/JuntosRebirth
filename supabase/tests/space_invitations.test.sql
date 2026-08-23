@@ -1,5 +1,5 @@
 begin;
-select plan(24);
+select plan(31);
 
 select has_table('public', 'space_invitations', 'space_invitations exists');
 select ok(
@@ -39,15 +39,15 @@ select ok(
   'invitations cannot be deleted directly, only revoked via create_space_invitation replacing them'
 );
 select has_index(
-  'public', 'space_invitations', 'space_invitations_one_pending_per_space_idx',
-  'at most one pending invitation per space is enforced at the database level'
+  'public', 'space_invitations', 'space_invitations_one_pending_per_target_idx',
+  'at most one pending invitation per target is enforced at the database level'
 );
 
 select has_function('public', 'create_couple_space', array['text', 'text'], 'create_couple_space exists');
 select has_function('public', 'create_space_invitation', array['uuid', 'text'], 'create_space_invitation exists');
 select has_function('public', 'get_space_invitation_preview', array['text'], 'get_space_invitation_preview exists');
 select has_function('public', 'accept_space_invitation', array['text'], 'accept_space_invitation exists');
-select has_function('public', 'dissolve_couple_space', array['uuid'], 'dissolve_couple_space exists');
+select has_function('public', 'leave_couple_space', array['uuid'], 'leave_couple_space exists');
 
 select ok(
   not has_function_privilege('anon', 'public.create_couple_space(text,text)', 'EXECUTE'),
@@ -66,8 +66,32 @@ select ok(
   'authenticated users can accept an invitation'
 );
 select ok(
-  has_function_privilege('authenticated', 'public.dissolve_couple_space(uuid)', 'EXECUTE'),
-  'authenticated users can dissolve a couple space they own'
+  has_function_privilege('authenticated', 'public.leave_couple_space(uuid)', 'EXECUTE'),
+  'authenticated users can leave a couple space they belong to'
+);
+select ok(
+  to_regprocedure('public.dissolve_couple_space(uuid)') is null,
+  'the obsolete symmetric dissolution RPC no longer exists'
+);
+select ok(
+  (select prosrc from pg_proc where oid = 'public.leave_couple_space(uuid)'::regprocedure) ~ 'status = ''left''',
+  'leaving records an individual departure instead of removing every member'
+);
+select ok(
+  (select prosrc from pg_proc where oid = 'public.leave_couple_space(uuid)'::regprocedure) ~ 'for update',
+  'concurrent departures are serialized before deciding whether to delete the space'
+);
+select ok(
+  (select prosrc from pg_proc where oid = 'public.leave_couple_space(uuid)'::regprocedure) ~ 'delete from public.money_accounts',
+  'the final departure clears money accounts before deleting the space'
+);
+select ok(
+  (select prosrc from pg_proc where oid = 'public.accept_space_invitation(text)'::regprocedure) ~ 'on conflict \(space_id, user_id\) do update',
+  'a link invitation can reactivate a member who previously left'
+);
+select ok(
+  (select prosrc from pg_proc where oid = 'public.accept_current_user_space_invitation(uuid)'::regprocedure) ~ 'on conflict \(space_id, user_id\) do update',
+  'an in-app invitation can reactivate a member who previously left'
 );
 
 -- Un espacio juntos no existe de verdad hasta que la otra persona acepta

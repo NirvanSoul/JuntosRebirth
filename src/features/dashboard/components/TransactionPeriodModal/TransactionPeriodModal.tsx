@@ -22,6 +22,7 @@ import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOpt
 import { PeriodComparisonIndicator } from '@/features/transactions/components/PeriodComparisonIndicator/PeriodComparisonIndicator';
 import { TransactionPeriodSelector } from '@/features/transactions/components/TransactionPeriodSelector/TransactionPeriodSelector';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
+import { PeriodTotalAmount } from '@/features/dashboard/components/TransactionPeriodModal/PeriodTotalAmount';
 import type {
   SessionTransaction,
   TransactionType,
@@ -243,9 +244,7 @@ export function TransactionPeriodModal({
                 <Text tone="secondary" variant="footnote">
                   {totalLabel}
                 </Text>
-                <Text testID={`${type}-period-total`} variant="heading">
-                  {formattedTotal}
-                </Text>
+                <PeriodTotalAmount type={type} value={formattedTotal} />
                 {comparison ? (
                   <View style={styles.comparisonRow}>
                     <PeriodComparisonIndicator

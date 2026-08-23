@@ -185,7 +185,7 @@ describe('supabaseInvitationGateway', () => {
     });
   });
 
-  describe('dissolveCoupleSpace', () => {
+  describe('leaveCoupleSpace', () => {
     it('no lanza cuando el RPC resuelve sin error', async () => {
       const rpc = jest.fn().mockResolvedValue({ data: null, error: null });
       const gateway = createSupabaseInvitationGateway(
@@ -193,9 +193,9 @@ describe('supabaseInvitationGateway', () => {
       );
 
       await expect(
-        gateway.dissolveCoupleSpace('space-1'),
+        gateway.leaveCoupleSpace('space-1'),
       ).resolves.toBeUndefined();
-      expect(rpc).toHaveBeenCalledWith('dissolve_couple_space', {
+      expect(rpc).toHaveBeenCalledWith('leave_couple_space', {
         p_space_id: 'space-1',
       });
     });
@@ -204,15 +204,15 @@ describe('supabaseInvitationGateway', () => {
       const rpc = jest.fn().mockResolvedValue({
         data: null,
         error: {
-          message: 'not_space_owner: solo un anfitrión puede eliminarlo',
+          message: 'not_active_space_member: ya no perteneces a este espacio',
         },
       });
       const gateway = createSupabaseInvitationGateway(
         createFakeClient({ rpc }),
       );
 
-      await expect(gateway.dissolveCoupleSpace('space-1')).rejects.toThrow(
-        'solo un anfitrión puede eliminarlo',
+      await expect(gateway.leaveCoupleSpace('space-1')).rejects.toThrow(
+        'ya no perteneces a este espacio',
       );
     });
   });

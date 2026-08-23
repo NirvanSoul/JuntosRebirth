@@ -121,7 +121,7 @@ const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const drawerWidthRatio = 0.88,
   drawerMaxWidth = 380;
 
-type CategoryCreationContext = 'quick' | 'transaction' | 'transaction-detail';
+type CategoryCreationContext = 'quick' | 'transaction';
 type CategoryDetailRequest = {
   categoryId: string;
   displayCurrency: CurrencyCode;
@@ -135,7 +135,7 @@ export function MainTabsNavigator() {
     activeSpace,
     createCoupleSpace,
     createSpace,
-    dissolveCoupleSpace,
+    leaveCoupleSpace,
     error: spacesError,
     isReady,
     refreshCoupleSpace,
@@ -623,14 +623,13 @@ export function MainTabsNavigator() {
   }, [session]);
 
   /**
-   * Descarta un espacio juntos que nunca llegó a tener dos personas.
-   * `dissolve_couple_space` lo borra entero en ese caso (no lo archiva) y
-   * `useSpaces` devuelve la selección al espacio Personal.
+   * Salir de un espacio juntos pendiente deja cero miembros activos, por lo
+   * que el servidor lo borra y `useSpaces` vuelve a Personal.
    */
   const handleCancelPendingCoupleSpace =
     useCallback(async (): Promise<void> => {
       try {
-        await dissolveCoupleSpace();
+        await leaveCoupleSpace();
       } catch (caught) {
         Alert.alert(
           'No pudimos cancelar el espacio',
@@ -639,7 +638,7 @@ export function MainTabsNavigator() {
             : 'Inténtalo de nuevo en un momento.',
         );
       }
-    }, [dissolveCoupleSpace]);
+    }, [leaveCoupleSpace]);
 
   const handleCreateAction = (action: CreateActionType) => {
     setCreateMenuVisible(false);
@@ -754,14 +753,6 @@ export function MainTabsNavigator() {
     if (categoryCreationContext === 'transaction') {
       setSelectedCategoryId(selection.categoryId);
     }
-    // Desde el detalle no se abre el formulario: la categoría se guarda y el
-    // usuario se queda en el movimiento que estaba mirando.
-    if (categoryCreationContext === 'transaction-detail' && detailTransaction) {
-      void quickEditTransaction(detailTransaction.id, {
-        categoryId: selection.categoryId,
-        field: 'category',
-      });
-    }
     closeCategoryPicker();
   };
 
@@ -799,6 +790,21 @@ export function MainTabsNavigator() {
     );
     if (draft.spaceId !== activeSpace.id || !categoryBelongsToSpace) {
       return;
+    }
+    if (draft.moneyAccountId) {
+      const account = moneyAccountsController.activeSpaceMoneyAccounts.find(
+        (candidate) => candidate.id === draft.moneyAccountId,
+      );
+      if (
+        account &&
+        !moneyAccountSupportsCurrency(account, draft.currency) &&
+        !(await moneyAccountsController.ensureCurrency(
+          draft.moneyAccountId,
+          draft.currency,
+        ))
+      ) {
+        return;
+      }
     }
 
     if (editingTransactionId) {
@@ -1315,6 +1321,7 @@ export function MainTabsNavigator() {
                 controller={moneyAccountsController}
                 onOpenTransactionDetail={setDetailTransactionId}
                 spaceId={activeSpace.id}
+                spaceCurrency={activeSpace.currency}
                 spaceName={activeSpace.name}
                 transactions={activeSpaceTransactions}
               />
@@ -1340,11 +1347,12 @@ export function MainTabsNavigator() {
                   setTransactionType(transaction.type);
                   setTransactionModalVisible(true);
                 }}
-                onOpenCategoryPicker={() => {
+                onOpenCategoryDetail={(categoryId) => {
                   if (!detailTransaction) return;
-                  setSelectedCategoryId(detailTransaction.categoryId);
-                  setCategoryCreationContext('transaction-detail');
-                  setCategoryPickerVisible(true);
+                  setDetailRequest({
+                    categoryId,
+                    displayCurrency: detailTransaction.currency,
+                  });
                 }}
                 onQuickEdit={quickEditTransaction}
                 onRemoveReminder={handleRemoveTransactionReminder}
@@ -1381,8 +1389,8 @@ export function MainTabsNavigator() {
               currencyPreferences={currencyPreferences}
               notificationRules={activeSpaceNotificationRules}
               onBack={() => navigation.navigate('Main')}
-              onDissolveCoupleSpace={async () => {
-                await dissolveCoupleSpace();
+              onLeaveCoupleSpace={async () => {
+                await leaveCoupleSpace();
                 navigation.navigate('Main');
               }}
               onSaveCurrencyPreferences={(next) => {

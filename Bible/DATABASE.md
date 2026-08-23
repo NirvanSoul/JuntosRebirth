@@ -564,7 +564,7 @@ Reglas:
 Funciones asociadas: `create_couple_space(p_name, p_currency)`,
 `create_space_invitation(p_space_id, p_invitee_email)`,
 `get_space_invitation_preview(p_token)`, `accept_space_invitation(p_token)`,
-`dissolve_couple_space(p_space_id)`. Ver ADR-068 para el detalle de cada una.
+`leave_couple_space(p_space_id)`. Ver ADR-083 para el ciclo de vida de salida.
 
 La migración `16_in_app_space_invitations.sql` deja de enviar invitaciones con
 Resend. Una invitación dirigida solo se crea si ese correo ya pertenece a una
@@ -596,6 +596,11 @@ Al aceptar una invitación, ambas personas quedan con `role = 'owner'`
 (anfitriones simétricos, sin jerarquía dueño/miembro) — no se introdujo un
 nuevo valor de `role` para esto.
 
+Una invitación nueva para alguien que ya tuvo una membresía en el mismo
+espacio la reactiva: conserva la fila, vuelve `status` a `'active'`, limpia
+`left_at` y actualiza `joined_at`. La unicidad `(space_id, user_id)` evita
+duplicar a esa persona al volver.
+
 Un espacio juntos nace **pendiente**: `create_couple_space()` inserta
 `activated_at = null` y son `accept_space_invitation()` y
 `accept_current_user_space_invitation()` las que lo activan
@@ -606,28 +611,20 @@ balance y la app no sincroniza nada contra él. El cupo de §6.4.1 se consume
 igualmente mientras la invitación esté viva, para que nadie acumule
 invitaciones abiertas en paralelo.
 
-### 6.4.2 Eliminar (disolver) un espacio juntos
+### 6.4.2 Salir de un espacio juntos
 
-Sobre un espacio **pendiente** (`activated_at is null`),
-`dissolve_couple_space()` no archiva: borra el espacio entero, porque nadie
-más llegó a entrar y no hay historia compartida que preservar. Así cancelar
-una invitación no deja otro espacio huérfano invisible y libera limpiamente
-el cupo de un espacio juntos por usuario.
+`leave_couple_space(p_space_id)` es la única operación de salida. Valida que
+quien llama sea miembro activo, cambia exclusivamente su membresía a `'left'`
+y revoca su acceso mediante RLS; no toca la membresía de la otra persona ni
+archiva el espacio. Si todavía queda una membresía activa, el espacio y sus
+datos permanecen disponibles para ella y quien salió puede volver con una
+nueva invitación.
 
-Sobre un espacio ya activo, `dissolve_couple_space(p_space_id)` archiva el
-espacio (`spaces.archived_at`) y desactiva ambas membresías activas
-(`space_members.status = 'removed'`), sin tocar movimientos ni categorías:
-se conservan, igual que la rama de espacio compartido de
-`request_account_deletion()`. No se introdujo un nuevo valor de `status`
-para distinguir esta disolución de una salida individual: la señal vive en
-`spaces.archived_at`.
-
-Un espacio disuelto queda invisible para ambas personas (`useSpaces` filtra
-por `archived_at is null` y las políticas RLS exigen
-`is_active_space_member`), pero sus filas siguen ahí. `request_account_deletion()`
-no lo borra mientras exista la membresía `'removed'` de la otra persona: solo
-anula la autoría de quien se da de baja (ADR-077). Falta una política de
-retención para estos espacios huérfanos.
+Si la salida deja cero miembros activos —incluido cancelar un espacio pendiente
+antes de que acepten—, la función elimina transaccionalmente el espacio y sus
+datos dependientes. Bloquea la fila de `spaces` antes de contar miembros, de
+modo que dos salidas simultáneas no dejen un espacio huérfano: la segunda ve la
+primera confirmada y ejecuta esa limpieza final.
 
 ### 6.4.3 Autoría y baja de cuenta
 
@@ -710,8 +707,10 @@ Reglas:
   con su saldo. Nunca se suman entre sí: un total mezclando divisas no
   significaría nada mientras no exista conversión.
 - Un movimiento solo puede asignarse a una cuenta que guarde su misma moneda.
-- La moneda solo puede cambiarse mientras la cuenta no tenga movimientos ni
-  series asignados; después reinterpretaría dinero ya registrado.
+- Una cuenta nueva comienza con la moneda principal del espacio. Al asignarle
+  el primer movimiento de otra moneda, se añade un saldo para esa divisa con
+  saldo inicial cero; las monedas y saldos que ya tienen movimientos no se
+  reescriben ni se eliminan.
 - El saldo es saldo inicial más ingresos menos gastos asignados, con la misma
   regla de horizonte mensual que el resto de la app (§8).
 - El tipo solo propone icono y color al crear la cuenta; los tres se comportan
@@ -1588,11 +1587,10 @@ Deben resolverse antes de las fases correspondientes:
    Resuelta como excepción explícita para el presupuesto de categoría, editable
    por cualquier miembro activo mediante `update_category_budget`; el resto de
    campos de una categoría ajena sigue sin poder editarse.
-2. Política de historial tras separación. Resuelta para espacios de pareja
-   (ADR-068): `dissolve_couple_space()` archiva el espacio y desactiva ambas
-   membresías sin borrar movimientos ni categorías. Sigue sin definir
-   exportación, copia automática de categorías al disolver y auditoría (ver
-   D-006 en `Bible/DECISIONS.md`).
+2. Política de salida de espacios de pareja. Resuelta por ADR-083: una salida
+   solo desactiva la membresía propia, permite reincorporarse por invitación y
+   elimina el espacio únicamente tras la última salida. Siguen sin definir
+   exportación, copia automática de categorías y auditoría de salidas.
 3. Unicidad de categorías por espacio.
 4. Ejecución remota de recurrencias cuando la aplicación no se abre.
 5. Retención de datos locales tras migración.

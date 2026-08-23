@@ -11,6 +11,7 @@ type MoneyAccountModalsProps = {
   controller: ReturnType<typeof useMoneyAccounts>;
   onOpenTransactionDetail: (transactionId: string) => void;
   spaceId: string;
+  spaceCurrency: CurrencyCode;
   spaceName: string;
   transactions: readonly SessionTransaction[];
 };
@@ -22,6 +23,7 @@ export function MoneyAccountModals({
   controller,
   onOpenTransactionDetail,
   spaceId,
+  spaceCurrency,
   spaceName,
   transactions,
 }: MoneyAccountModalsProps) {
@@ -48,6 +50,7 @@ export function MoneyAccountModals({
         onClose={controller.closeModal}
         onSubmit={controller.submit}
         spaceId={spaceId}
+        spaceCurrency={spaceCurrency}
         spaceName={spaceName}
         visible={controller.isModalVisible}
       />

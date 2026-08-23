@@ -58,7 +58,7 @@ function createGatewayStub(
     acceptInvitation: jest.fn(),
     createCoupleSpace: jest.fn(),
     createInvitation: jest.fn(),
-    dissolveCoupleSpace: jest.fn(),
+    leaveCoupleSpace: jest.fn(),
     getCurrentUserPendingInvitation: jest.fn(),
     getInvitationPreview: jest.fn(),
     getOutgoingInvitation: jest.fn(),
@@ -493,7 +493,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('dissolveCoupleSpace elimina la entrada local y cae a Personal si era la activa', async () => {
+  it('leaveCoupleSpace elimina la entrada local y cae a Personal si era la activa', async () => {
     mockAuthSession(fakeSession);
     const coupleSpace: Space = {
       id: 'space-remote',
@@ -507,7 +507,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     });
     mockRemoteCoupleSpace({ data: coupleSpace, error: null });
     const gateway = createGatewayStub({
-      dissolveCoupleSpace: jest.fn().mockResolvedValue(undefined),
+      leaveCoupleSpace: jest.fn().mockResolvedValue(undefined),
     });
     jest.mocked(createSupabaseInvitationGateway).mockReturnValue(gateway);
 
@@ -517,10 +517,10 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     );
 
     await act(async () => {
-      await result.current.dissolveCoupleSpace();
+      await result.current.leaveCoupleSpace();
     });
 
-    expect(gateway.dissolveCoupleSpace).toHaveBeenCalledWith('space-remote');
+    expect(gateway.leaveCoupleSpace).toHaveBeenCalledWith('space-remote');
     expect(result.current.spaces).toEqual([personalSpace]);
     expect(result.current.activeSpace.id).toBe(personalSpace.id);
   });

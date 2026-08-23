@@ -110,6 +110,9 @@ describe('CategoryDetailModal', () => {
     expect(onOpenTransactionDetail).toHaveBeenCalledWith('lunch');
     expect(within(detail).getByTestId('category-expense-metric')).toBeTruthy();
     expect(within(detail).queryByTestId('category-income-metric')).toBeNull();
+    expect(
+      within(detail).queryByTestId('category-currency-selector'),
+    ).toBeNull();
     expect(within(detail).queryByTestId('category-budget-summary')).toBeNull();
     const topBar = screen.getByTestId('category-detail-top-bar');
     expect(StyleSheet.flatten(topBar.props.style).paddingTop).toBe(spacing.xl);
@@ -386,6 +389,20 @@ describe('CategoryDetailModal', () => {
     const expenseMetric = within(detail).getByTestId('category-expense-metric');
     expect(within(expenseMetric).getByText(/20/)).toBeTruthy();
     expect(within(expenseMetric).getByText(/\$/)).toBeTruthy();
+
+    expect(
+      within(detail).getByTestId('category-currency-selector'),
+    ).toBeTruthy();
+    await fireEvent.press(
+      within(detail).getByTestId('category-currency-selector-VES'),
+    );
+    expect(within(detail).queryByText('Almuerzo USD')).toBeNull();
+    expect(within(detail).getByText('Almuerzo VES')).toBeTruthy();
+    expect(
+      within(within(detail).getByTestId('category-expense-metric')).getByText(
+        /40/,
+      ),
+    ).toBeTruthy();
 
     // Presupuesto en VES (100 VES total, 40 VES gastado -> 60 VES disponible)
     const budgetSummary = within(detail).getByTestId('category-budget-summary');

@@ -68,8 +68,7 @@ type TransactionDetailModalProps = {
     initialEditor?: TransactionEditorTarget,
   ) => void;
   onCreateMoneyAccount?: () => void;
-  /** Abre el selector de categoría encima del detalle. */
-  onOpenCategoryPicker?: () => void;
+  onOpenCategoryDetail?: (categoryId: string) => void;
   /** Guarda un cambio puntual sin salir del detalle. */
   onQuickEdit?: (transactionId: string, change: TransactionQuickEdit) => void;
   onRemoveReminder: (transactionId: string) => boolean | Promise<boolean>;
@@ -110,7 +109,7 @@ export function TransactionDetailModal({
   moneyAccount,
   onClose,
   onCreateMoneyAccount,
-  onOpenCategoryPicker,
+  onOpenCategoryDetail,
   onQuickEdit,
   onCopy,
   onDelete,
@@ -136,7 +135,6 @@ export function TransactionDetailModal({
   const [visibleRecurrenceCount, setVisibleRecurrenceCount] =
     useState(recurrencePageSize);
   const modalBottomInset = useAppModalBottomInset();
-  // `undefined` en un espacio personal: la fila «Autor» no aportaría nada.
   const author = useTransactionAuthor(transaction?.createdBy ?? '');
 
   useEffect(() => {
@@ -166,6 +164,7 @@ export function TransactionDetailModal({
     'es-ES',
   );
   const title = transaction.title.trim() || category?.name || 'Movimiento';
+  const openCategory = () => category && onOpenCategoryDetail?.(category.id);
   const isProjected = parseProjectedTransactionId(transaction.id) !== null;
   const upcomingDates = getUpcomingTransactionDates({
     count: visibleRecurrenceCount + 1,
@@ -220,9 +219,14 @@ export function TransactionDetailModal({
           >
             <View style={styles.hero}>
               <Pressable
-                accessibilityLabel="Cambiar categoría"
-                accessibilityRole="button"
-                onPress={() => onOpenCategoryPicker?.()}
+                accessibilityLabel={
+                  category
+                    ? `Abrir categoría: ${category.name}`
+                    : 'Sin categoría'
+                }
+                accessibilityRole={category ? 'button' : undefined}
+                disabled={!category}
+                onPress={openCategory}
                 style={({ pressed }) => [
                   styles.heroIcon,
                   {
@@ -372,9 +376,14 @@ export function TransactionDetailModal({
 
             <View style={styles.detailsCard}>
               <Pressable
-                accessibilityLabel={`Cambiar categoría: ${category?.name ?? 'Sin categoría'}`}
-                accessibilityRole="button"
-                onPress={() => onOpenCategoryPicker?.()}
+                accessibilityLabel={
+                  category
+                    ? `Abrir categoría: ${category.name}`
+                    : 'Sin categoría'
+                }
+                accessibilityRole={category ? 'button' : undefined}
+                disabled={!category}
+                onPress={openCategory}
                 style={({ pressed }) => [
                   styles.detailRow,
                   pressed && styles.pressed,

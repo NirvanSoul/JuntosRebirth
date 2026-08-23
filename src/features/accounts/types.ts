@@ -1,5 +1,9 @@
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import type { CategoryColorToken } from '@/theme/categoryColors';
+import {
+  categoryIconSections,
+  type CategoryIconName,
+} from '@/features/categories/types';
 
 /**
  * Tres tipos y no más: son los que la gente distingue sin pensarlo. El tipo
@@ -10,12 +14,8 @@ export const moneyAccountKinds = ['cash', 'bank', 'card'] as const;
 
 export type MoneyAccountKind = (typeof moneyAccountKinds)[number];
 
-/**
- * Catálogo cerrado propio: los iconos de categoría describen en qué se gasta
- * el dinero y los de cuenta, dónde está guardado. Mezclarlos obligaría a
- * enseñar «paw-print» al elegir una cuenta bancaria.
- */
-export const moneyAccountIconSections = [
+/** Iconos que describen de forma directa dónde se guarda el dinero. */
+const moneyAccountSpecificIconSections = [
   {
     title: 'Cuentas y ahorro',
     icons: [
@@ -51,8 +51,31 @@ export const moneyAccountIconSections = [
   },
 ] as const;
 
+type MoneyAccountSpecificIconName =
+  (typeof moneyAccountSpecificIconSections)[number]['icons'][number];
+
+const specificIconNames = new Set<string>(
+  moneyAccountSpecificIconSections.flatMap(({ icons }) => icons),
+);
+
+/**
+ * Primero aparecen los iconos propios de cuentas. Después se ofrecen los
+ * iconos de categoría que aún no estaban disponibles, para dar más libertad
+ * al personalizar una cuenta sin repetir opciones.
+ */
+export const moneyAccountIconSections: readonly {
+  title: string;
+  icons: readonly MoneyAccountIconName[];
+}[] = [
+  ...moneyAccountSpecificIconSections,
+  ...categoryIconSections.map(({ title, icons }) => ({
+    title,
+    icons: icons.filter((icon) => !specificIconNames.has(icon)),
+  })),
+];
+
 export type MoneyAccountIconName =
-  (typeof moneyAccountIconSections)[number]['icons'][number];
+  MoneyAccountSpecificIconName | CategoryIconName;
 
 export const moneyAccountIconNames: readonly MoneyAccountIconName[] =
   moneyAccountIconSections.flatMap(({ icons }) => icons);

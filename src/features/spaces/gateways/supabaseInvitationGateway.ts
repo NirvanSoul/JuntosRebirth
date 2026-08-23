@@ -78,7 +78,7 @@ export type InvitationGateway = {
   acceptInvitation(
     token: string,
   ): Promise<{ spaceId: string; spaceName: string }>;
-  dissolveCoupleSpace(spaceId: string): Promise<void>;
+  leaveCoupleSpace(spaceId: string): Promise<void>;
 };
 
 /**
@@ -290,13 +290,13 @@ export function createSupabaseInvitationGateway(
       return parseAcceptResult(data);
     },
 
-    async dissolveCoupleSpace(spaceId) {
-      const { error } = await client.rpc('dissolve_couple_space', {
+    async leaveCoupleSpace(spaceId) {
+      const { error } = await client.rpc('leave_couple_space', {
         p_space_id: spaceId,
       });
       if (error) {
         const { text } = splitErrorCode(error.message);
-        throw new Error(text || 'No pudimos eliminar el espacio juntos.');
+        throw new Error(text || 'No pudimos salir del espacio de pareja.');
       }
     },
   };

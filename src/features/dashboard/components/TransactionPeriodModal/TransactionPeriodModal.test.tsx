@@ -1,6 +1,10 @@
+import { StyleSheet } from 'react-native';
+
 import { TransactionPeriodModal } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
+import { fontFamily } from '@/theme/fonts';
+import { typography } from '@/theme/typography';
 
 function transaction(
   id: string,
@@ -85,6 +89,30 @@ describe('TransactionPeriodModal', () => {
 
     expect(getByText('60%')).toBeTruthy();
   });
+
+  it.each(['income', 'expense', 'balance'] as const)(
+    'muestra el total de %s en Gilroy Medium',
+    async (type) => {
+      const { getByTestId, unmount } = await renderWithTheme(
+        <TransactionPeriodModal
+          categories={[]}
+          onAdd={jest.fn()}
+          onClose={jest.fn()}
+          transactions={transactions}
+          type={type}
+          visible
+        />,
+      );
+
+      expect(
+        StyleSheet.flatten(getByTestId(`${type}-period-total`).props.style),
+      ).toMatchObject({
+        fontFamily: fontFamily.medium,
+        fontSize: typography.title.fontSize,
+      });
+      unmount();
+    },
+  );
 
   it('no reinterpreta movimientos de otra moneda', async () => {
     const { getByTestId, getByText, queryByText } = await renderWithTheme(

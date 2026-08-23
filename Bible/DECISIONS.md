@@ -5571,6 +5571,50 @@ apertura del detalle desde un badge y el retroceso de mes.
 
 ---
 
+# ADR-083 — Salida individual de espacios de pareja
+
+**Estado:** Aceptada
+
+## Contexto
+
+ADR-068 implementó «Eliminar espacio juntos» como una disolución simétrica:
+una persona archivaba el espacio y retiraba también a la otra. Esa acción no
+representaba una salida individual y hacía imposible que el espacio continuara
+con quien quería quedarse o que quien salió volviera más tarde.
+
+## Decisión
+
+Se elimina `dissolve_couple_space` y la interfaz pasa a ofrecer únicamente
+«Salir del espacio de pareja». `leave_couple_space` cambia a `'left'` solo la
+membresía de quien llama. Mientras quede un miembro activo, el espacio se
+mantiene sin archivar y una invitación nueva reactiva la fila de quien salió.
+
+Si esa salida deja cero miembros activos, el RPC elimina el espacio y todos sus
+datos dependientes en la misma transacción. Bloquear la fila de `spaces` antes
+de modificar la membresía serializa dos salidas simultáneas y garantiza que la
+última complete la limpieza.
+
+## Consecuencias
+
+- Una persona no puede sacar a la otra del espacio desde la interfaz ni por el
+  RPC de salida.
+- La última salida borra los datos compartidos porque ya no hay ningún miembro
+  activo que pueda conservarlos o acceder a ellos.
+- El reingreso requiere una invitación nueva emitida por quien permaneció;
+  reutilizar una membresía existente evita violar `unique (space_id, user_id)`.
+- Los espacios archivados por la antigua disolución no se reabren con esta
+  migración: siguen siendo historial legado fuera del nuevo flujo.
+
+## Validación
+
+`space_invitations.test.sql` comprueba la retirada del RPC simétrico, los
+permisos del RPC de salida, el bloqueo para concurrencia, la limpieza de cuentas
+de dinero y la reactivación de membresías por ambos tipos de invitación. Las
+suites de gateway, espacios y Ajustes cubren la llamada remota, la retirada del
+catálogo local y el texto/confirmación de salida.
+
+---
+
 ## 5. Principio final
 
 > Una decisión no documentada se convierte con el tiempo en una suposición.

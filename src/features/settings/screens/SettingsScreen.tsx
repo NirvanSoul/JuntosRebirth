@@ -63,7 +63,7 @@ type SettingsScreenProps = {
   currencyPreferences: CurrencyPreferences;
   notificationRules: readonly TransactionNotificationRule[];
   onBack: () => void;
-  onDissolveCoupleSpace: () => Promise<void>;
+  onLeaveCoupleSpace: () => Promise<void>;
   onSaveCurrencyPreferences: (preferences: CurrencyPreferences) => void;
   onSaveNotificationRule: (
     input: SaveLocalNotificationRuleInput,
@@ -72,16 +72,16 @@ type SettingsScreenProps = {
   showHomeComparisonIndicators: boolean;
 };
 
-type CoupleSpaceDissolutionState =
+type CoupleSpaceExitState =
   | { step: 'idle' }
   | { step: 'confirming' }
-  | { step: 'dissolving' }
+  | { step: 'leaving' }
   | { step: 'error'; message: string };
 
 /** Mismo retraso obligatorio que `DataRightsScreen` antes de habilitar la confirmación destructiva. */
-const confirmDissolveCoupleSpaceDelayMs = 5000;
-const confirmDissolveCoupleSpaceDelaySeconds =
-  confirmDissolveCoupleSpaceDelayMs / 1000;
+const confirmLeaveCoupleSpaceDelayMs = 5000;
+const confirmLeaveCoupleSpaceDelaySeconds =
+  confirmLeaveCoupleSpaceDelayMs / 1000;
 
 const profileIconSize = 56;
 const developerContactEmail = 'aora.estudio.o@gmail.com';
@@ -99,7 +99,7 @@ export function SettingsScreen({
   currencyPreferences,
   notificationRules,
   onBack,
-  onDissolveCoupleSpace,
+  onLeaveCoupleSpace,
   onSaveCurrencyPreferences,
   onSaveNotificationRule,
   onToggleHomeComparisonIndicators,
@@ -122,15 +122,14 @@ export function SettingsScreen({
   const [saveConfirmationNotice, setSaveConfirmationNotice] =
     useState<SaveConfirmationNotice | null>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const [coupleDissolution, setCoupleDissolution] =
-    useState<CoupleSpaceDissolutionState>({ step: 'idle' });
-  const [
-    coupleDissolutionSecondsRemaining,
-    setCoupleDissolutionSecondsRemaining,
-  ] = useState(confirmDissolveCoupleSpaceDelaySeconds);
-  const coupleDissolutionProgress = useSharedValue(0);
-  const coupleDissolutionProgressStyle = useAnimatedStyle(() => ({
-    width: `${coupleDissolutionProgress.value * 100}%`,
+  const [coupleSpaceExit, setCoupleSpaceExit] = useState<CoupleSpaceExitState>({
+    step: 'idle',
+  });
+  const [coupleSpaceExitSecondsRemaining, setCoupleSpaceExitSecondsRemaining] =
+    useState(confirmLeaveCoupleSpaceDelaySeconds);
+  const coupleSpaceExitProgress = useSharedValue(0);
+  const coupleSpaceExitProgressStyle = useAnimatedStyle(() => ({
+    width: `${coupleSpaceExitProgress.value * 100}%`,
   }));
   const nextSaveConfirmationId = useRef(1);
   const currencyValueLabel =
@@ -154,28 +153,24 @@ export function SettingsScreen({
   }, []);
 
   useEffect(() => {
-    if (coupleDissolution.step !== 'confirming') {
-      coupleDissolutionProgress.value = 0;
+    if (coupleSpaceExit.step !== 'confirming') {
+      coupleSpaceExitProgress.value = 0;
       return;
     }
 
-    setCoupleDissolutionSecondsRemaining(
-      confirmDissolveCoupleSpaceDelaySeconds,
-    );
-    coupleDissolutionProgress.value = 0;
-    coupleDissolutionProgress.value = withTiming(1, {
-      duration: confirmDissolveCoupleSpaceDelayMs,
+    setCoupleSpaceExitSecondsRemaining(confirmLeaveCoupleSpaceDelaySeconds);
+    coupleSpaceExitProgress.value = 0;
+    coupleSpaceExitProgress.value = withTiming(1, {
+      duration: confirmLeaveCoupleSpaceDelayMs,
       easing: Easing.linear,
     });
 
     const intervalId = setInterval(() => {
-      setCoupleDissolutionSecondsRemaining((current) =>
-        Math.max(0, current - 1),
-      );
+      setCoupleSpaceExitSecondsRemaining((current) => Math.max(0, current - 1));
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [coupleDissolution.step, coupleDissolutionProgress]);
+  }, [coupleSpaceExit.step, coupleSpaceExitProgress]);
 
   const handlePickAvatar = async (source: AvatarPickSource) => {
     try {
@@ -264,14 +259,14 @@ export function SettingsScreen({
     });
   };
 
-  const handleConfirmDissolveCoupleSpace = () => {
-    if (coupleDissolutionSecondsRemaining > 0) return;
+  const handleConfirmLeaveCoupleSpace = () => {
+    if (coupleSpaceExitSecondsRemaining > 0) return;
 
-    setCoupleDissolution({ step: 'dissolving' });
-    void onDissolveCoupleSpace().catch(() => {
-      setCoupleDissolution({
+    setCoupleSpaceExit({ step: 'leaving' });
+    void onLeaveCoupleSpace().catch(() => {
+      setCoupleSpaceExit({
         step: 'error',
-        message: 'No pudimos eliminar el espacio juntos. Inténtalo de nuevo.',
+        message: 'No pudimos salir del espacio de pareja. Inténtalo de nuevo.',
       });
     });
   };
@@ -454,60 +449,59 @@ export function SettingsScreen({
               destructive
               icon="trash-outline"
               iconBackgroundColor={categoryColors.red}
-              label="Eliminar espacio juntos"
-              onPress={() => setCoupleDissolution({ step: 'confirming' })}
+              label="Salir del espacio de pareja"
+              onPress={() => setCoupleSpaceExit({ step: 'confirming' })}
             />
           </SettingsSection>
         ) : null}
 
         {activeSpaceType === 'couple' &&
-        coupleDissolution.step === 'confirming' ? (
+        coupleSpaceExit.step === 'confirming' ? (
           <View style={styles.warningCard}>
             <Text tone="expense" variant="bodyStrong" weight="semibold">
-              Esta acción no se puede deshacer
+              Saldrás de este espacio
             </Text>
             <Text tone="secondary" variant="label">
-              El espacio juntos se eliminará para ambas personas. Los
-              movimientos y categorías compartidos se conservan, pero dejarán de
-              estar disponibles desde este espacio.
+              Dejarás de tener acceso a sus movimientos y categorías. Si ambas
+              personas salen, el espacio se eliminará automáticamente.
             </Text>
             <View style={styles.progressTrack}>
               <Animated.View
-                style={[styles.progressFill, coupleDissolutionProgressStyle]}
+                style={[styles.progressFill, coupleSpaceExitProgressStyle]}
               />
             </View>
             <View style={styles.actionsRow}>
               <ModalPrimaryAction
-                accessibilityLabel="Cancelar eliminación del espacio juntos"
+                accessibilityLabel="Cancelar salida del espacio de pareja"
                 label="Cancelar"
-                onPress={() => setCoupleDissolution({ step: 'idle' })}
+                onPress={() => setCoupleSpaceExit({ step: 'idle' })}
                 style={styles.actionButton}
                 variant="surface"
               />
               <ModalPrimaryAction
                 accessibilityLabel={
-                  coupleDissolutionSecondsRemaining > 0
-                    ? `Espera ${coupleDissolutionSecondsRemaining} segundos para confirmar la eliminación`
-                    : 'Confirmar eliminación del espacio juntos'
+                  coupleSpaceExitSecondsRemaining > 0
+                    ? `Espera ${coupleSpaceExitSecondsRemaining} segundos para confirmar la salida`
+                    : 'Confirmar salida del espacio de pareja'
                 }
-                disabled={coupleDissolutionSecondsRemaining > 0}
+                disabled={coupleSpaceExitSecondsRemaining > 0}
                 label={
-                  coupleDissolutionSecondsRemaining > 0
-                    ? `Espera (${coupleDissolutionSecondsRemaining})`
-                    : 'Sí, eliminar'
+                  coupleSpaceExitSecondsRemaining > 0
+                    ? `Espera (${coupleSpaceExitSecondsRemaining})`
+                    : 'Sí, salir'
                 }
-                onPress={handleConfirmDissolveCoupleSpace}
+                onPress={handleConfirmLeaveCoupleSpace}
                 style={[styles.actionButton, styles.destructiveButton]}
-                testID="confirm-couple-space-dissolution"
+                testID="confirm-couple-space-exit"
                 variant="cta"
               />
             </View>
           </View>
         ) : null}
 
-        {activeSpaceType === 'couple' && coupleDissolution.step === 'error' ? (
+        {activeSpaceType === 'couple' && coupleSpaceExit.step === 'error' ? (
           <Text tone="expense" variant="footnote">
-            {coupleDissolution.message}
+            {coupleSpaceExit.message}
           </Text>
         ) : null}
 

@@ -1,12 +1,14 @@
-import { fireEvent } from '@testing-library/react-native';
+import { DeviceEventEmitter, Platform, StyleSheet } from 'react-native';
+import { act, fireEvent } from '@testing-library/react-native';
 
 import { CreateMoneyAccountModal } from '@/features/accounts/components/CreateMoneyAccountModal/CreateMoneyAccountModal';
 import {
-  moneyAccountIconSections,
+  moneyAccountIconNames,
   type MoneyAccount,
 } from '@/features/accounts/types';
+import { categoryIconNames } from '@/features/categories/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
-import { colors } from '@/theme/colors';
+import { spacing } from '@/theme/spacing';
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
   AppModal: ({
@@ -21,10 +23,7 @@ jest.mock('@/components/overlays/AppModal/AppModal', () => ({
 
 jest.mock('@gorhom/bottom-sheet', () => {
   const { ScrollView, TextInput } = jest.requireActual('react-native');
-  return {
-    BottomSheetScrollView: ScrollView,
-    BottomSheetTextInput: TextInput,
-  };
+  return { BottomSheetScrollView: ScrollView, BottomSheetTextInput: TextInput };
 });
 
 const account: MoneyAccount = {
@@ -47,6 +46,7 @@ function renderModal(
       availableCurrencies={['EUR', 'USD']}
       onClose={jest.fn()}
       onSubmit={jest.fn()}
+      spaceCurrency="EUR"
       spaceId="personal"
       spaceName="Personal"
       visible
@@ -55,23 +55,45 @@ function renderModal(
   );
 }
 
+async function moveToKind(screen: Awaited<ReturnType<typeof renderModal>>) {
+  await fireEvent.changeText(
+    screen.getByLabelText('Nombre de la cuenta'),
+    'Efectivo',
+  );
+  await fireEvent.press(screen.getByLabelText('Continuar tipo de cuenta'));
+}
+
 describe('CreateMoneyAccountModal', () => {
-  it('crea una cuenta con su tipo, moneda y saldo inicial', async () => {
+  it('separa el campo de nombre del subtítulo del modal', async () => {
+    const screen = await renderModal();
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByLabelText('Nombre de la cuenta').props.style,
+      ).marginTop,
+    ).toBe(spacing.xxl);
+  });
+
+  it('crea una cuenta en tres pasos con su tipo y saldo inicial', async () => {
     const onSubmit = jest.fn();
     const screen = await renderModal({ onSubmit });
 
-    await fireEvent.changeText(
-      screen.getByLabelText('Nombre de la cuenta'),
-      'Efectivo',
-    );
+    expect(screen.queryByText('Elige el tipo de cuenta')).toBeNull();
+    await moveToKind(screen);
+    expect(screen.getByText('Elige el tipo de cuenta')).toBeTruthy();
+    expect(screen.queryByText('Tipo')).toBeNull();
+    expect(
+      StyleSheet.flatten(screen.getByLabelText('Saldo inicial').props.style)
+        .marginTop,
+    ).toBe(spacing.none);
     await fireEvent.press(screen.getByLabelText('Efectivo'));
     await fireEvent.changeText(screen.getByLabelText('Saldo inicial'), '250');
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
+    expect(screen.getByTestId('money-account-appearance-step')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        spaceId: 'personal',
         name: 'Efectivo',
         kind: 'cash',
         balances: [{ currency: 'EUR', openingBalanceMinor: 25000 }],
@@ -79,205 +101,94 @@ describe('CreateMoneyAccountModal', () => {
     );
   });
 
-  it('acepta un saldo inicial negativo escrito con el signo', async () => {
-    const onSubmit = jest.fn();
-    const screen = await renderModal({ onSubmit });
-
-    await fireEvent.changeText(
-      screen.getByLabelText('Nombre de la cuenta'),
-      'Visa',
-    );
-    await fireEvent.changeText(screen.getByLabelText('Saldo inicial'), '-450');
-    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
-    await fireEvent.press(screen.getByLabelText('Crear cuenta'));
-
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        balances: [{ currency: 'EUR', openingBalanceMinor: -45000 }],
-      }),
-    );
-  });
-
-  it('conserva los céntimos de un saldo negativo', async () => {
-    const onSubmit = jest.fn();
-    const screen = await renderModal({ onSubmit });
-
-    await fireEvent.changeText(
-      screen.getByLabelText('Nombre de la cuenta'),
-      'Visa',
-    );
-    await fireEvent.changeText(
-      screen.getByLabelText('Saldo inicial'),
-      '-450,50',
-    );
-    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
-    await fireEvent.press(screen.getByLabelText('Crear cuenta'));
-
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        balances: [{ currency: 'EUR', openingBalanceMinor: -45050 }],
-      }),
-    );
-  });
-
-  it('ofrece solo los tres tipos de cuenta', async () => {
+  it('nace solo con la moneda principal del espacio', async () => {
     const screen = await renderModal();
+    await moveToKind(screen);
 
-    expect(screen.getByLabelText('Efectivo')).toBeTruthy();
-    expect(screen.getByLabelText('Cuenta bancaria')).toBeTruthy();
-    expect(screen.getByLabelText('Tarjeta')).toBeTruthy();
-    expect(screen.queryByLabelText('Tarjeta de débito')).toBeNull();
-    expect(screen.queryByLabelText('Ahorro')).toBeNull();
+    expect(screen.queryByText('Monedas')).toBeNull();
+    expect(screen.queryByLabelText('🇺🇸 Dólar estadounidense (USD)')).toBeNull();
+  });
+
+  it('acerca continuar al campo mientras el teclado está visible', async () => {
+    const screen = await renderModal();
+    const showEvent =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('money-account-name-action').props.style,
+      ).flex,
+    ).toBe(1);
+    await act(async () => DeviceEventEmitter.emit(showEvent));
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('money-account-name-action').props.style,
+      ).flex,
+    ).toBe(0);
+    await act(async () => DeviceEventEmitter.emit(hideEvent));
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('money-account-name-action').props.style,
+      ).flex,
+    ).toBe(1);
+  });
+
+  it('vuelve por los pasos antes de cerrar el modal', async () => {
+    const onClose = jest.fn();
+    const screen = await renderModal({ onClose });
+
+    await moveToKind(screen);
+    await fireEvent.press(screen.getByLabelText('Volver'));
+    expect(screen.getByLabelText('Nombre de la cuenta')).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await moveToKind(screen);
+    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
+    expect(screen.getByTestId('money-account-appearance-step')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Volver'));
+    expect(screen.getByText('Elige el tipo de cuenta')).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByLabelText('Volver'));
+    expect(screen.getByLabelText('Nombre de la cuenta')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Volver'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('incluye cada icono de categoría que no estaba ya entre los de cuenta', () => {
+    expect(moneyAccountIconNames).toEqual(
+      expect.arrayContaining(categoryIconNames),
+    );
   });
 
   it('no deja continuar con un nombre repetido en el mismo espacio', async () => {
     const screen = await renderModal({ accounts: [account] });
-
     await fireEvent.changeText(
       screen.getByLabelText('Nombre de la cuenta'),
       'cuenta NÓMINA',
     );
-    // El botón queda deshabilitado, así que el aviso llega por la tecla de
-    // retorno del teclado, igual que en el modal de categoría.
     await fireEvent(
       screen.getByLabelText('Nombre de la cuenta'),
       'submitEditing',
     );
-
     expect(
       screen.getByText('Ya existe una cuenta con ese nombre en este espacio.'),
     ).toBeTruthy();
   });
 
-  it('permite añadir una segunda moneda sin modificar la original bloqueada', async () => {
-    const onSubmit = jest.fn();
+  it('mantiene la edición de monedas existente tras confirmar el nombre', async () => {
     const screen = await renderModal({
       account,
       accounts: [account],
       isCurrencyLocked: true,
-      onSubmit,
     });
-
+    await fireEvent.press(screen.getByLabelText('Continuar tipo de cuenta'));
     expect(
       screen.getByText(
         'La moneda original no se puede cambiar porque ya tiene movimientos. Puedes añadir una segunda moneda.',
       ),
     ).toBeTruthy();
-
-    await fireEvent.changeText(screen.getByLabelText('Saldo inicial'), '999');
-    await fireEvent.press(
-      screen.getByLabelText('🇺🇸 Dólar estadounidense (USD)'),
-    );
-    await fireEvent.changeText(
-      screen.getByLabelText('Saldo inicial en USD'),
-      '50',
-    );
-    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
-    await fireEvent.press(screen.getByLabelText('Guardar cambios de cuenta'));
-
-    // El saldo de la moneda original se conserva y solo se añade la nueva.
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        balances: [
-          { currency: 'EUR', openingBalanceMinor: 125000 },
-          { currency: 'USD', openingBalanceMinor: 5000 },
-        ],
-      }),
-    );
-  });
-
-  it('precarga los datos de la cuenta al editarla', async () => {
-    const screen = await renderModal({ account, accounts: [account] });
-
-    expect(screen.getByLabelText('Nombre de la cuenta').props.value).toBe(
-      'Cuenta nómina',
-    );
-    expect(screen.getByLabelText('Saldo inicial').props.value).toBe('1.250');
-  });
-
-  it('precarga el signo de una cuenta que arrastra deuda', async () => {
-    const screen = await renderModal({
-      account: {
-        ...account,
-        balances: [{ currency: 'EUR' as const, openingBalanceMinor: -45000 }],
-      },
-      accounts: [account],
-    });
-
-    expect(screen.getByLabelText('Saldo inicial').props.value).toBe('-450');
-  });
-
-  it('permite marcar varias monedas y dar a cada una su saldo', async () => {
-    const onSubmit = jest.fn();
-    const screen = await renderModal({ onSubmit });
-
-    await fireEvent.changeText(
-      screen.getByLabelText('Nombre de la cuenta'),
-      'Cuenta multidivisa',
-    );
-    await fireEvent.press(
-      screen.getByLabelText('🇺🇸 Dólar estadounidense (USD)'),
-    );
-    await fireEvent.changeText(
-      screen.getByLabelText('Saldo inicial en EUR'),
-      '1000',
-    );
-    await fireEvent.changeText(
-      screen.getByLabelText('Saldo inicial en USD'),
-      '-250',
-    );
-    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
-    await fireEvent.press(screen.getByLabelText('Crear cuenta'));
-
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        balances: [
-          { currency: 'EUR', openingBalanceMinor: 100000 },
-          { currency: 'USD', openingBalanceMinor: -25000 },
-        ],
-      }),
-    );
-  });
-
-  it('no deja quedarse sin ninguna moneda', async () => {
-    const screen = await renderModal();
-
-    await fireEvent.press(screen.getByLabelText('🇪🇺 Euro (EUR)'));
-
-    // Sin moneda no habría saldo que calcular, así que la última no se quita.
-    expect(screen.getByLabelText('Saldo inicial')).toBeTruthy();
-  });
-
-  it('permite elegir los iconos ampliados de una cuenta por categoría', async () => {
-    const onSubmit = jest.fn();
-    const screen = await renderModal({ onSubmit });
-
-    await fireEvent.changeText(
-      screen.getByLabelText('Nombre de la cuenta'),
-      'Tarjeta de viajes',
-    );
-    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
-
-    expect(screen.getByText('Cuentas y ahorro')).toBeTruthy();
-    expect(moneyAccountIconSections[0]?.title).toBe('Cuentas y ahorro');
-    expect(screen.getByText('Dinero')).toBeTruthy();
-    expect(screen.getByText('Tarjetas y pagos')).toBeTruthy();
-    expect(screen.queryByLabelText('Icono chart-line-up')).toBeNull();
-    expect(screen.queryByLabelText('Icono trend-up')).toBeNull();
-    expect(
-      screen.getByTestId('money-account-appearance-icons-scroll').props
-        .horizontal,
-    ).toBe(true);
-    expect(
-      screen.getByTestId('money-account-appearance-preview-icon').props.children
-        .props.color,
-    ).toBe(colors.onBrand);
-
-    await fireEvent.press(screen.getByLabelText('Icono cardholder'));
-    await fireEvent.press(screen.getByLabelText('Crear cuenta'));
-
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ icon: 'cardholder' }),
-    );
   });
 });

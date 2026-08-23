@@ -607,6 +607,7 @@ describe('MainTabsNavigator', () => {
 
     await fireEvent.press(screen.getByTestId('floating-create-button'));
     await fireEvent.press(screen.getByLabelText('Crear ingreso'));
+    await fireEvent.press(screen.getByLabelText('1'));
 
     expect(
       screen.getByLabelText('Ingreso').props.accessibilityState,
@@ -619,7 +620,7 @@ describe('MainTabsNavigator', () => {
       ).backgroundColor,
     ).toBe(colors.income);
     expect(StyleSheet.flatten(screen.getByText('+').props.style).color).toBe(
-      colors.income,
+      colors.textPrimary,
     );
     expect(
       StyleSheet.flatten(
@@ -641,6 +642,7 @@ describe('MainTabsNavigator', () => {
         name: 'Añadir movimiento',
       }),
     );
+    await fireEvent.press(screen.getByLabelText('1'));
 
     expect(
       screen.getByLabelText('Gasto').props.accessibilityState,
@@ -654,7 +656,7 @@ describe('MainTabsNavigator', () => {
       ).backgroundColor,
     ).toBe(colors.expense);
     expect(StyleSheet.flatten(screen.getByText('+').props.style).color).toBe(
-      colors.expense,
+      colors.textPrimary,
     );
     expect(
       StyleSheet.flatten(
@@ -675,7 +677,7 @@ describe('MainTabsNavigator', () => {
       selected: true,
     });
     expect(StyleSheet.flatten(screen.getByText('+').props.style).color).toBe(
-      colors.income,
+      colors.textPrimary,
     );
   });
 
