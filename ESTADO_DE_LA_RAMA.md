@@ -64,12 +64,18 @@ end-to-end, y todo el modelo y consumo de monedas, verificado en dos teléfonos.
 Cerrado también el frente SQL: las migraciones 24 y 25 retiran la ejecución
 anónima de seis funciones —solo la vista previa de invitación la conserva a
 propósito— y dejan `legal_acceptances` con permiso de lectura e inserción y
-nada más. Las doce suites pgTAP pasan contra staging: 174 aserciones.
+nada más. Las doce suites pgTAP pasan contra staging: 174 aserciones; en
+local, con la migración 26 aún sin publicar, son trece archivos y 186 tests.
 
 **En curso.** La escala monetaria real por divisa (ADR-080), en tres entregas.
-La primera está cerrada y verificada: catálogo con la unidad menor de cada
-moneda, formateo e importación. Quedan la entrada por teclado con su calculadora
-y la protección de la moneda del espacio en PostgreSQL.
+Las dos primeras están cerradas y verificadas: catálogo con la unidad menor de
+cada moneda, formateo, importación, entrada por teclado y calculadora. La
+tercera —inmutabilidad de `spaces.currency` en PostgreSQL— está implementada
+en local y pasó revisión: los dos bloqueantes detectados (enteros inseguros en
+la calculadora y un bypass del RPC `migrate_guest_data` sobre la moneda) están
+cerrados y documentados en `Bible/DECISIONS.md` (ADR-080). Falta publicar la
+migración 26 en staging, repetir la suite enlazada y hacer los smokes físicos;
+el despliegue sigue siendo conjunto para las tres entregas.
 
 **Pendiente, ya decidido.** La Fase 4 está abierta en seis frentes: autoría
 visible de cada movimiento, perfiles y avatares de miembros, cuentas de dinero,
@@ -88,7 +94,9 @@ vulnerabilidades sin versión corregida.
 Las migraciones SQL de `supabase/migrations/` levantan un proyecto Supabase
 desde cero; se comprobó creando uno limpio y aplicándolas en orden. La migración
 23 preserva la moneda al migrar datos de invitado sin sobrescribir las
-existentes.
+existentes, y la 26 consolida `spaces.currency` como inmutable: ni escrituras
+directas autenticadas ni el RPC de migración pueden cambiarla después de crear
+el espacio.
 
 El número 09 no existe: es un hueco heredado, documentado a propósito y no
 rellenado, porque renumerar migraciones ya aplicadas es destructivo. Las

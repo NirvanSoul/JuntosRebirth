@@ -5257,6 +5257,43 @@ Evidencia diferencial (rojo/verde) obligatoria:
 
 *Nota:* Ninguna entrega parcial se desplegará en staging ni se probará en los dispositivos. El rollout y la limpieza local ocurrirán únicamente tras aprobar las tres entregas.
 
+## Evidencia de la Entrega 3 y cierre de bloqueantes de revisión (2026-08-23)
+
+La entrega 3 se implementó en `bab8ecc`/`f90bf9e` y pasó revisión externa, que
+detectó dos bloqueantes, ambos cerrados:
+
+1. **Valores monetarios inseguros en cliente.** `parseAmountMinor` truncaba
+   decimales adicionales sin avisar (`df4f856`) y la calculadora evaluaba el
+   producto intermedio en float, devolviendo enteros imprecisos como válidos.
+   Cierre (`04f2add`): `evaluatePendingOperations` devuelve una unión
+   discriminada `{ ok, valueMinor } | { ok, reason }`; ante desbordamiento el
+   modal conserva el borrador intacto y muestra el motivo
+   (`testID="transaction-calculator-error"`, reutilizando
+   `currencySwitchErrorMessages`). Los estilos del modal se extrajeron a
+   `createTransactionModalStyles.ts`.
+2. **Bypass SQL sobre `spaces.currency`.** El trigger eximía a
+   `current_user = 'postgres'`, y `migrate_guest_data` es SECURITY DEFINER:
+   cualquier usuario autenticado podía mutar la moneda de un espacio existente
+   vía RPC con payload modificado. Cierre (`a851aa4`, migración 26 rehecha
+   como insert-only, segura porque seguía solo aplicada en local; staging en
+   25): la función ya no toca `currency` en espacios existentes — solo se fija
+   en el INSERT con fallback `'EUR'` — y la exención postgres queda reservada
+   a operaciones administrativas, inalcanzable vía RPC.
+
+Evidencia diferencial y de regresión:
+
+- Suites JS: `transactionAmount.test.ts` 30/30 (incluye desbordamiento
+  `Number.MAX_SAFE_INTEGER × 200` → `{ ok: false, reason: 'unsafe_integer' }`
+  y división exacta redondeada por exceso), `CreateTransactionModal.test.tsx`
+  36/36. `npm run validate` completo en verde: 125 suites / 815 tests.
+- pgTAP local (`supabase db reset` + `supabase test db`): 13 archivos / 186
+  tests PASS. Aserciones invertidas tras el cierre del bypass: la mutación
+  explícita EUR→VES por RPC ahora debe ignorarse
+  (`guest_space_currency.test.sql`) y se añadió regresión específica del bypass
+  (`spaces_currency_immutable.test.sql`, 12 aserciones).
+- Pendiente: push de la migración 26 a staging, suite focal enlazada y smokes
+  físicos, que ocurrirán junto al rollout conjunto de las tres entregas.
+
 ---
 
 ## 5. Principio final
