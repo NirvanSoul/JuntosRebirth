@@ -22,6 +22,13 @@ import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
 import { fontFamily } from '@/theme/fonts';
 
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual<typeof import('@react-navigation/native')>(
+    '@react-navigation/native',
+  ),
+  useScrollToTop: jest.fn(),
+}));
+
 const transactions: SessionTransaction[] = [
   {
     id: 'session-1',
@@ -771,6 +778,35 @@ describe('ActivityScreen', () => {
     expect(screen.getByRole('button', { name: 'Categorías' })).toBeTruthy();
   });
 
+  it('acepta el estado guardado de las secciones plegadas', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            accountsExpanded={false}
+            categories={categories}
+            categoriesExpanded={false}
+            transactions={transactions}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Categorías' }).props
+        .accessibilityState,
+    ).toMatchObject({ expanded: false });
+    expect(
+      screen.getByRole('button', { name: 'Cuentas' }).props.accessibilityState,
+    ).toMatchObject({ expanded: false });
+    expect(screen.queryByText('Detalle por categoría')).toBeNull();
+  });
+
   it('pliega la gráfica y el detalle de categorías como una sola sección', async () => {
     const screen = await render(
       <SafeAreaProvider
@@ -808,6 +844,68 @@ describe('ActivityScreen', () => {
         includeHiddenElements: true,
       }),
     ).toBeTruthy();
+  });
+
+  it('alterna el detalle por categoría entre la lista y las tarjetas de Inicio en tres columnas', async () => {
+    const foodCategory: Category = {
+      id: 'food',
+      spaceId: 'personal',
+      name: 'Comida',
+      icon: 'fork-knife',
+      colorToken: 'orange',
+      isDefault: false,
+      isArchived: false,
+    };
+    const travelCategory: Category = {
+      id: 'travel',
+      spaceId: 'personal',
+      name: 'Viajes',
+      icon: 'globe',
+      colorToken: 'blue',
+      isDefault: false,
+      isArchived: false,
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={[...categories, foodCategory, travelCategory]}
+            categoryView="list"
+            transactions={transactions}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const toggle = screen.getByRole('button', {
+      name: 'Cambiar a vista de cuadrícula',
+    });
+
+    await fireEvent.press(toggle);
+
+    expect(
+      screen.getByRole('button', { name: 'Cambiar a vista de lista' }),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('activity-category-separator')).toBeNull();
+    expect(screen.getAllByTestId('category-tile-surface')).toHaveLength(3);
+    expect(
+      StyleSheet.flatten(
+        screen.getAllByTestId('category-preview-card')[0]!.props.style,
+      ).width,
+    ).toBe('31.5%');
+    expect(
+      StyleSheet.flatten(
+        screen.getAllByTestId('category-preview-card')[0]!.props.style,
+      ),
+    ).toMatchObject({
+      borderColor: colors.border,
+      borderRadius: radii.lg * 0.9 + 1,
+    });
   });
 
   it('abre y cierra el modal de filtros sin aplicar el borrador', async () => {

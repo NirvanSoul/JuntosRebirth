@@ -188,7 +188,8 @@ jest.mock(
 );
 
 describe('MainTabsNavigator', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await AsyncStorage.removeItem('@juntoss/activity-sections/v1');
     mockUseSpaces.mockReturnValue({
       activeSpace: {
         currency: 'EUR',
@@ -575,6 +576,7 @@ describe('MainTabsNavigator', () => {
       '5',
     );
     await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Categorías' }));
 
     expect(await screen.findByTestId('transaction-preview-card')).toBeTruthy();
     expect(
@@ -752,6 +754,7 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
     await fireEvent.press(screen.getByLabelText('Crear categoría'));
     await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Categorías' }));
 
     expect(await screen.findByText('Jardinería')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Jardinería' })).toBeTruthy();
@@ -832,6 +835,7 @@ describe('MainTabsNavigator', () => {
     expect(screen.queryByTestId('category-preview-card')).toBeNull();
 
     await fireEvent.press(screen.getByLabelText('Guardar categorías'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Categorías' }));
 
     expect(screen.getAllByTestId('category-preview-card')).toHaveLength(2);
 
@@ -933,6 +937,7 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByLabelText('Salario'));
     await fireEvent.press(screen.getByLabelText('Guardar categorías'));
     await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Categorías' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Salario' }));
     await fireEvent.press(
       screen.getByRole('button', { name: 'Copiar en otro espacio' }),

@@ -14,7 +14,7 @@ import { FloatingCreateButton } from '@/components/navigation/FloatingCreateButt
 import { AppTabBar } from '@/components/navigation/AppTabBar/AppTabBar';
 import { CopySuccessToast } from '@/components/overlays/CopySuccessToast/CopySuccessToast';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
-import { ActivityScreen } from '@/features/activity/screens/ActivityScreen';
+import { ActivityTabContent } from '@/navigation/components/ActivityTabContent';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import {
   CategoryPickerModal,
@@ -70,6 +70,7 @@ import { isAwaitingPartnerSpace } from '@/features/spaces/types';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
 import { syncCoupleSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
+import { useActivitySectionsPreference } from '@/state/appPreferences/useActivitySectionsPreference';
 import { useHomeComparisonIndicatorsPreference } from '@/state/appPreferences/useHomeComparisonIndicatorsPreference';
 import { useHomeCurrencySelection } from '@/state/appPreferences/useHomeCurrencySelection';
 import { CreateTransactionModal } from '@/features/transactions/components/CreateTransactionModal/CreateTransactionModal';
@@ -163,6 +164,7 @@ export function MainTabsNavigator() {
     enabled: showHomeComparisonIndicators,
     setEnabled: setShowHomeComparisonIndicators,
   } = useHomeComparisonIndicatorsPreference();
+  const activitySections = useActivitySectionsPreference();
   const [activeMainTab, setActiveMainTab] = useState<
     'Home' | 'Activity' | 'Map'
   >('Home');
@@ -1129,20 +1131,17 @@ export function MainTabsNavigator() {
                   name="Activity"
                 >
                   {({ route }) => (
-                    <ActivityScreen
+                    <ActivityTabContent
                       categories={activeSpaceCategories}
                       currency={effectiveHomeCurrency}
                       focusResetKey={activityChartResetKey}
                       moneyAccounts={
                         moneyAccountsController.activeSpaceMoneyAccounts
                       }
-                      onCreateCategory={() => handleCreateAction('category')}
-                      onCreateExpense={() => handleCreateAction('expense')}
-                      onCreateIncome={() => handleCreateAction('income')}
+                      onCreateAction={handleCreateAction}
                       onCreateMoneyAccount={
                         moneyAccountsController.openCreation
                       }
-                      onCreateMovement={() => handleCreateAction('expense')}
                       onImport={() => setImportVisible(true)}
                       onOpenCategoryDetail={(categoryId, currency) =>
                         setDetailRequest({
@@ -1156,6 +1155,10 @@ export function MainTabsNavigator() {
                       onOpenTransactionDetail={setDetailTransactionId}
                       onScrollDirectionChange={handleScrollDirectionChange}
                       onSummaryPinnedChange={setActivitySummaryPinned}
+                      preference={activitySections.preference}
+                      savePreference={(preference) =>
+                        void activitySections.setPreference(preference)
+                      }
                       spaceCurrency={activeSpace.currency}
                       summaryPinned={isActivitySummaryPinned}
                       targetRequestId={route.params?.requestId}

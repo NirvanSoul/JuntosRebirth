@@ -1,5 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  type StyleProp,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
@@ -40,13 +46,14 @@ type CompactCategoryPreviewCardProps = BaseCategoryPreviewCardProps & {
 };
 
 type DetailedCategoryPreviewCardProps = BaseCategoryPreviewCardProps & {
-  variant?: 'row' | 'tile';
+  variant?: 'grid' | 'row' | 'tile';
   displayCurrency: CurrencyCode;
   spaceCurrency: CurrencyCode;
   budgetMinor?: number;
   incomeMinor: number;
   expenseMinor: number;
   budgetExpenseMinor: number;
+  style?: StyleProp<ViewStyle>;
 };
 
 export type CategoryPreviewCardProps =
@@ -104,7 +111,7 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
     );
   }
 
-  if (props.variant === 'tile') {
+  if (props.variant === 'grid' || props.variant === 'tile') {
     return (
       <CategoryTile
         accessibilityHint={props.accessibilityHint}
@@ -118,7 +125,9 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
         name={props.name}
         onPress={props.onPress}
         spaceCurrency={props.spaceCurrency}
+        style={props.style}
         testID={props.testID}
+        variant={props.variant}
       />
     );
   }

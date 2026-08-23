@@ -13,10 +13,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
 import { Screen } from '@/components/layout/Screen/Screen';
-import { Text } from '@/components/ui/Text/Text';
 import type { MoneyAccount } from '@/features/accounts/types';
 import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
 import { ActivityAccountsSection } from '@/features/activity/components/ActivityAccountsSection';
+import { ActivityCategoryDetail } from '@/features/activity/components/ActivityCategoryDetail';
 import {
   ActivityCollapsibleSection,
   getActivityLayoutTransition,
@@ -35,7 +35,6 @@ import {
   matchesTransactionDateFilter,
   type TransactionDateFilter,
 } from '@/features/activity/utils/transactionDateFilter';
-import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
 import {
@@ -66,6 +65,8 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ActivityScreenProps = {
   categories?: readonly Category[];
+  categoriesExpanded?: boolean;
+  categoryView?: 'grid' | 'list';
   moneyAccounts?: readonly MoneyAccount[];
   /** Moneda elegida en el encabezado global; nunca se mezclan importes aquí. */
   currency?: CurrencyCode;
@@ -74,12 +75,16 @@ type ActivityScreenProps = {
   /** Cambia al reenfocar la pantalla para reiniciar el donut de categorías. */
   focusResetKey?: number;
   onCreateCategory?: () => void;
+  onCategoriesExpandedChange?: (expanded: boolean) => void;
+  onCategoryViewChange?: (view: 'grid' | 'list') => void;
   onCreateExpense?: () => void;
   onCreateMoneyAccount?: () => void;
   onCreateIncome?: () => void;
   onCreateMovement?: () => void;
   onImport?: () => void;
   onOpenCategoryDetail?: (categoryId: string, currency?: CurrencyCode) => void;
+  onAccountsExpandedChange?: (expanded: boolean) => void;
+  accountsExpanded?: boolean;
   onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   onOpenTransactionDetail?: (transactionId: string) => void;
   onScrollDirectionChange?: (direction: 'down' | 'up') => void;
@@ -92,16 +97,22 @@ type ActivityScreenProps = {
 
 export function ActivityScreen({
   categories = [],
+  categoriesExpanded,
+  categoryView = 'list',
   currency = defaultCurrencyCode,
   focusResetKey,
   moneyAccounts = [],
   onCreateCategory,
+  onCategoriesExpandedChange,
+  onCategoryViewChange,
   onCreateExpense,
   onCreateIncome,
   onCreateMoneyAccount,
   onCreateMovement,
   onImport,
   onOpenCategoryDetail,
+  onAccountsExpandedChange,
+  accountsExpanded,
   onOpenMoneyAccountDetail,
   onOpenTransactionDetail,
   onScrollDirectionChange,
@@ -124,8 +135,12 @@ export function ActivityScreen({
   const summaryPulse = useSharedValue(1);
   const [movementsOffset, setMovementsOffset] = useState(0);
   const [accountsOffset, setAccountsOffset] = useState(0);
-  const [areCategoriesExpanded, setCategoriesExpanded] = useState(true);
-  const [areAccountsExpanded, setAccountsExpanded] = useState(true);
+  const [areCategoriesExpanded, setCategoriesExpanded] = useState(
+    categoriesExpanded ?? true,
+  );
+  const [areAccountsExpanded, setAccountsExpanded] = useState(
+    accountsExpanded ?? true,
+  );
   const [transactionFilter, setTransactionFilter] =
     useState<TransactionTypeFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>([]);
@@ -138,6 +153,30 @@ export function ActivityScreen({
   const [isFiltersModalVisible, setFiltersModalVisible] = useState(false);
   const [periodModalType, setPeriodModalType] =
     useState<TransactionPeriodModalType | null>(null);
+  useEffect(() => {
+    if (categoriesExpanded !== undefined) {
+      setCategoriesExpanded(categoriesExpanded);
+    }
+  }, [categoriesExpanded]);
+  useEffect(() => {
+    if (accountsExpanded !== undefined) {
+      setAccountsExpanded(accountsExpanded);
+    }
+  }, [accountsExpanded]);
+  const handleCategoriesToggle = () => {
+    setCategoriesExpanded((expanded) => {
+      const next = !expanded;
+      onCategoriesExpandedChange?.(next);
+      return next;
+    });
+  };
+  const handleAccountsToggle = () => {
+    setAccountsExpanded((expanded) => {
+      const next = !expanded;
+      onAccountsExpandedChange?.(next);
+      return next;
+    });
+  };
   const transactionsThroughCurrentMonth = useMemo(
     () => listTransactionsThroughCurrentMonth(transactions),
     [transactions],
@@ -348,7 +387,7 @@ export function ActivityScreen({
       >
         <ActivityCollapsibleSection
           expanded={areCategoriesExpanded}
-          onToggle={() => setCategoriesExpanded((expanded) => !expanded)}
+          onToggle={handleCategoriesToggle}
           testID="categories-section"
           title="Categorías"
         >
@@ -361,63 +400,16 @@ export function ActivityScreen({
             resetKey={focusResetKey}
             transactions={currencyTransactionsThroughCurrentMonth}
           />
-          <Animated.View
-            layout={getActivityLayoutTransition()}
-            testID="activity-category-detail"
-          >
-            <Text
-              accessibilityRole="header"
-              style={styles.categoryDetailTitle}
-              variant="label"
-            >
-              Detalle por categoría
-            </Text>
-            {categorySummaries.length > 0 ? (
-              <View
-                style={styles.categoryGroupShadow}
-                testID="activity-category-preview-group"
-              >
-                <View
-                  style={styles.categoryGroup}
-                  testID="activity-category-preview-list"
-                >
-                  {categorySummaries.map(({ id, ...category }, index) => (
-                    <View key={id}>
-                      <CategoryPreviewCard
-                        {...category}
-                        budgetExpenseMinor={
-                          budgetExpenseByCategoryId.get(id) ?? 0
-                        }
-                        displayCurrency={effectiveCurrency}
-                        onPress={() =>
-                          onOpenCategoryDetail?.(id, effectiveCurrency)
-                        }
-                        spaceCurrency={spaceCurrency}
-                      />
-                      {index < categorySummaries.length - 1 ? (
-                        <View
-                          accessibilityElementsHidden
-                          importantForAccessibility="no"
-                          style={styles.categorySeparator}
-                          testID="activity-category-separator"
-                        />
-                      ) : null}
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : (
-              <EmptyState
-                accessibilityLabel="Crear primera categoría"
-                description="Crea una categoría para organizar tus movimientos."
-                icon="pie-chart-outline"
-                iconBackgroundColor={colors.categoryAction}
-                onPress={onCreateCategory}
-                testID="activity-empty-categories"
-                title="Aún no hay categorías"
-              />
-            )}
-          </Animated.View>
+          <ActivityCategoryDetail
+            budgetExpenseByCategoryId={budgetExpenseByCategoryId}
+            categories={categorySummaries}
+            categoryView={categoryView}
+            currency={effectiveCurrency}
+            onCreateCategory={onCreateCategory}
+            onOpenCategoryDetail={onOpenCategoryDetail}
+            onCategoryViewChange={onCategoryViewChange}
+            spaceCurrency={spaceCurrency}
+          />
         </ActivityCollapsibleSection>
 
         <Animated.View
@@ -434,7 +426,7 @@ export function ActivityScreen({
             expanded={areAccountsExpanded}
             onCreateMoneyAccount={onCreateMoneyAccount}
             onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
-            onToggle={() => setAccountsExpanded((expanded) => !expanded)}
+            onToggle={handleAccountsToggle}
             resetKey={focusResetKey}
             transactions={currencyTransactionsThroughCurrentMonth}
           />

@@ -413,6 +413,14 @@ Nombre de trabajo para agrupar:
 - Cuentas.
 - Detalle de cuenta.
 
+Las secciones `Categorías` y `Cuentas` se muestran plegadas la primera vez
+que se abre Actividad. La aplicación recuerda en el dispositivo el último
+estado elegido para cada una. Dentro de Categorías, junto a `Detalle por
+categoría`, un botón alterna entre el listado continuo y una cuadrícula de tres
+columnas formada por las mismas tarjetas de vista previa de Inicio, con borde
+gris sutil; la aplicación también recuerda la última vista elegida. El icono
+siempre indica la vista a la que se cambiará.
+
 Debajo del título `Movimientos`, Actividad muestra un resumen compacto de
 ingresos, gastos y balance. Las tres cifras se calculan sobre el mismo conjunto
 de movimientos que presenta el listado y se actualizan al combinar o limpiar

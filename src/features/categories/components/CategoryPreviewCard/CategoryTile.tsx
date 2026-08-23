@@ -1,4 +1,10 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  type StyleProp,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { Text } from '@/components/ui/Text/Text';
@@ -18,6 +24,7 @@ import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const tileScale = 0.9;
+const gridTileRadius = radii.lg * tileScale + 1;
 const tileWidth = 132 * tileScale;
 const tileMinHeight = 164 * tileScale;
 const tileIconSize = 60 * tileScale;
@@ -39,7 +46,9 @@ export type CategoryTileProps = {
   expenseMinor: number;
   budgetExpenseMinor: number;
   onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
   testID?: string;
+  variant?: 'grid' | 'tile';
 };
 
 export function CategoryTile({
@@ -53,7 +62,9 @@ export function CategoryTile({
   expenseMinor,
   budgetExpenseMinor,
   onPress,
+  style,
   testID = 'category-preview-card',
+  variant = 'tile',
 }: CategoryTileProps) {
   const { colors, shadows } = useTheme();
   const themedStyles = useThemedStyles((palette) =>
@@ -80,6 +91,8 @@ export function CategoryTile({
       onPress={onPress}
       style={({ pressed }) => [
         themedStyles.tile,
+        variant === 'grid' ? themedStyles.gridTile : null,
+        style,
         pressed && styles.cardPressed,
       ]}
       testID={testID}
@@ -160,6 +173,12 @@ function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: radii.lg * tileScale,
       backgroundColor: colors.surface,
       overflow: 'visible',
+    },
+    gridTile: {
+      borderColor: colors.border,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: gridTileRadius,
+      width: '31.5%',
     },
   });
 }
