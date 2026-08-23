@@ -27,7 +27,7 @@ Pantalla 2 → País y moneda principal
 Pantalla 3 → Promesa principal
 Pantalla 4 → Diferenciador visual
 Pantalla 5 → Uso personal y compartido
-Pantalla 6 → Crear la primera categoría
+Pantalla 6 → Crear al menos tres categorías
 Pantalla 7 → Añadir el primer ingreso
 Pantalla 8 → Añadir el primer gasto
 Pantalla 9 → Cierre: listo para explorar
@@ -247,11 +247,11 @@ Cambia de espacio cuando quieras y consulta únicamente la información correspo
 
 ---
 
-# 6.1 Pantalla 6 — Crear la primera categoría
+# 6.1 Pantalla 6 — Crear las primeras categorías
 
 ## Objetivo
 
-Cerrar el onboarding con una acción real dentro de la aplicación, no solo con un mensaje: el usuario crea su primera categoría antes de llegar a la pantalla de acceso.
+Cerrar el onboarding con una acción real dentro de la aplicación, no solo con un mensaje: el usuario crea al menos tres categorías antes de llegar a la pantalla de acceso, para que Inicio no se perciba vacío en su primera llegada.
 
 ## Concepto visual
 
@@ -279,7 +279,7 @@ Las categorías te ayudan a organizar tus gastos e ingresos, para entender mejor
 
 No dice «Continuar». Dice **Crear categoría** y, al tocarlo, abre el mismo selector de categorías sugeridas que el resto de la aplicación (`CategoryPickerModal`, catálogo de 18 plantillas): el usuario elige una o varias y las guarda, o —si ninguna le sirve— toca «Crear otra categoría» para abrir el mismo formulario de categoría personalizada del resto de la app (`CreateCategoryModal`). Ambos modales son literalmente los mismos componentes que usa la aplicación ya autenticada, no una versión simplificada para onboarding.
 
-Crear al menos una categoría (de plantilla o personalizada) completa este paso y continúa el flujo hacia la Pantalla 7 (añadir el primer ingreso).
+El usuario debe crear al menos tres categorías, de plantilla o personalizadas. Puede seleccionarlas y guardarlas juntas o añadirlas en varias tandas; la pantalla indica cuántas faltan. Solo al alcanzar ese mínimo se completa el paso y continúa el flujo hacia la Pantalla 7 (añadir el primer ingreso).
 
 ---
 
@@ -287,7 +287,7 @@ Crear al menos una categoría (de plantilla o personalizada) completa este paso 
 
 ## Objetivo
 
-Continuar la acción real iniciada en la Pantalla 6: con al menos una categoría ya creada, registrar el primer movimiento del espacio.
+Continuar la acción real iniciada en la Pantalla 6: con al menos tres categorías ya creadas, registrar el primer movimiento del espacio.
 
 ## Concepto visual
 
@@ -332,7 +332,7 @@ Registrando tus gastos tendrás un mejor panorama de tus finanzas.
 
 ## Objetivo
 
-Cerrar el onboarding con un mensaje breve una vez que el usuario ya tiene categoría, ingreso y gasto reales en su espacio.
+Cerrar el onboarding con un mensaje breve una vez que el usuario ya tiene al menos tres categorías, un ingreso y un gasto reales en su espacio.
 
 ## Concepto visual
 
@@ -375,7 +375,7 @@ Pantallas 1 a 5:
 
 Pantallas 6 a 8, cada una con una acción real que reemplaza a `Continuar` y que también avanza el flujo al completarse:
 
-- Pantalla 6: **Crear categoría**.
+- Pantalla 6: **Crear categoría**, hasta completar al menos tres.
 - Pantalla 7: **Añadir ingreso**.
 - Pantalla 8: **Añadir gasto**.
 
@@ -386,7 +386,7 @@ Pantalla 9 (última, cierra el onboarding):
 Recomendación final:
 
 - `Continuar` en las pantallas 1 a 5.
-- La acción real correspondiente (`Crear categoría` / `Añadir ingreso` / `Añadir gasto`) en las pantallas 6 a 8.
+- La acción real correspondiente (`Crear categoría` hasta completar al menos tres / `Añadir ingreso` / `Añadir gasto`) en las pantallas 6 a 8.
 - `Empezar` en la 9.
 
 ---
@@ -991,7 +991,7 @@ Microtexto:
 # 24. Checklist para agentes
 
 - [ ] Leer este documento.
-- [ ] Mantener las nueve pantallas actuales en este orden: nombre, país y moneda, bienvenida, calendario, uso compartido, primera categoría, primer ingreso, primer gasto, cierre.
+- [ ] Mantener las nueve pantallas actuales en este orden: nombre, país y moneda, bienvenida, calendario, uso compartido, al menos tres categorías, primer ingreso, primer gasto, cierre.
 - [ ] Mantener una sola idea principal por pantalla.
 - [ ] No pedir registro antes de presentar valor.
 - [ ] Mantener visible la opción de probar sin cuenta.

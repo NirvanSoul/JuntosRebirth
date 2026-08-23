@@ -38,22 +38,27 @@ jest.mock('@/features/categories/repositories/localCategoryRepository', () => ({
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 const navigation = mockNavigation as never;
 const route = {} as never;
+let nextCreatedCategoryId = 0;
 
 describe('CreateFirstCategoryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    nextCreatedCategoryId = 0;
     mockGetLocalProfile.mockResolvedValue({
       avatarUri: null,
       displayName: 'Ana María',
     });
     mockListLocalCategories.mockResolvedValue([]);
     mockCreateLocalCategories.mockImplementation(
-      async (inputs: Record<string, unknown>[]) =>
-        inputs.map((input, index) => ({
+      async (inputs: Record<string, unknown>[]) => {
+        const created = inputs.map((input, index) => ({
           ...input,
-          id: `category-${index}`,
+          id: `category-${nextCreatedCategoryId + index}`,
           isArchived: false,
-        })),
+        }));
+        nextCreatedCategoryId += inputs.length;
+        return created;
+      },
     );
   });
 
@@ -92,7 +97,36 @@ describe('CreateFirstCategoryScreen', () => {
     expect(screen.getByLabelText('Salario')).toBeTruthy();
   });
 
-  it('al guardar plantillas elegidas, las crea y continúa hacia el primer ingreso', async () => {
+  it('pide tres categorías y continúa al guardar tres plantillas', async () => {
+    const screen = await renderWithTheme(
+      <CreateFirstCategoryScreen navigation={navigation} route={route} />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Te faltan 3 categorías para continuar.'),
+      ).toBeTruthy();
+    });
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByLabelText('Salario'));
+    await fireEvent.press(screen.getByLabelText('Supermercado'));
+    await fireEvent.press(screen.getByLabelText('Vivienda'));
+    await fireEvent.press(screen.getByLabelText('Guardar categorías'));
+
+    await waitFor(() => {
+      expect(mockCreateLocalCategories).toHaveBeenCalledWith([
+        expect.objectContaining({ spaceId: 'personal', name: 'Salario' }),
+        expect.objectContaining({ spaceId: 'personal', name: 'Supermercado' }),
+        expect.objectContaining({ spaceId: 'personal', name: 'Vivienda' }),
+      ]);
+    });
+    await waitFor(() => {
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('AddFirstIncome');
+    });
+  });
+
+  it('acumula las categorías creadas antes de avanzar', async () => {
     const screen = await renderWithTheme(
       <CreateFirstCategoryScreen navigation={navigation} route={route} />,
     );
@@ -103,16 +137,24 @@ describe('CreateFirstCategoryScreen', () => {
     await fireEvent.press(screen.getByLabelText('Guardar categorías'));
 
     await waitFor(() => {
-      expect(mockCreateLocalCategories).toHaveBeenCalledWith([
-        expect.objectContaining({ spaceId: 'personal', name: 'Salario' }),
-      ]);
+      expect(
+        screen.getByText('Te faltan 2 categorías para continuar.'),
+      ).toBeTruthy();
     });
+    expect(mockNavigation.navigate).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByLabelText('Supermercado'));
+    await fireEvent.press(screen.getByLabelText('Vivienda'));
+    await fireEvent.press(screen.getByLabelText('Guardar categorías'));
+
     await waitFor(() => {
       expect(mockNavigation.navigate).toHaveBeenCalledWith('AddFirstIncome');
     });
   });
 
-  it('si ninguna sugerencia sirve, abre el formulario de categoría personalizada', async () => {
+  it('cuenta una categoría personalizada para completar el mínimo', async () => {
     mockCreateLocalCategory.mockImplementation(
       async (input: Record<string, unknown>) => ({
         ...input,
@@ -120,10 +162,37 @@ describe('CreateFirstCategoryScreen', () => {
         isArchived: false,
       }),
     );
+    mockListLocalCategories.mockResolvedValue([
+      {
+        id: 'category-salary',
+        spaceId: 'personal',
+        name: 'Salario',
+        icon: 'money',
+        colorToken: 'green',
+        isDefault: true,
+        templateKey: 'salary',
+        isArchived: false,
+      },
+      {
+        id: 'category-groceries',
+        spaceId: 'personal',
+        name: 'Supermercado',
+        icon: 'shopping-cart',
+        colorToken: 'orange',
+        isDefault: true,
+        templateKey: 'groceries',
+        isArchived: false,
+      },
+    ]);
     const screen = await renderWithTheme(
       <CreateFirstCategoryScreen navigation={navigation} route={route} />,
     );
 
+    await waitFor(() => {
+      expect(
+        screen.getByText('Te falta 1 categoría para continuar.'),
+      ).toBeTruthy();
+    });
     await fireEvent.press(screen.getByTestId('floating-create-button'));
     await fireEvent.press(screen.getByLabelText('Crear categoría'));
     await fireEvent.press(screen.getByLabelText('Crear otra categoría'));

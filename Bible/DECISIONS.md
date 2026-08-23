@@ -301,7 +301,7 @@ nombre): se añaden cuatro pantallas al final del flujo, antes de la de
 acceso, que hacen que el invitado termine el onboarding con datos reales en
 su espacio personal local, no solo con mensajes:
 
-- **6 — Crear la primera categoría.** Reutiliza sin modificar
+- **6 — Crear al menos tres categorías.** Reutiliza sin modificar
   `CategoryPickerModal` (catálogo de 18 plantillas) y `CreateCategoryModal`
   (categoría personalizada), los mismos componentes que usa la app ya
   autenticada, contra el espacio local `personal` del invitado (`useSpaces()`,
@@ -319,8 +319,8 @@ su espacio personal local, no solo con mensajes:
 - **9 — Cierre.** Solo mensaje («Creces tan rápido…»). Botón `Empezar`,
   el que de verdad completa el onboarding.
 
-Cada lámina de acción real avanza el flujo al completar su acción (crear la
-categoría, guardar el movimiento), no mediante un botón `Continuar`
+Cada lámina de acción real avanza el flujo al completar su acción (crear al
+menos tres categorías, guardar el movimiento), no mediante un botón `Continuar`
 independiente. Ver `Bible/JUNTOSS_ONBOARDING_GUIDE.md` §6.1–§6.4 para el copy
 exacto y el detalle de cada componente.
 

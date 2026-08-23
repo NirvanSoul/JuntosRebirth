@@ -208,7 +208,7 @@ Objetivo financiero individual o compartido. Su implementación completa no form
 
 ### Objetivo
 
-Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y completar el flujo con nombre, país, primera categoría, primer ingreso, primer gasto y cierre.
+Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y completar el flujo con nombre, país, al menos tres categorías, primer ingreso, primer gasto y cierre.
 
 ### Flujo propuesto
 
@@ -217,7 +217,7 @@ Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y c
 3. Bienvenida: simplicidad y control diario.
 4. Calendario y mapa financiero.
 5. Uso personal y compartido.
-6. Creación de la primera categoría.
+6. Creación de al menos tres categorías.
 7. Primer ingreso.
 8. Primer gasto.
 9. Cierre y listo para explorar.

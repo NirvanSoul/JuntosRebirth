@@ -31,6 +31,27 @@ type Props = NativeStackScreenProps<
 >;
 
 const categoryIllustrationAspectRatio = 1268 / 1208;
+const minimumOnboardingCategories = 3;
+
+function categoryRequirementMessage(remainingCategories: number): string {
+  if (remainingCategories === 1) {
+    return 'Te falta 1 categoría para continuar.';
+  }
+
+  return `Te faltan ${remainingCategories} categorías para continuar.`;
+}
+
+function appendMissingCategories(
+  current: readonly Category[],
+  incoming: readonly Category[],
+): readonly Category[] {
+  const currentIds = new Set(current.map((category) => category.id));
+
+  return [
+    ...current,
+    ...incoming.filter((category) => !currentIds.has(category.id)),
+  ];
+}
 
 /** Si el usuario escribió nombre y apellido (o varios nombres), solo se usa el primero. */
 function firstNameFrom(displayName: string | null): string {
@@ -66,13 +87,15 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
     let isMounted = true;
     void listLocalCategories().then((all) => {
       if (!isMounted) return;
-      setCategories((current) => [
-        ...current,
-        ...all.filter(
-          (category) =>
-            category.spaceId === activeSpace.id && !category.isArchived,
+      setCategories((current) =>
+        appendMissingCategories(
+          current,
+          all.filter(
+            (category) =>
+              category.spaceId === activeSpace.id && !category.isArchived,
+          ),
         ),
-      ]);
+      );
     });
     return () => {
       isMounted = false;
@@ -80,11 +103,20 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
   }, [activeSpace.id]);
 
   const finishWithCategories = (created: readonly Category[]) => {
-    setCategories((current) => [...current, ...created]);
+    const nextCategories = appendMissingCategories(categories, created);
+    setCategories(nextCategories);
     setCustomVisible(false);
     setPickerVisible(false);
-    navigation.navigate('AddFirstIncome');
+
+    if (nextCategories.length >= minimumOnboardingCategories) {
+      navigation.navigate('AddFirstIncome');
+    }
   };
+
+  const remainingCategories = Math.max(
+    0,
+    minimumOnboardingCategories - categories.length,
+  );
 
   const handleCreateTemplates = async (
     definitions: readonly DefaultCategoryDefinition[],
@@ -138,7 +170,7 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
         currentStep={6}
         illustrationAspectRatio={categoryIllustrationAspectRatio}
         illustrationSource={require('../../../../assets/Onboarding/6 Crea tu categoria.png')}
-        subtitle="Las categorías te ayudan a organizar tus gastos e ingresos, para entender mejor en qué usas tu dinero."
+        subtitle="Crea al menos 3 categorías para organizar tus gastos e ingresos y entender mejor en qué usas tu dinero."
         testID="onboarding-create-category"
         title={
           firstName
@@ -146,6 +178,17 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
             : 'Empecemos\nCrea tus primeras categorías'
         }
       >
+        {remainingCategories > 0 ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            align="center"
+            testID="onboarding-category-requirement"
+            tone="secondary"
+            variant="footnote"
+          >
+            {categoryRequirementMessage(remainingCategories)}
+          </Text>
+        ) : null}
         {error ? (
           <Text align="center" tone="expense" variant="footnote">
             {error}

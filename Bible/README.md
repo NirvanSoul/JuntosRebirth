@@ -160,7 +160,7 @@ El cliente no es la autoridad final de permisos.
 Flujo previsto:
 
 1. El usuario abre la aplicación.
-2. Completa un onboarding de nueve pantallas (nombre, país y moneda, bienvenida, calendario, uso compartido, primera categoría, primer ingreso, primer gasto y cierre).
+2. Completa un onboarding de nueve pantallas (nombre, país y moneda, bienvenida, calendario, uso compartido, tres categorías, primer ingreso, primer gasto y cierre).
 3. Entra como invitado.
 4. Sus datos se almacenan localmente.
 5. Prueba las funciones principales con límites razonables.
