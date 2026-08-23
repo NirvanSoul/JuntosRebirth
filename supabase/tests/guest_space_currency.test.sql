@@ -100,7 +100,7 @@ begin
     '[]'::jsonb
   );
 
-  -- Caso 3: Inserción de un espacio en EUR que luego se actualizará a VES
+  -- Caso 3: Inserción de un espacio en EUR que será objetivo de un intento de mutación a VES
   res := public.migrate_guest_data(
     batch_3,
     'install-test-1',
@@ -112,7 +112,7 @@ begin
     '[]'::jsonb
   );
 
-  -- Caso 4: Actualización explícita de EUR a VES
+  -- Caso 4: Intento de mutación explícita de EUR a VES vía RPC: currency debe permanecer EUR
   res := public.migrate_guest_data(
     batch_4,
     'install-test-1',
@@ -194,13 +194,13 @@ select is(
   'legacy space migrated without currency falls back to EUR'
 );
 
--- Actualización explícita de EUR a VES
+-- Intento de mutación explícita de EUR a VES vía RPC: ignorado (currency inmutable)
 select is(
   (select s.currency from public.spaces s
     join public.space_local_sources sls on sls.space_id = s.id
    where sls.local_id = 'sp-eur-to-ves' and sls.installation_id = 'install-test-1'),
-  'VES',
-  'explicit update of space currency from EUR to VES succeeds'
+  'EUR',
+  'explicit currency mutation attempt via migrate_guest_data is ignored (insert-only)'
 );
 
 select is(

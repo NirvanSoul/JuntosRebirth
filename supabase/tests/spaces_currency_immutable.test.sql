@@ -1,6 +1,6 @@
 begin;
 set local role postgres;
-select plan(9);
+select plan(12);
 
 -- 1. Existencia del trigger y la función
 select ok(
@@ -144,6 +144,53 @@ select is(
   (select name from public.spaces where id = '55555555-5555-4555-8555-555555555555'),
   'Espacio Renombrado',
   'space name remains unchanged after foreign update attempt'
+);
+
+-- 8. El RPC migrate_guest_data tampoco puede mutar currency (bypass por
+--    SECURITY DEFINER cerrado en la migración 26, insert-only).
+insert into public.space_local_sources(space_id, user_id, installation_id, local_id)
+values ('55555555-5555-4555-8555-555555555555',
+        '44444444-4444-4444-8444-444444444444',
+        'install-immutable-1', 'sp-immutable-1');
+
+select set_config('request.jwt.claim.sub',
+  '44444444-4444-4444-8444-444444444444', true);
+
+do $$
+declare
+  err_msg text := 'no error';
+begin
+  perform public.migrate_guest_data(
+    '77777777-7777-4777-8777-777777777777'::uuid,
+    'install-immutable-1',
+    jsonb_build_array(
+      jsonb_build_object('id', 'sp-immutable-1', 'name', 'Intento de Mutacion', 'type', 'other', 'currency', 'JPY')
+    ),
+    '[]'::jsonb,
+    '[]'::jsonb,
+    '[]'::jsonb
+  );
+exception when others then
+  err_msg := sqlerrm;
+  perform set_config('test.migration_err', err_msg, true);
+end;
+$$;
+
+select ok(
+  coalesce(current_setting('test.migration_err', true), 'no error') = 'no error',
+  'migrate_guest_data executes without errors during bypass attempt'
+);
+
+select is(
+  (select name from public.spaces where id = '55555555-5555-4555-8555-555555555555'),
+  'Intento de Mutacion',
+  'migrate_guest_data still updates the space name'
+);
+
+select is(
+  (select currency from public.spaces where id = '55555555-5555-4555-8555-555555555555'),
+  'EUR',
+  'migrate_guest_data cannot mutate existing space currency (insert-only)'
 );
 
 select * from finish();
