@@ -76,7 +76,7 @@ funcionales deben resolverse sus otros prerrequisitos:
 - Resolver explícitamente la contradicción de `category_budgets` y decidir, con
   inventario real, si hace falta reparar el backfill histórico que asumió EUR.
 - Crear migraciones propias desde el siguiente número libre en nuestro
-  repositorio; los números 24-34 de la rama externa no están reservados ni se
+  repositorio; los números 24-35 de la rama externa no están reservados ni se
   copian.
 
 #### Fase 4a — Autoría compartida
@@ -161,6 +161,21 @@ funcionales deben resolverse sus otros prerrequisitos:
   componentes externos. Cada una requiere smoke en iPhone y Honor y debe
   respetar accesibilidad, movimiento reducido y los contratos monetarios.
 - Hacer smoke visual y nativo en iOS y Android.
+
+La reauditoría incremental de §9.6 añade candidatos, no implementaciones. Su
+orden interno obligatorio es:
+
+1. Unificar primero la semántica de modo, mes y periodo de Actividad.
+2. Después incorporar preferencias de vista, plegado y animaciones, con
+   movimiento reducido y sin parpadeo durante la carga asíncrona.
+3. Consolidar primitivas (`SegmentedControl`, selector de apariencia, métricas,
+   flechas e iconos) sin sustituir la paleta ni perder contraste.
+4. Rediseñar el modal de movimientos sobre la API monetaria de ADR-080.
+5. Tratar la edición rápida de categoría, cuenta, fecha y recurrencia como una
+   entrega conductual separada, con regresiones de series y sincronización.
+6. Evaluar encabezado global, scroll al inicio, onboarding y ciclo de vida de
+   espacios como decisiones de producto independientes; no esconderlas dentro
+   de un paquete visual.
 
 #### Fase 4e — Copias entre espacios
 
@@ -711,8 +726,10 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
 
 El 2026-08-23 se inspeccionó mediante la API pública de GitHub, **sin ejecutar
 `git fetch`, `pull`, `merge`, `cherry-pick` ni copiar archivos**, el trabajo que
-Alphonzo añadió a la rama `feat/ajustes-cuentas-actividad`, cuyo extremo
-observado es `1b40900`, desde la base común local `c039ae8`.
+Alphonzo añadió inicialmente a la rama `feat/ajustes-cuentas-actividad`, cuyo
+extremo observado era `1b40900`, desde la base común local `c039ae8`. La
+reauditoría del mismo día siguió el trabajo posterior en el PR externo #1,
+rama `release/version-actual-app`, hasta `34449b6` (§9.6).
 
 - Se observaron 18 commits de desarrollo y aproximadamente 170 archivos
   modificados bajo `src`, con más de 10.000 líneas añadidas. El tamaño no es
@@ -852,7 +869,7 @@ monedas.
 ### 9.5 Resultado operativo de la auditoría
 
 La auditoría no adopta migraciones externas ni cambia el estado de staging.
-Las migraciones observadas (incluidas las numeradas 24–34 en esa rama) entran
+Las migraciones observadas (incluidas las numeradas 24–35 en esa rama) entran
 en conflicto con la secuencia y los contratos locales; cualquier persistencia
 futura usará el siguiente número libre de este repositorio y pruebas propias.
 El resultado accionable queda distribuido en Fase 4a–4g: autoría, perfiles y
@@ -860,3 +877,62 @@ monedas de miembros, cuentas, superficie visual y copias entre espacios. La
 ausencia de un problema también es un resultado válido: si una propuesta no
 reproduce un requisito o no supera una prueba, se registra y no se implementa
 para aparentar avance.
+
+### 9.6 Reauditoría incremental del PR externo #1
+
+El extremo observado de `release/version-actual-app` fue `34449b6`. El PR
+mostraba 36 commits totales; frente al extremo ya auditado `1b40900`, el delta
+era de 18 commits, 100 archivos y 5.987 líneas añadidas / 2.076 eliminadas. Por
+alcance, **no es una tanda meramente estética**. GitHub indicaba que el commit
+de cabecera no tenía checks asociados; los mensajes de commits que declaran
+validaciones locales no constituyen evidencia local ni de CI.
+
+| Grupo incremental | Commits observados | Qué aporta o cambia | Disposición local |
+|---|---|---|---|
+| Reparación de esquema local externo | `8c2f82a` | Autorrepara una instalación que llegó a la versión 20 sin tablas o columnas de cuentas, mediante una versión local 25. | No portar. Es evidencia de que el esquema externo de cuentas fue inestable; nuestra Fase 4c parte de migraciones propias y pruebas sobre datos previos. |
+| Tipografía de saldos y métricas | `bbc9570`, `bdd97bf` | Agranda importes de detalle y centra el saldo de cuenta. | Candidato de 4d, después de existir cuentas; probar overflow, escalado de fuente y lectores de pantalla. |
+| Analítica por cuenta | `3ad344e` | Extrae un donut genérico y reparte ingresos/gastos por cuenta, mes, modo y moneda. | Candidato de 4c/4d. No mezclar divisas ni ocultar movimientos sin cuenta; primero corregir la semántica divergente de Actividad. |
+| Edición rápida de movimientos | `88db10e` | Edita categoría, cuenta, fecha y recurrencia desde el detalle y extrae lógica compartida. | Adoptar la necesidad, no el código. Entrega conductual propia con pruebas rojas de series, ocurrencias proyectadas, autoría, errores, notificaciones y sincronización. |
+| Selector visual compartido | `0d99a3b`, `b9c8c46` | Generaliza el selector de apariencia y amplía/ordena catálogos de iconos de categorías y cuentas. | Candidato de 4d. Mantener estable la paleta existente; decidir si cuentas usan un catálogo enfocado o expresivo y auditar contraste. |
+| Aislamiento de una copia del repositorio | `2cf2a8b` | Excluye una copia completa `JuntosRebirth-fase3/` de Git, TypeScript, ESLint, Prettier y Jest. | Rechazado: no aporta producto y puede ocultar artefactos. Este repositorio conserva sus guardas vigentes. |
+| Texto e iconos siempre blancos | `3b2c2c4` | Fuerza blanco sobre todos los colores aunque el propio cambio reconoce fallos WCAG. | Rechazado. Se conserva contraste calculado; ninguna preferencia estética justifica texto ilegible. |
+| Controles del modal | `0762325`, `cf340fa` | Mueve la moneda junto al título y corrige la rotación visual de flechas. | Candidatos de 4d, reimplementados sobre ADR-080, con ISO accesible y sin reiniciar el borrador al cambiar el catálogo. |
+| Navegación global | `6274eed` | Restaura el encabezado en Inicio/Actividad y hace scroll al inicio al reseleccionar una pestaña. | Candidato de 4d con pruebas de navegación tipada y smoke físico en ambas plataformas. |
+| Preferencias y animación de Actividad | `eb8e00f`, `6ff071d`, `3c6a89f` | Recuerda vista lista/cuadrícula y plegado; añade y luego secuencia la transición. | Candidato posterior a corregir modo/mes/periodo. Definir carga, error, toque rápido y movimiento reducido antes de animar. |
+| Tres categorías en onboarding | `3166836` | Sube de una a tres las categorías obligatorias para terminar el onboarding. | No aceptado por defecto. Es fricción de producto, no estética; requiere ficha/experimento con finalización, tiempo y salida segura. |
+| SVG exportados | `7e8d197` y activos de `34449b6` | Añade iconos de calendario, recurrencia, billetera y retroceso. | Referencia visual solamente. No copiar activos sin procedencia/licencia; preferir el sistema de iconos vigente. |
+| Flujo de cuentas y modal | `34449b6` | Separa creación/edición de cuenta, rediseña el teclado y agrega automáticamente una moneda a la cuenta al asignar un movimiento incompatible. | Aceptar la separación de pasos como candidato; **no** mutar saldos o divisas en silencio. Aplicar el contrato local: bloquear, confirmar conversión o crear/seleccionar balance compatible de forma explícita. |
+| Salida de espacios | `34449b6`, migración externa 35 | Sustituye disolución por salida individual y permite reactivar membresía; al salir el último miembro elimina el espacio y sus datos financieros. | Separar dos decisiones: salida individual/reingreso es candidata de Fase 4; el borrado duro del último miembro queda rechazado mientras no existan retención, exportación, reversibilidad y consentimiento explícitos. |
+| Scripts de iOS | `34449b6` | Cambia el comando iOS a túnel y añade simulador. | No es requisito de producto. Evaluar solo si resuelve una necesidad reproducible del entorno local. |
+
+Los números ADR que aparecen en esa rama no tienen autoridad ni se trasplantan:
+el siguiente ADR se asigna según la secuencia de este repositorio.
+
+### 9.7 Macrobloques de ejecución derivados
+
+Para avanzar en bloques mayores sin mezclar riesgos incompatibles, las ideas
+aceptadas o condicionadas se incorporan así:
+
+1. **Identidad y convivencia compartida (4a-4b):** autoría textual, censo de
+   miembros, avatar privado y contrato de salida/reingreso. El borrado terminal
+   queda fuera hasta una decisión de retención y exportación.
+2. **Núcleo de cuentas (4c, datos):** ficha y ADR, modelo local, SQL/RLS,
+   sincronización e invitado. Cierra con cuentas correctas sin depender todavía
+   del rediseño visual.
+3. **Cuentas en el producto (4c-4d, consumo):** asignación explícita y segura,
+   creación/edición por pasos, detalle, balances y analítica por cuenta, siempre
+   aislados por moneda.
+4. **Actividad y navegación (4d):** contrato único de modo/mes/periodo,
+   encabezado global, scroll al inicio, preferencias lista/cuadrícula, plegado y
+   animación accesible. La semántica se cierra antes que la persistencia visual.
+5. **Movimiento y edición avanzada (4d):** primitivas visuales, modal compatible
+   con ADR-080 y, como subentrega conductual, editores rápidos con recurrencia y
+   sincronización probadas.
+6. **Sistema visual y onboarding (4d):** selector de apariencia, catálogo de
+   iconos, métricas y pulido responsive; el requisito de tres categorías solo
+   entra si una ficha de producto lo aprueba.
+
+Cada macrobloque puede abarcar varios commits, pero mantiene una única ficha,
+un contrato verificable y Gate 1 verde. Persistencia, autenticación o ciclo de
+vida siguen siendo tareas grandes con dos verificadores, aunque formen parte de
+un bloque funcional mayor.

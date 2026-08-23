@@ -59,9 +59,10 @@ Los espacios de pareja pueden entrar después de consolidar el flujo personal y 
 
 ### Alcance adicional obligatorio del MVP final
 
-La auditoría de la rama externa `feat/ajustes-cuentas-actividad` (extremo
-observado `1b40900`, 2026-08-23) identificó capacidades que sí pertenecen al
-producto final, aunque su código no se adopta:
+La auditoría de la rama externa `feat/ajustes-cuentas-actividad` y su
+continuación en el PR #1, `release/version-actual-app` (extremo observado
+`34449b6`, 2026-08-23), identificó capacidades que sí pertenecen al producto
+final, aunque su código no se adopta:
 
 - Autoría visible de movimientos y perfiles de miembros con avatar privado.
 - Catálogo de monedas que incluya preferencias de miembros sin romper la
@@ -71,11 +72,21 @@ producto final, aunque su código no se adopta:
 - Copias seguras de categorías y movimientos entre espacios.
 - Consolidación visual de Inicio, Actividad, onboarding, modales, iconografía,
   secciones plegables, resumen sticky y acciones rápidas.
+- Analítica por cuenta, edición rápida de movimientos, preferencias de vista de
+  Actividad, encabezado global y scroll al inicio, sujetos a los contratos de
+  moneda, recurrencia, accesibilidad y movimiento reducido.
+- Salida individual y reingreso a espacios como necesidad por diseñar. No se
+  acepta el borrado duro de los datos cuando sale el último miembro.
 
 Estas capacidades se implementan en las entregas 4a–4g de `PLAN.md`. La rama
 externa es evidencia de necesidades y riesgos, no una fuente de código,
 migraciones ni pruebas. Cada entrega conserva el Gate 1, los verificadores y
 los smokes de iPhone y Honor que correspondan.
+
+La ejecución se agrupa en seis macrobloques: identidad compartida; núcleo de
+cuentas; cuentas en el producto; Actividad y navegación; movimiento y edición
+avanzada; y sistema visual/onboarding. `PLAN.md` §9.7 fija sus dependencias y
+separa las decisiones condicionadas de las ya aceptadas.
 
 ---
 

@@ -5339,7 +5339,7 @@ presupuestos ambiguos entre espacios.
 
 - Las capacidades se dividen en Fase 4a–4g de `PLAN.md`; las cuentas son una
   tarea grande con modelo, SQL/RLS, sync, consumo y UI separados.
-- Las migraciones externas 24–34 no se reutilizan: cualquier esquema nuevo
+- Las migraciones externas 24–35 no se reutilizan: cualquier esquema nuevo
   usa el siguiente número libre local, con pgTAP conductual y staging.
 - La reparación histórica de presupuestos requiere inventario y simulación; no
   se ejecuta una heurística externa por semejanza.
@@ -5352,3 +5352,62 @@ presupuestos ambiguos entre espacios.
 - `PLAN.md` §4 y §9.
 - `PRODUCT.md` conceptos de autor, moneda, cuentas y copias.
 - `DATABASE.md` §§6.1, 6.13 y 9.7.
+
+---
+
+# ADR-082 — Reauditoría incremental del PR externo y ejecución por macrobloques
+
+**Estado:** Aceptada
+
+## Contexto
+
+Después de la auditoría registrada en ADR-081, el trabajo externo continuó en
+el PR #1, rama `release/version-actual-app`. El 2026-08-23 se inspeccionó su
+extremo `34449b6` mediante GitHub, sin descargar ni ejecutar el código. Frente a
+`1b40900` aparecieron 18 commits, 100 archivos y 8.063 líneas cambiadas. El
+delta mezcla UI con cuentas, recurrencia, onboarding, navegación, migraciones y
+ciclo de vida de espacios; no puede clasificarse como meramente estético. El
+commit de cabecera no tenía checks de GitHub asociados.
+
+## Decisión
+
+Se mantiene la frontera de ADR-081: se documentan necesidades, riesgos y
+criterios, pero no se importan commits, componentes, activos, migraciones ni
+pruebas. Las propuestas aceptables se reimplementan desde los contratos locales
+y se agrupan en seis macrobloques descritos en `PLAN.md` §9.7.
+
+Se aceptan como candidatos la analítica por cuenta, el selector de apariencia,
+la edición rápida, el modal monetario consolidado, las preferencias de
+Actividad, el encabezado global, el scroll al inicio y la salida individual con
+posible reingreso. Su inclusión final depende de la fase y de sus criterios de
+aceptación.
+
+Se rechazan expresamente:
+
+- forzar texto e iconos blancos sobre fondos que no alcanzan contraste;
+- copiar SVG sin procedencia o licencia verificadas;
+- ocultar copias completas del repositorio excluyéndolas de todos los checks;
+- cambiar moneda, saldo o significado financiero de forma silenciosa;
+- eliminar el espacio y su historial financiero cuando sale el último miembro.
+
+Exigir tres categorías en onboarding queda condicionado a una decisión de
+producto medible. La salida individual y el reingreso se diseñan por separado
+del borrado, archivo o disolución del espacio.
+
+## Consecuencias
+
+- La semántica de Actividad se corrige antes de persistir o animar sus vistas.
+- La edición rápida de recurrencias conserva pruebas y entrega propias aunque
+  se incluya en un macrobloque funcional.
+- El núcleo de cuentas se cierra antes de consumirlo en gráficos o rediseños.
+- Ningún número de migración o ADR externo reserva la secuencia local.
+- Una tarea puede usar varios commits dentro de un macrobloque, pero no salta
+  Gate 1, pgTAP, staging, smokes ni el segundo verificador cuando corresponda.
+
+## Referencias
+
+- `PLAN.md` §§4c, 4d, 9.6 y 9.7.
+- `ROADMAP.md`, alcance adicional obligatorio del MVP final.
+- ADR-080 y ADR-081.
+- `PRODUCT.md`, contratos de moneda y cuentas.
+- `DATABASE.md`, ciclo de vida de espacios.
