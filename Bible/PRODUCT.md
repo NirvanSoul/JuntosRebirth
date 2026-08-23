@@ -419,7 +419,8 @@ estado elegido para cada una. Dentro de Categorías, junto a `Detalle por
 categoría`, un botón alterna entre el listado continuo y una cuadrícula de tres
 columnas formada por las mismas tarjetas de vista previa de Inicio, con borde
 gris sutil; la aplicación también recuerda la última vista elegida. El icono
-siempre indica la vista a la que se cambiará.
+siempre indica la vista a la que se cambiará y el cambio se presenta con una
+transición breve que respeta el movimiento reducido del sistema.
 
 Debajo del título `Movimientos`, Actividad muestra un resumen compacto de
 ingresos, gastos y balance. Las tres cifras se calculan sobre el mismo conjunto

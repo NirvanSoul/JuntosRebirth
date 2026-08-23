@@ -8,6 +8,7 @@ export const motion = {
   calendarViewTransitionDuration: 180,
   calendarContentMaxDelay: 120,
   calendarContentStagger: 12,
+  categoryViewTransitionDuration: 180,
   chartContentEnterDelay: 300,
   chartContentExitDuration: 300,
   chartContentFadeDuration: 180,

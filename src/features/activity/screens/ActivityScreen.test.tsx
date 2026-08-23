@@ -891,6 +891,13 @@ describe('ActivityScreen', () => {
     expect(
       screen.getByRole('button', { name: 'Cambiar a vista de lista' }),
     ).toBeTruthy();
+    expect(
+      screen.getByTestId('activity-category-preview-group').props,
+    ).toMatchObject({
+      entering: expect.anything(),
+      exiting: expect.anything(),
+      layout: expect.anything(),
+    });
     expect(screen.queryByTestId('activity-category-separator')).toBeNull();
     expect(screen.getAllByTestId('category-tile-surface')).toHaveLength(3);
     expect(

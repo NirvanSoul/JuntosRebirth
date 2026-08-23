@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { List } from 'phosphor-react-native/src/icons/List';
 import { SquaresFour } from 'phosphor-react-native/src/icons/SquaresFour';
-import Animated from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeInDown,
+  FadeOutUp,
+  ReduceMotion,
+} from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
 import { Text } from '@/components/ui/Text/Text';
@@ -13,6 +18,7 @@ import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { iconSize, layout } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { radii } from '@/theme/radii';
+import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
@@ -28,6 +34,18 @@ type ActivityCategoryDetailProps = {
   onOpenCategoryDetail?: (categoryId: string, currency: CurrencyCode) => void;
   spaceCurrency: CurrencyCode;
 };
+
+const categoryViewEntering = FadeInDown.duration(
+  motion.categoryViewTransitionDuration,
+)
+  .easing(Easing.out(Easing.cubic))
+  .reduceMotion(ReduceMotion.System);
+
+const categoryViewExiting = FadeOutUp.duration(
+  motion.categoryViewTransitionDuration,
+)
+  .easing(Easing.in(Easing.cubic))
+  .reduceMotion(ReduceMotion.System);
 
 export function ActivityCategoryDetail({
   budgetExpenseByCategoryId,
@@ -88,7 +106,11 @@ export function ActivityCategoryDetail({
         </Pressable>
       </View>
       {categories.length > 0 ? (
-        <View
+        <Animated.View
+          entering={categoryViewEntering}
+          exiting={categoryViewExiting}
+          key={isGridVisible ? 'grid' : 'list'}
+          layout={getActivityLayoutTransition()}
           style={isGridVisible ? styles.grid : styles.groupShadow}
           testID="activity-category-preview-group"
         >
@@ -129,7 +151,7 @@ export function ActivityCategoryDetail({
               ),
             )}
           </View>
-        </View>
+        </Animated.View>
       ) : (
         <EmptyState
           accessibilityLabel="Crear primera categoría"
