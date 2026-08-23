@@ -77,12 +77,12 @@ cerrados y documentados en `Bible/DECISIONS.md` (ADR-080). Falta publicar la
 migración 26 en staging, repetir la suite enlazada y hacer los smokes físicos;
 el despliegue sigue siendo conjunto para las tres entregas.
 
-**Pendiente, ya decidido.** La Fase 4 está abierta en seis frentes: autoría
+**Pendiente, ya decidido.** La Fase 4 está abierta en siete frentes: autoría
 visible de cada movimiento, perfiles y avatares de miembros, cuentas de dinero,
-consolidación visual, internacionalización a español e inglés, e inicio de
-sesión con Google y Apple. Las tres primeras son capacidades que tú propusiste y
-que entran como alcance obligatorio del MVP, implementadas desde los contratos
-de esta rama.
+copias entre espacios, consolidación visual, internacionalización a español e
+inglés, e inicio de sesión con Google y Apple. Las tres primeras son capacidades
+que tú propusiste y que entran como alcance obligatorio del MVP, implementadas
+desde los contratos de esta rama.
 
 **Pendiente de decisión.** El flujo de aceptación legal: la tabla existe, tiene
 políticas y pruebas, pero hoy la app no registra ningún consentimiento. Y la
