@@ -29,8 +29,7 @@ export type ConvertAmountMinorResult =
 const MAX_SAFE_INTEGER_DIGITS = 16;
 
 type DigitParseResult =
-  | { ok: true; value: number }
-  | { ok: false; reason: AmountParseReason };
+  { ok: true; value: number } | { ok: false; reason: AmountParseReason };
 
 /**
  * Convierte una cadena de dígitos en un entero seguro. Una entrada
