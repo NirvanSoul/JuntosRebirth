@@ -5264,3 +5264,54 @@ Evidencia diferencial (rojo/verde) obligatoria:
 > Una decisión no documentada se convierte con el tiempo en una suposición.
 
 Registrar el motivo evita que una persona o asistente deshaga una decisión válida por desconocer su contexto.
+
+---
+
+# ADR-081 — Auditoría de la rama externa y alcance del MVP final
+
+**Estado:** Aceptada
+
+## Contexto
+
+El 2026-08-23 se inspeccionó mediante la API pública de GitHub la rama
+`feat/ajustes-cuentas-actividad`, cuyo extremo observado era `1b40900`, sin
+descargarla ni ejecutar su código. La rama contiene 18 commits de desarrollo,
+aproximadamente 170 archivos bajo `src` y más de 10.000 líneas añadidas. No
+tenía checks de CI asociados. Incluye autoría de movimientos, perfiles y
+avatares compartidos, catálogo de monedas de miembros, cuentas de dinero,
+copias entre espacios y una revisión visual amplia.
+
+## Decisión
+
+Se adoptan como requisitos del MVP final las capacidades de producto que
+superen una ficha propia: autoría visible, perfiles y avatares privados,
+preferencias monetarias de miembros en el catálogo visible, cuentas de dinero,
+copias seguras entre espacios y la consolidación visual de Inicio, Actividad,
+onboarding, modales y acciones rápidas. La implementación se hará desde los
+contratos locales y no se copiarán commits, migraciones, componentes ni
+pruebas de la rama externa.
+
+La precedencia del catálogo sigue siendo moneda del espacio, preferencias
+propias, preferencias de miembros y monedas presentes en movimientos. La
+llegada de perfiles o sincronización no puede reiniciar un formulario abierto.
+Las cuentas no pueden relabelar importes, mezclar divisas ni conceder
+escrituras a cualquier miembro por defecto. Las copias no arrastran cuentas ni
+presupuestos ambiguos entre espacios.
+
+## Consecuencias y límites
+
+- Las capacidades se dividen en Fase 4a–4g de `PLAN.md`; las cuentas son una
+  tarea grande con modelo, SQL/RLS, sync, consumo y UI separados.
+- Las migraciones externas 24–34 no se reutilizan: cualquier esquema nuevo
+  usa el siguiente número libre local, con pgTAP conductual y staging.
+- La reparación histórica de presupuestos requiere inventario y simulación; no
+  se ejecuta una heurística externa por semejanza.
+- Las propuestas visuales son candidatas de producto, no una aprobación de
+  arquitectura ni evidencia de funcionamiento. La ausencia de un problema
+  reproducible es un resultado válido y no genera trabajo artificial.
+
+## Referencias
+
+- `PLAN.md` §4 y §9.
+- `PRODUCT.md` conceptos de autor, moneda, cuentas y copias.
+- `DATABASE.md` §§6.1, 6.13 y 9.7.

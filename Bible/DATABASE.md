@@ -241,10 +241,11 @@ imágenes pesadas en el dispositivo. `avatar_updated_at` solo se usa para
 invalidar la caché de imagen de React Native al cambiar la foto (se añade
 como parámetro `?v=` a la uri leída), no como estado de sincronización. Esta
 tabla es exclusivamente local: al no existir todavía inicio de sesión, la
-foto de perfil no viaja a `public.profiles.avatar_url` (columna remota ya
-prevista en la sección 6.1); cuando se implemente la autenticación real, la
-migración de invitado a cuenta deberá decidir explícitamente si sube este
-archivo a Supabase Storage.
+foto de perfil no viaja a un perfil remoto. Cuando se implemente la
+autenticación real, la migración de invitado a cuenta deberá decidir
+explícitamente si sube este archivo a un objeto privado de Supabase Storage;
+no debe convertirlo en una URL pública ni confundir la caché local con estado
+de sincronización.
 
 La versión 10 sustituye el presupuesto local implícitamente asociado a EUR
 por `category_budgets`, una tabla por categoría y moneda. La columna histórica
@@ -318,7 +319,8 @@ Campos sugeridos:
 ```text
 id                  uuid, PK, referencia a auth.users
 display_name        text
-avatar_url          text nullable
+avatar_path         text nullable
+avatar_updated_at   timestamptz nullable
 locale              text
 default_currency    text
 created_at          timestamptz
@@ -330,6 +332,9 @@ Reglas:
 - Un perfil pertenece a un usuario autenticado.
 - El correo no debe duplicarse innecesariamente.
 - La moneda por defecto puede usarse al crear el espacio personal.
+- La lectura de perfiles de terceros se limita a miembros de un espacio activo
+  y selecciona solo los campos que la interfaz necesita. `avatar_path` es una
+  ruta de objeto privado, no una URL pública; las URLs firmadas son efímeras.
 
 ---
 
@@ -823,6 +828,32 @@ Reglas:
   arrastrar el contador anterior.
 - Un inicio de sesión correcto borra la fila del correo.
 
+### 6.13 `money_accounts` y balances (modelo previsto)
+
+Las cuentas de dinero pertenecen al alcance del MVP final, pero todavía no
+forman parte del esquema aplicado en este repositorio. Su diseño debe
+aprobarse antes de crear migraciones nuevas.
+
+Requisitos mínimos del modelo:
+
+- Toda cuenta y todo balance quedan ligados al mismo `space_id` mediante una
+  relación compuesta, no mediante dos claves independientes.
+- La moneda y el saldo inicial tienen una única fuente de verdad y una fecha
+  efectiva. Si se admiten varias monedas, cada balance debe identificarse por
+  `currency` y nunca se agregan divisas distintas.
+- Las escrituras de balances pasan por RPC o políticas que comprueben autoría y
+  membresía; no se concede `INSERT`/`UPDATE` directo a cualquier miembro por
+  conveniencia.
+- Archivar conserva el historial. Transferencias, saldos proyectados,
+  asignación desde importación y migración de invitado requieren contratos y
+  pruebas separados.
+- El enlace opcional desde `transactions` y recurrencias debe preservar la
+  moneda del movimiento. No se permite relabelar un `amount_minor` al elegir
+  una cuenta.
+
+Antes de aplicar la primera migración se exigirán pgTAP conductual, pruebas de
+RLS y una verificación de concurrencia/idempotencia de la sincronización.
+
 ---
 
 ## 7. Dinero
@@ -910,6 +941,17 @@ Un usuario puede acceder a una fila de un espacio únicamente si tiene una membr
 - Evitar falsificar autoría.
 - Definir si todos los miembros pueden editar movimientos ajenos.
 - Preferir políticas explícitas y simples.
+
+### 9.7 Cuentas y balances (cuando se implementen)
+
+- Solo miembros activos del espacio pueden leer cuentas y balances del espacio.
+- Crear, editar y archivar debe comprobar la autoría o el rol acordado; la
+  membresía por sí sola no autoriza a sobrescribir una cuenta ajena.
+- La política debe impedir asociaciones cruzadas entre espacios y escrituras
+  directas que salten las validaciones de moneda.
+- Los objetos de avatar usan Storage privado y políticas equivalentes: un
+  usuario ajeno al espacio no puede enumerarlos ni leerlos por conocer una
+  ruta.
 
 ---
 

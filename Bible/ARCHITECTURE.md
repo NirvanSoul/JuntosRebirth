@@ -799,3 +799,31 @@ Las demás carpetas se añaden cuando el roadmap las necesita.
 > La arquitectura existe para que el cambio correcto sea fácil y el cambio incorrecto resulte evidente.
 
 Si una estructura obliga a recorrer demasiadas carpetas para comprender una funcionalidad sencilla, debe simplificarse.
+
+---
+
+## 30. Límites para las extensiones del MVP final
+
+Las capacidades derivadas de la auditoría externa se incorporan por contratos,
+no por trasplante de archivos:
+
+- **Autoría y perfiles:** las features consumen un modelo de miembro mínimo;
+  Storage, caché local y la identidad textual quedan separados para que una
+  imagen no sea requisito de la sincronización.
+- **Monedas visibles:** un catálogo compartido debe vivir en un hook/utilidad
+  canónica. Sus cambios de identidad no pueden ser una dependencia de
+  reinicio de formularios.
+- **Cuentas de dinero:** separar cuenta, balance por moneda y enlace opcional
+  del movimiento. El dominio no debe esconder conversiones dentro de un
+  selector visual; las transferencias y la autoridad de edición tienen
+  servicios explícitos.
+- **Copias entre espacios:** usar servicios de aplicación que limpien
+  referencias del espacio origen y validen moneda, categoría y presupuesto del
+  destino antes de persistir.
+- **Superficie visual:** `AvatarPair`, encabezados, secciones plegables,
+  controles de modal, FAB y onboarding son componentes reutilizables solo
+  después de tener un contrato estable y pruebas de accesibilidad. No se
+  extraen componentes por similitud visual de una rama externa.
+
+Cada frontera nueva debe tener pruebas de aislamiento por espacio, moneda,
+permisos y sincronización antes de exponerse desde una pantalla.

@@ -57,6 +57,26 @@ La primera versión útil debe permitir:
 
 Los espacios de pareja pueden entrar después de consolidar el flujo personal y la sincronización.
 
+### Alcance adicional obligatorio del MVP final
+
+La auditoría de la rama externa `feat/ajustes-cuentas-actividad` (extremo
+observado `1b40900`, 2026-08-23) identificó capacidades que sí pertenecen al
+producto final, aunque su código no se adopta:
+
+- Autoría visible de movimientos y perfiles de miembros con avatar privado.
+- Catálogo de monedas que incluya preferencias de miembros sin romper la
+  precedencia de la moneda del espacio ni reiniciar formularios.
+- Cuentas de dinero como segunda dimensión del movimiento, con balances
+  multidivisa aislados y permisos explícitos.
+- Copias seguras de categorías y movimientos entre espacios.
+- Consolidación visual de Inicio, Actividad, onboarding, modales, iconografía,
+  secciones plegables, resumen sticky y acciones rápidas.
+
+Estas capacidades se implementan en las entregas 4a–4g de `PLAN.md`. La rama
+externa es evidencia de necesidades y riesgos, no una fuente de código,
+migraciones ni pruebas. Cada entrega conserva el Gate 1, los verificadores y
+los smokes de iPhone y Honor que correspondan.
+
 ---
 
 # Fase 0 — Base del repositorio

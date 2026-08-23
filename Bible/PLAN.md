@@ -99,6 +99,11 @@ funcionales deben resolverse sus otros prerrequisitos:
   autoría siguen funcionando.
 - Verificar privacidad con usuarios ajenos y comportamiento real en iPhone y
   Honor.
+- Incluir en el catálogo visible las monedas por defecto de los miembros del
+  espacio, sin sustituir la precedencia vigente: moneda del espacio, moneda
+  propia, preferencias de miembros y, por último, monedas presentes en los
+  movimientos. La llegada asíncrona de perfiles no puede reiniciar un borrador
+  abierto ni hacer parpadear el selector.
 
 #### Fase 4c — Cuentas de dinero
 
@@ -113,6 +118,15 @@ funcionales deben resolverse sus otros prerrequisitos:
   Actividad/Inicio.
 - Exigir integridad por espacio, permisos de autor, pgTAP conductual, staging y
   pruebas financieras multidivisa en dos dispositivos.
+- El diseño debe elegir una fuente de verdad para moneda, saldo inicial y
+  balances; no se aceptan una moneda primaria y una fila de balance que puedan
+  contradecirse. Las cuentas se archivan, no se borran silenciosamente.
+- El selector de cuenta nunca puede cambiar la divisa de un movimiento
+  conservando el mismo entero: debe bloquear, convertir con confirmación o
+  crear/seleccionar un balance compatible.
+- La primera entrega no incluye por defecto transferencias, asignación desde
+  importación ni agregados entre monedas: cada una necesita contrato y pruebas
+  propios antes de entrar en el MVP.
 
 #### Fase 4d — Consolidación visual
 
@@ -138,16 +152,35 @@ funcionales deben resolverse sus otros prerrequisitos:
 - **Indicador de novedades en el selector de espacio:** Un punto cuando hay algo nuevo en un espacio que no estás mirando, calculado con una consulta ligera al abrir la app y al volver a primer plano. Sin suscripciones ni notificaciones flotantes (`JUNTOSS_NOTIFICATIONS.md` §19).
 - Implementar solo las que tengan objetivo y criterio de aceptación; no portar
   el commit externo de «trabajo en curso».
+- Evaluar y, si superan el criterio de aceptación, incorporar de forma propia:
+  `AvatarPair`, autoría visible en tarjetas y detalles, secciones plegables de
+  cuentas en Inicio/Actividad, resumen sticky, encabezados y filtros de
+  movimientos, iconografía consistente, progreso y fondo del onboarding,
+  `ModalCloseButton`, `SegmentedControl`, FAB/QuickCreate y estados vacíos.
+- Estas piezas visuales son superficie de producto, no permiso para copiar
+  componentes externos. Cada una requiere smoke en iPhone y Honor y debe
+  respetar accesibilidad, movimiento reducido y los contratos monetarios.
 - Hacer smoke visual y nativo en iOS y Android.
 
-#### Fase 4e — Internacionalización y locale (Obligatorio antes de release)
+#### Fase 4e — Copias entre espacios
+
+- Mantener la copia de movimientos y añadir copia de categorías solo con
+  contratos explícitos de destino.
+- Una copia nunca conserva un `moneyAccountId` de otro espacio. El presupuesto
+  de una categoría se limpia o se revalida según la moneda principal del
+  destino; no se arrastra un número ambiguo.
+- La copia conserva el original, exige una categoría válida del destino y
+  confirma qué ocurre si las monedas no coinciden. Probar aislamiento por
+  espacio, divisa y sincronización antes de publicarla.
+
+#### Fase 4f — Internacionalización y locale (Obligatorio antes de release)
 
 - Meta inicial español e inglés, con arquitectura extensible.
 - Incluye interfaz, onboarding, categorías predeterminadas, errores, notificaciones, plantillas de correo y textos del backend.
 - El `locale` fijo `'es-ES'` se sustituye; la selección del locale debe derivar de la arquitectura de idiomas, no al revés.
 - Se completa **antes** de publicar en tiendas para evitar retrabajo transversal y lanzar una experiencia lingüísticamente coherente.
 
-#### Fase 4f — Inicio de sesión con Google y Apple
+#### Fase 4g — Inicio de sesión con Google y Apple
 
 Se amplía `supabaseAuthGateway` con los proveedores nativos de Supabase Auth.
 **No se sustituye el proveedor de identidad**: `auth.uid()` sostiene todas las
@@ -676,16 +709,19 @@ Commits de Fase 2: `5e6bc8b` a `81ab049`, ambos inclusive. Las pruebas en los di
 
 ### 9.1 Frontera y procedencia
 
-El 2026-08-18 se inspeccionó mediante la API pública de GitHub, **sin ejecutar
+El 2026-08-23 se inspeccionó mediante la API pública de GitHub, **sin ejecutar
 `git fetch`, `pull`, `merge`, `cherry-pick` ni copiar archivos**, el trabajo que
-Alphonzo añadió después de `ffc87f9` a la rama publicada
-`limpieza/fases-1-y-1b` del repositorio original.
+Alphonzo añadió a la rama `feat/ajustes-cuentas-actividad`, cuyo extremo
+observado es `1b40900`, desde la base común local `c039ae8`.
 
-- `upstream/main` permanece en `b4c212a`; no recibió estos cambios.
-- La rama publicada dejó de ser una instantánea limpia de nuestro trabajo y no
-  debe usarse como fuente para continuar ni como base para una integración.
-- El extremo externo observado es `14de52b`. No tiene estados de CI ni checks
-  de GitHub asociados.
+- Se observaron 18 commits de desarrollo y aproximadamente 170 archivos
+  modificados bajo `src`, con más de 10.000 líneas añadidas. El tamaño no es
+  evidencia de calidad ni de completitud.
+- `upstream/main` permanece separado; la rama externa no se descargó ni se
+  usará como base para una integración.
+- El extremo observado no tiene checks de CI de GitHub asociados. Sus totales
+  de pruebas y sus afirmaciones de funcionamiento no sustituyen Gate 1, pgTAP,
+  staging ni los smokes exigidos por este repositorio.
 - Los commits externos son **material de investigación**, no implementación del
   proyecto local. Sus pruebas declaradas no sustituyen Gate 1, pgTAP, staging ni
   los smokes exigidos por este repositorio.
@@ -698,10 +734,12 @@ HEAD; no se traerá ni se reescribirá la rama externa actual.
 | Grupo externo | Commits observados | Idea | Disposición local |
 |---|---|---|---|
 | Miembros, autoría y avatares | `93a2b7f` a `c949ec3` | Mostrar autor de cada movimiento, leer perfiles de miembros y sincronizar miniaturas mediante un bucket privado. | Alcance obligatorio de Fase 4a-4b; no integrado. Se rediseña con privacidad, Storage, RLS, pgTAP y smoke en dos dispositivos. |
-| Monedas compartidas | `2d7a5b0`, `3aef261` | Unir moneda del espacio y preferencias de ambos miembros. | No portar: el defecto ya está resuelto localmente mediante el catálogo canónico del espacio (`dcb5d8a`, `b55fbdf`) sin depender de `profiles.default_currency`. |
+| Monedas compartidas | `2d7a5b0`, `3aef261` | Unir moneda del espacio y preferencias de ambos miembros. | Adoptar la necesidad, no el código: extender nuestro catálogo canónico con las preferencias de miembros, conservando la precedencia del espacio y la protección contra reinicios del modal. |
 | Reparación histórica de presupuestos | migración externa 27 dentro de `cd3abf1` | Reetiquetar como moneda del espacio ciertos presupuestos que la migración 08 asumió EUR. | Prerrequisito de Fase 4, no aplicado. Se resolverá la deuda con inventario real y migración propia solo si corresponde. |
 | Cuentas de dinero | `aec1504`, `23cb5f4`, `a7e9488`, `14de52b` | Cuenta opcional por movimiento, tres tipos visuales y varios saldos monetarios por cuenta, con persistencia y sync local/remota. | Alcance obligatorio de Fase 4c; el producto está aceptado, pero su diseño e implementación externa no. |
 | Ajustes visuales en curso | `cd3abf1` | Onboarding, botón flotante y fondo del navegador raíz. | Entran en la revisión de Fase 4d; se implementan de forma propia solo con criterio de aceptación. |
+| Copias entre espacios | servicios de copia observados en la rama | Copiar categorías y movimientos entre espacios con confirmación. | Fase 4e; revisar moneda, presupuesto, cuenta asociada y aislamiento antes de implementarlo. |
+| Superficie visual adicional | `cd3abf1`, `1b40900` | AvatarPair, secciones de cuentas, resumen sticky, encabezados/filtros, iconos, controles de modal y FAB. | Candidatos obligatorios del MVP final si cumplen accesibilidad y smoke; no se porta la implementación externa. |
 
 ### 9.3 Evaluación de «cuentas de dinero»
 
@@ -751,6 +789,21 @@ para servir de referencia directa:
 - Al escoger una cuenta incompatible, el formulario externo cambia la moneda
   del movimiento y conserva el importe numérico; eso altera su significado
   financiero sin conversión.
+- `signedAmountInput` usa la API monetaria anterior y trata el resultado de
+  `parseAmountMinor` como número; no es compatible con ADR-080 y no se copia.
+- El detalle de cuenta filtra la métrica por la moneda seleccionada, pero su
+  lista de movimientos solo filtra por cuenta: puede mostrar monedas mezcladas
+  bajo un encabezado de una sola divisa.
+- La tabla de balances permite escrituras directas a miembros activos aunque
+  el comentario del RPC diga que la escritura debe ser controlada; además, la
+  función de sincronización puede actualizar una cuenta existente sin validar
+  autoría.
+- La copia de movimiento conserva el identificador de cuenta del espacio
+  origen y la copia de categoría arrastra el presupuesto sin revisar la moneda;
+  ambas decisiones son peligrosas y quedan prohibidas en Fase 4e.
+- La reparación histórica de presupuestos usa heurísticas sobre importe y
+  fechas. Antes de escribir una migración propia se necesita inventario,
+  simulación y criterio de reversión, no una copia de esa heurística.
 - `money_accounts.test.sql` sigue afirmando que la cuenta es monomoneda y no
   cubre la tabla multidivisa añadida después. Las migraciones 28-34 no tienen
   ejecución pgTAP o staging aportada, y GitHub no registra CI para el extremo
@@ -787,7 +840,23 @@ separada y más sensible. Antes de implementar deben definirse:
   y pruebas contra usuarios que no comparten espacio.
 - Actualización y reintento sin convertir una pérdida de red en una foto
   equivocada o permanentemente obsoleta.
+- La lectura de `profiles` debe seleccionar solo los campos necesarios; una
+  política RLS de miembro no autoriza a exponer automáticamente locale,
+  moneda por defecto u otros datos privados. El objeto del avatar debe vivir
+  en Storage privado con rutas no predecibles y URLs temporales.
 
 La ejecución se separa en dos tareas: primero **autoría textual**; después
 **sincronización de avatares**. Ninguna se inicia durante el cierre actual de
 monedas.
+
+### 9.5 Resultado operativo de la auditoría
+
+La auditoría no adopta migraciones externas ni cambia el estado de staging.
+Las migraciones observadas (incluidas las numeradas 24–34 en esa rama) entran
+en conflicto con la secuencia y los contratos locales; cualquier persistencia
+futura usará el siguiente número libre de este repositorio y pruebas propias.
+El resultado accionable queda distribuido en Fase 4a–4g: autoría, perfiles y
+monedas de miembros, cuentas, superficie visual y copias entre espacios. La
+ausencia de un problema también es un resultado válido: si una propuesta no
+reproduce un requisito o no supera una prueba, se registra y no se implementa
+para aparentar avance.

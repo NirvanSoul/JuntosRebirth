@@ -87,6 +87,14 @@ Tipos futuros:
 
 Contexto global que determina los datos mostrados y creados en Inicio, Actividad, Mapa, Categorías, Ahorros, Planes, filtros y formularios.
 
+La moneda principal del espacio es la primera divisa visible para sus
+agregados y presupuestos. El catálogo de selección incluye, en este orden, la
+moneda del espacio, la moneda preferida del usuario, las preferencias de los
+miembros del espacio y las monedas presentes en sus movimientos, sin
+duplicados. Una recarga de perfiles o sincronización no puede cambiar la
+moneda seleccionada mientras un formulario esté abierto ni mezclar importes de
+divisas distintas.
+
 ### Movimiento
 
 Registro financiero de tipo gasto o ingreso.
@@ -105,6 +113,20 @@ Campos mínimos:
 - Fechas técnicas.
 - Estado de sincronización.
 - Recurrencia opcional.
+
+### Autor y perfil compartido
+
+En un espacio compartido, cada movimiento conserva el autor que lo creó. La
+interfaz puede mostrar nombre y avatar del autor cuando ayuden a entender la
+actividad, pero nunca debe atribuir un movimiento a otra persona por una
+recarga, una invitación o una sesión de invitado. Si el perfil o la imagen no
+están disponibles, se conserva una identidad textual segura y el movimiento
+sigue siendo usable.
+
+Los perfiles de miembros solo son visibles dentro de un espacio activo
+compartido. Una invitación pendiente no concede acceso a un perfil ni a su
+avatar; las imágenes, cuando existan, se sirven desde almacenamiento privado y
+se pueden borrar sin perder la autoría textual.
 
 ### Categoría
 
@@ -144,6 +166,24 @@ Ejemplo:
 Definición consistente:
 
 `balance = ingresos - gastos`
+
+### Cuenta de dinero
+
+Una cuenta de dinero representa dónde está el dinero (efectivo, banco o
+tarjeta), no una categoría ni una moneda. Es opcional para cada movimiento y
+no sustituye el balance por categoría.
+
+El MVP final debe definir antes de implementarla el significado del saldo
+inicial, su fecha efectiva, saldo actual frente a proyectado, propiedad
+compartida y transferencias. Una transferencia entre cuentas propias no puede
+convertirse en un ingreso y un gasto ordinarios. Los saldos de monedas
+distintas nunca se suman ni se presentan como un único total.
+
+Asignar una cuenta a un movimiento no puede cambiar silenciosamente su moneda
+ni conservar el mismo importe con otra escala. Si la cuenta no soporta la
+moneda, la interfaz bloquea, convierte con confirmación o crea/selecciona el
+balance compatible. Las cuentas se archivan; no se eliminan destruyendo el
+historial.
 
 ### Ahorro o plan
 
@@ -360,6 +400,12 @@ Nombre de trabajo para agrupar:
 - Categorías.
 - Detalle de categoría.
 - Movimientos asociados.
+
+Cuando las cuentas de dinero estén activas, Actividad ofrecerá una sección
+plegable de cuentas y permitirá filtrar movimientos por cuenta sin alterar el
+filtro de moneda. El resumen, la lista y el detalle deben usar exactamente el
+mismo periodo, tipo y divisa; una tarjeta de cuenta no puede presentar
+movimientos de otra moneda bajo una etiqueta única.
 
 Debajo del título `Movimientos`, Actividad muestra un resumen compacto de
 ingresos, gastos y balance. Las tres cifras se calculan sobre el mismo conjunto
@@ -748,7 +794,16 @@ título, fecha y recurrencia, y siempre queda asociada a una categoría válida
 del espacio de destino. Si allí existe una categoría equivalente se reutiliza;
 si no, se crea una copia de la categoría sin presupuesto. La operación no
 modifica ni elimina el movimiento original y utiliza la confirmación flotante
-común de las copias entre espacios.
+común de las copias entre espacios. Nunca conserva una cuenta de dinero del
+espacio de origen; si en el futuro se copia un movimiento con cuenta, debe
+seleccionarse una cuenta compatible en el destino. Si las monedas del origen y
+destino difieren, la copia debe bloquearse o pedir una conversión explícita.
+
+Las categorías también pueden copiarse entre espacios como una operación
+independiente. Una categoría copiada no arrastra un presupuesto ambiguo: se
+crea sin presupuesto o se revalida contra la moneda principal del espacio de
+destino. Siempre se confirma el destino y se mantiene intacta la categoría
+original.
 
 ---
 
