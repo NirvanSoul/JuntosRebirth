@@ -3,7 +3,10 @@ import { getCurrencyMinorUnitFactor } from './currencyCatalog';
 
 /** Motivo por el que un texto de importe no es parseable. */
 export type AmountParseReason =
-  'invalid_format' | 'invalid_fraction_for_currency';
+  | 'invalid_format'
+  | 'invalid_fraction_for_currency'
+  | 'too_many_decimals'
+  | 'unsafe_integer';
 
 /** Resultado discriminado de parsear un importe de entrada. */
 export type ParseAmountMinorResult =
@@ -22,17 +25,40 @@ export type ConvertAmountMinorResult =
   | { ok: true; amountMinor: number }
   | { ok: false; amountMinor: null; reason: CurrencySwitchReason };
 
-function parseWholePart(raw: string): number | null {
-  if (raw === '') return 0;
-  if (!/^\d+$/.test(raw)) return null;
-  return Number(raw);
+/** Dígitos de Number.MAX_SAFE_INTEGER (9007199254740991). */
+const MAX_SAFE_INTEGER_DIGITS = 16;
+
+type DigitParseResult =
+  | { ok: true; value: number }
+  | { ok: false; reason: AmountParseReason };
+
+/**
+ * Convierte una cadena de dígitos en un entero seguro. Una entrada
+ * demasiado larga o por encima de Number.MAX_SAFE_INTEGER es un error
+ * discriminado, no una pérdida silenciosa de precisión.
+ */
+function parseDigitsToSafeInteger(raw: string): DigitParseResult {
+  if (raw === '') return { ok: true, value: 0 };
+  if (!/^\d+$/.test(raw)) {
+    return { ok: false, reason: 'invalid_format' };
+  }
+  if (raw.length > MAX_SAFE_INTEGER_DIGITS) {
+    return { ok: false, reason: 'unsafe_integer' };
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value)) {
+    return { ok: false, reason: 'unsafe_integer' };
+  }
+  return { ok: true, value };
 }
 
 /**
  * Convierte el texto de entrada (coma decimal) a unidades menores.
  * Nunca lanza durante render. Devuelve un resultado discriminado: un
  * importe con fracciones en una moneda de factor 1 es un error, no un
- * truncamiento silencioso.
+ * truncamiento silencioso. Un decimal que la escala no representa
+ * («too_many_decimals») o un entero fuera del rango seguro
+ * («unsafe_integer») también se rechazan sin aproximar.
  */
 export function parseAmountMinor(
   value: string,
@@ -56,16 +82,16 @@ export function parseAmountMinor(
         reason: 'invalid_fraction_for_currency',
       };
     }
-    const whole = parseWholePart(wholeRaw);
-    if (whole === null) {
-      return { ok: false, amountMinor: null, reason: 'invalid_format' };
+    const whole = parseDigitsToSafeInteger(wholeRaw);
+    if (!whole.ok) {
+      return { ok: false, amountMinor: null, reason: whole.reason };
     }
-    return { ok: true, amountMinor: whole };
+    return { ok: true, amountMinor: whole.value };
   }
 
-  const whole = parseWholePart(wholeRaw);
-  if (whole === null) {
-    return { ok: false, amountMinor: null, reason: 'invalid_format' };
+  const whole = parseDigitsToSafeInteger(wholeRaw);
+  if (!whole.ok) {
+    return { ok: false, amountMinor: null, reason: whole.reason };
   }
 
   let decimals = 0;
@@ -73,10 +99,19 @@ export function parseAmountMinor(
     if (!/^\d+$/.test(decimalsRaw)) {
       return { ok: false, amountMinor: null, reason: 'invalid_format' };
     }
-    decimals = Number(`${decimalsRaw}00`.slice(0, 2));
+    // Solo se admiten las fracciones que la escala representa: un decimal
+    // adicional se rechaza, nunca se trunca silenciosamente.
+    if (decimalsRaw.length > 2) {
+      return { ok: false, amountMinor: null, reason: 'too_many_decimals' };
+    }
+    decimals = Number(decimalsRaw.padEnd(2, '0'));
   }
 
-  return { ok: true, amountMinor: whole * 100 + decimals };
+  const amountMinor = whole.value * 100 + decimals;
+  if (!Number.isSafeInteger(amountMinor)) {
+    return { ok: false, amountMinor: null, reason: 'unsafe_integer' };
+  }
+  return { ok: true, amountMinor };
 }
 
 /**

@@ -73,6 +73,64 @@ describe('transactionAmount', () => {
     });
   });
 
+  describe('parseAmountMinor (decimales adicionales, factor 100)', () => {
+    it('rechaza un tercer decimal sin truncarlo silenciosamente', () => {
+      // Regresión bab8ecc: «10,999» se truncaba a 10,99 sin avisar.
+      expect(parseAmountMinor('10,999', 'EUR')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'too_many_decimals',
+      });
+      expect(parseAmountMinor('0,001', 'USD')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'too_many_decimals',
+      });
+    });
+
+    it('acepta uno o dos decimales legítimos', () => {
+      expect(parseAmountMinor('10,9', 'EUR')).toEqual({
+        ok: true,
+        amountMinor: 1090,
+      });
+      expect(parseAmountMinor('10,99', 'EUR')).toEqual({
+        ok: true,
+        amountMinor: 1099,
+      });
+    });
+  });
+
+  describe('parseAmountMinor (límites de enteros seguros)', () => {
+    it('acepta el mayor valor representable de cada escala', () => {
+      expect(parseAmountMinor('9007199254740991', 'JPY')).toEqual({
+        ok: true,
+        amountMinor: Number.MAX_SAFE_INTEGER,
+      });
+      expect(parseAmountMinor('90071992547409', 'EUR')).toEqual({
+        ok: true,
+        amountMinor: 9007199254740900,
+      });
+    });
+
+    it('rechaza entradas muy largas que producen enteros no seguros', () => {
+      expect(parseAmountMinor('99999999999999999999', 'JPY')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'unsafe_integer',
+      });
+      expect(parseAmountMinor('9007199254740992', 'JPY')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'unsafe_integer',
+      });
+      expect(parseAmountMinor('90071992547410', 'EUR')).toEqual({
+        ok: false,
+        amountMinor: null,
+        reason: 'unsafe_integer',
+      });
+    });
+  });
+
   describe('amountMinorToInput', () => {
     it('factor 100', () => {
       expect(amountMinorToInput(1050, 'EUR')).toBe('10,5');
