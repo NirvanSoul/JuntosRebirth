@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useScrollToTop } from '@react-navigation/native';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
@@ -91,6 +92,8 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const { colors } = useTheme();
   const density = useLayoutDensity();
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
   const [isIncomeModalVisible, setIncomeModalVisible] = useState(false);
   const [isExpenseModalVisible, setExpenseModalVisible] = useState(false);
   const [isBalanceModalVisible, setBalanceModalVisible] = useState(false);
@@ -167,6 +170,7 @@ export function HomeScreen({
     <>
       <Screen
         onScrollDirectionChange={onScrollDirectionChange}
+        scrollRef={scrollRef}
         testID="home-screen"
       >
         {topContent}

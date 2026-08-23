@@ -19,6 +19,13 @@ import { previewCardLayout } from '@/theme/previewCard';
 import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
 
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual<typeof import('@react-navigation/native')>(
+    '@react-navigation/native',
+  ),
+  useScrollToTop: jest.fn(),
+}));
+
 function dateInCurrentMonth(day: number): string {
   const now = new Date();
   const year = now.getFullYear();

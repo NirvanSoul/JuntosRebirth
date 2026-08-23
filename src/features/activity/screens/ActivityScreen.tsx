@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useScrollToTop } from '@react-navigation/native';
 import { ScrollView, View } from 'react-native';
 import Animated, {
   ReduceMotion,
@@ -115,6 +116,7 @@ export function ActivityScreen({
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
   const handledTargetKeyRef = useRef<string | null>(null);
   const hasPinnedStateMountedRef = useRef(false);
   const scrollOffsetRef = useRef(0);

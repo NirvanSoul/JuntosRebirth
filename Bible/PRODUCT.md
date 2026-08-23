@@ -313,6 +313,9 @@ Si existen datos invitados en el dispositivo, no deben mezclarse con una cuenta 
 
 Tiene tres destinos principales:
 
+Al volver a pulsar Inicio o Actividad estando ya en ese destino, su contenido
+se desplaza de forma animada al inicio.
+
 ### Inicio
 
 - Espacio activo.

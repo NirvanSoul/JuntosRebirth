@@ -12,6 +12,13 @@ import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual<typeof import('@react-navigation/native')>(
+    '@react-navigation/native',
+  ),
+  useScrollToTop: jest.fn(),
+}));
+
 const mockScrollTo = jest.fn();
 
 type MockScreenProps = {

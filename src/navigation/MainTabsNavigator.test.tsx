@@ -450,6 +450,11 @@ describe('MainTabsNavigator', () => {
       screen.getByTestId('persistent-app-header').props.pointerEvents,
     ).toBe('box-none');
     expect(screen.queryAllByTestId('activity-summary')).toHaveLength(0);
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Inicio' }));
+    expect(
+      screen.getByTestId('persistent-app-header').props.pointerEvents,
+    ).toBe('box-none');
   });
 
   it('abre categoría y gasto desde las tarjetas vacías de Inicio', async () => {

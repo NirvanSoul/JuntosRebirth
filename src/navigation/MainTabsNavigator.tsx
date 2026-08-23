@@ -1031,7 +1031,9 @@ export function MainTabsNavigator() {
                 onCurrencyPress={handleHomeCurrencyPress}
                 onSpacePress={() => navigation.openDrawer()}
                 spaceName={activeSpace.name}
-                visible={!isActivitySummaryPinned}
+                visible={
+                  activeMainTab !== 'Activity' || !isActivitySummaryPinned
+                }
               />
               <Tabs.Navigator
                 initialRouteName="Home"
