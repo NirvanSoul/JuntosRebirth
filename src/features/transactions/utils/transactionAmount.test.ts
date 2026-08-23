@@ -162,19 +162,82 @@ describe('transactionAmount', () => {
 
   describe('applyCalculatorOperation', () => {
     it('calcula operaciones con factor 100', () => {
-      expect(applyCalculatorOperation(1000, 250, 'add', 'EUR')).toBe(1250);
-      expect(applyCalculatorOperation(1000, 250, 'subtract', 'EUR')).toBe(750);
-      expect(applyCalculatorOperation(1000, 200, 'multiply', 'EUR')).toBe(2000);
-      expect(applyCalculatorOperation(1000, 200, 'divide', 'EUR')).toBe(500);
-      expect(applyCalculatorOperation(1000, 0, 'divide', 'EUR')).toBe(1000);
+      expect(applyCalculatorOperation(1000, 250, 'add', 'EUR')).toEqual({
+        ok: true,
+        valueMinor: 1250,
+      });
+      expect(applyCalculatorOperation(1000, 250, 'subtract', 'EUR')).toEqual({
+        ok: true,
+        valueMinor: 750,
+      });
+      expect(applyCalculatorOperation(1000, 200, 'multiply', 'EUR')).toEqual({
+        ok: true,
+        valueMinor: 2000,
+      });
+      expect(applyCalculatorOperation(1000, 200, 'divide', 'EUR')).toEqual({
+        ok: true,
+        valueMinor: 500,
+      });
+      expect(applyCalculatorOperation(1000, 0, 'divide', 'EUR')).toEqual({
+        ok: true,
+        valueMinor: 1000,
+      });
     });
 
     it('calcula operaciones con factor 1', () => {
-      expect(applyCalculatorOperation(1000, 500, 'add', 'JPY')).toBe(1500);
-      expect(applyCalculatorOperation(1000, 500, 'subtract', 'JPY')).toBe(500);
-      expect(applyCalculatorOperation(1000, 3, 'multiply', 'JPY')).toBe(3000);
-      expect(applyCalculatorOperation(1000, 4, 'divide', 'JPY')).toBe(250);
-      expect(applyCalculatorOperation(1000, 0, 'divide', 'JPY')).toBe(1000);
+      expect(applyCalculatorOperation(1000, 500, 'add', 'JPY')).toEqual({
+        ok: true,
+        valueMinor: 1500,
+      });
+      expect(applyCalculatorOperation(1000, 500, 'subtract', 'JPY')).toEqual({
+        ok: true,
+        valueMinor: 500,
+      });
+      expect(applyCalculatorOperation(1000, 3, 'multiply', 'JPY')).toEqual({
+        ok: true,
+        valueMinor: 3000,
+      });
+      expect(applyCalculatorOperation(1000, 4, 'divide', 'JPY')).toEqual({
+        ok: true,
+        valueMinor: 250,
+      });
+      expect(applyCalculatorOperation(1000, 0, 'divide', 'JPY')).toEqual({
+        ok: true,
+        valueMinor: 1000,
+      });
+    });
+
+    it('rechaza resultados fuera del rango entero seguro', () => {
+      const halfMaxSafe = 4503599627370496; // 2^52
+      expect(
+        applyCalculatorOperation(halfMaxSafe, halfMaxSafe, 'add', 'JPY'),
+      ).toEqual({ ok: false, reason: 'unsafe_integer' });
+      // Regresión bab8ecc: el producto intermedio se evaluaba en float y
+      // devolvía un entero impreciso «válido».
+      expect(
+        applyCalculatorOperation(
+          Number.MAX_SAFE_INTEGER,
+          200,
+          'multiply',
+          'EUR',
+        ),
+      ).toEqual({ ok: false, reason: 'unsafe_integer' });
+      expect(
+        applyCalculatorOperation(Number.MAX_SAFE_INTEGER, 2, 'divide', 'EUR'),
+      ).toEqual({ ok: false, reason: 'unsafe_integer' });
+    });
+
+    it('evalúa la división con precisión exacta aunque el producto desborde float', () => {
+      // MAX_SAFE_INTEGER * 100 supera 2^53: un producto en float perdería
+      // precisión antes de dividir; BigInt lo mantiene exacto.
+      expect(
+        applyCalculatorOperation(
+          Number.MAX_SAFE_INTEGER,
+          1_000_000_000,
+          'divide',
+          'EUR',
+        ),
+      ).toEqual({ ok: true, valueMinor: 900719925 });
     });
   });
 
@@ -271,16 +334,36 @@ describe('transactionAmount', () => {
         { valueMinor: 1000, operator: 'add' as const },
         { valueMinor: 250, operator: 'subtract' as const },
       ];
-      expect(evaluatePendingOperations(ops, 100, 'EUR')).toBe(1150);
+      expect(evaluatePendingOperations(ops, 100, 'EUR')).toEqual({
+        ok: true,
+        valueMinor: 1150,
+      });
     });
 
     it('evalúa multiplicación y división con factor 1', () => {
       const ops = [{ valueMinor: 1000, operator: 'multiply' as const }];
-      expect(evaluatePendingOperations(ops, 3, 'JPY')).toBe(3000);
+      expect(evaluatePendingOperations(ops, 3, 'JPY')).toEqual({
+        ok: true,
+        valueMinor: 3000,
+      });
     });
 
     it('devuelve el importe actual sin operaciones pendientes', () => {
-      expect(evaluatePendingOperations([], 500, 'JPY')).toBe(500);
+      expect(evaluatePendingOperations([], 500, 'JPY')).toEqual({
+        ok: true,
+        valueMinor: 500,
+      });
+    });
+
+    it('falla de forma discriminada si cualquier paso desborda', () => {
+      // Regresión bab8ecc: un desborde intermedio devolvía un entero
+      // impreciso como si fuera válido.
+      const halfMaxSafe = 4503599627370496; // 2^52
+      const ops = [{ valueMinor: halfMaxSafe, operator: 'add' as const }];
+      expect(evaluatePendingOperations(ops, halfMaxSafe, 'JPY')).toEqual({
+        ok: false,
+        reason: 'unsafe_integer',
+      });
     });
   });
 });

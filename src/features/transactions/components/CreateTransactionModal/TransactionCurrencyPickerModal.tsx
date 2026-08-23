@@ -15,11 +15,12 @@ import {
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 
-const currencySwitchErrorMessages: Record<CurrencySwitchReason, string> = {
-  fraction_not_allowed:
-    'La moneda elegida no admite decimales. Ajusta el importe antes de cambiar.',
-  unsafe_integer: 'El importe es demasiado grande para esta moneda.',
-};
+export const currencySwitchErrorMessages: Record<CurrencySwitchReason, string> =
+  {
+    fraction_not_allowed:
+      'La moneda elegida no admite decimales. Ajusta el importe antes de cambiar.',
+    unsafe_integer: 'El importe es demasiado grande para esta moneda.',
+  };
 
 export type TransactionCurrencyPickerModalProps = {
   availableCurrencies: readonly CurrencyCode[];

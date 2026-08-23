@@ -1,7 +1,7 @@
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
+import { Keyboard, Pressable, View } from 'react-native';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -46,12 +46,9 @@ import {
   categoryColors,
   getCategoryContentContrast,
 } from '@/theme/categoryColors';
-import { iconSize, type LayoutDensity, layout } from '@/theme/layout';
+import { iconSize } from '@/theme/layout';
 import { motion } from '@/theme/motion';
-import { radii } from '@/theme/radii';
-import { spacing } from '@/theme/spacing';
-import type { ColorTokens } from '@/theme/types';
-import { maxFontScale, typography } from '@/theme/typography';
+import { maxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import { TransactionDatePickerModal } from './TransactionDatePickerModal';
@@ -60,7 +57,11 @@ import {
   recurrenceOptions,
   TransactionRecurrencePickerModal,
 } from './TransactionRecurrencePickerModal';
-import { TransactionCurrencyPickerModal } from './TransactionCurrencyPickerModal';
+import {
+  TransactionCurrencyPickerModal,
+  currencySwitchErrorMessages,
+} from './TransactionCurrencyPickerModal';
+import { createTransactionModalStyles } from './createTransactionModalStyles';
 
 type CreateTransactionModalProps = {
   activeSpaceId: string;
@@ -106,19 +107,9 @@ const operatorPresentation: Record<
 const defaultAvailableCurrencies: readonly CurrencyCode[] = [
   defaultCurrencyCode,
 ];
-/** Altura del bloque del importe antes de repartir el espacio sobrante. */
-const amountAreaMinHeight = { compact: 64, regular: 88 } as const;
 /** Límites visuales que evitan el autoajuste defectuoso de texto en iOS. */
 const amountHeroMaxLength = 9;
 const amountMaxLength = 13;
-/** Separación vertical de las filas del teclado numérico. */
-const keypadRowGap = { compact: spacing.md, regular: spacing.lg } as const;
-/** Lado del avatar de categoría. */
-const categoryIconSize = 44;
-/** Anchura compacta del selector; conserva dos objetivos táctiles holgados. */
-const typeSelectorWidth = { compact: 216, regular: 240 } as const;
-/** Anchura relativa de la columna de operadores; >48 pt en la pantalla más estrecha (320 pt). */
-const operatorColumnRatio = 0.72;
 
 export function CreateTransactionModal({
   activeSpaceId,
@@ -137,7 +128,9 @@ export function CreateTransactionModal({
 }: CreateTransactionModalProps) {
   const density = useLayoutDensity();
   const { colors } = useTheme();
-  const styles = useThemedStyles((palette) => createStyles(palette, density));
+  const styles = useThemedStyles((palette) =>
+    createTransactionModalStyles(palette, density),
+  );
   const effectiveAvailableCurrencies = useMemo(() => {
     const list = availableCurrencies ?? defaultAvailableCurrencies;
     return list.includes(spaceCurrency) ? list : [spaceCurrency, ...list];
@@ -159,6 +152,8 @@ export function CreateTransactionModal({
     useState(false);
   const [isCurrencyPickerVisible, setCurrencyPickerVisible] = useState(false);
   const [currencyError, setCurrencyError] =
+    useState<CurrencySwitchReason | null>(null);
+  const [calculatorError, setCalculatorError] =
     useState<CurrencySwitchReason | null>(null);
   const [segmentedControlWidth, setSegmentedControlWidth] = useState(0);
   const wasVisible = useRef(false);
@@ -282,6 +277,7 @@ export function CreateTransactionModal({
     setRecurrencePickerVisible(false);
     setCurrencyPickerVisible(false);
     setCurrencyError(null);
+    setCalculatorError(null);
   }, [visible, activeSpaceId]);
 
   useEffect(() => {
@@ -392,7 +388,16 @@ export function CreateTransactionModal({
       amountMinor,
       currency,
     );
-    setAmountInput(amountMinorToInput(result, currency));
+    if (!result.ok) {
+      // El borrador queda intacto para que la persona corrija la operación
+      // en lugar de perderla con un valor silenciosamente truncado.
+      setCalculatorError(result.reason);
+      animateAmountInput();
+      return;
+    }
+
+    setCalculatorError(null);
+    setAmountInput(amountMinorToInput(result.valueMinor, currency));
     setPendingOperations([]);
     setReplaceAmount(true);
     animateAmountInput();
@@ -624,6 +629,16 @@ export function CreateTransactionModal({
                 ) : null}
               </Text>
             </View>
+            {calculatorError ? (
+              <Text
+                style={styles.calculatorError}
+                testID="transaction-calculator-error"
+                tone="expense"
+                variant="footnote"
+              >
+                {currencySwitchErrorMessages[calculatorError]}
+              </Text>
+            ) : null}
           </Animated.View>
 
           <View style={styles.metadataRow} testID="transaction-metadata-row">
@@ -877,163 +892,4 @@ export function CreateTransactionModal({
       />
     </>
   );
-}
-
-function createStyles(colors: ColorTokens, density: LayoutDensity) {
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      justifyContent: 'space-between',
-      gap: layout.stackGap[density],
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.lg,
-    },
-    segmentedControl: {
-      width: typeSelectorWidth[density],
-      height: layout.minTouchTarget,
-      flexDirection: 'row',
-      borderRadius: radii.lg,
-      backgroundColor: colors.keypad,
-      overflow: 'hidden',
-    },
-    segment: {
-      flex: 1,
-      minHeight: layout.minTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      borderRadius: radii.lg,
-      zIndex: 1,
-    },
-    segmentIndicator: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      top: 0,
-      borderRadius: radii.lg,
-    },
-    diagonalArrow: {
-      transform: [{ rotate: '45deg' }],
-    },
-    lockedTypeBadge: {
-      height: layout.minTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      borderRadius: radii.lg,
-      paddingHorizontal: spacing.lg,
-    },
-    titleInput: {
-      minHeight: layout.controlHeight[density],
-      borderRadius: radii.md,
-      borderColor: colors.border,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      color: colors.textPrimary,
-      fontFamily: typography.body.fontFamily,
-      fontSize: typography.body.fontSize,
-      letterSpacing: typography.body.letterSpacing,
-      paddingHorizontal: spacing.lg,
-    },
-    amountArea: {
-      minHeight: amountAreaMinHeight[density],
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    amount: {
-      flex: 1,
-      textAlign: 'center',
-    },
-    amountRow: {
-      width: '100%',
-      maxWidth: '100%',
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'center',
-    },
-    metadataRow: {
-      flexDirection: 'row',
-      justifyContent: 'flex-start',
-      gap: layout.controlGap[density],
-    },
-    metadataButton: {
-      minWidth: layout.controlHeight[density],
-      height: layout.controlHeight[density],
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      borderRadius: radii.round,
-      borderColor: colors.border,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      paddingHorizontal: spacing.md,
-    },
-    metadataLabel: { flexShrink: 1 },
-    keypad: {
-      rowGap: keypadRowGap[density],
-    },
-    keypadRow: {
-      flexDirection: 'row',
-      columnGap: layout.controlGap[density],
-    },
-    key: {
-      flex: 1,
-      height: layout.keypadKeyHeight[density],
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.keypad,
-    },
-    operatorKey: {
-      flex: operatorColumnRatio,
-    },
-    keyPressed: {
-      backgroundColor: colors.surfaceMuted,
-      transform: [{ scale: 0.97 }],
-    },
-    footer: {
-      flexDirection: 'row',
-      gap: layout.controlGap[density],
-    },
-    categoryButton: {
-      flex: 1.6,
-      minWidth: 0,
-      minHeight: layout.actionHeight[density],
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      borderRadius: radii.md,
-      borderColor: colors.border,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      paddingHorizontal: spacing.md,
-    },
-    categoryIcon: {
-      width: categoryIconSize,
-      height: categoryIconSize,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.modalBackground,
-    },
-    selectedCategoryIcon: {
-      backgroundColor: 'transparent',
-    },
-    categoryLabel: {
-      flex: 1,
-    },
-    submitButton: {
-      flex: 1,
-    },
-    pressed: {
-      opacity: 0.72,
-    },
-  });
 }
