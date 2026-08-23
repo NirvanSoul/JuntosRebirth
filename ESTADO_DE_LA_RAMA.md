@@ -79,7 +79,7 @@ el despliegue sigue siendo conjunto para las tres entregas.
 
 **Pendiente, ya decidido.** La Fase 4 está abierta en siete frentes: autoría
 visible de cada movimiento, perfiles y avatares de miembros, cuentas de dinero,
-copias entre espacios, consolidación visual, internacionalización a español e
+consolidación visual, copias entre espacios, internacionalización a español e
 inglés, e inicio de sesión con Google y Apple. Las tres primeras son capacidades
 que tú propusiste y que entran como alcance obligatorio del MVP, implementadas
 desde los contratos de esta rama.
