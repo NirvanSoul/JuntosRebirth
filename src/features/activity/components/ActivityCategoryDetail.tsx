@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { List } from 'phosphor-react-native/src/icons/List';
 import { SquaresFour } from 'phosphor-react-native/src/icons/SquaresFour';
 import Animated, {
   Easing,
-  FadeInDown,
-  FadeOutUp,
   ReduceMotion,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
@@ -35,17 +37,13 @@ type ActivityCategoryDetailProps = {
   spaceCurrency: CurrencyCode;
 };
 
-const categoryViewEntering = FadeInDown.duration(
-  motion.categoryViewTransitionDuration,
-)
-  .easing(Easing.out(Easing.cubic))
-  .reduceMotion(ReduceMotion.System);
+type CategoryView = 'grid' | 'list';
 
-const categoryViewExiting = FadeOutUp.duration(
-  motion.categoryViewTransitionDuration,
-)
-  .easing(Easing.in(Easing.cubic))
-  .reduceMotion(ReduceMotion.System);
+const categoryViewTiming = {
+  duration: motion.categoryViewTransitionDuration,
+  easing: Easing.out(Easing.cubic),
+  reduceMotion: ReduceMotion.System,
+};
 
 export function ActivityCategoryDetail({
   budgetExpenseByCategoryId,
@@ -59,18 +57,91 @@ export function ActivityCategoryDetail({
 }: ActivityCategoryDetailProps) {
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
-  const [isGridVisible, setGridVisible] = useState(categoryView === 'grid');
+  const [selectedCategoryView, setSelectedCategoryView] =
+    useState<CategoryView>(categoryView);
+  const [displayedCategoryView, setDisplayedCategoryView] =
+    useState<CategoryView>(categoryView);
+  const entryOffset = useRef<number | null>(null);
+  const isTransitioning = useRef(false);
+  const previousCategoryView = useRef(categoryView);
+  const opacity = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const isGridVisible = selectedCategoryView === 'grid';
+  const displayedGridView = displayedCategoryView === 'grid';
+
+  const categoryViewAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateX: translateX.value }],
+  }));
 
   useEffect(() => {
-    setGridVisible(categoryView === 'grid');
-  }, [categoryView]);
+    if (categoryView === previousCategoryView.current) {
+      return;
+    }
+
+    previousCategoryView.current = categoryView;
+    if (categoryView === selectedCategoryView) {
+      return;
+    }
+
+    isTransitioning.current = false;
+    entryOffset.current = null;
+    opacity.value = 1;
+    translateX.value = 0;
+    setSelectedCategoryView(categoryView);
+    setDisplayedCategoryView(categoryView);
+  }, [categoryView, opacity, selectedCategoryView, translateX]);
+
+  const finishTransition = useCallback(() => {
+    isTransitioning.current = false;
+  }, []);
+
+  const showNextCategoryView = useCallback(
+    (nextView: CategoryView, incomingOffset: number) => {
+      entryOffset.current = incomingOffset;
+      setDisplayedCategoryView(nextView);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const incomingOffset = entryOffset.current;
+    if (incomingOffset === null) {
+      return;
+    }
+
+    entryOffset.current = null;
+    opacity.value = 0;
+    translateX.value = incomingOffset;
+    opacity.value = withTiming(1, categoryViewTiming);
+    translateX.value = withTiming(0, categoryViewTiming, (finished) => {
+      if (finished) {
+        runOnJS(finishTransition)();
+      }
+    });
+  }, [displayedCategoryView, finishTransition, opacity, translateX]);
 
   const toggleCategoryView = () => {
-    setGridVisible((visible) => {
-      const next = !visible;
-      onCategoryViewChange?.(next ? 'grid' : 'list');
-      return next;
-    });
+    if (isTransitioning.current) {
+      return;
+    }
+
+    const nextView: CategoryView = isGridVisible ? 'list' : 'grid';
+    const outgoingOffset = motion.categoryViewTransitionTravel;
+
+    isTransitioning.current = true;
+    setSelectedCategoryView(nextView);
+    onCategoryViewChange?.(nextView);
+    opacity.value = withTiming(0, categoryViewTiming);
+    translateX.value = withTiming(
+      outgoingOffset,
+      categoryViewTiming,
+      (finished) => {
+        if (finished) {
+          runOnJS(showNextCategoryView)(nextView, -outgoingOffset);
+        }
+      },
+    );
   };
 
   return (
@@ -107,19 +178,19 @@ export function ActivityCategoryDetail({
       </View>
       {categories.length > 0 ? (
         <Animated.View
-          entering={categoryViewEntering}
-          exiting={categoryViewExiting}
-          key={isGridVisible ? 'grid' : 'list'}
           layout={getActivityLayoutTransition()}
-          style={isGridVisible ? styles.grid : styles.groupShadow}
+          style={[
+            displayedGridView ? styles.grid : styles.groupShadow,
+            categoryViewAnimatedStyle,
+          ]}
           testID="activity-category-preview-group"
         >
           <View
-            style={isGridVisible ? styles.gridContent : styles.group}
+            style={displayedGridView ? styles.gridContent : styles.group}
             testID="activity-category-preview-list"
           >
             {categories.map(({ id, ...category }, index) =>
-              isGridVisible ? (
+              displayedGridView ? (
                 <CategoryPreviewCard
                   {...category}
                   budgetExpenseMinor={budgetExpenseByCategoryId.get(id) ?? 0}

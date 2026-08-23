@@ -846,7 +846,7 @@ describe('ActivityScreen', () => {
     ).toBeTruthy();
   });
 
-  it('alterna el detalle por categoría entre la lista y las tarjetas de Inicio en tres columnas', async () => {
+  it('desplaza las tarjetas de Inicio sin superponer la vista de lista', async () => {
     const foodCategory: Category = {
       id: 'food',
       spaceId: 'personal',
@@ -875,7 +875,7 @@ describe('ActivityScreen', () => {
         <ThemeProvider initialAppearance="light">
           <ActivityScreen
             categories={[...categories, foodCategory, travelCategory]}
-            categoryView="list"
+            categoryView="grid"
             transactions={transactions}
           />
         </ThemeProvider>
@@ -883,22 +883,9 @@ describe('ActivityScreen', () => {
     );
 
     const toggle = screen.getByRole('button', {
-      name: 'Cambiar a vista de cuadrícula',
+      name: 'Cambiar a vista de lista',
     });
 
-    await fireEvent.press(toggle);
-
-    expect(
-      screen.getByRole('button', { name: 'Cambiar a vista de lista' }),
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId('activity-category-preview-group').props,
-    ).toMatchObject({
-      entering: expect.anything(),
-      exiting: expect.anything(),
-      layout: expect.anything(),
-    });
-    expect(screen.queryByTestId('activity-category-separator')).toBeNull();
     expect(screen.getAllByTestId('category-tile-surface')).toHaveLength(3);
     expect(
       StyleSheet.flatten(
@@ -912,6 +899,25 @@ describe('ActivityScreen', () => {
     ).toMatchObject({
       borderColor: colors.border,
       borderRadius: radii.lg * 0.9 + 1,
+    });
+
+    await fireEvent.press(toggle);
+
+    expect(
+      screen.getByRole('button', { name: 'Cambiar a vista de cuadrícula' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('activity-category-preview-group').props,
+    ).toMatchObject({
+      layout: expect.anything(),
+    });
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('activity-category-preview-group').props.style,
+      ),
+    ).toMatchObject({
+      opacity: 1,
+      transform: [{ translateX: 0 }],
     });
   });
 
