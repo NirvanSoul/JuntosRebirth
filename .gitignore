@@ -49,3 +49,8 @@ yarn-error.*
 *HANDOFF*.md
 *IMPLEMENTATION_STATE*.md
 *CONTEXT_ENGINE*.md
+
+# Bundles de traspaso entre maquinas (git bundle). Son el vehiculo del
+# codigo, no codigo: pesan decenas de MB y su contenido ya esta en el
+# historial.
+*.bundle
