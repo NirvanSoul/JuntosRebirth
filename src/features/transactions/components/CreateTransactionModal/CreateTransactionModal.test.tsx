@@ -262,6 +262,46 @@ describe('CreateTransactionModal', () => {
     expect(screen.getByLabelText('300 euros')).toBeTruthy();
   });
 
+  it('muestra el error de entero inseguro y conserva el borrador al desbordar la calculadora', async () => {
+    const screen = await renderWithTheme(
+      <CreateTransactionModal
+        activeSpaceId="personal"
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={jest.fn()}
+        selectedCategory={category}
+        visible
+      />,
+    );
+
+    for (let digit = 0; digit < 13; digit += 1) {
+      await fireEvent.press(screen.getByLabelText('9'));
+    }
+    await fireEvent.press(screen.getByLabelText('Multiplicar'));
+    for (let digit = 0; digit < 13; digit += 1) {
+      await fireEvent.press(screen.getByLabelText('9'));
+    }
+
+    const overflowExpressionLabel =
+      '9.999.999.999.999 × 9.999.999.999.999 euros, operación Multiplicar seleccionada';
+
+    expect(screen.getByLabelText(overflowExpressionLabel)).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Calcular resultado'));
+
+    expect(screen.getByTestId('transaction-calculator-error')).toBeTruthy();
+    expect(
+      screen.getByText('El importe es demasiado grande para esta moneda.'),
+    ).toBeTruthy();
+    // El importe y la expresión pendiente permanecen exactamente iguales.
+    expect(screen.getByLabelText(overflowExpressionLabel)).toBeTruthy();
+    expect(screen.getByTestId('transaction-active-operator')).toBeTruthy();
+    // No se presentó ni aceptó un resultado parcial.
+    expect(screen.getByLabelText('Calcular resultado')).toBeTruthy();
+    expect(screen.queryByLabelText('Agregar movimiento')).toBeNull();
+  });
+
   it('permite cambiar el operador antes de introducir el segundo importe', async () => {
     const screen = await renderWithTheme(
       <CreateTransactionModal
