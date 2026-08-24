@@ -19,7 +19,7 @@ import {
 } from '@/components/overlays/CopySuccessToast/CopySuccessToast';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { ActivityScreen } from '@/features/activity/screens/ActivityScreen';
-import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import {
   CategoryPickerModal,
   type CategoryPickerSelection,
@@ -145,7 +145,7 @@ export function MainTabsNavigator() {
     selectSpace,
     spaces,
   } = useSpaces();
-  const { session } = useAuthSession();
+  const { session } = useLegalSessionGate();
   const [isInvitePartnerVisible, setInvitePartnerVisible] = useState(false);
   const [isSpaceAuthModalVisible, setSpaceAuthModalVisible] = useState(false);
   const coupleSpace = spaces.find((space) => space.type === 'couple') ?? null;

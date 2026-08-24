@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { StepProgressBar } from '@/components/ui/StepProgressBar/StepProgressBar';
 import { Text } from '@/components/ui/Text/Text';
-import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import { ForgotPasswordScreen } from '@/features/auth/screens/ForgotPasswordScreen';
+import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
 import { ResetPasswordScreen } from '@/features/auth/screens/ResetPasswordScreen';
 import {
@@ -20,6 +20,7 @@ import {
   type AcceptInvitationErrorCode,
   type InvitationPreview,
 } from '@/features/spaces/gateways/supabaseInvitationGateway';
+import { useInvitationAutoAcceptance } from '@/features/spaces/hooks/useInvitationAutoAcceptance';
 import { useRecoveryPhase } from '@/features/spaces/hooks/useRecoveryPhase';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
@@ -86,11 +87,7 @@ function describeAcceptError(
   }
 }
 
-/**
- * Pantalla completa (no modal): debe poder abrirse desde un enlace profundo
- * en frío, antes de que exista ningún host de modales. Cubre las tres ramas
- * de `docs`/plan: con sesión, sin sesión con cuenta, sin cuenta.
- */
+/** Pantalla completa (no modal) para el enlace profundo de invitación: cubre con sesión, sin sesión con cuenta y sin cuenta. */
 export function AcceptInvitationScreen({
   onFinished,
   refreshCoupleSpace,
@@ -98,7 +95,11 @@ export function AcceptInvitationScreen({
 }: AcceptInvitationScreenProps) {
   const styles = useThemedStyles(createStyles);
   const { colors } = useTheme();
-  const { isReady: isAuthReady, session } = useAuthSession();
+  const {
+    isReady: isAuthReady,
+    session,
+    setRecoveryHalted,
+  } = useLegalSessionGate();
   const [previewState, setPreviewState] = useState<PreviewState>({
     status: 'loading',
   });
@@ -112,6 +113,12 @@ export function AcceptInvitationScreen({
     phase: recoveryPhase,
     startRecovery,
   } = useRecoveryPhase();
+
+  // Mientras hay un subflujo de recuperación, la sesión del OTP queda en pausa:
+  // ni la puerta legal ni la autoaceptación pueden cortocircuitar el restablecimiento.
+  useEffect(() => {
+    setRecoveryHalted(recoveryPhase.kind !== 'inactive');
+  }, [recoveryPhase.kind, setRecoveryHalted]);
   const goToForgot = useCallback(() => {
     startRecovery();
     setAuthStep({ screen: 'forgot' });
@@ -120,9 +127,6 @@ export function AcceptInvitationScreen({
     finishRecovery();
     setAuthStep({ screen: 'login' });
   }, [finishRecovery]);
-  const hasAutoAcceptedRef = useRef(false);
-  const initialSessionCheckedRef = useRef(false);
-  const hadSessionOnLoadRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -139,12 +143,6 @@ export function AcceptInvitationScreen({
       isMounted = false;
     };
   }, [token]);
-
-  useEffect(() => {
-    if (!isAuthReady || initialSessionCheckedRef.current) return;
-    initialSessionCheckedRef.current = true;
-    hadSessionOnLoadRef.current = Boolean(session);
-  }, [isAuthReady, session]);
 
   const handleAccept = useCallback(async () => {
     setAcceptState({ status: 'accepting' });
@@ -164,23 +162,15 @@ export function AcceptInvitationScreen({
     }
   }, [refreshCoupleSpace, token]);
 
-  useEffect(() => {
-    if (!initialSessionCheckedRef.current || hadSessionOnLoadRef.current)
-      return;
-    if (!session) return;
-    // Pausa: la sesión del OTP de recuperación no debe autoaceptar.
-    if (recoveryPhase.kind !== 'inactive') return;
-    if (
-      previewState.status !== 'loaded' ||
-      previewState.preview.status !== 'pending'
-    ) {
-      return;
-    }
-    if (acceptState.status !== 'idle' || hasAutoAcceptedRef.current) return;
-
-    hasAutoAcceptedRef.current = true;
-    void handleAccept();
-  }, [acceptState.status, handleAccept, previewState, recoveryPhase, session]);
+  // La autoaceptación espera a la sesión legalmente habilitada y acepta una vez.
+  useInvitationAutoAcceptance({
+    acceptState,
+    isAuthReady,
+    onAccept: handleAccept,
+    previewState,
+    recoveryPhaseKind: recoveryPhase.kind,
+    session,
+  });
 
   if (previewState.status === 'loading') {
     return (
@@ -363,6 +353,7 @@ export function AcceptInvitationScreen({
               onSuccess={({ email }) =>
                 setAuthStep({ screen: 'verify-signup', email })
               }
+              source="invitation-signup"
               step={authStep.step}
             />
           ) : null}

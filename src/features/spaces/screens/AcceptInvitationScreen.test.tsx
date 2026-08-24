@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 
+import { resetLegalSessionGateForTests } from '@/features/legal/hooks/useLegalSessionGate';
 import { AcceptInvitationScreen } from '@/features/spaces/screens/AcceptInvitationScreen';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
@@ -43,12 +44,23 @@ jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
   createSupabaseAuthGateway: () => ({ signOut: mockSignOut }),
 }));
 
+const mockConsumePendingLegalAcceptance = jest.fn();
+const mockGetMissingCurrentLegalDocuments = jest.fn();
+jest.mock('@/features/legal/services/legalAcceptanceService', () => ({
+  consumePendingLegalAcceptance: (...args: unknown[]) =>
+    mockConsumePendingLegalAcceptance(...args),
+  getMissingCurrentLegalDocuments: (...args: unknown[]) =>
+    mockGetMissingCurrentLegalDocuments(...args),
+  recordMissingCurrentLegalAcceptances: jest.fn(),
+  LegalAcceptanceEmailMismatchError: class LegalAcceptanceEmailMismatchError extends Error {},
+}));
+
 jest.mock('@/features/auth/screens/LoginScreen', () => ({
   LoginScreen: jest.requireActual('@/test/authScreenStubs').LoginScreenStub,
 }));
 jest.mock('@/features/auth/screens/SignUpScreen', () => ({
   SignUpScreen: jest.requireActual('@/test/authScreenStubs').SignUpScreenStub,
-  signUpTotalSteps: 4,
+  signUpTotalSteps: 5,
 }));
 jest.mock('@/features/auth/screens/VerifyCodeScreen', () => ({
   VerifyCodeScreen: jest.requireActual('@/test/authScreenStubs')
@@ -88,11 +100,21 @@ async function aparecerSesion(session: Session) {
 
 describe('AcceptInvitationScreen — cableado de autenticación', () => {
   beforeEach(() => {
+    resetLegalSessionGateForTests();
     mockSetSession = null;
     mockAcceptInvitation.mockReset();
     mockAcceptInvitation.mockResolvedValue({ spaceName: 'Nuestro hogar' });
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
+    // La puerta legal resuelve «al día» por defecto: el flujo de invitación se
+    // comporta como hasta ahora y los casos de puerta la controlan a medida.
+    mockConsumePendingLegalAcceptance.mockReset();
+    mockConsumePendingLegalAcceptance.mockResolvedValue({
+      outcome: 'no-intention',
+      insertedCount: 0,
+    });
+    mockGetMissingCurrentLegalDocuments.mockReset();
+    mockGetMissingCurrentLegalDocuments.mockResolvedValue([]);
   });
 
   async function renderInvitation() {
@@ -135,6 +157,14 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
 
     await fireEvent.press(screen.getByTestId('stub-login-signup'));
     expect(await screen.findByTestId('stub-signup-screen')).toBeTruthy();
+    // Origen legal de invitación y progreso extendido.
+    expect(screen.getByTestId('stub-signup-source').props.children).toBe(
+      'invitation-signup',
+    );
+    expect(
+      screen.getByTestId('accept-invitation-signup-progress').props
+        .accessibilityValue.max,
+    ).toBe(6);
 
     await fireEvent.press(await screen.findByTestId('stub-signup-complete'));
     expect(await screen.findByText('signup')).toBeTruthy();
@@ -232,6 +262,39 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
       await screen.findByText('signup');
 
       // El OTP de registro crea la sesión: la autoaceptación sigue viva.
+      await aparecerSesion(createOtpSession('user-signup'));
+
+      await waitFor(() =>
+        expect(mockAcceptInvitation).toHaveBeenCalledTimes(1),
+      );
+      expect(await screen.findByTestId('accept-invitation-done')).toBeTruthy();
+    });
+
+    it('una sesión con evidencia legal pendiente no autoacepta hasta habilitarla y entonces acepta una sola vez', async () => {
+      const screen = await renderInvitation();
+
+      await fireEvent.press(screen.getByTestId('stub-login-signup'));
+      await screen.findByTestId('stub-signup-screen');
+      await fireEvent.press(screen.getByTestId('stub-signup-complete'));
+      await screen.findByText('signup');
+
+      // Falta evidencia: la sesión recién creada no habilita efectos.
+      mockGetMissingCurrentLegalDocuments.mockResolvedValue([
+        'terms-of-service',
+      ]);
+      await aparecerSesion(createOtpSession('user-signup'));
+
+      await waitFor(() =>
+        expect(mockGetMissingCurrentLegalDocuments).toHaveBeenCalled(),
+      );
+      expect(mockAcceptInvitation).not.toHaveBeenCalled();
+
+      // La puerta se despeja (evidencia registrada en la consulta remota) y la
+      // sesión recién habilitada acepta exactamente una vez.
+      mockGetMissingCurrentLegalDocuments.mockResolvedValue([]);
+      await act(async () => {
+        mockSetSession?.(null);
+      });
       await aparecerSesion(createOtpSession('user-signup'));
 
       await waitFor(() =>

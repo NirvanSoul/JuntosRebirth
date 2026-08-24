@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 
-import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import type { InvitationGateway } from '@/features/spaces/gateways/supabaseInvitationGateway';
 import { createSupabaseInvitationGateway } from '@/features/spaces/gateways/supabaseInvitationGateway';
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
@@ -14,7 +14,7 @@ import { personalSpace, type Space } from '@/features/spaces/types';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 import { loadCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 
-jest.mock('@/features/auth/hooks/useAuthSession');
+jest.mock('@/features/legal/hooks/useLegalSessionGate');
 jest.mock('@/features/spaces/gateways/supabaseInvitationGateway');
 jest.mock('@/features/spaces/repositories/localSpaceRepository');
 jest.mock('@/lib/supabase/supabaseClient');
@@ -29,10 +29,19 @@ function sessionFor(userId: string): Session {
 }
 
 function mockAuthSession(session: Session | null) {
-  jest.mocked(useAuthSession).mockReturnValue({
+  jest.mocked(useLegalSessionGate).mockReturnValue({
     isReady: true,
+    gateReady: true,
+    isLegallyEnabled: true,
     session,
-    userId: session?.user.id ?? null,
+    rawSession: session,
+    status: session ? { kind: 'cleared' } : { kind: 'no-session' },
+    error: null,
+    missingDocuments: [],
+    retryGate: jest.fn(),
+    submitRegularization: jest.fn(),
+    abandonSession: jest.fn(),
+    setRecoveryHalted: jest.fn(),
   });
 }
 

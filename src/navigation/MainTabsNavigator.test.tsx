@@ -39,11 +39,20 @@ jest.mock('@/features/spaces/hooks/useSpaces', () => ({
   useSpaces: () => mockUseSpaces(),
 }));
 
-jest.mock('@/features/auth/hooks/useAuthSession', () => ({
-  useAuthSession: () => ({
-    session: mockSession,
-    userId: mockSession?.user?.id ?? null,
+jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
+  useLegalSessionGate: () => ({
     isReady: true,
+    gateReady: true,
+    isLegallyEnabled: true,
+    session: mockSession,
+    rawSession: mockSession,
+    status: mockSession ? { kind: 'cleared' } : { kind: 'no-session' },
+    error: null,
+    missingDocuments: [],
+    retryGate: jest.fn(),
+    submitRegularization: jest.fn(),
+    abandonSession: jest.fn(),
+    setRecoveryHalted: jest.fn(),
   }),
 }));
 

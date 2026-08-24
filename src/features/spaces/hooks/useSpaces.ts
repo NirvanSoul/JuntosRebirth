@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import { createSupabaseInvitationGateway } from '@/features/spaces/gateways/supabaseInvitationGateway';
 import {
   createSpaceId,
@@ -155,7 +155,7 @@ export function useSpaces(): SpacesController {
   const [state, setState] = useState<SpacesState>(initialSpacesState);
   const [isReady, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isReady: isAuthReady, session } = useAuthSession();
+  const { isReady: isAuthReady, session } = useLegalSessionGate();
   const userId = session?.user.id ?? null;
   const stateRef = useRef(state);
   stateRef.current = state;

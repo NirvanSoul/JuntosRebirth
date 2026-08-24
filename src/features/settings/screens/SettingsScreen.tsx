@@ -31,7 +31,7 @@ import {
 import { Avatar } from '@/components/ui/Avatar/Avatar';
 import { Text } from '@/components/ui/Text/Text';
 import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
-import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import { DataRightsScreen } from '@/features/legal/screens/DataRightsScreen';
 import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScreen';
 import { PermissionsScreen } from '@/features/legal/screens/PermissionsScreen';
@@ -110,7 +110,7 @@ export function SettingsScreen({
 }: SettingsScreenProps) {
   const { colors, isDark, setAppearance, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
-  const { session } = useAuthSession();
+  const { session } = useLegalSessionGate();
   const { restartOnboarding } = useOnboardingStatus();
   const [isAuthModalVisible, setAuthModalVisible] = useState(false);
   const [isSigningOut, setSigningOut] = useState(false);

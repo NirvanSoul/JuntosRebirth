@@ -8,7 +8,7 @@ import {
   createSupabaseInvitationGateway,
   type CurrentUserInvitation,
 } from '@/features/spaces/gateways/supabaseInvitationGateway';
-import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import { useAppForeground } from '@/hooks/useAppForeground';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
@@ -23,7 +23,7 @@ type PendingInvitationBannerProps = {
 export function PendingInvitationBanner({
   onAccepted,
 }: PendingInvitationBannerProps) {
-  const { session } = useAuthSession();
+  const { session } = useLegalSessionGate();
   const styles = useThemedStyles(createStyles);
   const [invitation, setInvitation] = useState<CurrentUserInvitation | null>(
     null,
