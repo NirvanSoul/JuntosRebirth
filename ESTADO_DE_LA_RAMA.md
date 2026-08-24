@@ -104,19 +104,25 @@ veredicto de la ronda 4 (GPT) aceptó esa base pero rechazó la entrega por B9
 (guardar la contraseña después de un `cancelReset` fallido dejaba la máquina
 incoherente: cierre por éxito con pausa retenida y sesión recién terminada) e
 I1 (la idempotencia de `cancelReset` no era atómica: dos llamadas inmediatas
-abrían dos `signOut`). La ronda 5 introdujo `completeRecovery` —terminación confirmada tras el éxito
-real de la nueva contraseña, `inactive` sin `signOut`— y la publicación
-síncrona de la fase en la ref (I1), con una prueba roja por anfitrión y una
-directa del hook. El veredicto de la ronda 5 aprobó B9 e I1 pero rechazó B10:
-la terminación se descartaba durante `canceling`. La ronda 6 la encola de
-verdad —fase `cancelingCompletion`— y define el resultado ganador al resolver
-el signOut: `inactive` sin `onCanceled`, también cuando el signOut falla (nunca
-`cancelError` con el host cerrado/abandonado); el cierre forzado de `AuthModal`
-ya no re-llama `cancelReset` con una cancelación en vuelo. Queda corregida la
-afirmación previa: `requestClose` es el único camino de cancelación hacia
-`onClose`; el cierre por éxito es una transición distinta. Validación actual:
-**135 suites / 888
-pruebas / EXIT=0**. Queda el veredicto de la ronda 6 del Gate 2 y, solo
+abrían dos `signOut`). La ronda 5 introdujo `completeRecovery` —terminación
+confirmada tras el éxito real de la nueva contraseña, `inactive` sin `signOut`—
+y la publicación síncrona de la fase en la ref (I1), con una prueba roja por
+anfitrión y una directa del hook. El veredicto de la ronda 5 aprobó B9 e I1
+pero rechazó B10 (la terminación se descartaba durante `canceling`); la ronda 6
+la encoló en `cancelingCompletion`, y el veredicto de la ronda 6 rechazó B11
+(la ronda 6 asumía sesión viva, pero GoTrue elimina la sesión local con éxito y
+en la mayoría de errores del `_signOut`) y B12 (`cancelingCompletion` no era
+pegajosa). La ronda 7 define el ganador por el estado real posterior con
+`getSession` —sesión `null` → ganó la cancelación (`inactive` + `onCanceled`);
+sesión presente → ganó la terminación (`inactive`, sin `onCanceled`); estado
+desconocido → fallo observable seguro (`cancelError`)— y hace `cancelingCompletion`
+pegajosa frente a todos los escritores; los mocks de la invitación reproducen el
+cambio real de sesión (no se autoacepta si ya no existe; sí solo con sesión
+viva). El cierre forzado de `AuthModal` ya no re-llama `cancelReset` con una
+cancelación en vuelo, y sigue documentado que `requestClose` es el único camino
+de cancelación hacia `onClose` (el cierre por éxito es una transición distinta).
+Validación actual: **135 suites / 893
+pruebas / EXIT=0**. Queda el veredicto de la ronda 7 del Gate 2 y, solo
 después, el smoke físico (recuperación de contraseña incluida, y con
 `enable_confirmations` activado en local para los pasos del OTP) antes de
 marcar la tarea cerrada.

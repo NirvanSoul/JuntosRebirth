@@ -5415,7 +5415,7 @@ del borrado, archivo o disolución del espacio.
 
 # ADR-083 — Integración legal en la autenticación existente: intención durable y puerta de sesión obligatoria
 
-**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; el veredicto de la ronda 3 aprobó B6 y B8 y rechazó B7, corregido estructuralmente en la ronda 4 —ver ronda 4 abajo—; el veredicto de la ronda 4 rechazó la entrega por B9 e I1, corregidos en la ronda 5 —ver ronda 5 abajo—; el veredicto de la ronda 5 rechazó la entrega por B10 (terminación perdida durante `canceling`), corregido en la ronda 6 con la terminación encolada —ver ronda 6 abajo—; pendientes el veredicto de la ronda 6 y el smoke físico).
+**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; el veredicto de la ronda 3 aprobó B6 y B8 y rechazó B7, corregido estructuralmente en la ronda 4 —ver ronda 4 abajo—; el veredicto de la ronda 4 rechazó la entrega por B9 e I1, corregidos en la ronda 5 —ver ronda 5 abajo—; el veredicto de la ronda 5 rechazó la entrega por B10 (terminación perdida durante `canceling`), corregido en la ronda 6 con la terminación encolada —ver ronda 6 abajo—; el veredicto de la ronda 6 rechazó la entrega por B11 (el resultado asumía sesión viva pese al contrato real de GoTrue) y B12 (`cancelingCompletion` no era pegajosa), corregidos en la ronda 7 —ver ronda 7 abajo—; pendientes el veredicto de la ronda 7 y el smoke físico).
 
 ## Contexto
 
@@ -5756,6 +5756,62 @@ signOut (sin `onCanceled`). Evidencia roja (5 fallan) y verde focal con
 Validación final del árbol ya commiteado: **135 suites / 888 pruebas / EXIT=0**
 (`npm run validate`; `gate2_r6_final.txt`). Pendientes para cerrar la Fase 5
 legal: veredicto de la ronda 6 de ambos verificadores y, solo después, el smoke
+físico completo.
+
+## Gate 2 — ronda 7 (2026-08-24): resultado por el estado real de la sesión (B11) y pegajosidad de cancelingCompletion (B12)
+
+El veredicto de la ronda 6 aprobó la terminación encolada como mecanismo (B10)
+y la validación de **135 suites / 888 pruebas / EXIT=0**, pero rechazó la
+entrega con dos bloqueantes:
+
+- **B11 — el «resultado definido» contradecía el contrato real de Supabase.**
+  `GoTrueClient._signOut` elimina la sesión local con éxito y también en la
+  mayoría de errores antes de devolver el error; `supabaseAuthGateway` convierte
+  el error en excepción, pero esa excepción NO demuestra que la sesión siga
+  viva. La ronda 6 asumía lo contrario (que el fallo del signOut implicaba
+  sesión conservada) y los mocks de `signOut` resolviendo/rechazando sin
+  reproducir el cambio de sesión daban un falso verde: un signOut con éxito no
+  podía perder contra la terminación, y un signOut rechazado tampoco
+  garantizaba «sesión viva».
+- **B12 — `cancelingCompletion` podía sobrescribirse.** `startRecovery` y
+  `finishRecovery` bloqueaban `canceling`/`cancelError` pero no
+  `cancelingCompletion`: «cancelar → guardar durante el vuelo → Access en login
+  con `cancelingCompletion` → pulsar «Olvidé mi contraseña»» publicaba `active`
+  y la resolución del signOut tomaba la rama errónea al perder la marca encolada.
+
+**Corrección estructural:**
+
+- `cancelReset` define el ganador con el **estado real posterior** de la sesión
+  (`getSession` del gateway, lectura fiel del estado local de GoTrue):
+  - sesión `null` → ganó la cancelación: `inactive` + `onCanceled` (no hay
+    sesión que habilitar; la invitación no puede autoaceptar y el anfitrión
+    vuelve al destino de cancelación);
+  - sesión presente → ganó la terminación: `inactive`, sin `onCanceled`;
+  - estado desconocido (`getSession` lanza) → `cancelError`: fallo observable
+    seguro, jamás asumir que la sesión sigue viva.
+  El éxito/fallo del `signOut` deja de ser la variable decisoria (se conserva
+  solo en el caso sin terminación encolada, donde rige el contrato previo de
+  `cancelError`/`onCanceled`).
+- `startRecovery` y `finishRecovery` bloquean también `cancelingCompletion`: la
+  fase encolada es pegajosa frente a TODOS los escritores y la resolución nunca
+  pierde la marca.
+
+**Pruebas (rojas y fieles al contrato de Supabase):** los mocks reproducen el
+cambio de sesión que produce el `_signOut` real. En la invitación: (1) signOut
+con éxito elimina la sesión → aunque se haya guardado la contraseña, NO se
+autoacepta y se vuelve al destino de cancelación; (2) signOut rechaza pero
+también deja la sesión `null` → mismo resultado de cancelación; (3) solo si el
+fallo deja realmente la sesión presente gana la terminación y la invitación se
+acepta una vez. Contrato directo del hook: sesión `null` (éxito y fallo) →
+`inactive` + `onCanceled`; sesión presente → `inactive` sin `onCanceled`; estado
+desconocido → `cancelError`; y `cancelingCompletion` pegajosa frente a
+`startRecovery`/`finishRecovery`/`cancelReset` con un solo `signOut`. Evidencia
+roja (7 fallan) y verde focal con `COMANDO` + `EXIT=` en
+`gate2_r7_rojo_B11_B12.txt` y `gate2_r7_verde_B11_B12.txt`.
+
+Validación final del árbol ya commiteado: **135 suites / 893 pruebas / EXIT=0**
+(`npm run validate`; `gate2_r7_final.txt`). Pendientes para cerrar la Fase 5
+legal: veredicto de la ronda 7 de ambos verificadores y, solo después, el smoke
 físico completo.
 
 ## Consecuencias
