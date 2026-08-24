@@ -5415,7 +5415,7 @@ del borrado, archivo o disolución del espacio.
 
 # ADR-083 — Integración legal en la autenticación existente: intención durable y puerta de sesión obligatoria
 
-**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; el veredicto de la ronda 3 aprobó B6 y B8 y rechazó B7, corregido estructuralmente en la ronda 4 —ver ronda 4 abajo—; pendientes el veredicto de ronda 4 y el smoke físico).
+**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; el veredicto de la ronda 3 aprobó B6 y B8 y rechazó B7, corregido estructuralmente en la ronda 4 —ver ronda 4 abajo—; el veredicto de la ronda 4 rechazó la entrega por B9 e I1, corregidos en la ronda 5 —ver ronda 5 abajo—; pendientes el veredicto de la ronda 5 y el smoke físico).
 
 ## Contexto
 
@@ -5647,6 +5647,64 @@ se sostiene y reintentar termina de cerrar. Evidencia roja (3 fallan) y verde
 Validación final del árbol ya commiteado: **134 suites / 879 pruebas / EXIT=0**
 (`npm run validate`; `gate2_r4_final.txt`). Pendientes para cerrar la Fase 5
 legal: veredicto de la ronda 4 de ambos verificadores y, solo después, el smoke
+físico completo.
+
+## Gate 2 — ronda 5 (2026-08-24): completeRecovery e idempotencia atómica
+
+El veredicto de la ronda 4 (GPT) aceptó la corrección estructural de las dos
+rutas originales de B7 y la validación independiente de **134 suites / 879
+pruebas / EXIT=0**, pero rechazó la entrega con dos hallazgos nuevos:
+
+- **B9 — completar la recuperación tras un `cancelReset` fallido dejaba la
+  máquina incoherente.** Secuencia: OTP verificado → sesión creada → reset →
+  Cancelar → `signOut('local')` falla → `cancelError` → la pantalla sigue
+  operativa → la persona guarda la contraseña nueva → `onSuccess` termina el
+  flujo igualmente. Como la guarda de B7 bloqueaba `finishRecovery`, el anfitrión
+  navegaba o cerraba con la pausa retenida: en `AuthModal` el cierre por éxito
+  ocultaba el modal con el `halt` global (y el efecto de `visible=false`
+  volvía a disparar `signOut` sobre una sesión cuya recuperación ya había
+  terminado: si volvía a fallar, modal oculto con pausa global), `AccessScreen`
+  pasaba a login halted y la invitación quedaba en reset y halted.
+- **I1 — `cancelReset` no era atómicamente idempotente.** `phaseRef.current`
+  solo se sincronizaba en el render; dos `cancelReset` invocados antes de ese
+  render leían la fase vieja y abrían dos `signOut('local')`.
+
+**Corrección estructural:**
+
+- Nueva transición explícita **`completeRecovery`** en `useRecoveryPhase`:
+  distingue la «terminación confirmada» —solo el éxito real de `setNewPassword`,
+  cableada en el `onSuccess` de `ResetPasswordScreen` de los tres anfitriones—
+  de las salidas/cambios de pantalla previos al OTP (`finishRecovery`). Publica
+  `inactive` **sin** `signOut` (la sesión del OTP queda legítimamente
+  habilitada) y atraviesa `cancelError` —una cancelación fallida no puede dejar
+  clavada una recuperación ya terminada—, pero mientras `cancelReset` está en
+  vuelo la finalización queda serializada detrás de la cancelación
+  (`canceling` → no-op).
+- **Publicación atómica de la fase (I1):** todas las transiciones escriben
+  `phaseRef.current` de forma síncrona junto con `setPhase` (`commitPhase`);
+  `cancelReset` publica `canceling` en la ref antes del `await`, así dos
+  llamadas inmediatas producen exactamente un `signOut('local')` y un solo
+  callback.
+- **Matiza la ronda 4:** `requestClose` no es literalmente el único camino hacia
+  `onClose` del modal; es el único camino de **cancelación**. El cierre por
+  éxito es una transición distinta: `completeRecovery()` y después `onClose()`
+  directo, sin pasar por `requestClose`. Tras una terminación confirmada la fase
+  ya es `inactive`, así que un cierre inducido por `visible=false` no vuelve a
+  cancelar.
+
+**Pruebas rojas (nuevas, con transición real):** una por anfitrión con la
+secuencia B9 completa —cancelación falla → mensaje visible → guardar contraseña
+con éxito → pausa liberada → sesión no cerrada (el único `signOut` es el intento
+fallido) → el anfitrión termina en su destino: modal cerrado por éxito (sin
+re-disparar `signOut` aunque `visible` caiga, con cierre real), acceso en login,
+invitación aceptada exactamente una vez—. Una prueba directa del hook para I1
+con `signOut` diferido: dos `cancelReset` inmediatos producen exactamente un
+`signOut` y un solo callback. Evidencia roja (4 fallan) y verde focal, con
+`COMANDO` + `EXIT=`, en `gate2_r5_rojo_B9_I1.txt` y `gate2_r5_verde_B9_I1.txt`.
+
+Validación final del árbol ya commiteado: **135 suites / 883 pruebas / EXIT=0**
+(`npm run validate`; `gate2_r5_final.txt`). Pendientes para cerrar la Fase 5
+legal: veredicto de la ronda 5 de ambos verificadores y, solo después, el smoke
 físico completo.
 
 ## Consecuencias

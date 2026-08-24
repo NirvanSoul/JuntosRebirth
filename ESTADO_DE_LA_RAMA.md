@@ -99,9 +99,19 @@ ronda 3 aprobó B6 y B8 sin reservas y rechazó B7 con dos rutas nuevas en
 por orden de efectos); la ronda 4 corrigió B7 de forma estructural —pausa
 gobernada solo por la fase de recuperación, toda salida posterior a la sesión
 del OTP por `cancelReset`, descarte manual desactivado durante la recuperación
-y guards en `useRecoveryPhase`— con tres pruebas rojas de transición real.
-Validación actual: **134 suites / 879
-pruebas / EXIT=0**. Queda el veredicto de la ronda 4 del Gate 2 y, solo
+y guards en `useRecoveryPhase`— con tres pruebas rojas de transición real. El
+veredicto de la ronda 4 (GPT) aceptó esa base pero rechazó la entrega por B9
+(guardar la contraseña después de un `cancelReset` fallido dejaba la máquina
+incoherente: cierre por éxito con pausa retenida y sesión recién terminada) e
+I1 (la idempotencia de `cancelReset` no era atómica: dos llamadas inmediatas
+abrían dos `signOut`). La ronda 5 introdujo `completeRecovery` —terminación
+confirmada tras el éxito real de la nueva contraseña, `inactive` sin `signOut`,
+serializada detrás de una cancelación en vuelo— y la publicación síncrona de la
+fase en la ref, con una prueba roja por anfitrión y una prueba directa del hook.
+Queda corregida la afirmación previa: `requestClose` es el único camino de
+cancelación hacia `onClose`; el cierre por éxito es una transición distinta.
+Validación actual: **135 suites / 883
+pruebas / EXIT=0**. Queda el veredicto de la ronda 5 del Gate 2 y, solo
 después, el smoke físico (recuperación de contraseña incluida, y con
 `enable_confirmations` activado en local para los pasos del OTP) antes de
 marcar la tarea cerrada.
