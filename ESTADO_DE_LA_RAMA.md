@@ -121,8 +121,18 @@ cambio real de sesión (no se autoacepta si ya no existe; sí solo con sesión
 viva). El cierre forzado de `AuthModal` ya no re-llama `cancelReset` con una
 cancelación en vuelo, y sigue documentado que `requestClose` es el único camino
 de cancelación hacia `onClose` (el cierre por éxito es una transición distinta).
-Validación actual: **135 suites / 893
-pruebas / EXIT=0**. Queda el veredicto de la ronda 7 del Gate 2 y, solo
+El veredicto de la ronda 7 rechazó **B13**: con una cancelación en vuelo, el
+anfitrión ejecutaba su destino de éxito nada más encolar la terminación, sin
+esperar al ganador. Si después ganaba la cancelación se ejecutaban dos destinos,
+y si `getSession` fallaba el `cancelError` quedaba invisible con el modal ya
+cerrado, más un reintento automático oculto. La ronda 8 —con Claude como actor y
+excepción registrada de un solo verificador (§4.3)— encola la **continuación**
+junto con el estado: `completeRecovery(onCompleted?)` la guarda y la resolución
+ejecuta **exactamente un destino**; la marca encolada vive fuera de la fase para
+sobrevivir a `cancelError`, de modo que el reintento ya no degrada a cancelación
+una contraseña que sí se guardó.
+Validación actual: **136 suites / 900
+pruebas / EXIT=0**. Queda el veredicto de la ronda 8 del Gate 2 y, solo
 después, el smoke físico (recuperación de contraseña incluida, y con
 `enable_confirmations` activado en local para los pasos del OTP) antes de
 marcar la tarea cerrada.

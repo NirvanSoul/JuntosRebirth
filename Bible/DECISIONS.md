@@ -5842,6 +5842,69 @@ físico completo.
 - Google y Apple (Fase 4g) siguen fuera por requerir credenciales, enlace de
   identidades y pruebas nativas independientes.
 
+## Gate 2 — ronda 8 (2026-08-24): la resolución gobierna el destino del host (B13)
+
+Actor: **Claude** (excepción registrada de PROJECT_RULES §4.3: esta ronda va con
+un solo verificador, GPT, por decisión explícita del responsable).
+
+El veredicto de la ronda 7 aprobó B11 y B12 dentro del hook, pero rechazó la
+entrega por un bloqueante de integración:
+
+- **B13 — el host abandonaba la recuperación antes de conocer al ganador.**
+  `cancelReset` recibía su continuación (`onCanceled`) y `completeRecovery` no
+  recibía ninguna: el hook arbitraba el ESTADO y dejaba suelto el DESTINO. Con
+  una cancelación en vuelo, `AuthModal` llamaba a `completeRecovery()` y acto
+  seguido a `onClose()`. Si después ganaba la cancelación se ejecutaban dos
+  destinos; si `getSession` fallaba, el `cancelError` quedaba invisible con el
+  modal ya cerrado y el efecto de cierre forzado relanzaba `cancelReset` por su
+  cuenta, formando un ciclo oculto `cancelError → canceling → cancelError`.
+  `AccessScreen` tenía el mismo defecto navegando a `login` por adelantado.
+
+**Corrección estructural:** se encola la continuación junto con el estado.
+`completeRecovery(onCompleted?)` la guarda y la resolución ejecuta **exactamente
+un destino**:
+
+- sesión presente → ganó la terminación: su continuación, una sola vez;
+- sesión `null` → ganó la cancelación: `onCanceled`, una sola vez;
+- `getSession` lanza → ningún destino: `cancelError` observable, sin reintento
+  automático, y la persona permanece en la superficie actual.
+
+La marca de terminación encolada pasa a `pendingCompletionRef`, **fuera de la
+fase**, para que sobreviva a `cancelError`: sin eso el reintento perdía la
+terminación y degradaba a cancelación una contraseña ya guardada (defecto
+latente que no estaba denunciado y se cierra aquí con su propia prueba).
+
+`AuthModal` deja de disparar `cancelReset` desde el efecto de cierre forzado
+cuando la fase es `cancelError`. Reintentar es siempre a petición de la persona,
+con el mensaje delante. Si el padre fuerza el cierre en ese estado, la fase y la
+pausa se sostienen: falla cerrado y la sesión del OTP nunca queda habilitada.
+
+**Pruebas rojas previas** (fuentes en `8573af5`, ficheros de prueba en su
+versión final): 4 suites, **0 sin arrancar**, **7 fallos conductuales**,
+`EXIT=1`. Cubren las tres carreras por host, las dos del contrato del hook y el
+reintento que conserva la terminación.
+
+**Dos pruebas existentes codificaban el contrato antiguo** y se actualizan:
+`ruta 5` de `AuthModal` y `B11` de `AccessScreen` esperaban el cierre y la
+navegación inmediatos, que es justo lo que B13 prohíbe. La de `AccessScreen`
+además era **vacua**: comprobaba con `queryByText` síncrono un render que aún no
+había ocurrido, así que pasaba también contra el código defectuoso. Ahora espera
+a que React vacíe la cola antes de afirmar la ausencia.
+
+**Nota de higiene de pruebas:** las de la carrera viven en
+`AuthModal.recoveryRace.test.tsx`. Envolver la resolución del `signOut` en un
+`act()` propio solapaba ámbitos con los que ya gestionan `fireEvent` y
+`waitFor` («overlapping act() calls»), lo que corrompía la cola de React y hacía
+que el render de la prueba siguiente no montara el modal. La resolución se deja
+sin `act` propio.
+
+**Validación de la ronda 8:** ROJO 7/36 `EXIT=1`; VERDE `npm run validate`
+**136 suites / 900 pruebas / EXIT=0** (typecheck, check:suppressions, eslint,
+prettier y jest), frente a 135/893 de la ronda 7. `frozenLineDebt` sin subidas;
+`AcceptInvitationScreen.tsx` queda en 400 líneas no vacías (≤400) tras condensar
+comentarios, sin tocar el umbral. Evidencia en `c:\Projects\gate2_r8_*.txt` con
+`COMANDO` y `EXIT=`.
+
 ## Validación
 
 - ROJO contra `c4a669e` (ronda 1): 5 suites fallidas / 2 tests fallidos, EXIT=1.
