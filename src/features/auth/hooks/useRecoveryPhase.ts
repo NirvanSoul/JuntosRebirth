@@ -9,11 +9,14 @@ export type RecoveryPhase =
   | { kind: 'cancelError'; message: string };
 
 /**
- * Ciclo del subflujo de recuperación de contraseña en un anfitrión de
- * invitación. Mientras `phase.kind !== 'inactive'`, la sesión creada por el
- * OTP de recuperación queda en pausa: no puede autoaceptar ni cortocircuitar a
- * la puerta de sesión. Cancelar cierra solo la sesión local (`scope: 'local'`)
- * para no revocar la sesión del usuario en sus otros dispositivos.
+ * Ciclo del subflujo de recuperación de contraseña, compartido por los tres
+ * anfitriones de autenticación (invitación, acceso inicial y Ajustes).
+ * Mientras `phase.kind !== 'inactive'`, la sesión creada por el OTP de
+ * recuperación queda en pausa: no puede autoaceptar ni cortocircuitar a la
+ * puerta de sesión. Cancelar cierra solo la sesión local (`scope: 'local'`),
+ * igual que abandona la puerta, para no revocar la sesión del usuario en sus
+ * otros dispositivos (B7): cancelar un restablecimiento sin haber puesto la
+ * contraseña nueva jamás deja la sesión del OTP habilitada.
  */
 export function useRecoveryPhase() {
   const [phase, setPhase] = useState<RecoveryPhase>({ kind: 'inactive' });

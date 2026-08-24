@@ -21,7 +21,7 @@ import {
   type InvitationPreview,
 } from '@/features/spaces/gateways/supabaseInvitationGateway';
 import { useInvitationAutoAcceptance } from '@/features/spaces/hooks/useInvitationAutoAcceptance';
-import { useRecoveryPhase } from '@/features/spaces/hooks/useRecoveryPhase';
+import { useRecoveryPhase } from '@/features/auth/hooks/useRecoveryPhase';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';

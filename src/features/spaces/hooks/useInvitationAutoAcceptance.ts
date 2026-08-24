@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useRef } from 'react';
 
-import type { RecoveryPhase } from '@/features/spaces/hooks/useRecoveryPhase';
+import type { RecoveryPhase } from '@/features/auth/hooks/useRecoveryPhase';
 
 type InvitationAuthFlowSnapshot = {
   isAuthReady: boolean;

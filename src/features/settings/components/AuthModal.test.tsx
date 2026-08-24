@@ -1,4 +1,5 @@
-import { fireEvent, waitFor } from '@testing-library/react-native';
+import type { Session } from '@supabase/supabase-js';
+import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { useState } from 'react';
 
 import { AuthModal } from '@/features/settings/components/AuthModal';
@@ -8,10 +9,15 @@ jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
   useOnboardingStatus: () => ({ markAuthenticated: jest.fn() }),
 }));
 
+const mockSignOut = jest.fn();
+jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
+  createSupabaseAuthGateway: () => ({ signOut: mockSignOut }),
+}));
+
 function createGateMock() {
   return {
-    session: null,
-    rawSession: null,
+    session: null as Session | null,
+    rawSession: null as Session | null,
     isReady: true,
     gateReady: true,
     isLegallyEnabled: true,
@@ -27,6 +33,11 @@ function createGateMock() {
 
 let mockGateState = createGateMock();
 let mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
+
+/** Sesión que el OTP de recuperación crea al verificarse el código (B7). */
+const mockOtpSession = {
+  user: { id: 'user-1', email: 'persona@ejemplo.com' },
+} as unknown as Session;
 
 jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
   useLegalSessionGate: () => mockGateState,
@@ -57,6 +68,8 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
   beforeEach(() => {
     mockGateState = createGateMock();
     mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
+    mockSignOut.mockReset();
+    mockSignOut.mockResolvedValue(undefined);
   });
 
   it('usa el origen de Ajustes y el progreso extendido al abrir crear cuenta', async () => {
@@ -140,5 +153,67 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     fireEvent.press(await screen.findByTestId('stub-verify-go-recovery'));
 
     expect(await screen.findByText('Recuperar contraseña')).toBeTruthy();
+  });
+
+  it('cancelar el restablecimiento cierra la sesión local creada por el OTP (B7)', async () => {
+    const screen = await renderWithTheme(
+      <AuthModal onClose={jest.fn()} visible />,
+    );
+
+    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+    mockGateState.session = mockOtpSession;
+
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith('local'));
+  });
+
+  it('cerrar el modal a mitad de restablecimiento también cierra la sesión local del OTP (B7)', async () => {
+    let closeModal: (() => void) | null = null;
+    function ModalHarness() {
+      const [visible, setVisible] = useState(true);
+      closeModal = () => setVisible(false);
+      return <AuthModal onClose={() => setVisible(false)} visible={visible} />;
+    }
+    const screen = await renderWithTheme(<ModalHarness />);
+
+    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+    mockGateState.session = mockOtpSession;
+
+    // La X del modal llama a onClose: visible pasa a false con la sesión del
+    // OTP viva, lo mismo que cancelar el restablecimiento.
+    await act(async () => {
+      if (closeModal) closeModal();
+    });
+
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith('local'));
+  });
+
+  it('terminar el restablecimiento conserva la sesión: solo cancelar la cierra (B7)', async () => {
+    const screen = await renderWithTheme(
+      <AuthModal onClose={jest.fn()} visible />,
+    );
+
+    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+    mockGateState.session = mockOtpSession;
+
+    fireEvent.press(screen.getByTestId('stub-reset-success'));
+
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,7 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { StepProgressBar } from '@/components/ui/StepProgressBar/StepProgressBar';
 import { Text } from '@/components/ui/Text/Text';
 import { ForgotPasswordScreen } from '@/features/auth/screens/ForgotPasswordScreen';
+import { useRecoveryPhase } from '@/features/auth/hooks/useRecoveryPhase';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
 import { ResetPasswordScreen } from '@/features/auth/screens/ResetPasswordScreen';
 import {
@@ -56,24 +57,36 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
   const styles = useThemedStyles(createStyles);
   const { scheduleMarkAuthenticated } = useDeferredAuthenticatedMark();
   const { setRecoveryHalted } = useLegalSessionGate();
+  const {
+    cancelReset,
+    finishRecovery,
+    phase: recoveryPhase,
+    startRecovery,
+  } = useRecoveryPhase();
   const [step, setStep] = useState<AuthModalStep>({ screen: 'entry' });
 
-  // B3: igual que en el resto de hosts, el subflujo de recuperación pausa la
-  // puerta legal mientras el OTP crea una sesión. La pausa solo tiene sentido
-  // con el modal abierto: cerrarlo a mitad de restablecimiento la libera, y el
-  // cleanup desmonta el host sin dejar la puerta colgada.
+  // B3 + B7: igual que en el resto de hosts, el subflujo de recuperación pausa
+  // la puerta legal mientras el OTP crea una sesión. La pausa solo tiene
+  // sentido con el modal abierto: cerrarlo a mitad de restablecimiento la
+  // libera, y el cleanup desmonta el host sin dejar la puerta colgada.
   useEffect(() => {
-    const inRecovery =
-      visible && (step.screen === 'verify-recovery' || step.screen === 'reset');
-    setRecoveryHalted(inRecovery);
+    setRecoveryHalted(visible && recoveryPhase.kind !== 'inactive');
     return () => setRecoveryHalted(false);
-  }, [setRecoveryHalted, step.screen, visible]);
+  }, [recoveryPhase.kind, setRecoveryHalted, visible]);
 
   useEffect(() => {
     if (visible) {
       setStep({ screen: 'entry' });
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible && recoveryPhase.kind === 'active') {
+      // B7: cerrar el modal a mitad de restablecimiento equivale a cancelarlo:
+      // la sesión creada por el OTP se cierra en local y no queda habilitada.
+      void cancelReset(() => undefined);
+    }
+  }, [cancelReset, recoveryPhase.kind, visible]);
 
   const goBack = () => {
     switch (step.screen) {
@@ -180,7 +193,10 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
             {step.screen === 'login' ? (
               <LoginScreen
                 onCancel={onClose}
-                onNavigateToForgotPassword={() => setStep({ screen: 'forgot' })}
+                onNavigateToForgotPassword={() => {
+                  startRecovery();
+                  setStep({ screen: 'forgot' });
+                }}
                 onNavigateToSignUp={() =>
                   setStep({ screen: 'signup', step: 1 })
                 }
@@ -207,7 +223,10 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
                 email={step.email}
                 onCancel={onClose}
                 onGoToLogin={() => setStep({ screen: 'login' })}
-                onGoToRecovery={() => setStep({ screen: 'forgot' })}
+                onGoToRecovery={() => {
+                  startRecovery();
+                  setStep({ screen: 'forgot' });
+                }}
                 onSuccess={() => void handleAuthenticated()}
                 purpose="signup"
               />
@@ -215,8 +234,14 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
 
             {step.screen === 'forgot' ? (
               <ForgotPasswordScreen
-                onCancel={onClose}
-                onNavigateToLogin={() => setStep({ screen: 'login' })}
+                onCancel={() => {
+                  finishRecovery();
+                  onClose();
+                }}
+                onNavigateToLogin={() => {
+                  finishRecovery();
+                  setStep({ screen: 'login' });
+                }}
                 onSuccess={({ email }) =>
                   setStep({ screen: 'verify-recovery', email })
                 }
@@ -226,14 +251,23 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
             {step.screen === 'verify-recovery' ? (
               <VerifyCodeScreen
                 email={step.email}
-                onCancel={onClose}
+                onCancel={() => {
+                  finishRecovery();
+                  onClose();
+                }}
                 onSuccess={() => setStep({ screen: 'reset' })}
                 purpose="recovery"
               />
             ) : null}
 
             {step.screen === 'reset' ? (
-              <ResetPasswordScreen onCancel={onClose} onSuccess={onClose} />
+              <ResetPasswordScreen
+                onCancel={() => void cancelReset(onClose)}
+                onSuccess={() => {
+                  finishRecovery();
+                  onClose();
+                }}
+              />
             ) : null}
           </Animated.View>
         </BottomSheetScrollView>

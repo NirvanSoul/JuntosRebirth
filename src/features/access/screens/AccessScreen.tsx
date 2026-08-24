@@ -8,6 +8,7 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { StepProgressBar } from '@/components/ui/StepProgressBar/StepProgressBar';
 import { Text } from '@/components/ui/Text/Text';
 import { ForgotPasswordScreen } from '@/features/auth/screens/ForgotPasswordScreen';
+import { useRecoveryPhase } from '@/features/auth/hooks/useRecoveryPhase';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
 import { ResetPasswordScreen } from '@/features/auth/screens/ResetPasswordScreen';
 import {
@@ -47,19 +48,23 @@ export function AccessScreen() {
   const { markGuestComplete } = useOnboardingStatus();
   const { scheduleMarkAuthenticated } = useDeferredAuthenticatedMark();
   const { setRecoveryHalted } = useLegalSessionGate();
+  const {
+    cancelReset,
+    finishRecovery,
+    phase: recoveryPhase,
+    startRecovery,
+  } = useRecoveryPhase();
   const [step, setStep] = useState<AccessStep>({ screen: 'entry' });
   const [isCompletingGuest, setCompletingGuest] = useState(false);
 
-  // B3: mientras el subflujo de recuperación está activo, la sesión que creará
-  // el OTP queda en pausa (ni la puerta legal ni la navegación por sesión
-  // cruda pueden desmontar el restablecimiento a mitad). El cleanup libera la
-  // pausa al salir o al desmontar el host.
+  // B3 + B7: mientras el subflujo de recuperación está activo, la sesión que
+  // creará el OTP queda en pausa (ni la puerta legal ni la navegación por
+  // sesión cruda pueden desmontar el restablecimiento a mitad). El cleanup
+  // libera la pausa al salir o al desmontar el host.
   useEffect(() => {
-    const inRecovery =
-      step.screen === 'verify-recovery' || step.screen === 'reset';
-    setRecoveryHalted(inRecovery);
+    setRecoveryHalted(recoveryPhase.kind !== 'inactive');
     return () => setRecoveryHalted(false);
-  }, [setRecoveryHalted, step.screen]);
+  }, [recoveryPhase.kind, setRecoveryHalted]);
 
   // El marcado de «autenticado» se difiere hasta que la puerta legal habilite
   // la sesión: mientras falte evidencia no se marca el onboarding.
@@ -71,6 +76,11 @@ export function AccessScreen() {
     if (isCompletingGuest) return;
     setCompletingGuest(true);
     await markGuestComplete();
+  };
+
+  const goToForgot = () => {
+    startRecovery();
+    setStep({ screen: 'forgot' });
   };
 
   const goBack = () => {
@@ -89,8 +99,13 @@ export function AccessScreen() {
         setStep({ screen: 'signup', step: 1 });
         return;
       case 'forgot':
-      case 'reset':
+        finishRecovery();
         setStep({ screen: 'login' });
+        return;
+      case 'reset':
+        // B7: volver desde «nueva contraseña» sin ponerla es cancelar; la
+        // sesión que creó el OTP se cierra en local, no se queda habilitada.
+        void cancelReset(() => setStep({ screen: 'login' }));
         return;
       case 'verify-recovery':
         setStep({ screen: 'forgot' });
@@ -180,7 +195,7 @@ export function AccessScreen() {
           {step.screen === 'login' ? (
             <LoginScreen
               onCancel={goBack}
-              onNavigateToForgotPassword={() => setStep({ screen: 'forgot' })}
+              onNavigateToForgotPassword={goToForgot}
               onNavigateToSignUp={() => setStep({ screen: 'signup', step: 1 })}
               onSuccess={() => void completeAuthenticated()}
             />
@@ -205,7 +220,7 @@ export function AccessScreen() {
               email={step.email}
               onCancel={goBack}
               onGoToLogin={() => setStep({ screen: 'login' })}
-              onGoToRecovery={() => setStep({ screen: 'forgot' })}
+              onGoToRecovery={goToForgot}
               onSuccess={() => completeAuthenticated()}
               purpose="signup"
             />
@@ -214,7 +229,10 @@ export function AccessScreen() {
           {step.screen === 'forgot' ? (
             <ForgotPasswordScreen
               onCancel={goBack}
-              onNavigateToLogin={() => setStep({ screen: 'login' })}
+              onNavigateToLogin={() => {
+                finishRecovery();
+                setStep({ screen: 'login' });
+              }}
               onSuccess={({ email }) =>
                 setStep({ screen: 'verify-recovery', email })
               }
@@ -231,7 +249,15 @@ export function AccessScreen() {
           ) : null}
 
           {step.screen === 'reset' ? (
-            <ResetPasswordScreen onCancel={goBack} onSuccess={goBack} />
+            <ResetPasswordScreen
+              onCancel={() =>
+                void cancelReset(() => setStep({ screen: 'login' }))
+              }
+              onSuccess={() => {
+                finishRecovery();
+                setStep({ screen: 'login' });
+              }}
+            />
           ) : null}
         </Animated.View>
       </ScrollView>
