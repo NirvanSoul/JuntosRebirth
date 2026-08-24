@@ -5,31 +5,32 @@ import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 
 /**
  * Diferencia el marcado de «onboarding autenticado» hasta que la puerta legal
- * habilita la sesión. Mientras falta evidencia no se marca como autenticado
- * (ADR-083): el flujo de acceso actualiza el estado de onboarding solo cuando
- * las versiones vigentes ya constan.
+ * confirma la evidencia de la sesión. Solo un estado `cleared` (sesión presente
+ * y comprobada) autoriza a marcar: ni el invitado ni una sesión aún sin
+ * comprobar pueden afirmar que existe evidencia legal (B2).
  */
 export function useDeferredAuthenticatedMark(): {
   scheduleMarkAuthenticated: () => void;
 } {
   const { markAuthenticated } = useOnboardingStatus();
-  const { isLegallyEnabled } = useLegalSessionGate();
+  const { status } = useLegalSessionGate();
   const pendingRef = useRef(false);
+  const isCleared = status.kind === 'cleared';
 
   const scheduleMarkAuthenticated = useCallback(() => {
-    if (isLegallyEnabled) {
+    if (isCleared) {
       void markAuthenticated();
       return;
     }
     pendingRef.current = true;
-  }, [isLegallyEnabled, markAuthenticated]);
+  }, [isCleared, markAuthenticated]);
 
   useEffect(() => {
-    if (pendingRef.current && isLegallyEnabled) {
+    if (pendingRef.current && isCleared) {
       pendingRef.current = false;
       void markAuthenticated();
     }
-  }, [isLegallyEnabled, markAuthenticated]);
+  }, [isCleared, markAuthenticated]);
 
   return { scheduleMarkAuthenticated };
 }

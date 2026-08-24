@@ -4,7 +4,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text/Text';
 import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScreen';
-import type { LegalDecision } from '@/features/legal/model/types';
+import type {
+  LegalAcceptanceDocumentId,
+  LegalDecision,
+} from '@/features/legal/model/types';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
@@ -15,6 +18,12 @@ type LegalAcceptanceStepProps = {
   disabled?: boolean;
   error?: string | null;
   onChange: (decision: LegalDecision) => void;
+  /**
+   * Documentos que exigen acción en este paso. B4: la puerta legal pasa
+   * únicamente los pendientes de versión vigente y no vuelve a pedir lo que ya
+   * consta. El registro (SignUpScreen) exige siempre los dos por defecto.
+   */
+  requiredDocuments?: readonly LegalAcceptanceDocumentId[];
   testIDPrefix?: string;
   value: LegalDecision;
 };
@@ -33,6 +42,7 @@ export function LegalAcceptanceStep({
   disabled = false,
   error,
   onChange,
+  requiredDocuments = ['terms-of-service', 'privacy-policy'],
   testIDPrefix = 'legal-step',
   value,
 }: LegalAcceptanceStepProps) {
@@ -40,88 +50,98 @@ export function LegalAcceptanceStep({
   const styles = useThemedStyles(createStyles);
   const [openDocument, setOpenDocument] = useState<OpenDocument>(null);
 
+  const termsRequired = requiredDocuments.includes('terms-of-service');
+  const privacyRequired = requiredDocuments.includes('privacy-policy');
+  const showsPartialSet = !(termsRequired && privacyRequired);
+
   return (
     <View style={styles.container}>
       <Text tone="secondary" variant="label">
-        Antes de continuar necesitamos tu confirmación legal.
+        {showsPartialSet
+          ? 'Confirma los documentos de versión vigente que te faltan.'
+          : 'Antes de continuar necesitamos tu confirmación legal.'}
       </Text>
 
       <View style={styles.actions}>
-        <Pressable
-          accessibilityLabel="Acepto los Términos de servicio"
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: value.acceptedTerms, disabled }}
-          disabled={disabled}
-          onPress={() =>
-            onChange({ ...value, acceptedTerms: !value.acceptedTerms })
-          }
-          style={({ pressed }) => [
-            styles.actionRow,
-            pressed && styles.actionRowPressed,
-          ]}
-          testID={`${testIDPrefix}-terms-toggle`}
-        >
-          <Ionicons
-            color={value.acceptedTerms ? colors.cta : colors.textMuted}
-            name={value.acceptedTerms ? 'checkbox' : 'square-outline'}
-            size={toggleIconSize}
-          />
-          <Text style={styles.actionText} variant="body">
-            Acepto los Términos de servicio
-          </Text>
+        {termsRequired ? (
           <Pressable
-            accessibilityLabel="Leer Términos de servicio"
-            accessibilityRole="link"
-            accessibilityState={{ disabled }}
+            accessibilityLabel="Acepto los Términos de servicio"
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: value.acceptedTerms, disabled }}
             disabled={disabled}
-            hitSlop={spacing.sm}
-            onPress={() => setOpenDocument('terms-of-service')}
-            style={styles.readButton}
-            testID={`${testIDPrefix}-open-terms`}
+            onPress={() =>
+              onChange({ ...value, acceptedTerms: !value.acceptedTerms })
+            }
+            style={({ pressed }) => [
+              styles.actionRow,
+              pressed && styles.actionRowPressed,
+            ]}
+            testID={`${testIDPrefix}-terms-toggle`}
           >
-            <Text tone="brand" variant="footnote">
-              Leer
+            <Ionicons
+              color={value.acceptedTerms ? colors.cta : colors.textMuted}
+              name={value.acceptedTerms ? 'checkbox' : 'square-outline'}
+              size={toggleIconSize}
+            />
+            <Text style={styles.actionText} variant="body">
+              Acepto los Términos de servicio
             </Text>
+            <Pressable
+              accessibilityLabel="Leer Términos de servicio"
+              accessibilityRole="link"
+              accessibilityState={{ disabled }}
+              disabled={disabled}
+              hitSlop={spacing.sm}
+              onPress={() => setOpenDocument('terms-of-service')}
+              style={styles.readButton}
+              testID={`${testIDPrefix}-open-terms`}
+            >
+              <Text tone="brand" variant="footnote">
+                Leer
+              </Text>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        ) : null}
 
-        <Pressable
-          accessibilityLabel="Confirmo que he podido consultar la Política de privacidad"
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: value.consultedPrivacy, disabled }}
-          disabled={disabled}
-          onPress={() =>
-            onChange({ ...value, consultedPrivacy: !value.consultedPrivacy })
-          }
-          style={({ pressed }) => [
-            styles.actionRow,
-            pressed && styles.actionRowPressed,
-          ]}
-          testID={`${testIDPrefix}-privacy-toggle`}
-        >
-          <Ionicons
-            color={value.consultedPrivacy ? colors.cta : colors.textMuted}
-            name={value.consultedPrivacy ? 'checkbox' : 'square-outline'}
-            size={toggleIconSize}
-          />
-          <Text style={styles.actionText} variant="body">
-            Confirmo que he podido consultar la Política de privacidad
-          </Text>
+        {privacyRequired ? (
           <Pressable
-            accessibilityLabel="Leer Política de privacidad"
-            accessibilityRole="link"
-            accessibilityState={{ disabled }}
+            accessibilityLabel="Confirmo que he podido consultar la Política de privacidad"
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: value.consultedPrivacy, disabled }}
             disabled={disabled}
-            hitSlop={spacing.sm}
-            onPress={() => setOpenDocument('privacy-policy')}
-            style={styles.readButton}
-            testID={`${testIDPrefix}-open-privacy`}
+            onPress={() =>
+              onChange({ ...value, consultedPrivacy: !value.consultedPrivacy })
+            }
+            style={({ pressed }) => [
+              styles.actionRow,
+              pressed && styles.actionRowPressed,
+            ]}
+            testID={`${testIDPrefix}-privacy-toggle`}
           >
-            <Text tone="brand" variant="footnote">
-              Leer
+            <Ionicons
+              color={value.consultedPrivacy ? colors.cta : colors.textMuted}
+              name={value.consultedPrivacy ? 'checkbox' : 'square-outline'}
+              size={toggleIconSize}
+            />
+            <Text style={styles.actionText} variant="body">
+              Confirmo que he podido consultar la Política de privacidad
             </Text>
+            <Pressable
+              accessibilityLabel="Leer Política de privacidad"
+              accessibilityRole="link"
+              accessibilityState={{ disabled }}
+              disabled={disabled}
+              hitSlop={spacing.sm}
+              onPress={() => setOpenDocument('privacy-policy')}
+              style={styles.readButton}
+              testID={`${testIDPrefix}-open-privacy`}
+            >
+              <Text tone="brand" variant="footnote">
+                Leer
+              </Text>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        ) : null}
       </View>
 
       {error ? (

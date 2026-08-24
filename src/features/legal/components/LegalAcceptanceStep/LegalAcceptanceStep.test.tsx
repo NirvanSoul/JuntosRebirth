@@ -61,6 +61,21 @@ describe('LegalAcceptanceStep — semántica y accesibilidad', () => {
     );
   });
 
+  it('solo expone y valida las acciones de los documentos requeridos (B4)', async () => {
+    const screen = await renderWithTheme(
+      <LegalAcceptanceStep
+        onChange={jest.fn()}
+        requiredDocuments={['terms-of-service']}
+        value={{ acceptedTerms: false, consultedPrivacy: true }}
+      />,
+    );
+
+    // La Política ya consta: no se vuelve a pedir.
+    expect(screen.queryByTestId('legal-step-privacy-toggle')).toBeNull();
+    expect(screen.getByTestId('legal-step-terms-toggle')).toBeTruthy();
+    expect(screen.getByTestId('legal-step-open-terms')).toBeTruthy();
+  });
+
   it('permite abrir y cerrar ambos documentos desde sus enlaces', async () => {
     const screen = await renderWithTheme(<Harness />);
 
