@@ -92,11 +92,16 @@ durable. El Gate 2 (ronda 1) rechazó cinco bloqueantes conductuales (B1–B5) y
 dos condiciones (C1–C2); se corrigieron escribiendo primero la tabla de
 transiciones de la puerta y una prueba roja por bloqueante. La ronda 2
 (2026-08-24) rechazó B6–B8 —identidad del snapshot, sesión del OTP viva al
-cancelar y ranura única de intención—; los tres están corregidos y commiteados
-(B8 ranura por correo normalizado, B6 identidad en los snapshots autenticados y
-B7 cancelación segura en los tres hosts) con prueba roja previa por defecto y
-evidencia con `COMANDO` + `EXIT=`. Validación actual: **134 suites / 877
-pruebas / EXIT=0**. Queda el veredicto de la ronda 3 del Gate 2 y, solo
+cancelar y ranura única de intención—; los tres se corrigieron con prueba roja
+previa por defecto y evidencia `COMANDO`+`EXIT=`. El veredicto conjunto de la
+ronda 3 aprobó B6 y B8 sin reservas y rechazó B7 con dos rutas nuevas en
+`AuthModal` (Atrás desde reset sin `cancelReset`, y cierre manual que despausaba
+por orden de efectos); la ronda 4 corrigió B7 de forma estructural —pausa
+gobernada solo por la fase de recuperación, toda salida posterior a la sesión
+del OTP por `cancelReset`, descarte manual desactivado durante la recuperación
+y guards en `useRecoveryPhase`— con tres pruebas rojas de transición real.
+Validación actual: **134 suites / 879
+pruebas / EXIT=0**. Queda el veredicto de la ronda 4 del Gate 2 y, solo
 después, el smoke físico (recuperación de contraseña incluida, y con
 `enable_confirmations` activado en local para los pasos del OTP) antes de
 marcar la tarea cerrada.

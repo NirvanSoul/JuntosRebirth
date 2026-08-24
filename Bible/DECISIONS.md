@@ -5415,7 +5415,7 @@ del borrado, archivo o disolución del espacio.
 
 # ADR-083 — Integración legal en la autenticación existente: intención durable y puerta de sesión obligatoria
 
-**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; pendientes el veredicto de ronda 3 y el smoke físico).
+**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; el veredicto de la ronda 3 aprobó B6 y B8 y rechazó B7, corregido estructuralmente en la ronda 4 —ver ronda 4 abajo—; pendientes el veredicto de ronda 4 y el smoke físico).
 
 ## Contexto
 
@@ -5586,9 +5586,68 @@ los ficheros de esta ronda (rojo por defecto y verde tras el fix) incluyen
 ambos.
 
 Validación de la ronda 3 sobre el árbol ya commiteado: **134 suites / 877
-pruebas / EXIT=0** (`npm run validate`, post-commit). Prioridad del cierre:
-veredicto de ronda 3 de ambos verificadores y, solo después, el smoke físico
-completo.
+pruebas / EXIT=0** (`npm run validate`, post-commit). El veredicto conjunto de
+la ronda 3 (2026-08-24) aprobó B6 y B8 sin reservas y rechazó B7 con dos rutas
+nuevas en `AuthModal`; la corrección estructural está en la ronda 4 (sección
+siguiente).
+
+## Gate 2 — ronda 4 (2026-08-24): B7 estructural en AuthModal
+
+El veredicto conjunto de la ronda 3 repitió, con otra cara, la secuencia de las
+rondas anteriores: cada corrección tapó las salidas de la recuperación que
+estaban nombradas y dejó vivas las que faltaban por nombrar. B6 y B8 quedan
+aprobados sin reservas; B7 vuelve rechazado por **dos rutas nuevas en
+`AuthModal`** que abandonaban el restablecimiento con la sesión del OTP viva:
+
+- **Ruta 1 — Atrás en el encabezado:** `goBack` con `case 'reset'` pasaba a
+  `forgot` sin `cancelReset`, y desde ahí tanto «Cancelar» como «Iniciar
+  sesión» llamaban a `finishRecovery()`, que solo cambia la fase y no cierra la
+  sesión. Secuencia completa: recuperación → OTP verificado (sesión creada) →
+  reset → Atrás → forgot → Cancelar/Iniciar sesión → la puerta se despausa con
+  la sesión del OTP viva, sin contraseña nueva.
+- **Ruta 2 — Cierre manual, por orden de efectos:** al pasar `visible` a
+  `false`, el efecto de la pausa (`visible && phase !== 'inactive'`) la
+  despausaba de inmediato y solo después arrancaba el `signOut('local')`
+  asíncrono. La puerta quedaba libre mientras el signOut estaba pendiente; si
+  este fallaba, el manejo correcto de `useRecoveryPhase` (mantener la pausa en
+  `cancelError`) quedaba anulado por ese orden.
+
+**Corrección estructural (dejar de parchear salidas):**
+
+- La pausa es función solo de la fase, no de `visible`:
+  `setRecoveryHalted(phase.kind !== 'inactive')`. Se sostiene durante
+  `canceling` y `cancelError` y solo cae con `inactive`, que se publica tras un
+  `signOut('local')` con éxito o al terminar el restablecimiento.
+- Toda salida posterior a la creación de la sesión del OTP pasa por
+  `cancelReset`: «Atrás» desde «nueva contraseña» espera al signOut antes de
+  volver a `forgot`, y `requestClose` es el único camino hacia `onClose` del
+  modal —si la fase sigue viva primero se cierra la sesión y solo tras el éxito
+  el modal se oculta; si falla, `cancelError` deja el mensaje visible y el
+  mismo botón reintenta.
+- Durante la recuperación el descarte manual queda desactivado
+  (`allowManualDismiss={false}`) y la única cancelación es la controlada. Un
+  cierre forzado desde el padre sigue cancelando, pero ya no libera la pausa:
+  la gobierna la fase.
+- `useRecoveryPhase` blinda las transiciones: un segundo `cancelReset` mientras
+  el `signOut('local')` está en vuelo se ignora (idempotente), y ni
+  `startRecovery` ni `finishRecovery` cambian la fase durante
+  `canceling`/`cancelError`. El mensaje de error de cancelación es visible
+  también en `AccessScreen` y `AuthModal` (ya lo era en la invitación).
+
+**Pruebas rojas (nuevas, con transición real):** ninguna asigna ya `session`
+para simular el OTP; las tres conducen el flujo entero por el modal y observan
+la puerta vía `setRecoveryHalted`, con `signOut('local')` diferido para probar
+el orden. reset → Atrás → forgot → Cancelar/Iniciar sesión cierra la sesión
+**antes** de liberar la pausa; el cierre manual mantiene `halted=true` hasta
+que el signOut resuelve; si el signOut falla, el error queda visible, la pausa
+se sostiene y reintentar termina de cerrar. Evidencia roja (3 fallan) y verde
+(10 pasan) con `COMANDO` + `EXIT=` en `gate2_r4_rojo_B7_modal.txt` y
+`gate2_r4_verde_B7_modal.txt`.
+
+Validación final del árbol ya commiteado: **134 suites / 879 pruebas / EXIT=0**
+(`npm run validate`; `gate2_r4_final.txt`). Pendientes para cerrar la Fase 5
+legal: veredicto de la ronda 4 de ambos verificadores y, solo después, el smoke
+físico completo.
 
 ## Consecuencias
 
