@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -16,6 +16,7 @@ import {
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
 import { useDeferredAuthenticatedMark } from '@/features/legal/hooks/useDeferredAuthenticatedMark';
+import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
@@ -45,8 +46,20 @@ export function AccessScreen() {
   const styles = useThemedStyles(createStyles);
   const { markGuestComplete } = useOnboardingStatus();
   const { scheduleMarkAuthenticated } = useDeferredAuthenticatedMark();
+  const { setRecoveryHalted } = useLegalSessionGate();
   const [step, setStep] = useState<AccessStep>({ screen: 'entry' });
   const [isCompletingGuest, setCompletingGuest] = useState(false);
+
+  // B3: mientras el subflujo de recuperación está activo, la sesión que creará
+  // el OTP queda en pausa (ni la puerta legal ni la navegación por sesión
+  // cruda pueden desmontar el restablecimiento a mitad). El cleanup libera la
+  // pausa al salir o al desmontar el host.
+  useEffect(() => {
+    const inRecovery =
+      step.screen === 'verify-recovery' || step.screen === 'reset';
+    setRecoveryHalted(inRecovery);
+    return () => setRecoveryHalted(false);
+  }, [setRecoveryHalted, step.screen]);
 
   // El marcado de «autenticado» se difiere hasta que la puerta legal habilite
   // la sesión: mientras falte evidencia no se marca el onboarding.

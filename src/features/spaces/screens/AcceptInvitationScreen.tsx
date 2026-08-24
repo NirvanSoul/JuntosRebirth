@@ -115,9 +115,12 @@ export function AcceptInvitationScreen({
   } = useRecoveryPhase();
 
   // Mientras hay un subflujo de recuperación, la sesión del OTP queda en pausa:
-  // ni la puerta legal ni la autoaceptación pueden cortocircuitar el restablecimiento.
+  // ni la puerta legal ni la autoaceptación pueden cortocircuitar el
+  // restablecimiento. El cleanup libera la pausa al salir o si esta pantalla se
+  // desmonta a mitad (B3): la puerta nunca queda colgada para nadie.
   useEffect(() => {
     setRecoveryHalted(recoveryPhase.kind !== 'inactive');
+    return () => setRecoveryHalted(false);
   }, [recoveryPhase.kind, setRecoveryHalted]);
   const goToForgot = useCallback(() => {
     startRecovery();

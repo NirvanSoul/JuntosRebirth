@@ -17,6 +17,7 @@ import {
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
 import { useDeferredAuthenticatedMark } from '@/features/legal/hooks/useDeferredAuthenticatedMark';
+import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -54,7 +55,19 @@ const stepTitles: Record<AuthModalStep['screen'], string> = {
 export function AuthModal({ onClose, visible }: AuthModalProps) {
   const styles = useThemedStyles(createStyles);
   const { scheduleMarkAuthenticated } = useDeferredAuthenticatedMark();
+  const { setRecoveryHalted } = useLegalSessionGate();
   const [step, setStep] = useState<AuthModalStep>({ screen: 'entry' });
+
+  // B3: igual que en el resto de hosts, el subflujo de recuperación pausa la
+  // puerta legal mientras el OTP crea una sesión. La pausa solo tiene sentido
+  // con el modal abierto: cerrarlo a mitad de restablecimiento la libera, y el
+  // cleanup desmonta el host sin dejar la puerta colgada.
+  useEffect(() => {
+    const inRecovery =
+      visible && (step.screen === 'verify-recovery' || step.screen === 'reset');
+    setRecoveryHalted(inRecovery);
+    return () => setRecoveryHalted(false);
+  }, [setRecoveryHalted, step.screen, visible]);
 
   useEffect(() => {
     if (visible) {

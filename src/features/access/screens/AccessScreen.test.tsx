@@ -13,6 +13,31 @@ jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
   }),
 }));
 
+function createGateMock() {
+  return {
+    session: null,
+    rawSession: null,
+    isReady: true,
+    gateReady: true,
+    isLegallyEnabled: true,
+    status: { kind: 'no-session' },
+    error: null,
+    missingDocuments: [],
+    retryGate: jest.fn(),
+    submitRegularization: jest.fn(),
+    abandonSession: jest.fn(),
+    setRecoveryHalted: jest.fn(),
+  };
+}
+
+let mockGateState = createGateMock();
+let mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
+
+jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
+  useLegalSessionGate: () => mockGateState,
+  resetLegalSessionGateForTests: jest.fn(),
+}));
+
 jest.mock('@/features/auth/screens/LoginScreen', () => ({
   LoginScreen: jest.requireActual('@/test/authScreenStubs').LoginScreenStub,
 }));
@@ -37,6 +62,8 @@ describe('AccessScreen', () => {
   beforeEach(() => {
     mockMarkAuthenticated.mockReset();
     mockMarkGuestComplete.mockReset();
+    mockGateState = createGateMock();
+    mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
   });
 
   it('mantiene visible la entrada como invitado y la persiste al elegirla', async () => {
@@ -84,6 +111,27 @@ describe('AccessScreen', () => {
 
       expect(await screen.findByText('Nueva contraseña')).toBeTruthy();
       expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
+    });
+
+    it('pausa la puerta legal durante la recuperación (B3): el OTP va a crear una sesión y el restablecimiento no puede cortocircuitarse', async () => {
+      const screen = await renderWithTheme(<AccessScreen />);
+
+      fireEvent.press(screen.getByTestId('access-open-login'));
+      fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+      await screen.findByTestId('stub-forgot-screen');
+      fireEvent.press(screen.getByTestId('stub-forgot-send'));
+
+      await screen.findByText('recovery');
+      expect(mockSetRecoveryHalted).toHaveBeenCalledWith(true);
+
+      fireEvent.press(await screen.findByTestId('stub-verify-success'));
+      await screen.findByText('Nueva contraseña');
+      expect(mockSetRecoveryHalted).toHaveBeenCalledWith(true);
+
+      // Salir del restablecimiento vuelve al acceso y libera la pausa.
+      fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      await screen.findByText('Iniciar sesión');
+      expect(mockSetRecoveryHalted).toHaveBeenCalledWith(false);
     });
 
     it('desde la verificación de registro, recuperar contraseña lleva al flujo de recuperación', async () => {

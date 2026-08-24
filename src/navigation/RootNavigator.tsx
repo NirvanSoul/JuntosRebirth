@@ -1,5 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native';
-import { useEffect, useMemo } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef } from 'react';
 
 import { linking } from '@/navigation/linking';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
@@ -21,6 +21,13 @@ export function RootNavigator() {
     status,
   } = useOnboardingStatus();
   const legalGate = useLegalSessionGate();
+
+  // B3: mientras hay una pausa de recuperación en curso, el host mostrado no
+  // puede cambiar por la sesión cruda que acaba de crear el OTP: la persona
+  // aún está poniendo la contraseña nueva en AccessScreen, o en el flujo de
+  // invitación dentro de MainTabs. El ref recuerda qué host estaba activo
+  // antes de que la pausa llegara.
+  const wasAccessShown = useRef(false);
 
   useEffect(() => {
     // El onboarding no se marca como autenticado mientras falte la evidencia
@@ -66,16 +73,27 @@ export function RootNavigator() {
     return null;
   }
 
-  const content = !status.completed ? (
-    <OnboardingNavigator />
-  ) : status.accessMode === 'authenticated' && !session ? (
-    <AccessScreen />
-  ) : (
-    <MainTabsNavigator />
-  );
+  let content: ReactNode;
+  if (!status.completed) {
+    content = <OnboardingNavigator />;
+  } else if (legalGate.status.kind === 'halted') {
+    // La sesión del OTP de recuperación no desmonta a mitad del restablecimiento.
+    content = wasAccessShown.current ? <AccessScreen /> : <MainTabsNavigator />;
+  } else if (status.accessMode === 'authenticated' && !session) {
+    wasAccessShown.current = true;
+    content = <AccessScreen />;
+  } else {
+    wasAccessShown.current = false;
+    content = <MainTabsNavigator />;
+  }
 
+  // B5: la superficie queda bloqueada también durante la comprobación, no solo
+  // cuando falta evidencia: ningún efecto puede dispararse mientras la puerta
+  // verifica y la persona ve el estado en curso.
   const showLegalGate = Boolean(
-    session && legalGate.status.kind === 'required',
+    session &&
+    (legalGate.status.kind === 'required' ||
+      legalGate.status.kind === 'checking'),
   );
 
   return (
@@ -90,6 +108,9 @@ export function RootNavigator() {
           onAbandon={() => void legalGate.abandonSession()}
           onRetry={legalGate.retryGate}
           onSubmit={(decision) => legalGate.submitRegularization(decision)}
+          variant={
+            legalGate.status.kind === 'checking' ? 'checking' : 'required'
+          }
         />
       ) : null}
     </>
