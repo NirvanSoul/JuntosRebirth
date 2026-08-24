@@ -63,10 +63,41 @@ jest.mock('@/features/auth/screens/ForgotPasswordScreen', () => ({
   ForgotPasswordScreen: jest.requireActual('@/test/authScreenStubs')
     .ForgotPasswordScreenStub,
 }));
-jest.mock('@/features/auth/screens/ResetPasswordScreen', () => ({
-  ResetPasswordScreen: jest.requireActual('@/test/authScreenStubs')
-    .ResetPasswordScreenStub,
-}));
+/**
+ * Guardado de contraseña con inicio y resolución SEPARADOS (B14). El stub
+ * compartido convierte «guardar» directamente en `onSuccess`, así que solo puede
+ * modelar un orden. `ResetPasswordScreen` real hace `await setNewPassword(...)`
+ * y después `onSuccess()`, sin guarda de desmontaje: la continuación capturada
+ * sigue viva aunque la pantalla ya no esté montada, y eso es justo lo que hay
+ * que reproducir.
+ */
+let mockResolveDeferredSave: (() => void) | null = null;
+jest.mock('@/features/auth/screens/ResetPasswordScreen', () => {
+  const { Pressable, View } = jest.requireActual('react-native');
+  return {
+    ResetPasswordScreen: (props: {
+      onCancel?: () => void;
+      onSuccess?: () => void;
+    }) => (
+      <View testID="stub-reset-screen">
+        <Pressable
+          onPress={() => props.onSuccess?.()}
+          testID="stub-reset-success"
+        />
+        <Pressable
+          onPress={() => props.onCancel?.()}
+          testID="stub-reset-cancel"
+        />
+        <Pressable
+          onPress={() => {
+            mockResolveDeferredSave = () => props.onSuccess?.();
+          }}
+          testID="stub-reset-save-start"
+        />
+      </View>
+    ),
+  };
+});
 
 /**
  * B13(r8): con una cancelación en vuelo, terminar el restablecimiento encola la
@@ -82,6 +113,7 @@ describe('AuthModal — la resolución gobierna el destino del host (B13)', () =
     mockGateState = createGateMock();
     mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
     resolveSignOut = undefined;
+    mockResolveDeferredSave = null;
     onCloseSpy = jest.fn();
     mockSignOut.mockReset();
     mockSignOut.mockImplementation(
@@ -144,6 +176,31 @@ describe('AuthModal — la resolución gobierna el destino del host (B13)', () =
     resolveSignOut?.();
   }
 
+  // Única que termina con el modal abierto y la fase en `cancelError`: es justo
+  // la garantía que afirma —el fallo tiene que quedar delante de la persona—.
+  //
+  // LIMITACIÓN CONOCIDA: esta suite es sensible al orden. Cada prueba deja una
+  // cadena asíncrona real a medio camino (signOut diferido, getSession, o un
+  // guardado que resuelve tras el desmontaje) y el entorno de render no las
+  // aísla del todo entre casos. Con esta primera funcionan las cuatro; moverla
+  // rompe a la siguiente por no llegar a montar el modal. No se ha camuflado con
+  // `act()` propios: eso fue lo que en la ronda 8 solapó ámbitos y corrompió la
+  // cola de React.
+  it('getSession falla: el modal sigue visible, el error se ve, no se cierra y no se reintenta solo', async () => {
+    mockGetSession.mockRejectedValue(new Error('Sin conexión con la red.'));
+    const screen = await arrangeHostRace();
+
+    settleRace();
+
+    await screen.findByText('Sin conexión con la red.');
+    expect(screen.getByTestId('auth-modal')).toBeTruthy();
+    expect(onCloseSpy).not.toHaveBeenCalled();
+    // Sin reintento automático: el efecto de cierre forzado no puede relanzar
+    // la cancelación a espaldas de la persona.
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+  });
+
   it('sesión nula: gana la cancelación y el destino se ejecuta una sola vez', async () => {
     mockGetSession.mockResolvedValue(null);
     const screen = await arrangeHostRace();
@@ -165,20 +222,54 @@ describe('AuthModal — la resolución gobierna el destino del host (B13)', () =
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 
-  // Única que termina con el modal abierto y la fase en `cancelError`: es justo
-  // la garantía que afirma —el fallo tiene que quedar delante de la persona—.
-  it('getSession falla: el modal sigue visible, el error se ve, no se cierra y no se reintenta solo', async () => {
-    mockGetSession.mockRejectedValue(new Error('Sin conexión con la red.'));
-    const screen = await arrangeHostRace();
+  /**
+   * B14(r9): el orden inverso al de B13. El guardado arranca, la cancelación
+   * resuelve ANTES y ejecuta su destino; después responde `setNewPassword` y la
+   * pantalla —ya desmontada— invoca su `onSuccess`. Sigue siendo una sola
+   * carrera y solo puede tener un destino.
+   */
+  it('la cancelación gana antes de que responda el guardado: el éxito tardío no ejecuta un segundo destino', async () => {
+    mockGetSession.mockResolvedValue(null);
+    function ModalHarness() {
+      const [visible, setVisible] = useState(true);
+      return (
+        <AuthModal
+          onClose={() => {
+            onCloseSpy();
+            setVisible(false);
+          }}
+          visible={visible}
+        />
+      );
+    }
+    const screen = await renderWithTheme(<ModalHarness />);
 
+    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByTestId('stub-reset-screen');
+
+    // El guardado arranca (su promesa queda en vuelo, sin resolver todavía).
+    fireEvent.press(screen.getByTestId('stub-reset-save-start'));
+    // Y la cancelación arranca después, con el signOut diferido.
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+
+    // La cancelación resuelve PRIMERO: gana y ejecuta su destino.
     settleRace();
+    await waitFor(() => expect(onCloseSpy).toHaveBeenCalledTimes(1));
 
-    await screen.findByText('Sin conexión con la red.');
-    expect(screen.getByTestId('auth-modal')).toBeTruthy();
-    expect(onCloseSpy).not.toHaveBeenCalled();
-    // Sin reintento automático: el efecto de cierre forzado no puede relanzar
-    // la cancelación a espaldas de la persona.
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+    // Ahora responde el guardado. La pantalla ya no está montada, pero su
+    // `onSuccess` capturado sigue vivo y se invoca igual.
+    mockResolveDeferredSave?.();
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+
+    // Un único destino en toda la carrera.
+    expect(onCloseSpy).toHaveBeenCalledTimes(1);
+
+    // No se deja árbol montado detrás: la continuación tardía se invocó sobre
+    // una pantalla ya desmontada y conviene cerrar el episodio de la prueba.
+    screen.unmount();
   });
 });

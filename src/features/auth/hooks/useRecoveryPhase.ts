@@ -63,6 +63,11 @@ export function useRecoveryPhase() {
   // B13(r8): continuación de éxito encolada mientras la cancelación resuelve.
   // `null` significa «no hay terminación encolada».
   const pendingCompletionRef = useRef<(() => void) | null>(null);
+  // B14(r9): `inactive` significa DOS cosas —«no hay recuperación en curso» y
+  // «este episodio ya se resolvió»— y confundirlas reabría el doble destino.
+  // Esta ref marca la segunda: el episodio ya produjo su desenlace y ninguna
+  // terminación tardía puede ejecutar otro. Solo `startRecovery` la reabre.
+  const outcomeSettledRef = useRef(false);
 
   // I1(r5): la `phaseRef` es la lectura síncrona que usan los guards entre
   // renders; cada transición la escribe junto con el estado, sin esperar a que
@@ -83,6 +88,9 @@ export function useRecoveryPhase() {
     ) {
       return;
     }
+    // B14(r9): abre un episodio nuevo. Es el único punto que reabre la
+    // terminación tras un desenlace: «Olvidé mi contraseña» de nuevo.
+    outcomeSettledRef.current = false;
     commitPhase({ kind: 'active' });
   }, []);
 
@@ -97,6 +105,7 @@ export function useRecoveryPhase() {
     ) {
       return;
     }
+    outcomeSettledRef.current = true;
     commitPhase({ kind: 'inactive' });
   }, []);
 
@@ -121,6 +130,13 @@ export function useRecoveryPhase() {
       return;
     }
     if (phaseRef.current.kind === 'cancelingCompletion') return;
+    // B14(r9): el orden inverso. Si la cancelación resolvió antes de que
+    // respondiera `setNewPassword`, este episodio ya ejecutó su destino y la
+    // fase es un `inactive` TERMINAL. `ResetPasswordScreen` llama a `onSuccess`
+    // al resolver aunque esté desmontada, así que esa terminación tardía llega
+    // igual: se ignora, o volveríamos a tener dos destinos.
+    if (outcomeSettledRef.current) return;
+    outcomeSettledRef.current = true;
     pendingCompletionRef.current = null;
     commitPhase({ kind: 'inactive' });
     onCompleted?.();
@@ -161,8 +177,13 @@ export function useRecoveryPhase() {
     // una cancelación fallida observable (mensaje visible y reintento).
     if (!hasCompletionEnqueued()) {
       if (signOutFailed) {
+        // `cancelError` NO cierra el episodio: el reintento sigue vivo.
         commitPhase({ kind: 'cancelError', message: signOutErrorMessage });
       } else {
+        // B14(r9): la cancelación gana y cierra el episodio. Un `onSuccess`
+        // tardío de un `setNewPassword` que aún estaba en vuelo no podrá
+        // ejecutar un segundo destino.
+        outcomeSettledRef.current = true;
         commitPhase({ kind: 'inactive' });
         onCanceled();
       }
@@ -197,6 +218,8 @@ export function useRecoveryPhase() {
     }
     const completion = pendingCompletionRef.current ?? noop;
     pendingCompletionRef.current = null;
+    // B14(r9): gane quien gane, aquí el episodio queda cerrado.
+    outcomeSettledRef.current = true;
     if (liveSession === null) {
       commitPhase({ kind: 'inactive' });
       onCanceled();

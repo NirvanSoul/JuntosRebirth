@@ -386,4 +386,76 @@ describe('useRecoveryPhase — la resolución gobierna un único destino (B13)',
     expect(onCompleted).toHaveBeenCalledTimes(1);
     expect(onCanceled).not.toHaveBeenCalled();
   });
+
+  /**
+   * B14(r9): el orden inverso. La cancelación puede resolverse ANTES de que
+   * responda `setNewPassword`, y `ResetPasswordScreen` llama a `onSuccess()` al
+   * resolver aunque la pantalla ya esté desmontada. Ese `completeRecovery`
+   * tardío llega con la fase en `inactive` —pero es un `inactive` terminal,
+   * producido por una cancelación que ya ejecutó su destino—, así que no puede
+   * ejecutar un segundo destino.
+   */
+  it('una terminación que llega después de que la cancelación ya ganó no ejecuta un segundo destino', async () => {
+    const onCanceled = jest.fn();
+    const onCompleted = jest.fn();
+    const { result } = await renderHook(() => useRecoveryPhase());
+
+    await act(async () => {
+      result.current.startRecovery();
+    });
+    let cancelPromise: Promise<void> | undefined;
+    await act(async () => {
+      cancelPromise = result.current.cancelReset(onCanceled);
+    });
+
+    // La cancelación resuelve primero: aún no hubo `onSuccess`, así que no hay
+    // terminación encolada y gana la cancelación.
+    await act(async () => {
+      resolveSignOut?.();
+      await cancelPromise;
+    });
+    expect(result.current.phase.kind).toBe('inactive');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+
+    // Ahora responde `setNewPassword` y la pantalla, ya desmontada, invoca su
+    // `onSuccess`. El episodio está cerrado: se ignora.
+    await act(async () => {
+      result.current.completeRecovery(onCompleted);
+    });
+
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    expect(result.current.phase.kind).toBe('inactive');
+  });
+
+  it('una recuperación nueva tras un episodio cerrado vuelve a admitir terminación', async () => {
+    const onCanceled = jest.fn();
+    const onCompleted = jest.fn();
+    const { result } = await renderHook(() => useRecoveryPhase());
+
+    await act(async () => {
+      result.current.startRecovery();
+    });
+    let cancelPromise: Promise<void> | undefined;
+    await act(async () => {
+      cancelPromise = result.current.cancelReset(onCanceled);
+    });
+    await act(async () => {
+      resolveSignOut?.();
+      await cancelPromise;
+    });
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+
+    // El cierre del episodio no puede dejar inservible la recuperación
+    // siguiente: «Olvidé mi contraseña» abre un episodio nuevo.
+    await act(async () => {
+      result.current.startRecovery();
+    });
+    await act(async () => {
+      result.current.completeRecovery(onCompleted);
+    });
+
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(result.current.phase.kind).toBe('inactive');
+  });
 });

@@ -109,8 +109,10 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
   // sesión local y solo tras el éxito el modal se oculta; si el signOut falla,
   // el modal permanece con el mensaje visible y el mismo botón reintenta—. El
   // cierre por éxito es una transición distinta: el `onSuccess` de
-  // `ResetPasswordScreen` llama a `completeRecovery()` y recién entonces a
-  // `onClose()` directamente, sin pasar por `requestClose`.
+  // `ResetPasswordScreen` ENTREGA `onClose` a `completeRecovery` y es el hook
+  // quien lo ejecuta —de inmediato si no hay cancelación en vuelo, o al resolver
+  // la carrera si la hay, y nunca si ya ganó la cancelación (B13/B14)—. El host
+  // no cierra por su cuenta ni pasa por `requestClose` en ese camino.
   const requestClose = () => {
     if (recoveryPhase.kind !== 'inactive') {
       void cancelReset(onClose);
