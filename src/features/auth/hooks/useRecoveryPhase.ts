@@ -54,9 +54,15 @@ export type RecoveryPhase =
  * render. `cancelReset` así es atómicamente idempotente: dos llamadas en el
  * mismo tick abren exactamente un `signOut('local')` y un solo callback.
  */
+/** Terminación encolada sin destino propio (el host no navega a ninguna parte). */
+const noop = () => undefined;
+
 export function useRecoveryPhase() {
   const [phase, setPhase] = useState<RecoveryPhase>({ kind: 'inactive' });
   const phaseRef = useRef<RecoveryPhase>({ kind: 'inactive' });
+  // B13(r8): continuación de éxito encolada mientras la cancelación resuelve.
+  // `null` significa «no hay terminación encolada».
+  const pendingCompletionRef = useRef<(() => void) | null>(null);
 
   // I1(r5): la `phaseRef` es la lectura síncrona que usan los guards entre
   // renders; cada transición la escribe junto con el estado, sin esperar a que
@@ -102,21 +108,29 @@ export function useRecoveryPhase() {
   // recuperación ya terminada—. Mientras `cancelReset` está en vuelo la
   // terminación NO se descarta: se encola en `cancelingCompletion` (fase que
   // sostiene la pausa) y al resolver `cancelReset` gana de forma definida.
-  const completeRecovery = useCallback(() => {
+  //
+  // B13(r8): se encola la CONTINUACIÓN junto con el estado. Antes el host
+  // ejecutaba su destino de éxito (cerrar el modal, navegar) nada más llamar
+  // aquí, sin esperar al ganador: si después ganaba la cancelación se ejecutaban
+  // dos destinos, y si `getSession` fallaba el `cancelError` quedaba invisible
+  // con el host ya cerrado. Ahora el destino lo ejecuta la resolución, una vez.
+  const completeRecovery = useCallback((onCompleted?: () => void) => {
     if (phaseRef.current.kind === 'canceling') {
+      pendingCompletionRef.current = onCompleted ?? noop;
       commitPhase({ kind: 'cancelingCompletion' });
       return;
     }
     if (phaseRef.current.kind === 'cancelingCompletion') return;
+    pendingCompletionRef.current = null;
     commitPhase({ kind: 'inactive' });
+    onCompleted?.();
   }, []);
 
-  // B10(r6): lectura fresca de la ref para la resolución. `commitPhase` muta
-  // `phaseRef.current` durante el `await`, pero TS no lo sabe y conservaría el
-  // narrowing del guard inicial («solo inactive|active|cancelError»); al vivir
-  // la comparación en su propio alcance evalúa sobre la unión completa.
-  const hasCompletionEnqueued = () =>
-    phaseRef.current.kind === 'cancelingCompletion';
+  // B13(r8): la marca de «terminación encolada» vive en su propia ref, no en la
+  // fase. Así sobrevive a `cancelError`: si `getSession` falla, el reintento
+  // sigue sabiendo que la contraseña ya se guardó y no degrada la terminación a
+  // una cancelación. La fase describe la pausa; la ref describe el destino.
+  const hasCompletionEnqueued = () => pendingCompletionRef.current !== null;
 
   const cancelReset = useCallback(async (onCanceled: () => void) => {
     // Idempotente y atómico (I1) + B12(r7): el guard se lee de la ref y cubre
@@ -159,13 +173,19 @@ export function useRecoveryPhase() {
     // estado real de la sesión posterior al signOut:
     // - sesión `null` → ganó la cancelación: `inactive` + `onCanceled` (no hay
     //   sesión que habilitar; la invitación no puede autoaceptar);
-    // - sesión presente → ganó la terminación: `inactive`, sin `onCanceled`;
+    // - sesión presente → ganó la terminación: `inactive` + su continuación;
     // - estado desconocido (`getSession` lanza) → fallo observable seguro:
     //   `cancelError`, jamás asumir que la sesión sigue viva.
+    // B13(r8): cada rama ejecuta EXACTAMENTE UN destino, o ninguno cuando el
+    // estado es desconocido —ahí la persona sigue en la superficie actual, con
+    // el mensaje visible y el mismo botón para reintentar—.
     let liveSession: Session | null;
     try {
       liveSession = await createSupabaseAuthGateway().getSession();
     } catch (caught) {
+      // La terminación encolada se CONSERVA: la contraseña ya se guardó, así
+      // que el reintento debe seguir pudiendo resolver a favor de la
+      // terminación en vez de degradarla a cancelación.
       commitPhase({
         kind: 'cancelError',
         message:
@@ -175,12 +195,15 @@ export function useRecoveryPhase() {
       });
       return;
     }
+    const completion = pendingCompletionRef.current ?? noop;
+    pendingCompletionRef.current = null;
     if (liveSession === null) {
       commitPhase({ kind: 'inactive' });
       onCanceled();
       return;
     }
     commitPhase({ kind: 'inactive' });
+    completion();
   }, []);
 
   return {

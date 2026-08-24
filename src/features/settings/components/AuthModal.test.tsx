@@ -409,8 +409,12 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     // Guardar la contraseña mientras la cancelación sigue pendiente: el éxito
     // de setNewPassword encola la terminación. El host no re-abre la sesión ni
     // el cierre por visible=false lanza una segunda cancelación.
+    // B13(r8): el cierre se encola JUNTO con la terminación. Aquí todavía no
+    // puede haber ocurrido: la carrera sigue sin resolver y nadie sabe si gana
+    // la terminación o la cancelación. Antes esta línea esperaba el cierre
+    // inmediato, que era precisamente el defecto.
     fireEvent.press(screen.getByTestId('stub-reset-success'));
-    await waitFor(() => expect(onCloseSpy).toHaveBeenCalledTimes(1));
+    expect(onCloseSpy).not.toHaveBeenCalled();
     expect(mockSignOut).toHaveBeenCalledTimes(1);
 
     // La cancelación pendiente falla y la sesión sigue viva: la terminación

@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { act, fireEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, waitFor } from '@testing-library/react-native';
 
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { renderWithTheme } from '@/test/renderWithTheme';
@@ -262,18 +262,27 @@ describe('AccessScreen', () => {
 
     // Guardar mientras el signOut pende: la navegación de éxito no libera la
     // pausa prematuramente (la transición sigue en vuelo) ni reabre la sesión.
+    // B13(r8): la navegación tampoco ocurre ya: queda ENCOLADA junto con la
+    // terminación. Con la carrera sin resolver nadie sabe todavía quién gana, y
+    // navegar aquí era ejecutar el destino de éxito a ciegas.
     fireEvent.press(screen.getByTestId('stub-reset-success'));
-    await screen.findByText('Iniciar sesión');
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+    // Se deja que React vacíe la cola: una navegación ansiosa habría llegado a
+    // renderizarse aquí. Comprobarlo de forma síncrona no distinguía nada,
+    // porque el render posterior al evento aún no había ocurrido.
+    await waitFor(() =>
+      expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true),
+    );
+    expect(screen.queryByTestId('stub-reset-screen')).not.toBeNull();
+    expect(screen.queryByText('Iniciar sesión')).toBeNull();
     expect(mockSignOut).toHaveBeenCalledTimes(1);
 
-    // El signOut falla con la sesión viva: la terminación encolada gana → inactive.
-    await act(async () => {
-      rejectSignOut?.();
-    });
+    // El signOut falla con la sesión viva: la terminación encolada gana →
+    // inactive, y solo ahora se ejecuta su destino, exactamente una vez.
+    rejectSignOut?.();
     await waitFor(() =>
       expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false),
     );
+    await screen.findByText('Iniciar sesión');
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 });

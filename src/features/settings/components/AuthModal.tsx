@@ -90,11 +90,15 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
   // `cancelReset` ahí abriría un segundo signOut. La pausa no la libera el
   // cierre: la gobierna solo la fase, así que se mantiene mientras el signOut
   // está pendiente y si este falla.
+  //
+  // B13(r8): `cancelError` ya NO dispara aquí. Reintentar solo se hace a
+  // petición de la persona, con el mensaje delante: un reintento automático es
+  // invisible, y encadenado con un fallo persistente formaba el ciclo
+  // cancelError → canceling → cancelError a espaldas de todos. Si el padre
+  // fuerza el cierre estando en `cancelError`, la fase se sostiene y con ella la
+  // pausa de la puerta: la sesión del OTP nunca queda habilitada. Falla cerrado.
   useEffect(() => {
-    if (
-      !visible &&
-      (recoveryPhase.kind === 'active' || recoveryPhase.kind === 'cancelError')
-    ) {
+    if (!visible && recoveryPhase.kind === 'active') {
       void cancelReset(() => undefined);
     }
   }, [cancelReset, recoveryPhase.kind, visible]);
@@ -298,14 +302,15 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
             {step.screen === 'reset' ? (
               <ResetPasswordScreen
                 onCancel={() => void cancelReset(onClose)}
-                onSuccess={() => {
-                  // B9: el éxito real de setNewPassword termina por la
-                  // transición distinguida (completeRecovery), no vuelve a
-                  // intentar cerrar la sesión aunque un cancelar anterior
-                  // haya fallado; el cierre por éxito llama a onClose directo.
-                  completeRecovery();
-                  onClose();
-                }}
+                // B9: el éxito real de setNewPassword termina por la transición
+                // distinguida (completeRecovery), no vuelve a intentar cerrar la
+                // sesión aunque un cancelar anterior haya fallado.
+                // B13(r8): el cierre por éxito se ENTREGA al hook en vez de
+                // ejecutarse aquí. Sin cancelación en vuelo se ejecuta de
+                // inmediato; con una en vuelo queda encolado y solo lo ejecuta la
+                // resolución si gana la terminación. Así nunca se cierra el modal
+                // antes de conocer al ganador ni se ocultan dos destinos.
+                onSuccess={() => completeRecovery(onClose)}
               />
             ) : null}
           </Animated.View>

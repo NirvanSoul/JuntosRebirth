@@ -397,11 +397,12 @@ export function AcceptInvitationScreen({
               onCancel={() =>
                 void cancelReset(() => setAuthStep({ screen: 'login' }))
               }
-              // B9: el éxito real de setNewPassword termina por la transición
-              // distinguida (completeRecovery): libera la pausa sin cerrar la
-              // sesión, aunque un intento de cancelar haya fallado; recién
-              // entonces la autoaceptación puede ocurrir.
-              onSuccess={completeRecovery}
+              // B9: el éxito de setNewPassword termina por completeRecovery:
+              // libera la pausa sin cerrar la sesión aunque cancelar haya
+              // fallado, y recién entonces la autoaceptación puede ocurrir.
+              // B13(r8): sin destino propio, y envuelto para no pasar el evento
+              // del Pressable como si fuera la continuación.
+              onSuccess={() => completeRecovery()}
             />
           ) : null}
         </View>

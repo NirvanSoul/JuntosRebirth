@@ -250,3 +250,140 @@ describe('useRecoveryPhase — contrato de cancelReset y pegajosidad de cancelin
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * B13(r8): la carrera entre la cancelación en vuelo y la terminación confirmada
+ * no solo decide la FASE, decide el DESTINO. `completeRecovery` recibe su propia
+ * continuación y la resolución ejecuta exactamente una: la de terminación o la
+ * de cancelación, nunca las dos y nunca ninguna por descuido.
+ */
+describe('useRecoveryPhase — la resolución gobierna un único destino (B13)', () => {
+  let resolveSignOut: (() => void) | undefined;
+
+  beforeEach(() => {
+    resolveSignOut = undefined;
+    mockSignOut.mockReset();
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSignOut = resolve;
+        }),
+    );
+    mockGetSession.mockReset();
+    mockGetSession.mockResolvedValue(null);
+  });
+
+  /** Deja el hook con un `signOut` en vuelo y la terminación ya encolada. */
+  async function arrangeRace(onCanceled: jest.Mock, onCompleted: jest.Mock) {
+    const { result } = await renderHook(() => useRecoveryPhase());
+    await act(async () => {
+      result.current.startRecovery();
+    });
+    let cancelPromise: Promise<void> | undefined;
+    await act(async () => {
+      cancelPromise = result.current.cancelReset(onCanceled);
+    });
+    await act(async () => {
+      result.current.completeRecovery(onCompleted);
+    });
+    expect(result.current.phase.kind).toBe('cancelingCompletion');
+    // Encolada quiere decir encolada: la continuación de éxito no se ejecuta
+    // por adelantado, que es exactamente lo que hacía el host en B13.
+    expect(onCompleted).not.toHaveBeenCalled();
+    return { cancelPromise, result };
+  }
+
+  it('sesión presente tras el signOut: gana la terminación y se ejecuta solo su continuación', async () => {
+    const onCanceled = jest.fn();
+    const onCompleted = jest.fn();
+    mockGetSession.mockResolvedValue(recoverySession);
+    const { cancelPromise, result } = await arrangeRace(
+      onCanceled,
+      onCompleted,
+    );
+
+    await act(async () => {
+      resolveSignOut?.();
+      await cancelPromise;
+    });
+
+    expect(result.current.phase.kind).toBe('inactive');
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(onCanceled).not.toHaveBeenCalled();
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('sesión nula tras el signOut: gana la cancelación y se ejecuta solo su continuación', async () => {
+    const onCanceled = jest.fn();
+    const onCompleted = jest.fn();
+    mockGetSession.mockResolvedValue(null);
+    const { cancelPromise, result } = await arrangeRace(
+      onCanceled,
+      onCompleted,
+    );
+
+    await act(async () => {
+      resolveSignOut?.();
+      await cancelPromise;
+    });
+
+    expect(result.current.phase.kind).toBe('inactive');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    expect(onCompleted).not.toHaveBeenCalled();
+  });
+
+  it('getSession falla: ningún destino se ejecuta, el error queda observable y no se reintenta solo', async () => {
+    const onCanceled = jest.fn();
+    const onCompleted = jest.fn();
+    mockGetSession.mockRejectedValue(new Error('sin red'));
+    const { cancelPromise, result } = await arrangeRace(
+      onCanceled,
+      onCompleted,
+    );
+
+    await act(async () => {
+      resolveSignOut?.();
+      await cancelPromise;
+    });
+
+    expect(result.current.phase.kind).toBe('cancelError');
+    expect(onCanceled).not.toHaveBeenCalled();
+    expect(onCompleted).not.toHaveBeenCalled();
+    // Un solo signOut: la resolución no relanza la cancelación por su cuenta.
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('el reintento tras cancelError conserva la terminación encolada y no la degrada a cancelación', async () => {
+    const onCanceled = jest.fn();
+    const onCompleted = jest.fn();
+    mockGetSession.mockRejectedValueOnce(new Error('sin red'));
+    const { cancelPromise, result } = await arrangeRace(
+      onCanceled,
+      onCompleted,
+    );
+
+    await act(async () => {
+      resolveSignOut?.();
+      await cancelPromise;
+    });
+    expect(result.current.phase.kind).toBe('cancelError');
+
+    // Reintento: la contraseña ya se guardó, así que la terminación sigue
+    // pendiente. Con la sesión viva debe ganar la terminación, no la
+    // cancelación: si la marca encolada viviera solo en la fase, se habría
+    // perdido al pasar por `cancelError`.
+    mockGetSession.mockResolvedValue(recoverySession);
+    let retryPromise: Promise<void> | undefined;
+    await act(async () => {
+      retryPromise = result.current.cancelReset(onCanceled);
+    });
+    await act(async () => {
+      resolveSignOut?.();
+      await retryPromise;
+    });
+
+    expect(result.current.phase.kind).toBe('inactive');
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(onCanceled).not.toHaveBeenCalled();
+  });
+});

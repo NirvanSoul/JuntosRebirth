@@ -260,13 +260,15 @@ export function AccessScreen() {
               onCancel={() =>
                 void cancelReset(() => setStep({ screen: 'login' }))
               }
-              onSuccess={() => {
-                // B9: el éxito real de setNewPassword termina por la transición
-                // distinguida (completeRecovery): publica `inactive` sin cerrar
-                // la sesión, aunque un intento de cancelar haya fallado.
-                completeRecovery();
-                setStep({ screen: 'login' });
-              }}
+              // B9: el éxito real de setNewPassword termina por la transición
+              // distinguida (completeRecovery): publica `inactive` sin cerrar la
+              // sesión, aunque un intento de cancelar haya fallado.
+              // B13(r8): la navegación se entrega al hook, igual que en Ajustes.
+              // Con una cancelación en vuelo queda encolada y solo se ejecuta si
+              // gana la terminación; nunca se navega antes de conocer al ganador.
+              onSuccess={() =>
+                completeRecovery(() => setStep({ screen: 'login' }))
+              }
             />
           ) : null}
         </Animated.View>
