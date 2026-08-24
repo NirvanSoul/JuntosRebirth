@@ -51,4 +51,76 @@ describe('useRecoveryPhase — idempotencia atómica de cancelReset', () => {
     expect(onCanceled).toHaveBeenCalledTimes(1);
     expect(result.current.phase.kind).toBe('inactive');
   });
+
+  it('B10 contrato: completeRecovery durante canceling encola la terminación y gana sobre el fallo del signOut', async () => {
+    const rejecters: (() => void)[] = [];
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejecters.push(() => reject(new Error('Sin conexión.')));
+        }),
+    );
+    const onCanceled = jest.fn();
+    const { result } = await renderHook(() => useRecoveryPhase());
+
+    await act(async () => {
+      result.current.startRecovery();
+    });
+
+    let cancelPromise: Promise<void> | undefined;
+    await act(async () => {
+      cancelPromise = result.current.cancelReset(onCanceled);
+    });
+
+    // Mientras el signOut está en vuelo la terminación se encola; no se
+    // descarta y `cancelError` no puede ganar después.
+    await act(async () => {
+      result.current.completeRecovery?.();
+    });
+    expect(result.current.phase.kind).toBe('cancelingCompletion');
+    expect(onCanceled).not.toHaveBeenCalled();
+
+    await act(async () => {
+      rejecters.forEach((reject) => reject());
+      await cancelPromise;
+    });
+
+    expect(result.current.phase.kind).toBe('inactive');
+    expect(onCanceled).not.toHaveBeenCalled();
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('B10 contrato: con signOut con éxito, la terminación encolada publica inactive sin ejecutar onCanceled', async () => {
+    let resolveSignOut: (() => void) | undefined;
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSignOut = resolve;
+        }),
+    );
+    const onCanceled = jest.fn();
+    const { result } = await renderHook(() => useRecoveryPhase());
+
+    await act(async () => {
+      result.current.startRecovery();
+    });
+
+    let cancelPromise: Promise<void> | undefined;
+    await act(async () => {
+      cancelPromise = result.current.cancelReset(onCanceled);
+    });
+    await act(async () => {
+      result.current.completeRecovery?.();
+    });
+    expect(result.current.phase.kind).toBe('cancelingCompletion');
+
+    await act(async () => {
+      resolveSignOut?.();
+      await cancelPromise;
+    });
+
+    expect(result.current.phase.kind).toBe('inactive');
+    expect(onCanceled).not.toHaveBeenCalled();
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
 });

@@ -83,12 +83,18 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
     }
   }, [visible]);
 
-  // B7(r4): si `visible` cae a mitad de recuperación por una vía que no pasa
-  // por requestClose (el padre fuerza el cierre), la sesión del OTP se sigue
-  // cancelando. La pausa no la libera el cierre: la gobierna solo la fase, así
-  // que se mantiene mientras el signOut está pendiente y si este falla.
+  // B7(r4)+B10(r6): si `visible` cae a mitad de recuperación por una vía que no
+  // pasa por requestClose (el padre fuerza el cierre), la sesión del OTP se
+  // sigue cancelando solo cuando NO hay ya una cancelación en vuelo ni una
+  // terminación encolada (`canceling`/`cancelingCompletion`): re-llamar
+  // `cancelReset` ahí abriría un segundo signOut. La pausa no la libera el
+  // cierre: la gobierna solo la fase, así que se mantiene mientras el signOut
+  // está pendiente y si este falla.
   useEffect(() => {
-    if (!visible && recoveryPhase.kind !== 'inactive') {
+    if (
+      !visible &&
+      (recoveryPhase.kind === 'active' || recoveryPhase.kind === 'cancelError')
+    ) {
       void cancelReset(() => undefined);
     }
   }, [cancelReset, recoveryPhase.kind, visible]);

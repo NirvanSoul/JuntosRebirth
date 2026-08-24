@@ -271,6 +271,38 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
       expect(mockSignOut).toHaveBeenCalledTimes(1);
     });
 
+    it('B10: guardar durante una cancelación en vuelo encola la terminación; si el signOut falla, acepta la invitación una vez y conserva la sesión', async () => {
+      const screen = await llegarAlRestablecimientoConSesion();
+      const rejecters: (() => void)[] = [];
+      mockSignOut.mockImplementation(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejecters.push(() =>
+              reject(new Error('No pudimos cerrar sesión.')),
+            );
+          }),
+      );
+
+      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+
+      // Guardar mientras el signOut pende: sigue en reset y sin autoaceptar
+      // hasta que la transición encolada se resuelva.
+      await fireEvent.press(screen.getByTestId('stub-reset-success'));
+      expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
+      expect(mockAcceptInvitation).not.toHaveBeenCalled();
+
+      // El signOut falla; la terminación encolada gana y habilita la sesión.
+      await act(async () => {
+        rejecters.forEach((reject) => reject());
+      });
+      await waitFor(() =>
+        expect(mockAcceptInvitation).toHaveBeenCalledTimes(1),
+      );
+      expect(await screen.findByTestId('accept-invitation-done')).toBeTruthy();
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+    });
+
     it('la sesión creada por el registro conserva la autoaceptación', async () => {
       const screen = await renderInvitation();
 

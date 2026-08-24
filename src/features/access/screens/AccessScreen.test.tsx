@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { fireEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, waitFor } from '@testing-library/react-native';
 
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { renderWithTheme } from '@/test/renderWithTheme';
@@ -230,5 +230,42 @@ describe('AccessScreen', () => {
     await screen.findByText('Iniciar sesión');
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+  });
+
+  it('B10: guardar la contraseña durante una cancelación en vuelo encola la terminación: login sin liberar la pausa hasta resolver el signOut, y sin cerrar la sesión aunque falle', async () => {
+    const rejecters: (() => void)[] = [];
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejecters.push(() => reject(new Error('Sin conexión con la red.')));
+        }),
+    );
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    fireEvent.press(screen.getByTestId('access-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+
+    // Guardar mientras el signOut pende: la navegación de éxito no libera la
+    // pausa prematuramente (la transición sigue en vuelo) ni reabre la sesión.
+    fireEvent.press(screen.getByTestId('stub-reset-success'));
+    await screen.findByText('Iniciar sesión');
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+
+    // El signOut falla: la terminación encolada gana → inactive y sesión viva.
+    await act(async () => {
+      rejecters.forEach((reject) => reject());
+    });
+    await waitFor(() =>
+      expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false),
+    );
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 });

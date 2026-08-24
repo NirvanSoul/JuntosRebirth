@@ -356,4 +356,58 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
   });
+
+  it('ruta 5 (B10 r6): guardar la contraseña durante una cancelación en vuelo encola la terminación: pausa liberada, sesión conservada y cierre por éxito aunque el signOut falle', async () => {
+    const rejecters: (() => void)[] = [];
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejecters.push(() => reject(new Error('Sin conexión con la red.')));
+        }),
+    );
+    const onCloseSpy = jest.fn();
+    function ModalHarness() {
+      const [visible, setVisible] = useState(true);
+      return (
+        <AuthModal
+          onClose={() => {
+            onCloseSpy();
+            setVisible(false);
+          }}
+          visible={visible}
+        />
+      );
+    }
+    const screen = await renderWithTheme(<ModalHarness />);
+
+    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+
+    // Cancelar deja el signOut del OTP en vuelo (diferido).
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+
+    // Guardar la contraseña mientras la cancelación sigue pendiente: el éxito
+    // de setNewPassword encola la terminación. El host no re-abre la sesión ni
+    // el cierre por visible=false lanza una segunda cancelación.
+    fireEvent.press(screen.getByTestId('stub-reset-success'));
+    await waitFor(() => expect(onCloseSpy).toHaveBeenCalledTimes(1));
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+
+    // La cancelación pendiente falla: la terminación encolada gana —inactive,
+    // nada de cancelError con el modal ya cerrado— y la sesión se conserva.
+    await act(async () => {
+      rejecters.forEach((reject) => reject());
+    });
+    await waitFor(() =>
+      expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false),
+    );
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(onCloseSpy).toHaveBeenCalledTimes(1);
+  });
 });
