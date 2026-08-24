@@ -22,7 +22,7 @@ financiero, autenticación, importación, legal y espacios de pareja). La
 **sincronización Supabase** y la **verificación de correo** ya se comprobaron de
 punta a punta en staging con dos cuentas y dos dispositivos físicos (§§6-8).
 
-La **Fase 3** está oficialmente cerrada tras la resolución del frente SQL y las ACL en staging. El trabajo activo avanza a la **Fase 4** de desarrollo funcional. La Fase 5 de release no ha comenzado. El macrobloque de integración legal (ADR-083) está implementado y con Gate 1 en verde (132 suites / 852 pruebas); solo le falta el smoke físico y la verificación de ambos verificadores para cerrarse.
+La **Fase 3** está oficialmente cerrada tras la resolución del frente SQL y las ACL en staging. El trabajo activo avanza a la **Fase 4** de desarrollo funcional. La Fase 5 de release no ha comenzado. El macrobloque de integración legal (ADR-083) está implementado y pasó su Gate 1 (132 suites / 852 pruebas). El Gate 2 (ronda 1) rechazó cinco bloqueantes conductuales (B1–B5) y dos condiciones (C1–C2); quedan corregidos con su tabla de transiciones y una prueba roja por bloqueante, y la validación actual es **134 suites / 866 pruebas** (seguir `Bible/DECISIONS.md` → ADR-083 → Gate 2). Solo le falta el segundo veredicto del Gate 2, el smoke físico (con `enable_confirmations` activado en local para los pasos del OTP) y la verificación de ambos verificadores para cerrarse.
 
 ## 3. Orden de trabajo
 

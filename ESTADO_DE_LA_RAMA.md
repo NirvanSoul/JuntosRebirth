@@ -88,9 +88,13 @@ desde los contratos de esta rama.
 para importar y arrastra vulnerabilidades sin versión corregida. El flujo legal
 ya no está aquí: el macrobloque de integración (ADR-083) lo implementó, con la
 puerta de sesión obligatoria, el paso legal en el registro y la intención
-durable, y validado en Gate 1 (132 suites / 852 pruebas). Queda solo el smoke
-físico (checklist en el paquete de entrega) y la verificación de ambos
-verificadores antes de marcarlo cerrado.
+durable. El Gate 2 (ronda 1) rechazó cinco bloqueantes conductuales (B1–B5) y
+dos condiciones (C1–C2); se corrigieron escribiendo primero la tabla de
+transiciones de la puerta y una prueba roja por bloqueante. Validación actual:
+**134 suites / 866 pruebas / EXIT=0**. Queda el segundo veredicto del Gate 2
+sobre este código y, solo después, el smoke físico (recuperación de contraseña
+incluida, y con `enable_confirmations` activado en local para los pasos del
+OTP) antes de marcar la tarea cerrada.
 
 ## Backend
 

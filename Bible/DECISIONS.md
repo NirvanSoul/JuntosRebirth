@@ -5464,16 +5464,17 @@ recalcular versiones documentales en caliente.
   (`@juntoss/pending-legal-acceptance/v1`) con esquema versionado (v1) y
   validación de lectura; contiene correo normalizado (identidad de registro),
   locale `es-ES`, origen, versión real de la app y la instantánea de
-  documentos/versiones/acción. Nunca contraseña, OTP u otros secretos. Solo se
-  elimina cuando la consulta remota confirma que todas las filas esperadas
-  existen.
+  documentos/versiones/acción. Nunca contraseña, OTP u otros secretos. No
+  persiste `createdAt` (no gobierna ninguna caducidad: es dato muerto, C2).
+  Solo se elimina cuando la consulta remota confirma que todas las filas
+  esperadas existen.
 - **Orden de efectos de sesión:** `useLegalSessionGate` publica una sesión
   «legalmente habilitada»; los consumidores autenticados (`useSpaces`,
   `MainTabsNavigator`, `AcceptInvitationScreen`, `PendingInvitationBanner`,
   `SettingsScreen`) leen esa sesión, de modo que ningún efecto autenticado
   reacciona antes de terminar la comprobación. `RootNavigator` muestra la
-  puerta obligatoria (`LegalSessionGateScreen`, no descartable) cuando la
-  sesión existe y falta evidencia.
+  puerta obligatoria (`LegalSessionGateScreen`, no descartable) durante la
+  comprobación y cuando existe sesión sin evidencia vigente.
 - **Origen tipado:** `LegalAcceptanceSource` cierra los valores
   (`access-signup`, `settings-signup`, `invitation-signup`,
   `account-regularization`, `new-version`); cada host pasa el suyo.
@@ -5486,11 +5487,58 @@ recalcular versiones documentales en caliente.
   al final. La tabla no garantiza unicidad por versión: no se promete una única
   fila bajo concurrencia, pero el cliente evita duplicados secuenciales.
 - **OTP de recuperación:** la puerta se pausa (`setRecoveryHalted`) durante el
-  subflujo de recuperación en invitación: el restablecimiento no se cortocircuita
-  y nunca autoacepta. Tras el alta por OTP de registro y la habilitación legal,
-  la invitación se acepta exactamente una vez.
+  subflujo de recuperación en los tres hosts (invitación, `AccessScreen` y
+  `AuthModal`): el restablecimiento no se cortocircuita y nunca autoacepta. La
+  pausa solo es válida con el flujo en vivo: `AuthModal` la libera al cerrarse
+  (`visible`), los `useEffect` liberan al desmontar/abandonar y perder la
+  sesión resetea la pausa global (nunca queda colgada para nadie, B3).
+  `RootNavigator` no cambia de host mientras dura la pausa. Tras el alta por
+  OTP de registro y la habilitación legal, la invitación se acepta exactamente
+  una vez.
 - **OAuth futuro:** consumirá la misma puerta (es una sesión autenticada más);
   los orígenes nuevos se añaden al enum documentado.
+
+## Gate 2 — tabla de transiciones y correcciones (2026-08-24)
+
+La puerta es una máquina de estados de ámbito de módulo. Los cinco bloqueantes
+del Gate 2 (B1–B5) eran transiciones nunca enumeradas; la tabla resultante es:
+
+| Estado | Condición | `rawSession` | `session` (legal) | `isLegallyEnabled` | Superficie | Efectos |
+|---|---|---|---|---|---|---|
+| `no-session` | sin sesión cruda | `null` | `null` | true (invitado) | — | — |
+| `pending` (derivado) | sesión cruda con snapshot aún sin comprobar | set | `null` | **false** | checking | bloqueados |
+| `checking` | comprobación en vuelo | set | `null` | **false** | bloqueda (B5) | bloqueados |
+| `cleared` | evidencia completa | set | set | true | — | habilitados |
+| `required` | falta evidencia o fallo observable | set | `null` | **false** | puerta obligatoria | bloqueados |
+| `halted` | OTP de recuperación activo | set | `null` | **false** | host invariante (B3) | bloqueados |
+
+Decisiones que cierran cada bloqueante:
+
+- **B1 — intención de otro correo:** la cuenta real de la sesión decide, no la
+  intención. Si el correo difiere, se consultan los documentos de la sesión:
+  cuenta al día ⇒ `cleared` (sin tocar la intención); faltan documentos ⇒
+  `required` con solo esos. La intención ajena se conserva intacta, a propósito:
+  destruirla también tiene coste, porque su titular aún podría verificar en este
+  móvil y su aceptación explícita sigue siendo válida.
+- **B2 — estados no compartidos:** `no-session` y «sesión sin comprobar» no
+  comparten estado. La vista del hook deriva `pending`/`checking` (habilitada =
+  false) cuando hay sesión cruda con snapshot permisivo; `useDeferredAuthenticatedMark`
+  marca solo ante `cleared`.
+- **B3 — recuperación:** pausa en los tres hosts con cleanup y con
+  `visible` condicional en `AuthModal`; `RootNavigator` conserva el host durante
+  la pausa (ref `wasAccessShown`); perder la sesión resetea la pausa global.
+- **B4 — solo lo pendiente:** `LegalSessionGateScreen` pasa
+  `requiredDocuments={missingDocuments}` al paso y valida con exactamente ese
+  conjunto (un episodio nuevo resetea decisión y entrega vía estado derivado de
+  props); `submitRegularization(decision)` rechaza decisiones que no cubren los
+  pendientes (la acción de la persona es vinculante).
+- **B5 — comprobaciones concurrentes:** *latest-wins*: cada petición invalida
+  la comprobación en vuelo y encola la sesión más reciente; ninguna se pierde y
+  ningún resultado viejo se publica. La superficie se bloquea también durante
+  `checking`, no solo en `required`.
+- **C2 — createdAt:** eliminado del esquema v1 (no gobernaba caducidad ni se
+  leía). La clave `@juntoss/pending-legal-acceptance/v1` se conserva: una
+  intención antigua con el campo extra sigue siendo válida.
 ## Consecuencias
 
 - `signUpTotalSteps` pasa de 4 a 5; los tres hosts (AccessScreen, AuthModal,
@@ -5506,21 +5554,30 @@ recalcular versiones documentales en caliente.
 - Sin restricción única por versión en la tabla, la unicidad de fila bajo
   concurrencia no está garantizada por la base; el cliente garantiza solo
   ausencia de duplicados secuenciales y la puerta es un único consumidor.
+- Una intención de otro correo puede permanecer guardada en el dispositivo
+  mientras su titular no verifique; es intencional (ver B1 en el Gate 2) y es
+  inerte: la cuenta de la sesión decide sobre sus propios documentos.
 - El smoke físico (registro completo, cierre antes de verificar, reapertura,
-  consulta de `legal_acceptances`, pérdida de red e invitación) queda
-  pendiente: el checklist exacto se entrega en el paquete del macrobloque y la
-  tarea no se marca cerrada hasta que exista la evidencia.
+  consulta de `legal_acceptances`, pérdida de red, recuperación de contraseña e
+  invitación) queda pendiente y no debe ejecutarse hasta obtener los dos
+  veredictos del Gate 2 sobre el código definitivo. En la Supabase local
+  `enable_confirmations = false` autoconfirma: hay que activar la confirmación
+  para el smoke (los pasos 7–8 del checklist ejercitan la intención durable) y
+  revertir el fichero después.
 - Google y Apple (Fase 4g) siguen fuera por requerir credenciales, enlace de
   identidades y pruebas nativas independientes.
 
 ## Validación
 
-- ROJO contra `c4a669e`: 5 suites fallidas / 2 tests fallidos, EXIT=1.
-- VERDE focal y `npm run validate` final: **132 suites / 852 tests, EXIT=0**
-  (typecheck, check:suppressions, eslint, prettier y jest), frente a la línea
-  base de 125/816.
+- ROJO contra `c4a669e` (ronda 1): 5 suites fallidas / 2 tests fallidos, EXIT=1.
+- ROJO del Gate 2 (ronda 2, contra el código entregado): 6 suites / 11 tests
+  fallidos — uno por cada bloqueante (B1×1, B2×2, B3×3, B4×3, B5×1) y C2×1 —
+  sobre el comportamiento real (`verify` preservado, no por parseo).
+- VERDE focal y `npm run validate` final (ronda 2): **134 suites / 866 tests,
+  EXIT=0** (typecheck, check:suppressions, eslint, prettier y jest), frente a la
+  línea base de 125/816 y al 132/852 previo al Gate 2.
 - `frozenLineDebt` sin subidas: `MainTabsNavigator.tsx` se mide en 1336 líneas
-  no vacías (se mantiene); `AcceptInvitationScreen.tsx` queda en 391 (≤400).
+  no vacías (se mantiene); `AcceptInvitationScreen.tsx` queda en 394 (≤400).
 
 ## Referencias
 
