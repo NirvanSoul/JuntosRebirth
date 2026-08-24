@@ -275,6 +275,37 @@ Regla práctica: si el mock inmoviliza la señal que la prueba observa, no
 protege. Hay que exponer el setter (o el mecanismo equivalente) y disparar la
 transición real.
 
+### 8.2 Escalación por iteraciones repetidas del Gate 2
+
+El Gate 2 no puede convertirse en una sucesión indefinida de parches sobre el
+mismo diseño.
+
+Se considera una devolución relevante cuando un verificador encuentra un
+bloqueante o hallazgo importante de comportamiento relacionado con el mismo
+flujo, módulo, máquina de estados o causa raíz. No cuentan los hallazgos
+exclusivamente documentales, la falta de un artefacto de evidencia ni problemas
+externos al alcance.
+
+- Tras la tercera devolución relevante consecutiva, el actor debe advertir que
+  el enfoque puede estar agotándose y registrar la causa común observada.
+- Tras la cuarta devolución, se detiene obligatoriamente la implementación antes
+  de preparar una quinta ronda.
+- Antes de continuar, el actor presenta una revisión de diseño que incluya:
+  1. Estados, transiciones y dueños actuales.
+  2. Causa raíz compartida por las devoluciones.
+  3. Al menos dos alternativas razonables, incluida sustituir el mecanismo.
+  4. Invariantes que el nuevo enfoque hará imposibles de violar.
+  5. Código y pruebas que se conservarán, migrarán o eliminarán.
+  6. Riesgos, coste, smoke y estrategia de transición.
+- El responsable decide explícitamente entre continuar el enfoque existente o
+  aprobar el rediseño.
+- Continuar con parches exige una justificación registrada y concede como máximo
+  una ronda adicional. Si esa ronda vuelve a recibir un bloqueante o hallazgo
+  importante de la misma familia, el rediseño pasa a ser obligatorio.
+- Un rediseño aprobado no autoriza ampliar el alcance funcional ni eliminar
+  comportamiento válido. Sus invariantes se escriben antes del código y su
+  implementación vuelve a pasar todos los gates aplicables.
+
 ---
 
 ## 9. Modo de trabajo actual
