@@ -5415,7 +5415,7 @@ del borrado, archivo o disolución del espacio.
 
 # ADR-083 — Integración legal en la autenticación existente: intención durable y puerta de sesión obligatoria
 
-**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; el veredicto de la ronda 3 aprobó B6 y B8 y rechazó B7, corregido estructuralmente en la ronda 4 —ver ronda 4 abajo—; el veredicto de la ronda 4 rechazó la entrega por B9 e I1, corregidos en la ronda 5 —ver ronda 5 abajo—; pendientes el veredicto de la ronda 5 y el smoke físico).
+**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; el veredicto de la ronda 3 aprobó B6 y B8 y rechazó B7, corregido estructuralmente en la ronda 4 —ver ronda 4 abajo—; el veredicto de la ronda 4 rechazó la entrega por B9 e I1, corregidos en la ronda 5 —ver ronda 5 abajo—; el veredicto de la ronda 5 rechazó la entrega por B10 (terminación perdida durante `canceling`), corregido en la ronda 6 con la terminación encolada —ver ronda 6 abajo—; pendientes el veredicto de la ronda 6 y el smoke físico).
 
 ## Contexto
 
@@ -5705,6 +5705,57 @@ con `signOut` diferido: dos `cancelReset` inmediatos producen exactamente un
 Validación final del árbol ya commiteado: **135 suites / 883 pruebas / EXIT=0**
 (`npm run validate`; `gate2_r5_final.txt`). Pendientes para cerrar la Fase 5
 legal: veredicto de la ronda 5 de ambos verificadores y, solo después, el smoke
+físico completo.
+
+## Gate 2 — ronda 6 (2026-08-24): terminación encolada (B10) — la serialización real
+
+El veredicto de la ronda 5 aprobó B9 secuencial e I1 y la validación
+independiente de **135 suites / 883 pruebas / EXIT=0**, pero rechazó la
+entrega con un bloqueante de concurrencia:
+
+- **B10 — `completeRecovery` se perdía durante `canceling`.** El guard de la
+  ronda 5 hacía `if (phaseRef.current.kind === 'canceling') return;`: eso no
+  serializaba la terminación, la descartaba. Mientras `signOut('local')`
+  seguía pendiente, `ResetPasswordScreen` seguía operativa; si la persona
+  guardaba la contraseña, `setNewPassword` tenía éxito y `completeRecovery` no
+  publicaba `inactive`, pero los anfitriones continuaban igual: `AuthModal`
+  ejecutaba `onClose()`, `AccessScreen` navegaba a login y la invitación
+  quedaba esperando en reset. Si el signOut entonces fallaba, quedaba
+  `cancelError` con el modal cerrado o el paso abandonado: una variante
+  concurrente de B9.
+
+**Corrección estructural (serialización real, con resultado definido):**
+
+- Nueva fase **`cancelingCompletion`** en `useRecoveryPhase`. `completeRecovery`
+  durante `canceling` NO es no-op: encola la terminación publicando
+  `cancelingCompletion` (la pausa se sostiene igual, pues sigue
+  `phase.kind !== 'inactive'`, y los anfitriones no muestran error). Al resolver
+  `cancelReset`, la terminación gana de forma explícita:
+  - `signOut('local')` **con éxito** → `inactive` **sin ejecutar `onCanceled`**
+    (el anfitrión ya fue a su destino por la vía de éxito; empujarlo al destino
+    de cancelación perdería la autoaceptación de la invitación).
+  - `signOut('local')` **fallido** → `inactive` **siempre**; nunca `cancelError`
+    con el host cerrado/abandonado.
+- El guard de `cancelReset` cubre también `cancelingCompletion`: con un signOut
+  en vuelo o una terminación encolada nunca se abre una segunda cancelación.
+- `AuthModal` restringe su cierre forzado por `visible=false` a las fases
+  `active`/`cancelError`: durante `canceling`/`cancelingCompletion` ya existe un
+  signOut en vuelo y la pausa la gobierna la fase; re-llamar `cancelReset`
+  abriría un segundo.
+
+**Pruebas rojas (nuevas, con signOut diferido):** la carrera completa por
+anfitrión —cancelar → mientras el signOut pende, guardar la contraseña → el host
+no abre una segunda cancelación ni libera la pausa prematuramente → resolver y
+rechazar el signOut → la terminación encolada gana: `inactive`, pausa `false` y
+sesión conservada; modal cerrado por éxito, acceso en login, invitación aceptada
+una vez—. Dos pruebas directas del contrato del hook: `cancelingCompletion` se
+publica durante el vuelo y gana tanto sobre el fallo como sobre el éxito del
+signOut (sin `onCanceled`). Evidencia roja (5 fallan) y verde focal con
+`COMANDO` + `EXIT=` en `gate2_r6_rojo_B10.txt` y `gate2_r6_verde_B10.txt`.
+
+Validación final del árbol ya commiteado: **135 suites / 888 pruebas / EXIT=0**
+(`npm run validate`; `gate2_r6_final.txt`). Pendientes para cerrar la Fase 5
+legal: veredicto de la ronda 6 de ambos verificadores y, solo después, el smoke
 físico completo.
 
 ## Consecuencias
