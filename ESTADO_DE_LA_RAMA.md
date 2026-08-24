@@ -131,8 +131,15 @@ junto con el estado: `completeRecovery(onCompleted?)` la guarda y la resolución
 ejecuta **exactamente un destino**; la marca encolada vive fuera de la fase para
 sobrevivir a `cancelError`, de modo que el reintento ya no degrada a cancelación
 una contraseña que sí se guardó.
-Validación actual: **136 suites / 900
-pruebas / EXIT=0**. Queda el veredicto de la ronda 8 del Gate 2 y, solo
+El veredicto de la ronda 8 rechazó **B14**, el orden inverso: `cancelReset`
+puede resolver antes de que responda `setNewPassword`, ganar la cancelación y
+ejecutar su destino; después la pantalla —ya desmontada— invoca su `onSuccess`
+igual, y esa terminación tardía ejecutaba un segundo destino. La causa estaba en
+que `inactive` significaba dos cosas: «no hay recuperación» y «este episodio ya
+se resolvió». La ronda 9 separa el desenlace de la fase con `outcomeSettledRef`,
+que solo `startRecovery` reabre.
+Validación actual: **136 suites / 903
+pruebas / EXIT=0**. Queda el veredicto de la ronda 9 del Gate 2 y, solo
 después, el smoke físico (recuperación de contraseña incluida, y con
 `enable_confirmations` activado en local para los pasos del OTP) antes de
 marcar la tarea cerrada.

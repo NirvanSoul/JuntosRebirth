@@ -5905,6 +5905,65 @@ prettier y jest), frente a 135/893 de la ronda 7. `frozenLineDebt` sin subidas;
 comentarios, sin tocar el umbral. Evidencia en `c:\Projects\gate2_r8_*.txt` con
 `COMANDO` y `EXIT=`.
 
+## Gate 2 — ronda 9 (2026-08-24): el orden inverso de las dos asíncronas (B14)
+
+Actor: **Claude**, un solo verificador (GPT), excepción de §4.3 ya registrada.
+
+El veredicto de la ronda 8 aprobó B13 para el orden cubierto —terminación antes
+de la resolución del `signOut`— pero rechazó la entrega por el orden contrario:
+
+- **B14 — la cancelación gana antes de que responda el guardado.** `cancelReset`
+  puede resolver mientras `setNewPassword` sigue en vuelo. En ese instante no
+  hay terminación encolada, así que gana la cancelación y ejecuta su destino.
+  Después responde el guardado y `ResetPasswordScreen` invoca `onSuccess()` —lo
+  hace al resolver, **sin guarda de desmontaje**, así que la continuación
+  capturada sigue viva—. Ese `completeRecovery` tardío llegaba con la fase en
+  `inactive` y ejecutaba también el destino de éxito: dos destinos otra vez. En
+  Ajustes, «Atrás» podía llevar a `forgot` y el guardado tardío cerrar el modal
+  después; con «Cancelar», `onClose` dos veces.
+
+**Causa, y por qué la tabla de la ronda 8 la escondía.** Aquella tabla agrupaba
+`inactive`/`active` en una sola columna. Pero `inactive` significa **dos cosas**:
+«no hay recuperación en curso» y «este episodio ya se resolvió». Confundirlas
+reabre el doble destino. La lección es concreta: enumerar los estados no basta
+cuando un estado tiene dos significados; hay que enumerar los **desenlaces**.
+
+**Corrección:** `outcomeSettledRef` marca el desenlace del episodio, separada de
+la fase porque la fase describe la pausa, no la conclusión.
+
+- La ponen `finishRecovery`, la terminación normal y las dos ramas de la
+  resolución que ejecutan un destino.
+- **No** la pone `cancelError`: ahí el reintento sigue vivo.
+- Solo `startRecovery` la reabre («Olvidé mi contraseña» de nuevo), y hay prueba
+  de que un episodio nuevo vuelve a admitir terminación.
+
+`completeRecovery` la consulta antes de su rama terminal y se ignora si el
+episodio ya concluyó.
+
+**Prueba de host fiel al orden inverso.** El stub compartido convierte «guardar»
+directamente en `onSuccess` y solo puede modelar un orden. Esta suite usa un
+stub propio de `ResetPasswordScreen` que separa el **inicio** del guardado de su
+**resolución**, y esa resolución se invoca cuando la pantalla ya no está montada,
+como en el código real.
+
+**Limitación conocida declarada:** `AuthModal.recoveryRace.test.tsx` es sensible
+al orden de sus casos. Cada uno deja una cadena asíncrona real a medio camino y
+el entorno de render no las aísla del todo. Con la de `getSession` en primer
+lugar pasan las cuatro; moverla rompe a la siguiente por no llegar a montar el
+modal. No se ha camuflado con `act()` propios: eso fue exactamente lo que en la
+ronda 8 solapó ámbitos y corrompió la cola de React.
+
+**Correcciones documentales del veredicto:** el comentario de `AuthModal`
+afirmaba todavía que `onClose()` se llama directamente tras `completeRecovery()`
+—ahora se entrega al hook—, y `PLAN.md` §25 decía que faltaban «ambos
+verificadores» pese a la excepción registrada.
+
+**Validación de la ronda 9:** ROJO contra `79eb239` con las pruebas finales —2
+suites, **0 sin arrancar**, 2 fallos conductuales, `EXIT=1`—; VERDE focal 16/16
+`EXIT=0`; `npm run validate` **136 suites / 903 pruebas / EXIT=0**, frente a
+136/900 de la ronda 8. Evidencia en `c:\Projects\gate2_r9_*.txt` con `COMANDO` y
+`EXIT=`.
+
 ## Validación
 
 - ROJO contra `c4a669e` (ronda 1): 5 suites fallidas / 2 tests fallidos, EXIT=1.
