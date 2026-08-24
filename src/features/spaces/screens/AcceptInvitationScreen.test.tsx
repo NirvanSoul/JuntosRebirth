@@ -40,8 +40,12 @@ jest.mock('@/features/spaces/gateways/supabaseInvitationGateway', () => ({
 }));
 
 const mockSignOut = jest.fn();
+const mockGetSession = jest.fn();
 jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
-  createSupabaseAuthGateway: () => ({ signOut: mockSignOut }),
+  createSupabaseAuthGateway: () => ({
+    getSession: mockGetSession,
+    signOut: mockSignOut,
+  }),
 }));
 
 const mockConsumePendingLegalAcceptance = jest.fn();
@@ -106,6 +110,8 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
     mockAcceptInvitation.mockResolvedValue({ spaceName: 'Nuestro hogar' });
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
+    mockGetSession.mockReset();
+    mockGetSession.mockResolvedValue(null);
     // La puerta legal resuelve «al día» por defecto: el flujo de invitación se
     // comporta como hasta ahora y los casos de puerta la controlan a medida.
     mockConsumePendingLegalAcceptance.mockReset();
@@ -271,35 +277,96 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
       expect(mockSignOut).toHaveBeenCalledTimes(1);
     });
 
-    it('B10: guardar durante una cancelación en vuelo encola la terminación; si el signOut falla, acepta la invitación una vez y conserva la sesión', async () => {
+    it('B11 fiel 3: signOut fallido con la sesión realmente presente — la terminación encolada gana: la invitación se acepta una vez y se conserva la sesión', async () => {
       const screen = await llegarAlRestablecimientoConSesion();
-      const rejecters: (() => void)[] = [];
+      let rejectSignOut: (() => void) | undefined;
       mockSignOut.mockImplementation(
         () =>
           new Promise<void>((_resolve, reject) => {
-            rejecters.push(() =>
-              reject(new Error('No pudimos cerrar sesión.')),
-            );
+            rejectSignOut = () =>
+              reject(new Error('No pudimos cerrar sesión.'));
           }),
       );
+      // El fallo de GoTrue no eliminó la sesión (B11): sigue viva.
+      mockGetSession.mockResolvedValue(createOtpSession('user-recovery'));
 
       await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
       await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
 
       // Guardar mientras el signOut pende: sigue en reset y sin autoaceptar
-      // hasta que la transición encolada se resuelva.
+      // hasta que la transición encolada resuelva con el estado real.
       await fireEvent.press(screen.getByTestId('stub-reset-success'));
       expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
       expect(mockAcceptInvitation).not.toHaveBeenCalled();
 
-      // El signOut falla; la terminación encolada gana y habilita la sesión.
       await act(async () => {
-        rejecters.forEach((reject) => reject());
+        rejectSignOut?.();
       });
       await waitFor(() =>
         expect(mockAcceptInvitation).toHaveBeenCalledTimes(1),
       );
       expect(await screen.findByTestId('accept-invitation-done')).toBeTruthy();
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+    });
+
+    it('B11 fiel 1: signOut con éxito elimina la sesión local — aunque la contraseña se haya guardado, la invitación NO se autoacepta y vuelve al destino de cancelación', async () => {
+      const screen = await llegarAlRestablecimientoConSesion();
+      let resolveSignOut: (() => void) | undefined;
+      mockSignOut.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveSignOut = () => {
+              // GoTrue con éxito ya eliminó la sesión local antes de resolver.
+              mockSetSession?.(null);
+              resolve();
+            };
+          }),
+      );
+      mockGetSession.mockResolvedValue(null);
+
+      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+
+      // Guardar mientras el signOut pende deja la terminación encolada.
+      await fireEvent.press(screen.getByTestId('stub-reset-success'));
+      expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
+
+      await act(async () => {
+        resolveSignOut?.();
+      });
+
+      // La sesión ya no existe: ganó la cancelación; vuelve a login sin aceptar.
+      expect(await screen.findByTestId('stub-login-screen')).toBeTruthy();
+      expect(mockAcceptInvitation).not.toHaveBeenCalled();
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+    });
+
+    it('B11 fiel 2: signOut rechaza pero también deja la sesión eliminada — mismo resultado de cancelación', async () => {
+      const screen = await llegarAlRestablecimientoConSesion();
+      let rejectSignOut: (() => void) | undefined;
+      mockSignOut.mockImplementation(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectSignOut = () => {
+              // GoTrue borra la sesión local también en la mayoría de errores
+              // del _signOut (B11): la excepción no prueba que siga viva.
+              mockSetSession?.(null);
+              reject(new Error('No pudimos cerrar sesión.'));
+            };
+          }),
+      );
+      mockGetSession.mockResolvedValue(null);
+
+      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+      await fireEvent.press(screen.getByTestId('stub-reset-success'));
+
+      await act(async () => {
+        rejectSignOut?.();
+      });
+
+      expect(await screen.findByTestId('stub-login-screen')).toBeTruthy();
+      expect(mockAcceptInvitation).not.toHaveBeenCalled();
       expect(mockSignOut).toHaveBeenCalledTimes(1);
     });
 

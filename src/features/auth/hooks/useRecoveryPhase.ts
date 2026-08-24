@@ -1,3 +1,4 @@
+import type { Session } from '@supabase/supabase-js';
 import { useCallback, useRef, useState } from 'react';
 
 import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
@@ -33,13 +34,20 @@ export type RecoveryPhase =
  * pantalla previos al OTP (`finishRecovery`): publica `inactive` SIN
  * `signOut` y atraviesa `cancelError`.
  *
- * B10(r6): la terminación también se serializa con una cancelación en vuelo,
- * no se descarta. Cuando `completeRecovery` llega durante `canceling`, la fase
- * pasa a `cancelingCompletion` (la pausa se sostiene igual) y al resolver
- * `cancelReset` la terminación gana de forma definida: con `signOut` con éxito
- * se publica `inactive` sin ejecutar `onCanceled` (el anfitrión ya fue a su
- * destino por la vía de éxito); con `signOut` fallido se publica `inactive`
- * igualmente —nunca `cancelError` con el host cerrado/abandonado—.
+ * B10(r6)+B11(r7): la terminación también se serializa con una cancelación en
+ * vuelo, no se descarta. Cuando `completeRecovery` llega durante `canceling`, la
+ * fase pasa a `cancelingCompletion` (la pausa se sostiene igual). El ganador al
+ * resolver `cancelReset` se define con el **estado real posterior** de la
+ * sesión (`getSession`), no con el éxito/fallo del `signOut`: GoTrue elimina la
+ * sesión local también en la mayoría de errores del `_signOut`, así que una
+ * excepción no prueba que la sesión siga viva. Sesión `null` → ganó la
+ * cancelación (`inactive` + `onCanceled`); sesión presente → ganó la
+ * terminación (`inactive`, sin `onCanceled`); estado desconocido → `cancelError`
+ * (fallo observable seguro, nunca asumir que vive).
+ *
+ * B12(r7): `cancelingCompletion` es pegajosa frente a TODOS los escritores:
+ * `startRecovery`, `finishRecovery` y `cancelReset` no la mueven mientras el
+ * `signOut` está en vuelo, para que la resolución nunca pierda la marca.
  *
  * I1(r5): cada transición publica la fase nueva en la `phaseRef` de forma
  * síncrona (la acompañante del estado que leen los guards), sin esperar al
@@ -60,8 +68,11 @@ export function useRecoveryPhase() {
   };
 
   const startRecovery = useCallback(() => {
+    // B12(r7): `cancelingCompletion` también bloquea: con la terminación
+    // encolada ningún escritor puede mover la fase.
     if (
       phaseRef.current.kind === 'canceling' ||
+      phaseRef.current.kind === 'cancelingCompletion' ||
       phaseRef.current.kind === 'cancelError'
     ) {
       return;
@@ -70,11 +81,12 @@ export function useRecoveryPhase() {
   }, []);
 
   // Salida/cambio de pantalla anterior al OTP: normaliza la fase sin tocar la
-  // sesión. Bloqueada durante `canceling` y `cancelError`: no puede enmascarar
-  // una cancelación fallida (B7).
+  // sesión. Bloqueada durante `canceling`, `cancelingCompletion` y
+  // `cancelError`: no puede enmascarar una cancelación fallida (B7/B12).
   const finishRecovery = useCallback(() => {
     if (
       phaseRef.current.kind === 'canceling' ||
+      phaseRef.current.kind === 'cancelingCompletion' ||
       phaseRef.current.kind === 'cancelError'
     ) {
       return;
@@ -107,8 +119,8 @@ export function useRecoveryPhase() {
     phaseRef.current.kind === 'cancelingCompletion';
 
   const cancelReset = useCallback(async (onCanceled: () => void) => {
-    // Idempotente y atómico (I1) + B10(r6): el guard se lee de la ref y
-    // también cubre `cancelingCompletion` —con el signOut en vuelo o con una
+    // Idempotente y atómico (I1) + B12(r7): el guard se lee de la ref y cubre
+    // también `cancelingCompletion` —con el signOut en vuelo o con una
     // terminación encolada nunca se abre una segunda cancelación—. Publica
     // `canceling` en la ref con `commitPhase` de forma síncrona antes del
     // `await`; solo desde `cancelError` se puede invocar de nuevo (reintento).
@@ -119,34 +131,56 @@ export function useRecoveryPhase() {
       return;
     }
     commitPhase({ kind: 'canceling' });
+    let signOutFailed = false;
+    let signOutErrorMessage = 'No pudimos cerrar la sesión de recuperación.';
     try {
       await createSupabaseAuthGateway().signOut('local');
-      // B10(r6): si la persona guardó la contraseña mientras el signOut estaba
-      // en vuelo, la terminación encolada gana: `inactive` sin `onCanceled`
-      // (el anfitrión ya fue a su destino por la vía de éxito; empujarlo al
-      // destino de cancelación perdería la autoaceptación de la invitación).
-      if (hasCompletionEnqueued()) {
-        commitPhase({ kind: 'inactive' });
-        return;
-      }
-      commitPhase({ kind: 'inactive' });
-      onCanceled();
     } catch (caught) {
-      // B10(r6): la terminación encolada también gana sobre el fallo del
-      // signOut: la contraseña se guardó y la sesión del OTP es legítima.
-      // Publicar `cancelError` con el host cerrado/abandonado sería B9.
-      if (hasCompletionEnqueued()) {
+      // B11(r7): la excepción de GoTrue no prueba que la sesión siga viva; el
+      // ganador se decide después, con el estado real posterior.
+      signOutFailed = true;
+      signOutErrorMessage =
+        caught instanceof Error ? caught.message : signOutErrorMessage;
+    }
+
+    // Sin terminación encolada: el contrato previo sigue valiendo. El fallo es
+    // una cancelación fallida observable (mensaje visible y reintento).
+    if (!hasCompletionEnqueued()) {
+      if (signOutFailed) {
+        commitPhase({ kind: 'cancelError', message: signOutErrorMessage });
+      } else {
         commitPhase({ kind: 'inactive' });
-        return;
+        onCanceled();
       }
+      return;
+    }
+
+    // B11(r7): con una terminación encolada el resultado se define por el
+    // estado real de la sesión posterior al signOut:
+    // - sesión `null` → ganó la cancelación: `inactive` + `onCanceled` (no hay
+    //   sesión que habilitar; la invitación no puede autoaceptar);
+    // - sesión presente → ganó la terminación: `inactive`, sin `onCanceled`;
+    // - estado desconocido (`getSession` lanza) → fallo observable seguro:
+    //   `cancelError`, jamás asumir que la sesión sigue viva.
+    let liveSession: Session | null;
+    try {
+      liveSession = await createSupabaseAuthGateway().getSession();
+    } catch (caught) {
       commitPhase({
         kind: 'cancelError',
         message:
           caught instanceof Error
             ? caught.message
-            : 'No pudimos cerrar la sesión de recuperación.',
+            : 'No pudimos confirmar el estado de sesión.',
       });
+      return;
     }
+    if (liveSession === null) {
+      commitPhase({ kind: 'inactive' });
+      onCanceled();
+      return;
+    }
+    commitPhase({ kind: 'inactive' });
   }, []);
 
   return {

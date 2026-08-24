@@ -1,16 +1,28 @@
+import type { Session } from '@supabase/supabase-js';
 import { act, renderHook } from '@testing-library/react-native';
 
 import { useRecoveryPhase } from '@/features/auth/hooks/useRecoveryPhase';
 
 const mockSignOut = jest.fn();
+const mockGetSession = jest.fn();
 jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
-  createSupabaseAuthGateway: () => ({ signOut: mockSignOut }),
+  createSupabaseAuthGateway: () => ({
+    getSession: mockGetSession,
+    signOut: mockSignOut,
+  }),
 }));
 
-describe('useRecoveryPhase — idempotencia atómica de cancelReset', () => {
+/** Sesión real que `getSession` reporta cuando el `signOut` no la eliminó. */
+const recoverySession = {
+  user: { id: 'user-1' },
+} as unknown as Session;
+
+describe('useRecoveryPhase — contrato de cancelReset y pegajosidad de cancelingCompletion', () => {
   beforeEach(() => {
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
+    mockGetSession.mockReset();
+    mockGetSession.mockResolvedValue(null);
   });
 
   it('I1: dos cancelReset inmediatos (antes de un render) producen exactamente un signOut y un solo callback', async () => {
@@ -52,45 +64,43 @@ describe('useRecoveryPhase — idempotencia atómica de cancelReset', () => {
     expect(result.current.phase.kind).toBe('inactive');
   });
 
-  it('B10 contrato: completeRecovery durante canceling encola la terminación y gana sobre el fallo del signOut', async () => {
-    const rejecters: (() => void)[] = [];
+  it('B11 contrato: signOut fallido con la sesión realmente presente — la terminación encolada gana (inactive, sin onCanceled)', async () => {
+    let rejectSignOut: (() => void) | undefined;
     mockSignOut.mockImplementation(
       () =>
         new Promise<void>((_resolve, reject) => {
-          rejecters.push(() => reject(new Error('Sin conexión.')));
+          rejectSignOut = () => reject(new Error('Sin conexión.'));
         }),
     );
+    mockGetSession.mockResolvedValue(recoverySession);
     const onCanceled = jest.fn();
     const { result } = await renderHook(() => useRecoveryPhase());
 
     await act(async () => {
       result.current.startRecovery();
     });
-
     let cancelPromise: Promise<void> | undefined;
     await act(async () => {
       cancelPromise = result.current.cancelReset(onCanceled);
     });
-
-    // Mientras el signOut está en vuelo la terminación se encola; no se
-    // descarta y `cancelError` no puede ganar después.
     await act(async () => {
-      result.current.completeRecovery?.();
+      result.current.completeRecovery();
     });
     expect(result.current.phase.kind).toBe('cancelingCompletion');
-    expect(onCanceled).not.toHaveBeenCalled();
 
     await act(async () => {
-      rejecters.forEach((reject) => reject());
+      rejectSignOut?.();
       await cancelPromise;
     });
 
+    // GoTrue lanza, pero la sesión sigue viva: gana la terminación real.
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
     expect(result.current.phase.kind).toBe('inactive');
     expect(onCanceled).not.toHaveBeenCalled();
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 
-  it('B10 contrato: con signOut con éxito, la terminación encolada publica inactive sin ejecutar onCanceled', async () => {
+  it('B11 contrato: signOut con éxito y sesión ya eliminada — ganó la cancelación aunque hubiera terminación encolada: inactive + onCanceled', async () => {
     let resolveSignOut: (() => void) | undefined;
     mockSignOut.mockImplementation(
       () =>
@@ -98,19 +108,19 @@ describe('useRecoveryPhase — idempotencia atómica de cancelReset', () => {
           resolveSignOut = resolve;
         }),
     );
+    mockGetSession.mockResolvedValue(null);
     const onCanceled = jest.fn();
     const { result } = await renderHook(() => useRecoveryPhase());
 
     await act(async () => {
       result.current.startRecovery();
     });
-
     let cancelPromise: Promise<void> | undefined;
     await act(async () => {
       cancelPromise = result.current.cancelReset(onCanceled);
     });
     await act(async () => {
-      result.current.completeRecovery?.();
+      result.current.completeRecovery();
     });
     expect(result.current.phase.kind).toBe('cancelingCompletion');
 
@@ -120,7 +130,123 @@ describe('useRecoveryPhase — idempotencia atómica de cancelReset', () => {
     });
 
     expect(result.current.phase.kind).toBe('inactive');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('B11 contrato: signOut fallido y sesión tampoco existe — mismo resultado de cancelación: inactive + onCanceled', async () => {
+    let rejectSignOut: (() => void) | undefined;
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectSignOut = () => reject(new Error('Sin conexión.'));
+        }),
+    );
+    mockGetSession.mockResolvedValue(null);
+    const onCanceled = jest.fn();
+    const { result } = await renderHook(() => useRecoveryPhase());
+
+    await act(async () => {
+      result.current.startRecovery();
+    });
+    let cancelPromise: Promise<void> | undefined;
+    await act(async () => {
+      cancelPromise = result.current.cancelReset(onCanceled);
+    });
+    await act(async () => {
+      result.current.completeRecovery();
+    });
+
+    await act(async () => {
+      rejectSignOut?.();
+      await cancelPromise;
+    });
+
+    expect(result.current.phase.kind).toBe('inactive');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('B11 contrato: estado de sesión desconocido (getSession falla) — cancelError: fallo observable seguro, nunca asumir que vive', async () => {
+    let rejectSignOut: (() => void) | undefined;
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectSignOut = () => reject(new Error('Sin conexión.'));
+        }),
+    );
+    mockGetSession.mockRejectedValue(
+      new Error('No pudimos recuperar tu sesión.'),
+    );
+    const onCanceled = jest.fn();
+    const { result } = await renderHook(() => useRecoveryPhase());
+
+    await act(async () => {
+      result.current.startRecovery();
+    });
+    let cancelPromise: Promise<void> | undefined;
+    await act(async () => {
+      cancelPromise = result.current.cancelReset(onCanceled);
+    });
+    await act(async () => {
+      result.current.completeRecovery();
+    });
+
+    await act(async () => {
+      rejectSignOut?.();
+      await cancelPromise;
+    });
+
+    expect(result.current.phase.kind).toBe('cancelError');
+    if (result.current.phase.kind === 'cancelError') {
+      expect(result.current.phase.message).toBe(
+        'No pudimos recuperar tu sesión.',
+      );
+    }
     expect(onCanceled).not.toHaveBeenCalled();
+  });
+
+  it('B12: cancelingCompletion es pegajosa frente a startRecovery, finishRecovery y cancelReset: un solo signOut', async () => {
+    let resolveSignOut: (() => void) | undefined;
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSignOut = resolve;
+        }),
+    );
+    mockGetSession.mockResolvedValue(recoverySession);
+    const onCanceled = jest.fn();
+    const { result } = await renderHook(() => useRecoveryPhase());
+
+    await act(async () => {
+      result.current.startRecovery();
+    });
+    let cancelPromise: Promise<void> | undefined;
+    await act(async () => {
+      cancelPromise = result.current.cancelReset(onCanceled);
+    });
+    await act(async () => {
+      result.current.completeRecovery();
+    });
+    expect(result.current.phase.kind).toBe('cancelingCompletion');
+
+    // Ningún escritor mueve la fase mientras el signOut está en vuelo con la
+    // terminación encolada: si lo hiciera, la resolución tomaría la rama
+    // errónea y se perdería la marca encolada.
+    await act(async () => {
+      result.current.startRecovery();
+      result.current.finishRecovery();
+      void result.current.cancelReset(onCanceled);
+    });
+    expect(result.current.phase.kind).toBe('cancelingCompletion');
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(onCanceled).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSignOut?.();
+      await cancelPromise;
+    });
+    expect(result.current.phase.kind).toBe('inactive');
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 });

@@ -15,8 +15,12 @@ jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
 }));
 
 const mockSignOut = jest.fn();
+const mockGetSession = jest.fn();
 jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
-  createSupabaseAuthGateway: () => ({ signOut: mockSignOut }),
+  createSupabaseAuthGateway: () => ({
+    getSession: mockGetSession,
+    signOut: mockSignOut,
+  }),
 }));
 
 function createGateMock() {
@@ -77,6 +81,8 @@ describe('AccessScreen', () => {
     mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
+    mockGetSession.mockReset();
+    mockGetSession.mockResolvedValue(null);
   });
 
   it('mantiene visible la entrada como invitado y la persiste al elegirla', async () => {
@@ -232,14 +238,16 @@ describe('AccessScreen', () => {
     expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
   });
 
-  it('B10: guardar la contraseña durante una cancelación en vuelo encola la terminación: login sin liberar la pausa hasta resolver el signOut, y sin cerrar la sesión aunque falle', async () => {
-    const rejecters: (() => void)[] = [];
+  it('B11: guardar la contraseña durante una cancelación en vuelo con la sesión realmente conservada — login sin liberar la pausa hasta resolver el signOut, y sin cerrar la sesión aunque falle', async () => {
+    let rejectSignOut: (() => void) | undefined;
     mockSignOut.mockImplementation(
       () =>
         new Promise<void>((_resolve, reject) => {
-          rejecters.push(() => reject(new Error('Sin conexión con la red.')));
+          rejectSignOut = () => reject(new Error('Sin conexión con la red.'));
         }),
     );
+    // El signOut falló pero la sesión sigue viva (B11): la terminación gana.
+    mockGetSession.mockResolvedValue(mockOtpSession);
     const screen = await renderWithTheme(<AccessScreen />);
 
     fireEvent.press(screen.getByTestId('access-open-login'));
@@ -259,9 +267,9 @@ describe('AccessScreen', () => {
     expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
     expect(mockSignOut).toHaveBeenCalledTimes(1);
 
-    // El signOut falla: la terminación encolada gana → inactive y sesión viva.
+    // El signOut falla con la sesión viva: la terminación encolada gana → inactive.
     await act(async () => {
-      rejecters.forEach((reject) => reject());
+      rejectSignOut?.();
     });
     await waitFor(() =>
       expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false),

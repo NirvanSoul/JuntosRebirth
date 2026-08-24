@@ -1,3 +1,4 @@
+import type { Session } from '@supabase/supabase-js';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { useState } from 'react';
 
@@ -9,9 +10,18 @@ jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
 }));
 
 const mockSignOut = jest.fn();
+const mockGetSession = jest.fn();
 jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
-  createSupabaseAuthGateway: () => ({ signOut: mockSignOut }),
+  createSupabaseAuthGateway: () => ({
+    getSession: mockGetSession,
+    signOut: mockSignOut,
+  }),
 }));
+
+/** Sesión que `getSession` reporta cuando el `signOut` no la eliminó. */
+const mockOtpSession = {
+  user: { id: 'user-1' },
+} as unknown as Session;
 
 function createGateMock() {
   return {
@@ -64,6 +74,8 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
+    mockGetSession.mockReset();
+    mockGetSession.mockResolvedValue(null);
   });
 
   it('usa el origen de Ajustes y el progreso extendido al abrir crear cuenta', async () => {
@@ -357,14 +369,16 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
   });
 
-  it('ruta 5 (B10 r6): guardar la contraseña durante una cancelación en vuelo encola la terminación: pausa liberada, sesión conservada y cierre por éxito aunque el signOut falle', async () => {
-    const rejecters: (() => void)[] = [];
+  it('ruta 5 (B11 r7): guardar la contraseña durante una cancelación en vuelo con la sesión realmente conservada — la terminación encolada gana: pausa liberada y cierre por éxito aunque el signOut falle', async () => {
+    let rejectSignOut: (() => void) | undefined;
     mockSignOut.mockImplementation(
       () =>
         new Promise<void>((_resolve, reject) => {
-          rejecters.push(() => reject(new Error('Sin conexión con la red.')));
+          rejectSignOut = () => reject(new Error('Sin conexión con la red.'));
         }),
     );
+    // El signOut falló pero la sesión sigue viva (B11): la terminación gana.
+    mockGetSession.mockResolvedValue(mockOtpSession);
     const onCloseSpy = jest.fn();
     function ModalHarness() {
       const [visible, setVisible] = useState(true);
@@ -399,10 +413,10 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     await waitFor(() => expect(onCloseSpy).toHaveBeenCalledTimes(1));
     expect(mockSignOut).toHaveBeenCalledTimes(1);
 
-    // La cancelación pendiente falla: la terminación encolada gana —inactive,
-    // nada de cancelError con el modal ya cerrado— y la sesión se conserva.
+    // La cancelación pendiente falla y la sesión sigue viva: la terminación
+    // encolada gana —inactive, nada de cancelError con el modal ya cerrado—.
     await act(async () => {
-      rejecters.forEach((reject) => reject());
+      rejectSignOut?.();
     });
     await waitFor(() =>
       expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false),
