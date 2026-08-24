@@ -82,14 +82,14 @@ function acceptanceBuilder() {
   return builder;
 }
 
-function createOtpSession(email: string): Session {
+function createOtpSession(email: string, userId = 'user-1'): Session {
   return {
     access_token: `access-token`,
     refresh_token: 'refresh-token',
     expires_at: 9999999999,
     token_type: 'bearer',
     user: {
-      id: 'user-1',
+      id: userId,
       email,
       app_metadata: {},
       user_metadata: {},
@@ -179,7 +179,7 @@ describe('useLegalSessionGate — sesión legalmente habilitada', () => {
     await waitFor(() => expect(result.current.isLegallyEnabled).toBe(true));
     expect(result.current.session?.user.id).toBe('user-1');
     expect(mockInsert).toHaveBeenCalledTimes(2);
-    expect(await loadPendingLegalAcceptance()).toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).toBeNull();
   });
 
   it('una intención de otro correo no habilita esta sesión y se conserva', async () => {
@@ -190,7 +190,7 @@ describe('useLegalSessionGate — sesión legalmente habilitada', () => {
     await aparecerSesion(createOtpSession('otra@ejemplo.com'));
 
     await waitFor(() => expect(result.current.status.kind).toBe('required'));
-    expect(await loadPendingLegalAcceptance()).not.toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).not.toBeNull();
   });
 
   it('una cuenta al día entra sin puerta ni parpadeo de estado', async () => {
@@ -228,7 +228,7 @@ describe('useLegalSessionGate — sesión legalmente habilitada', () => {
 
     await waitFor(() => expect(result.current.status.kind).toBe('required'));
     expect(result.current.error).not.toBeNull();
-    expect(await loadPendingLegalAcceptance()).not.toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).not.toBeNull();
 
     await act(async () => {
       result.current.retryGate();
@@ -236,7 +236,7 @@ describe('useLegalSessionGate — sesión legalmente habilitada', () => {
 
     await waitFor(() => expect(result.current.status.kind).toBe('cleared'));
     await waitFor(() => expect(result.current.isLegallyEnabled).toBe(true));
-    expect(await loadPendingLegalAcceptance()).toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).toBeNull();
   });
 
   it('submitRegularization registra los documentos pendientes y habilita la puerta', async () => {
@@ -295,7 +295,7 @@ describe('useLegalSessionGate — sesión legalmente habilitada', () => {
     await waitFor(() => expect(result.current.status.kind).toBe('cleared'));
     expect(result.current.isLegallyEnabled).toBe(true);
     // La intención de «ana» se conserva intacta (aún podría verificar su correo).
-    expect(await loadPendingLegalAcceptance()).not.toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).not.toBeNull();
   });
 
   it('una sesión cruda presente desde el primer render nunca aparece como habilitada antes de comprobarse (B2)', async () => {

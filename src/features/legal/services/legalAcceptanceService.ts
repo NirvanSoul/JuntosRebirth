@@ -195,7 +195,9 @@ export async function consumePendingLegalAcceptance(input: {
   userId: string;
   sessionEmail: string;
 }): Promise<ConsumePendingLegalAcceptanceResult> {
-  const intention = await loadPendingLegalAcceptance();
+  // La intención se guarda y se consume por correo normalizado (B8): la de otra
+  // persona sigue intacta en su propia ranura y nunca se aplica a esta sesión.
+  const intention = await loadPendingLegalAcceptance(input.sessionEmail);
   if (!intention) {
     return { outcome: 'no-intention', insertedCount: 0 };
   }
@@ -246,7 +248,7 @@ export async function consumePendingLegalAcceptance(input: {
     );
   }
 
-  await clearPendingLegalAcceptance().catch(() => {
+  await clearPendingLegalAcceptance(input.sessionEmail).catch(() => {
     // Si la limpieza falla, el siguiente reintento consulta y confirma que
     // todo existe antes de volver a intentar borrar: el flujo es seguro.
   });

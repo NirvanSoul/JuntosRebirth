@@ -10,6 +10,7 @@ import {
 } from '@/features/legal/services/legalAcceptanceService';
 import {
   loadPendingLegalAcceptance,
+  pendingLegalAcceptanceStorageKeyForEmail,
   savePendingLegalAcceptance,
 } from '@/features/legal/persistence/pendingLegalAcceptanceRepository';
 import type { PendingLegalAcceptanceNew } from '@/features/legal/model/types';
@@ -25,6 +26,7 @@ const mockInsert = jest.fn();
 const mockSelect = jest.fn();
 const mockGetUser = jest.fn();
 let acceptedRows: {
+  user_id: string;
   document_type: string;
   document_version: string;
 }[];
@@ -40,12 +42,23 @@ jest.mock('@/lib/supabase/supabaseClient', () => ({
 }));
 
 function acceptanceBuilder() {
+  // Aísla por `user_id` como la tabla real: las filas de otro usuario no
+  // contaminan la consulta de esta sesión.
+  const eq = jest.fn().mockReturnThis();
   const builder = {
-    eq: jest.fn().mockReturnThis(),
+    eq,
     then: (resolve: (value: unknown) => void) =>
-      Promise.resolve().then(() =>
-        resolve({ data: acceptedRows, error: null }),
-      ),
+      Promise.resolve().then(() => {
+        // `.eq(field, value)`: el valor filtrado es el segundo argumento.
+        const targetUserId = eq.mock.calls[eq.mock.calls.length - 1]?.[1];
+        resolve({
+          data:
+            typeof targetUserId === 'string'
+              ? acceptedRows.filter((row) => row.user_id === targetUserId)
+              : acceptedRows,
+          error: null,
+        });
+      }),
   };
   mockSelect.mockReturnValue(builder);
   return builder;
@@ -95,6 +108,7 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
     // consulta, reproduciendo el estado real de la base.
     mockInsert.mockImplementation(async (row: Record<string, unknown>) => {
       acceptedRows.push({
+        user_id: String(row.user_id),
         document_type: String(row.document_type),
         document_version: String(row.document_version),
       });
@@ -118,6 +132,7 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
     // Los Términos ya constan en 2026.1; la Política aún no.
     acceptedRows = [
       {
+        user_id: 'user-1',
         document_type: 'terms-of-service',
         document_version: '2026.1',
       },
@@ -140,22 +155,46 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
       source: 'access-signup',
     });
     // Al confirmar que las filas esperadas existen, la intención se elimina.
-    expect(await loadPendingLegalAcceptance()).toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).toBeNull();
   });
 
-  it('una intención de otro correo jamás se aplica a la sesión actual', async () => {
+  it('una intención de otro correo jamás se aplica a la sesión actual (B8)', async () => {
     await savePendingLegalAcceptance(newIntention);
+
+    const result = await consumePendingLegalAcceptance({
+      userId: 'user-2',
+      sessionEmail: 'otra@ejemplo.com',
+    });
+
+    // Cada correo tiene su propia ranura: la sesión de «otra» no encuentra la
+    // intención de «ana» ni la toca.
+    expect(result.outcome).toBe('no-intention');
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).not.toBeNull();
+  });
+
+  it('una intención escrita bajo una clave ajena con otro correo es un fallo observable', async () => {
+    // Almacenamiento manipulado: una intención de «otra» bajo la clave de
+    // «ana». El guard sigue siendo necesario: algo así nunca se aplica.
+    await AsyncStorage.setItem(
+      pendingLegalAcceptanceStorageKeyForEmail('ana@ejemplo.com'),
+      JSON.stringify({
+        version: 1,
+        email: 'otra@ejemplo.com',
+        locale: 'es-ES',
+        source: 'access-signup',
+        appVersion: '0.1.0',
+        documents: newIntention.documents,
+      }),
+    );
 
     await expect(
       consumePendingLegalAcceptance({
-        userId: 'user-2',
-        sessionEmail: 'otra@ejemplo.com',
+        userId: 'user-ana',
+        sessionEmail: 'ana@ejemplo.com',
       }),
     ).rejects.toBeInstanceOf(LegalAcceptanceEmailMismatchError);
-
     expect(mockInsert).not.toHaveBeenCalled();
-    // La intención original se conserva intacta.
-    expect(await loadPendingLegalAcceptance()).not.toBeNull();
   });
 
   it('un fallo de inserción conserva la intención para reintentar solo lo faltante', async () => {
@@ -167,6 +206,7 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
       }))
       .mockImplementation(async (row: Record<string, unknown>) => {
         acceptedRows.push({
+          user_id: String(row.user_id),
           document_type: String(row.document_type),
           document_version: String(row.document_version),
         });
@@ -179,11 +219,15 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
         sessionEmail: 'ana@ejemplo.com',
       }),
     ).rejects.toBeInstanceOf(LegalAcceptanceInsertError);
-    expect(await loadPendingLegalAcceptance()).not.toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).not.toBeNull();
 
     // Al reintentar, la consulta previa evita reinsertar lo que ya consta.
     acceptedRows = [
-      { document_type: 'terms-of-service', document_version: '2026.1' },
+      {
+        user_id: 'user-1',
+        document_type: 'terms-of-service',
+        document_version: '2026.1',
+      },
     ];
     const retry = await consumePendingLegalAcceptance({
       userId: 'user-1',
@@ -194,14 +238,22 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
     expect(mockInsert).toHaveBeenLastCalledWith(
       expect.objectContaining({ document_type: 'privacy-policy' }),
     );
-    expect(await loadPendingLegalAcceptance()).toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).toBeNull();
   });
 
   it('una versión vigente ya registrada no vuelve a insertarse', async () => {
     await savePendingLegalAcceptance(newIntention);
     acceptedRows = [
-      { document_type: 'terms-of-service', document_version: '2026.1' },
-      { document_type: 'privacy-policy', document_version: '2026.1' },
+      {
+        user_id: 'user-1',
+        document_type: 'terms-of-service',
+        document_version: '2026.1',
+      },
+      {
+        user_id: 'user-1',
+        document_type: 'privacy-policy',
+        document_version: '2026.1',
+      },
     ];
     acceptanceBuilder();
 
@@ -212,7 +264,7 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
 
     expect(result.outcome).toBe('complete-nothing-needed');
     expect(mockInsert).not.toHaveBeenCalled();
-    expect(await loadPendingLegalAcceptance()).toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).toBeNull();
   });
 
   it('un fallo de consulta es observable y conserva la intención', async () => {
@@ -225,14 +277,22 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
         sessionEmail: 'ana@ejemplo.com',
       }),
     ).rejects.toBeInstanceOf(LegalAcceptanceQueryError);
-    expect(await loadPendingLegalAcceptance()).not.toBeNull();
+    expect(await loadPendingLegalAcceptance('ana@ejemplo.com')).not.toBeNull();
   });
 
   it('getMissingCurrentLegalDocuments devuelve solo lo que falta de la versión vigente', async () => {
     // Solo una versión vieja de la Política consta.
     acceptedRows = [
-      { document_type: 'terms-of-service', document_version: '2026.1' },
-      { document_type: 'privacy-policy', document_version: '2025.1' },
+      {
+        user_id: 'user-1',
+        document_type: 'terms-of-service',
+        document_version: '2026.1',
+      },
+      {
+        user_id: 'user-1',
+        document_type: 'privacy-policy',
+        document_version: '2025.1',
+      },
     ];
     acceptanceBuilder();
 
@@ -243,8 +303,16 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
 
   it('getMissingCurrentLegalDocuments con la versión vigente registrada devuelve lista vacía', async () => {
     acceptedRows = [
-      { document_type: 'terms-of-service', document_version: '2026.1' },
-      { document_type: 'privacy-policy', document_version: '2026.1' },
+      {
+        user_id: 'user-1',
+        document_type: 'terms-of-service',
+        document_version: '2026.1',
+      },
+      {
+        user_id: 'user-1',
+        document_type: 'privacy-policy',
+        document_version: '2026.1',
+      },
     ];
     acceptanceBuilder();
 
@@ -284,5 +352,30 @@ describe('legalAcceptanceService — flujo de intención pendiente', () => {
         appVersion: '0.1.0',
       }),
     ).rejects.toBeInstanceOf(LegalAcceptanceInsertError);
+  });
+
+  it('consume una intención solo para su correo: B no pisa a A y A puede consumirse después (B8)', async () => {
+    const ana: PendingLegalAcceptanceNew = newIntention;
+    const beta: PendingLegalAcceptanceNew = {
+      ...newIntention,
+      email: 'beta@ejemplo.com',
+    };
+    await savePendingLegalAcceptance(ana);
+    await savePendingLegalAcceptance(beta);
+    acceptanceBuilder();
+
+    const betaResult = await consumePendingLegalAcceptance({
+      userId: 'user-beta',
+      sessionEmail: 'beta@ejemplo.com',
+    });
+    expect(betaResult.outcome).toBe('inserted');
+
+    // La intención de A sigue viva: su titular aún puede verificar su cuenta en
+    // este móvil (B1) sin que el registro de otra persona se la haya arrebatado.
+    const anaResult = await consumePendingLegalAcceptance({
+      userId: 'user-ana',
+      sessionEmail: 'ana@ejemplo.com',
+    });
+    expect(anaResult.outcome).toBe('inserted');
   });
 });
