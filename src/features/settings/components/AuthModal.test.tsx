@@ -311,4 +311,49 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
   });
+
+  it('ruta 4 (B9 r5): cancelación fallida y luego contraseña guardada — termina por éxito: pausa liberada, sesión no cerrada y modal cerrado sin cancelar', async () => {
+    mockSignOut.mockRejectedValue(new Error('Sin conexión con la red.'));
+    let closeModal: (() => void) | null = null;
+    const onCloseSpy = jest.fn();
+    function ModalHarness() {
+      const [visible, setVisible] = useState(true);
+      closeModal = () => setVisible(false);
+      return (
+        <AuthModal
+          onClose={() => {
+            onCloseSpy();
+            setVisible(false);
+          }}
+          visible={visible}
+        />
+      );
+    }
+    const screen = await renderWithTheme(<ModalHarness />);
+
+    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+
+    // Cancelar falla: el error queda visible y la pausa se sostiene.
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await screen.findByText('Sin conexión con la red.');
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+
+    // Guardar la contraseña nueva completa el restablecimiento PESE al error
+    // de cancelación pendiente: el éxito termina por una transición distinta
+    // (completeRecovery), no vuelve a intentar cerrar la sesión.
+    expect(closeModal).not.toBeNull();
+    fireEvent.press(screen.getByTestId('stub-reset-success'));
+    await waitFor(() => expect(onCloseSpy).toHaveBeenCalledTimes(1));
+
+    // B9: la sesión no se toca (el único signOut fue el intento de cancelar que
+    // falló) y la pausa se libera. Aunque `visible` cae, el cierre por éxito no
+    // dispara la cancelación de nuevo: la fase ya es `inactive`.
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+  });
 });

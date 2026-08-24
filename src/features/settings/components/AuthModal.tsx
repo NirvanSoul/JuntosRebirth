@@ -59,6 +59,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
   const { setRecoveryHalted } = useLegalSessionGate();
   const {
     cancelReset,
+    completeRecovery,
     finishRecovery,
     phase: recoveryPhase,
     startRecovery,
@@ -92,11 +93,14 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
     }
   }, [cancelReset, recoveryPhase.kind, visible]);
 
-  // B7(r4): toda salida posterior a la creación de la sesión del OTP pasa por
-  // cancelReset. `requestClose` es el único camino hacia onClose: si la fase de
-  // recuperación sigue viva, primero se cierra la sesión local y solo tras el
-  // éxito el modal se oculta; si el signOut falla, el modal permanece con el
-  // mensaje visible y el mismo botón reintenta.
+  // B7(r4)+B9(r5): toda salida por cancelación posterior a la creación de la
+  // sesión del OTP pasa por `cancelReset`. `requestClose` es el único camino de
+  // cancelación hacia `onClose` —si la fase sigue viva, primero se cierra la
+  // sesión local y solo tras el éxito el modal se oculta; si el signOut falla,
+  // el modal permanece con el mensaje visible y el mismo botón reintenta—. El
+  // cierre por éxito es una transición distinta: el `onSuccess` de
+  // `ResetPasswordScreen` llama a `completeRecovery()` y recién entonces a
+  // `onClose()` directamente, sin pasar por `requestClose`.
   const requestClose = () => {
     if (recoveryPhase.kind !== 'inactive') {
       void cancelReset(onClose);
@@ -289,7 +293,11 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
               <ResetPasswordScreen
                 onCancel={() => void cancelReset(onClose)}
                 onSuccess={() => {
-                  finishRecovery();
+                  // B9: el éxito real de setNewPassword termina por la
+                  // transición distinguida (completeRecovery), no vuelve a
+                  // intentar cerrar la sesión aunque un cancelar anterior
+                  // haya fallado; el cierre por éxito llama a onClose directo.
+                  completeRecovery();
                   onClose();
                 }}
               />

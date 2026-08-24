@@ -50,6 +50,7 @@ export function AccessScreen() {
   const { setRecoveryHalted } = useLegalSessionGate();
   const {
     cancelReset,
+    completeRecovery,
     finishRecovery,
     phase: recoveryPhase,
     startRecovery,
@@ -260,7 +261,10 @@ export function AccessScreen() {
                 void cancelReset(() => setStep({ screen: 'login' }))
               }
               onSuccess={() => {
-                finishRecovery();
+                // B9: el éxito real de setNewPassword termina por la transición
+                // distinguida (completeRecovery): publica `inactive` sin cerrar
+                // la sesión, aunque un intento de cancelar haya fallado.
+                completeRecovery();
                 setStep({ screen: 'login' });
               }}
             />

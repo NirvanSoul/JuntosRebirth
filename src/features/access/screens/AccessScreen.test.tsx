@@ -206,4 +206,29 @@ describe('AccessScreen', () => {
     await screen.findByText('Iniciar sesión');
     expect(mockSignOut).not.toHaveBeenCalled();
   });
+
+  it('B9: si cancelar falla y luego se guarda la contraseña, la recuperación termina por éxito: pausa liberada y login sin cerrar la sesión', async () => {
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    fireEvent.press(screen.getByTestId('access-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+
+    // Cancelar falla: el error queda visible y la pausa se sostiene.
+    mockSignOut.mockRejectedValue(new Error('Sin conexión con la red.'));
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await screen.findByText('Sin conexión con la red.');
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+
+    // Guardar la contraseña nueva termina el restablecimiento pese al error de
+    // cancelación pendiente: la salida a login no toca la sesión (el único
+    // signOut fue el intento fallido) y la pausa se libera.
+    fireEvent.press(screen.getByTestId('stub-reset-success'));
+    await screen.findByText('Iniciar sesión');
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+  });
 });

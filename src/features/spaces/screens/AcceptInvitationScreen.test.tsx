@@ -253,6 +253,24 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
       expect(mockAcceptInvitation).not.toHaveBeenCalled();
     });
 
+    it('pese al fallo de cancelación, guardar la contraseña termina la recuperación y la invitación se acepta una vez sin cerrar la sesión (B9)', async () => {
+      const screen = await llegarAlRestablecimientoConSesion();
+      mockSignOut.mockRejectedValue(new Error('No pudimos cerrar sesión.'));
+
+      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      expect(await screen.findByText('No pudimos cerrar sesión.')).toBeTruthy();
+
+      // El éxito real de setNewPassword termina por la transición explícita
+      // completeRecovery: publica `inactive` sin signOut. La pausa cae, la
+      // sesión del OTP queda habilitada y la autoaceptación ocurre una vez.
+      await fireEvent.press(screen.getByTestId('stub-reset-success'));
+      await waitFor(() =>
+        expect(mockAcceptInvitation).toHaveBeenCalledTimes(1),
+      );
+      expect(await screen.findByTestId('accept-invitation-done')).toBeTruthy();
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+    });
+
     it('la sesión creada por el registro conserva la autoaceptación', async () => {
       const screen = await renderInvitation();
 
