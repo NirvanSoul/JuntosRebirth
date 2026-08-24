@@ -84,10 +84,13 @@ inglés, e inicio de sesión con Google y Apple. Las tres primeras son capacidad
 que tú propusiste y que entran como alcance obligatorio del MVP, implementadas
 desde los contratos de esta rama.
 
-**Pendiente de decisión.** El flujo de aceptación legal: la tabla existe, tiene
-políticas y pruebas, pero hoy la app no registra ningún consentimiento. Y la
-librería `xlsx`, que se usa en tiempo de ejecución para importar y arrastra
-vulnerabilidades sin versión corregida.
+**Pendiente de decisión.** La librería `xlsx`, que se usa en tiempo de ejecución
+para importar y arrastra vulnerabilidades sin versión corregida. El flujo legal
+ya no está aquí: el macrobloque de integración (ADR-083) lo implementó, con la
+puerta de sesión obligatoria, el paso legal en el registro y la intención
+durable, y validado en Gate 1 (132 suites / 852 pruebas). Queda solo el smoke
+físico (checklist en el paquete de entrega) y la verificación de ambos
+verificadores antes de marcarlo cerrado.
 
 ## Backend
 

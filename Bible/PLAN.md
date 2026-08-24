@@ -22,7 +22,7 @@ financiero, autenticación, importación, legal y espacios de pareja). La
 **sincronización Supabase** y la **verificación de correo** ya se comprobaron de
 punta a punta en staging con dos cuentas y dos dispositivos físicos (§§6-8).
 
-La **Fase 3** está oficialmente cerrada tras la resolución del frente SQL y las ACL en staging. El trabajo activo avanza a la **Fase 4** de desarrollo funcional. La Fase 5 de release no ha comenzado.
+La **Fase 3** está oficialmente cerrada tras la resolución del frente SQL y las ACL en staging. El trabajo activo avanza a la **Fase 4** de desarrollo funcional. La Fase 5 de release no ha comenzado. El macrobloque de integración legal (ADR-083) está implementado y con Gate 1 en verde (132 suites / 852 pruebas); solo le falta el smoke físico y la verificación de ambos verificadores para cerrarse.
 
 ## 3. Orden de trabajo
 
@@ -264,17 +264,7 @@ a extracción cuando una tarea de producto lo toque.
   oscuro real) — `PROJECT_RULES.md` §10.
 - [ ] Smoke test físico (iPhone/Honor) de `AcceptInvitationScreen` (deep link `juntoss://` desde verificación de correo), pendiente de un development build.
 - Build EAS, cuentas de tienda, política de privacidad accesible.
-- [ ] **Definir e implementar el flujo legal previo al release.** Hoy
-  `recordLegalAcceptance` no tiene consumidores: la tabla y el gateway existen,
-  pero la aplicación no registra ninguna aceptación. Antes de conectarlos,
-  decidir con criterio legal y de producto si los Términos requieren una acción
-  afirmativa al crear la cuenta y qué tratamientos, si alguno, requieren un
-  consentimiento separado; no presentar la Política de privacidad completa como
-  consentimiento genérico. Si se aprueba el flujo, registrar la versión exacta
-  del documento, locale, origen y versión real de la app (no el literal actual
-  `0.1.0`), y definir invitados, usuarios autenticados, reintentos y nuevas
-  versiones documentales. Verificar además que App Store Privacy y Google Play
-  Data Safety coincidan con el comportamiento real.
+- [ ] **Flujo legal previo al release implementado (ADR-083), pendiente de smoke físico y verificadores.** El flujo quedó cerrado en el macrobloque de cierre de la integración legal: `recordLegalAcceptance` ya tiene consumidores, la puerta de sesión exige evidencia de las versiones vigentes (invitados exceptuados), el registro pide las dos acciones diferenciadas antes de crear la cuenta y persiste una intención durable que el OTP consume. Queda pendiente: smoke físico (checklist entregado en el macrobloque), confirmación del segundo verificador y verificar que App Store Privacy y Google Play Data Safety coinciden con el comportamiento real.
 - Revisar la licencia y las vulnerabilidades de `xlsx`: es de **runtime**
   (importación) y `npm audit` le marca prototype pollution + ReDoS **sin fix**.
 - Revisar `npm audit` (29: 13 moderadas, 16 altas); el resto son tooling de

@@ -5411,3 +5411,119 @@ del borrado, archivo o disolución del espacio.
 - ADR-080 y ADR-081.
 - `PRODUCT.md`, contratos de moneda y cuentas.
 - `DATABASE.md`, ciclo de vida de espacios.
+---
+
+# ADR-083 — Integración legal en la autenticación existente: intención durable y puerta de sesión obligatoria
+
+**Estado:** Aceptada (implementada; pendientes smoke físico y verificación de ambos verificadores).
+
+## Contexto
+
+`recordLegalAcceptance` no tenía consumidores: la tabla `public.legal_acceptances`,
+su RLS y sus permisos existían (migraciones 05 y 25) pero la app no registraba
+evidencia. La aceptación ocurre antes de que exista sesión, y el registro solo
+puede insertar después de que `verifyOtp` cree una sesión autenticada. El flujo
+tenía que conservar la acción explícita de forma durable entre el registro y la
+verificación, sin secretos, sin aplicar una aceptación a otro correo y sin
+recalcular versiones documentales en caliente.
+
+## Alternativas consideradas
+
+1. **Conservar la aceptación solo en memoria** hasta la verificación OTP.
+   Descartada: perder la evidencia al cerrar la app entre registro y
+   verificación viola el requisito de durabilidad.
+2. **Persistir una intención legal versionada** hasta que aparezca la sesión.
+   Elegida: sobrevive al cierre, se valida al leerla y se aplica con la
+   instantánea original (documentos, versiones, locale, origen y versión de la
+   app), sin contraseñas ni OTP.
+3. **Reconstruir los documentos con las versiones «actuales» al hacer flush.**
+   Descartada: reemplazaría silenciosamente la versión que la persona aceptó.
+4. **Fixture de `expo-constants`** para la versión de la app.
+   Descartada: sería una dependencia transitiva sin declarar; se importa
+   directamente `app.json` (`resolveJsonModule` ya activo) vía
+   `src/app/config/appVersion.ts`.
+
+## Decisión (resumen ejecutivo)
+
+- **Invitados:** sin evidencia remota (no hay identidad autenticada); los
+  documentos siguen accesibles.
+- **Cuentas existentes:** toda sesión autenticada sin evidencia vigente pasa la
+  puerta legal una vez. Mientras falta evidencia no se marca el onboarding como
+  autenticado, no arranca la restauración/sincronización remota, no se
+  autoaceptan invitaciones y el producto no aparece como terminado. Se ofrece
+  reintentar o cerrar solo la sesión local; no existe botón de omitir.
+- **Nuevas versiones:** la vigencia se calcula por documento y versión exacta.
+  Un cambio de versión vuelve a exigir únicamente ese documento (el contrato
+  `recordMissingCurrentLegalAcceptances` distingue `account-regularization` de
+  `new-version`).
+- **Semántica legal:** dos acciones separadas e inconfundibles — «Acepto los
+  Términos de servicio» y «Confirmo que he podido consultar la Política de
+  privacidad»—, ambas abiertas con `LegalDocumentScreen` sin perder el estado
+  del formulario. La Política no se presenta como consentimiento genérico.
+- **Modelo de intención pendiente:** guardada en `AsyncStorage`
+  (`@juntoss/pending-legal-acceptance/v1`) con esquema versionado (v1) y
+  validación de lectura; contiene correo normalizado (identidad de registro),
+  locale `es-ES`, origen, versión real de la app y la instantánea de
+  documentos/versiones/acción. Nunca contraseña, OTP u otros secretos. Solo se
+  elimina cuando la consulta remota confirma que todas las filas esperadas
+  existen.
+- **Orden de efectos de sesión:** `useLegalSessionGate` publica una sesión
+  «legalmente habilitada»; los consumidores autenticados (`useSpaces`,
+  `MainTabsNavigator`, `AcceptInvitationScreen`, `PendingInvitationBanner`,
+  `SettingsScreen`) leen esa sesión, de modo que ningún efecto autenticado
+  reacciona antes de terminar la comprobación. `RootNavigator` muestra la
+  puerta obligatoria (`LegalSessionGateScreen`, no descartable) cuando la
+  sesión existe y falta evidencia.
+- **Origen tipado:** `LegalAcceptanceSource` cierra los valores
+  (`access-signup`, `settings-signup`, `invitation-signup`,
+  `account-regularization`, `new-version`); cada host pasa el suyo.
+- **Versión canónica:** `src/app/config/appVersion.ts` lee `app.json →
+  expo.version`; desaparece el literal `0.1.0` duplicado en el servicio.
+- **Errores observables:** el servicio expone errores tipados (config faltante,
+  sesión faltante, consulta e inserción) en vez de retornos silenciosos.
+- **Idempotencia:** `consumePendingLegalAcceptance` consulta antes de insertar,
+  inserta solo documentos faltantes, verifica el resultado y borra la intención
+  al final. La tabla no garantiza unicidad por versión: no se promete una única
+  fila bajo concurrencia, pero el cliente evita duplicados secuenciales.
+- **OTP de recuperación:** la puerta se pausa (`setRecoveryHalted`) durante el
+  subflujo de recuperación en invitación: el restablecimiento no se cortocircuita
+  y nunca autoacepta. Tras el alta por OTP de registro y la habilitación legal,
+  la invitación se acepta exactamente una vez.
+- **OAuth futuro:** consumirá la misma puerta (es una sesión autenticada más);
+  los orígenes nuevos se añaden al enum documentado.
+## Consecuencias
+
+- `signUpTotalSteps` pasa de 4 a 5; los tres hosts (AccessScreen, AuthModal,
+  AcceptInvitationScreen) actualizan el progreso de forma automática y pasan su
+  origen legal.
+- `AppModal` gana `allowManualDismiss={false}` para puertas obligatorias.
+- `AcceptInvitationScreen` extrae su autoaceptación a
+  `useInvitationAutoAcceptance` (menos de 400 líneas no vacías).
+- La deuda congelada no crece: `MainTabsNavigator` mantiene 1336 líneas.
+
+## Limitaciones
+
+- Sin restricción única por versión en la tabla, la unicidad de fila bajo
+  concurrencia no está garantizada por la base; el cliente garantiza solo
+  ausencia de duplicados secuenciales y la puerta es un único consumidor.
+- El smoke físico (registro completo, cierre antes de verificar, reapertura,
+  consulta de `legal_acceptances`, pérdida de red e invitación) queda
+  pendiente: el checklist exacto se entrega en el paquete del macrobloque y la
+  tarea no se marca cerrada hasta que exista la evidencia.
+- Google y Apple (Fase 4g) siguen fuera por requerir credenciales, enlace de
+  identidades y pruebas nativas independientes.
+
+## Validación
+
+- ROJO contra `c4a669e`: 5 suites fallidas / 2 tests fallidos, EXIT=1.
+- VERDE focal y `npm run validate` final: **132 suites / 852 tests, EXIT=0**
+  (typecheck, check:suppressions, eslint, prettier y jest), frente a la línea
+  base de 125/816.
+- `frozenLineDebt` sin subidas: `MainTabsNavigator.tsx` se mide en 1336 líneas
+  no vacías (se mantiene); `AcceptInvitationScreen.tsx` queda en 391 (≤400).
+
+## Referencias
+
+- ADR-066 (sistema legal), ADR-068 (autenticación/anfitriones), ADR-075
+  (sesión segura), ADR-080/081/082.
+- `PLAN.md` §Fase 5 y `ESTADO_DE_LA_RAMA.md`.
