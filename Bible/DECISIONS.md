@@ -5415,7 +5415,7 @@ del borrado, archivo o disolución del espacio.
 
 # ADR-083 — Integración legal en la autenticación existente: intención durable y puerta de sesión obligatoria
 
-**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; el veredicto de la ronda 3 aprobó B6 y B8 y rechazó B7, corregido estructuralmente en la ronda 4 —ver ronda 4 abajo—; el veredicto de la ronda 4 rechazó la entrega por B9 e I1, corregidos en la ronda 5 —ver ronda 5 abajo—; el veredicto de la ronda 5 rechazó la entrega por B10 (terminación perdida durante `canceling`), corregido en la ronda 6 con la terminación encolada —ver ronda 6 abajo—; el veredicto de la ronda 6 rechazó la entrega por B11 (el resultado asumía sesión viva pese al contrato real de GoTrue) y B12 (`cancelingCompletion` no era pegajosa), corregidos en la ronda 7 —ver ronda 7 abajo—; pendientes el veredicto de la ronda 7 y el smoke físico).
+**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; el veredicto de la ronda 3 aprobó B6 y B8 y rechazó B7, corregido estructuralmente en la ronda 4 —ver ronda 4 abajo—; el veredicto de la ronda 4 rechazó la entrega por B9 e I1, corregidos en la ronda 5 —ver ronda 5 abajo—; el veredicto de la ronda 5 rechazó la entrega por B10 (terminación perdida durante `canceling`), corregido en la ronda 6 con la terminación encolada —ver ronda 6 abajo—; el veredicto de la ronda 6 rechazó la entrega por B11 (el resultado asumía sesión viva pese al contrato real de GoTrue) y B12 (`cancelingCompletion` no era pegajosa), corregidos en la ronda 7 —ver rondas 7–9 abajo—; el Gate 2 cerró con la ronda 9 (B1–B14 aprobados) y el mecanismo de recuperación fue reemplazado por **ADR-084** —ver ADR-084 abajo—).
 
 ## Contexto
 
@@ -6034,8 +6034,8 @@ de «arbitraje posterior» a «exclusión por construcción».
 ## Estructura
 
 - `recoveryMachine.test.ts` contiene la **matriz completa 10×9 = 90 celdas**
-  (los 10 estados × los 9 eventos) más 14 pruebas de invariantes/helpers: 114
-  pruebas para la base. La matriz se escribió entera a propósito: los defectos
+  (los 10 estados × los 9 eventos) más 14 pruebas de invariantes/helpers: **104
+  pruebas** para la base. La matriz se escribió entera a propósito: los defectos
   B10, B12 y B14 fueron celdas que nadie había mirado.
 - `recoveryHoldRegistry.ts`: concesión de pausa **con dueño, a nivel de módulo**.
   Cada controlador sostiene la suya con su identificador y solo libera la propia
@@ -6074,8 +6074,21 @@ siguiente. `saveError` devuelve el control completo (reintentar o cancelar).
   `useLegalSessionGate.test.tsx` y `AddFirstTransactionStep.test.tsx` ya eran
   dependientes del orden en HEAD (la puerta llegó a fallar 7 de 14 antes de
   tocar nada; `AddFirstTransactionStep` falla de forma intermitente). El
-  cableado nuevo (hosts + máquina + controlador + invitación) pasa
-  **142/142** con `--randomize`. Se documenta en `PLAN.md` como deuda técnica.
+  cableado nuevo pasa **5 suites / 156 pruebas** con `--randomize` y los avisos
+  de `act` de Access e invitación se eliminaron con la misma higiene
+  (`await fireEvent`). Se documenta en `PLAN.md` como deuda técnica.
+- **Revisión de la entrega (GPT, verificador único):** tres correcciones sobre
+  la entrega inicial, todas con prueba roja fiel primero:
+  - **B15 (regresión de B11):** el desenlace de la cancelación volvía a
+    decidirse por el éxito/fallo del `signOut('local')`. Se reintrodujo la
+    postcondición, consultada SIEMPRE (también cuando el signOut resuelve):
+    `getSession()` → `null` → `cancelSucceeded` aunque el signOut haya fallado;
+    sesión presente → `cancelFailed`; estado desconocido → `cancelFailed` seguro.
+  - **I1:** mientras `saving`, el chrome del anfitrión se deshabilita de verdad
+    (`disabled` accesible en «Atrás» de AuthModal/AccessScreen y en Cancelar de
+    ResetPasswordScreen), no solo queda inerte.
+  - **I2:** la puerta dejó de borrar en global las concesiones al desaparecer la
+    sesión; cada dueño libera la suya al terminar su episodio.
 
 ## Consecuencias
 
