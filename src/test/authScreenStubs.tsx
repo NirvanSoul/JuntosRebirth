@@ -40,6 +40,9 @@ export function LoginScreenStub(props: AnyProps) {
 export function SignUpScreenStub(props: AnyProps) {
   return (
     <View testID="stub-signup-screen">
+      <Text testID="stub-signup-source">
+        {typeof props.source === 'string' ? props.source : ''}
+      </Text>
       <Pressable
         onPress={() => props.onSuccess?.({ email: 'persona@ejemplo.com' })}
         testID="stub-signup-complete"

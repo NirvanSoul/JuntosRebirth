@@ -15,6 +15,7 @@ import {
   signUpTotalSteps,
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
+import { useDeferredAuthenticatedMark } from '@/features/legal/hooks/useDeferredAuthenticatedMark';
 import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
@@ -42,12 +43,15 @@ const stepTitles: Record<AccessStep['screen'], string> = {
 /** Host de autenticación a pantalla completa, reutilizando los mismos formularios de Ajustes. */
 export function AccessScreen() {
   const styles = useThemedStyles(createStyles);
-  const { markAuthenticated, markGuestComplete } = useOnboardingStatus();
+  const { markGuestComplete } = useOnboardingStatus();
+  const { scheduleMarkAuthenticated } = useDeferredAuthenticatedMark();
   const [step, setStep] = useState<AccessStep>({ screen: 'entry' });
   const [isCompletingGuest, setCompletingGuest] = useState(false);
 
-  const completeAuthenticated = async () => {
-    await markAuthenticated();
+  // El marcado de «autenticado» se difiere hasta que la puerta legal habilite
+  // la sesión: mientras falte evidencia no se marca el onboarding.
+  const completeAuthenticated = () => {
+    scheduleMarkAuthenticated();
   };
 
   const completeGuest = async () => {
@@ -178,6 +182,7 @@ export function AccessScreen() {
               onSuccess={({ email }) =>
                 setStep({ screen: 'verify-signup', email })
               }
+              source="access-signup"
               step={step.step}
             />
           ) : null}
@@ -188,7 +193,7 @@ export function AccessScreen() {
               onCancel={goBack}
               onGoToLogin={() => setStep({ screen: 'login' })}
               onGoToRecovery={() => setStep({ screen: 'forgot' })}
-              onSuccess={() => void completeAuthenticated()}
+              onSuccess={() => completeAuthenticated()}
               purpose="signup"
             />
           ) : null}

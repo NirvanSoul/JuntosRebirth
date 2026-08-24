@@ -1,10 +1,12 @@
 import { NavigationContainer } from '@react-navigation/native';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { linking } from '@/navigation/linking';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
+import { LegalSessionGateScreen } from '@/features/legal/screens/LegalSessionGateScreen';
 import { OnboardingNavigator } from '@/features/onboarding/OnboardingNavigator';
 import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import { useTheme } from '@/theme/useTheme';
@@ -13,7 +15,31 @@ import { fontFamily } from '@/theme/fonts';
 export function RootNavigator() {
   const { colors, isDark } = useTheme();
   const { isReady: isAuthReady, session } = useAuthSession();
-  const { isReady: isOnboardingReady, status } = useOnboardingStatus();
+  const {
+    isReady: isOnboardingReady,
+    markAuthenticated,
+    status,
+  } = useOnboardingStatus();
+  const legalGate = useLegalSessionGate();
+
+  useEffect(() => {
+    // El onboarding no se marca como autenticado mientras falte la evidencia
+    // legal: se marca solo cuando la puerta habilita la sesión.
+    if (
+      isAuthReady &&
+      session &&
+      legalGate.isLegallyEnabled &&
+      status.accessMode !== 'authenticated'
+    ) {
+      void markAuthenticated();
+    }
+  }, [
+    isAuthReady,
+    legalGate.isLegallyEnabled,
+    markAuthenticated,
+    session,
+    status.accessMode,
+  ]);
 
   const navigationTheme = useMemo(
     () => ({
@@ -48,9 +74,24 @@ export function RootNavigator() {
     <MainTabsNavigator />
   );
 
+  const showLegalGate = Boolean(
+    session && legalGate.status.kind === 'required',
+  );
+
   return (
-    <NavigationContainer linking={linking} theme={navigationTheme}>
-      {content}
-    </NavigationContainer>
+    <>
+      <NavigationContainer linking={linking} theme={navigationTheme}>
+        {content}
+      </NavigationContainer>
+      {showLegalGate ? (
+        <LegalSessionGateScreen
+          error={legalGate.error}
+          missingDocuments={legalGate.missingDocuments}
+          onAbandon={() => void legalGate.abandonSession()}
+          onRetry={legalGate.retryGate}
+          onSubmit={(decision) => legalGate.submitRegularization(decision)}
+        />
+      ) : null}
+    </>
   );
 }

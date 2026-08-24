@@ -18,7 +18,7 @@ jest.mock('@/features/auth/screens/LoginScreen', () => ({
 }));
 jest.mock('@/features/auth/screens/SignUpScreen', () => ({
   SignUpScreen: jest.requireActual('@/test/authScreenStubs').SignUpScreenStub,
-  signUpTotalSteps: 4,
+  signUpTotalSteps: 5,
 }));
 jest.mock('@/features/auth/screens/VerifyCodeScreen', () => ({
   VerifyCodeScreen: jest.requireActual('@/test/authScreenStubs')
@@ -47,12 +47,17 @@ describe('AccessScreen', () => {
     expect(mockMarkGuestComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('abre el paso de crear cuenta', async () => {
+  it('abre el paso de crear cuenta con su origen y el progreso de 6 pasos', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
     fireEvent.press(screen.getByTestId('access-open-signup'));
 
     expect(screen.getByText('Crear cuenta')).toBeTruthy();
+    // Origen legal del registro desde el acceso inicial y progreso extendido.
+    const source = await screen.findByTestId('stub-signup-source');
+    expect(source.props.children).toBe('access-signup');
+    const progress = screen.getByTestId('access-signup-progress');
+    expect(progress.props.accessibilityValue.max).toBe(6);
   });
 
   describe('cableado de navegación de autenticación', () => {

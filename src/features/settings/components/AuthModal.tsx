@@ -16,7 +16,7 @@ import {
   signUpTotalSteps,
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
-import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
+import { useDeferredAuthenticatedMark } from '@/features/legal/hooks/useDeferredAuthenticatedMark';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -53,7 +53,7 @@ const stepTitles: Record<AuthModalStep['screen'], string> = {
  */
 export function AuthModal({ onClose, visible }: AuthModalProps) {
   const styles = useThemedStyles(createStyles);
-  const { markAuthenticated } = useOnboardingStatus();
+  const { scheduleMarkAuthenticated } = useDeferredAuthenticatedMark();
   const [step, setStep] = useState<AuthModalStep>({ screen: 'entry' });
 
   useEffect(() => {
@@ -93,7 +93,9 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
   };
 
   const handleAuthenticated = async () => {
-    await markAuthenticated();
+    // El marcado de «autenticado» se difiere hasta que la puerta legal
+    // habilite la sesión; el modal solo se cierra.
+    scheduleMarkAuthenticated();
     onClose();
   };
 
@@ -182,6 +184,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
                 onSuccess={({ email }) =>
                   setStep({ screen: 'verify-signup', email })
                 }
+                source="settings-signup"
                 step={step.step}
               />
             ) : null}

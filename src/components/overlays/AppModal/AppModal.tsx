@@ -33,6 +33,12 @@ type AppModalProps = PropsWithChildren<{
    */
   containsScrollable?: boolean;
   stackBehavior?: 'push' | 'switch' | 'replace';
+  /**
+   * False en puertas obligatorias (p. ej. la aceptación legal): desactiva el
+   * gesto de cerrar deslizando y el toque en el fondo para que el modal no
+   * pueda descartarse.
+   */
+  allowManualDismiss?: boolean;
   testID?: string;
 }>;
 
@@ -64,6 +70,7 @@ export function AppModal({
   hideHandle = false,
   containsScrollable = false,
   stackBehavior = 'replace',
+  allowManualDismiss = true,
   testID,
 }: AppModalProps) {
   const modalRef = useRef<BottomSheetModal>(null);
@@ -154,7 +161,7 @@ export function AppModal({
         appearsOnIndex={0}
         disappearsOnIndex={-1}
         opacity={1}
-        pressBehavior="close"
+        pressBehavior={allowManualDismiss ? 'close' : 'none'}
         style={[props.style, styles.transparentBackdrop]}
       >
         <BlurView
@@ -170,7 +177,7 @@ export function AppModal({
         <View pointerEvents="none" style={themedStyles.backdropShade} />
       </BottomSheetBackdrop>
     ),
-    [isDark, themedStyles.backdropShade],
+    [allowManualDismiss, isDark, themedStyles.backdropShade],
   );
 
   const contentStyle = [
@@ -202,7 +209,7 @@ export function AppModal({
       ]}
       containerComponent={ModalLayer}
       enableDynamicSizing={!hasFixedHeight}
-      enablePanDownToClose
+      enablePanDownToClose={allowManualDismiss}
       handleComponent={hideHandle ? null : undefined}
       handleIndicatorStyle={themedStyles.handle}
       index={0}

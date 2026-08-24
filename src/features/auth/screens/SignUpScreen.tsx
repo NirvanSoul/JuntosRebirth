@@ -2,8 +2,17 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { appVersion } from '@/app/config/appVersion';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
+import { LegalAcceptanceStep } from '@/features/legal/components/LegalAcceptanceStep/LegalAcceptanceStep';
+import { privacyPolicy } from '@/features/legal/content/privacyPolicy';
+import { termsOfService } from '@/features/legal/content/termsOfService';
+import type {
+  LegalAcceptanceSource,
+  LegalDecision,
+} from '@/features/legal/model/types';
+import { savePendingLegalAcceptance } from '@/features/legal/persistence/pendingLegalAcceptanceRepository';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
 import { signUp } from '@/features/auth/services/signUpService';
 import {
@@ -16,12 +25,14 @@ import { getDisclosureEntering } from '@/theme/transitions';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
-export const signUpTotalSteps = 4;
+export const signUpTotalSteps = 5;
 
 type SignUpScreenProps = {
   onNavigateToLogin?: () => void;
   onStepChange: (step: number) => void;
   onSuccess: (result: { email: string }) => void;
+  /** Origen legal del registro: cada host pasa el suyo (ADR-083). */
+  source?: LegalAcceptanceSource;
   step: number;
 };
 
@@ -29,6 +40,7 @@ type SignUpFieldErrors = {
   confirmPassword?: string;
   displayName?: string;
   email?: string;
+  legal?: string;
   password?: string;
 };
 
@@ -42,6 +54,7 @@ const stepFields = [
   'email',
   'password',
   'confirmPassword',
+  'legal',
 ] as const;
 type StepField = (typeof stepFields)[number];
 
@@ -49,6 +62,7 @@ export function SignUpScreen({
   onNavigateToLogin,
   onStepChange,
   onSuccess,
+  source = 'access-signup',
   step,
 }: SignUpScreenProps) {
   const { colors } = useTheme();
@@ -57,6 +71,10 @@ export function SignUpScreen({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [legalDecision, setLegalDecision] = useState<LegalDecision>({
+    acceptedTerms: false,
+    consultedPrivacy: false,
+  });
   const [fieldErrors, setFieldErrors] = useState<SignUpFieldErrors>({});
   const [state, setState] = useState<SignUpState>({ step: 'idle' });
   const isSubmitting = state.step === 'submitting';
@@ -82,12 +100,36 @@ export function SignUpScreen({
         return password === confirmPassword
           ? undefined
           : 'Las contraseñas no coinciden.';
+      case 'legal':
+        return legalDecision.acceptedTerms && legalDecision.consultedPrivacy
+          ? undefined
+          : 'Acepta los Términos y confirma que has podido consultar la Política para continuar.';
     }
   };
 
-  const handleSubmit = async () => {
+  const createAccountAfterLegalIntention = async () => {
     setState({ step: 'submitting' });
     try {
+      // Primero se persiste la intención legal durable (versiones y versión de
+      // la app de la instantánea); solo después se pide crear la cuenta.
+      await savePendingLegalAcceptance({
+        email: email.trim(),
+        locale: 'es-ES',
+        source,
+        appVersion,
+        documents: [
+          {
+            documentId: 'terms-of-service',
+            documentVersion: termsOfService.version,
+            action: 'accepted',
+          },
+          {
+            documentId: 'privacy-policy',
+            documentVersion: privacyPolicy.version,
+            action: 'consulted',
+          },
+        ],
+      });
       await signUp({
         email: email.trim(),
         password,
@@ -105,15 +147,15 @@ export function SignUpScreen({
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (isSubmitting) return;
 
     const error = validateCurrentField();
     setFieldErrors((previous) => ({ ...previous, [currentField]: error }));
     if (error) return;
 
-    if (isLastStep) {
-      void handleSubmit();
+    if (currentField === 'legal') {
+      await createAccountAfterLegalIntention();
       return;
     }
     onStepChange(step + 1);
@@ -188,6 +230,16 @@ export function SignUpScreen({
             testID="signup-confirm-password"
             textContentType="newPassword"
             value={confirmPassword}
+          />
+        ) : null}
+
+        {currentField === 'legal' ? (
+          <LegalAcceptanceStep
+            disabled={isSubmitting}
+            error={fieldErrors.legal}
+            onChange={setLegalDecision}
+            testIDPrefix="signup-legal"
+            value={legalDecision}
           />
         ) : null}
       </Animated.View>

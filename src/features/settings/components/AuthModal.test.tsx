@@ -12,7 +12,7 @@ jest.mock('@/features/auth/screens/LoginScreen', () => ({
 }));
 jest.mock('@/features/auth/screens/SignUpScreen', () => ({
   SignUpScreen: jest.requireActual('@/test/authScreenStubs').SignUpScreenStub,
-  signUpTotalSteps: 4,
+  signUpTotalSteps: 5,
 }));
 jest.mock('@/features/auth/screens/VerifyCodeScreen', () => ({
   VerifyCodeScreen: jest.requireActual('@/test/authScreenStubs')
@@ -28,6 +28,19 @@ jest.mock('@/features/auth/screens/ResetPasswordScreen', () => ({
 }));
 
 describe('AuthModal — cableado de navegación de autenticación', () => {
+  it('usa el origen de Ajustes y el progreso extendido al abrir crear cuenta', async () => {
+    const screen = await renderWithTheme(
+      <AuthModal onClose={jest.fn()} visible />,
+    );
+
+    fireEvent.press(await screen.findByTestId('auth-modal-open-signup'));
+
+    const source = await screen.findByTestId('stub-signup-source');
+    expect(source.props.children).toBe('settings-signup');
+    const progress = screen.getByTestId('auth-modal-signup-progress');
+    expect(progress.props.accessibilityValue.max).toBe(6);
+  });
+
   it('del inicio de sesión lleva a recuperar contraseña', async () => {
     const screen = await renderWithTheme(
       <AuthModal onClose={jest.fn()} visible />,
