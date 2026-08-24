@@ -5981,3 +5981,114 @@ suites, **0 sin arrancar**, 2 fallos conductuales, `EXIT=1`—; VERDE focal 16/1
 - ADR-066 (sistema legal), ADR-068 (autenticación/anfitriones), ADR-075
   (sesión segura), ADR-080/081/082.
 - `PLAN.md` §Fase 5 y `ESTADO_DE_LA_RAMA.md`.
+# ADR-084 — Rediseño del flujo de recuperación: máquina de episodio y controlador único
+
+## Contexto
+
+El Gate 2 de ADR-083 tardó nueve rondas (B1–B14 y cuatro contratos posteriores)
+en estabilizar el subflujo de recuperación de contraseña. Todos los defectos del
+ciclo compartían una causa: **se miraba una transición y no lo que ocurre
+después, ni todas las salidas del estado**. Coordinar `setNewPassword` y
+`signOut('local')` con guardas locales (`useRecoveryPhase`, fases como
+`cancelingCompletion`, refs de continuaciones) no converge: cada arreglo añadía
+un estado implícito y ese estado abría un orden nuevo.
+
+La lección del ciclo fue pedir la herramienta que faltó: una **tabla completa
+de transiciones**. Este rediseño la construye primero y cambia la coordinación
+de «arbitraje posterior» a «exclusión por construcción».
+
+## Decisión
+
+- **Una máquina de episodio** (`src/features/auth/recovery/recoveryMachine.ts`,
+  reductor puro sin efectos) y **un controlador único**
+  (`src/features/auth/recovery/usePasswordRecoveryFlow.ts`). El controlador es
+  el **único dueño** de `setNewPassword`, `signOut('local')`, la identidad del
+  episodio, su concesión de pausa de la puerta legal y el destino final del
+  anfitrión. Los hosts (AuthModal, AccessScreen, AcceptInvitationScreen) solo
+  renderizan, entregan sus destinos y cablean `ResetPasswordScreen`, que pasa a
+  ser **controlada** (recibe `onSubmit`, `isSubmitting`, `errorMessage`,
+  `canCancel`; ya no llama a `setNewPassword` ni decide cuándo terminó).
+- **Regla: «gana la primera operación aceptada, no la primera que termina».**
+  La aceptación la decide la máquina en el momento de la petición; no existe
+  arbitraje posterior porque nunca hay dos operaciones en vuelo.
+
+## Invariantes
+
+1. `saving` y `canceling` son estados distintos sin transición entre ellos: las
+   dos operaciones **nunca están en vuelo a la vez**. No hay candidatos que
+   arbitrar.
+2. Todo resultado asíncrono viaja con su `episodeId`; el de un episodio anterior
+   se descarta. Sustituye a `outcomeSettledRef` y a las continuaciones tardías
+   (B14).
+3. Hay exactamente dos terminales (`completed`, `canceled`) y el destino del
+   anfitrión se ejecuta al entrar, una vez. Sustituye a `pendingCompletionRef`
+   (B13).
+4. La pausa de la puerta **pertenece al episodio**: deriva del estado y solo cae
+   al terminal. Sustituye a la pausa derivada de `visible`/fase (B3, B7).
+5. Antes de verificar el código no hay sesión: cancelar ahí es abandonar sin
+   `signOut`. Después, cancelar **siempre** cierra la sesión local (B7).
+6. La intención de salida viaja con `cancelRequested` y solo se custodia si la
+   transición se acepta: gana la primera **aceptada**, no la primera solicitada.
+   El reintento desde `cancelError` conserva la suya.
+
+## Estructura
+
+- `recoveryMachine.test.ts` contiene la **matriz completa 10×9 = 90 celdas**
+  (los 10 estados × los 9 eventos) más 14 pruebas de invariantes/helpers: 114
+  pruebas para la base. La matriz se escribió entera a propósito: los defectos
+  B10, B12 y B14 fueron celdas que nadie había mirado.
+- `recoveryHoldRegistry.ts`: concesión de pausa **con dueño, a nivel de módulo**.
+  Cada controlador sostiene la suya con su identificador y solo libera la propia
+  (`applyRecoveryHold`/`commitRecoveryHold`/`isRecoveryHalted`); `useRecoveryHold`
+  de la puerta expone la concesión sin suscribir al controlador a
+  `useLegalSessionGate` entero. La puerta registra los efectos de publicación de
+  la pausa al importarse el módulo.
+- La concesión vive fuera del hook a propósito: suscribir al controlador a la
+  puerta entera lo acoplaba además a `useAuthSession` (rompía el mock de la
+  invitación).
+
+## Precio deliberado
+
+Mientras `saving` está en vuelo **no se puede cancelar, ni volver atrás, ni
+cerrar**. Es la contrapartida de eliminar la carrera y es intencional: un
+guardado que no responde deja el episodio retenido hasta que resuelva o falle
+(sin timeout). Un `Promise.race` sin `AbortSignal` (la alternativa que se
+descartó) habría recreado los resultados tardíos que B13/B14 demostraron: al
+perder la carrera, `setNewPassword` seguiría resolviendo y ensuciaría el estado
+siguiente. `saveError` devuelve el control completo (reintentar o cancelar).
+
+## Validación y higiene de tests
+
+- `npm run validate` en el árbol commiteado: **136 suites / 1002 pruebas /
+  EXIT=0**.
+- **`--randomize`**: la suite de `AuthModal` quedó estable (10/10 repetido).
+  Tres causas corregidas en los tests, no en producción: el `afterEach` llamaba
+  `cleanup()` (async en RNTL v14) sin `await` y luego abría un `act` propio —
+  «overlapping act() calls» que corrompía el ámbito global y rompía el montaje
+  de la prueba siguiente; `@gorhom/bottom-sheet` se mockea como en
+  `AppModal.test` (la cola de presentación real es global al proceso y
+  sobrevivía al `cleanup`); y todos los `fireEvent.press(...)` se esperan
+  (`await`), pues en RNTL v14 son asíncronos y dejaban su `act` interno
+  pendiente.
+- **Deuda preexistente documentada, no introducida por este rediseño:**
+  `useLegalSessionGate.test.tsx` y `AddFirstTransactionStep.test.tsx` ya eran
+  dependientes del orden en HEAD (la puerta llegó a fallar 7 de 14 antes de
+  tocar nada; `AddFirstTransactionStep` falla de forma intermitente). El
+  cableado nuevo (hosts + máquina + controlador + invitación) pasa
+  **142/142** con `--randomize`. Se documenta en `PLAN.md` como deuda técnica.
+
+## Consecuencias
+
+- `useRecoveryPhase` y su suite se borran; `AuthModal.recoveryRace.test.tsx`
+  desaparece (la carrera ya no existe: `saving` rechaza cancelar y `canceling`
+  rechaza guardar).
+- `ResetPasswordScreen` pasa de autónoma a controlada; los tres hosts pierden
+  todo efecto de recuperación.
+- `useLegalSessionGate` se mantiene bajo el tope de 400 líneas no vacías (tras
+  extraer la concesión al registry pierde también el camino heredado
+  `setRecoveryHalted`).
+
+## Referencias
+
+- ADR-083 (Gate 2, rondas 1–9: el historial que este rediseño reemplaza).
+- `PLAN.md` §Fase 5 y `ESTADO_DE_LA_RAMA.md`.

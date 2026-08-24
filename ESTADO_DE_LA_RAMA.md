@@ -138,8 +138,8 @@ igual, y esa terminación tardía ejecutaba un segundo destino. La causa estaba 
 que `inactive` significaba dos cosas: «no hay recuperación» y «este episodio ya
 se resolvió». La ronda 9 separa el desenlace de la fase con `outcomeSettledRef`,
 que solo `startRecovery` reabre.
-Validación actual: **136 suites / 903
-pruebas / EXIT=0**. Queda el veredicto de la ronda 9 del Gate 2 y, solo
+El veredicto de la ronda 9 aprobó ADR-083 (B1–B14) y, en vez de seguir parcheando la coordinación, el responsable ordenó el **rediseño ADR-084** (Claude como actor, GPT verificador único — excepción §4.3): una **máquina de episodio** (reductor puro con la matriz completa 10×9 = 90 celdas) y un controlador único (`usePasswordRecoveryFlow`) dueño de `setNewPassword`, `signOut('local')`, la identidad del episodio, la concesión de pausa (`recoveryHoldRegistry`, con dueño a nivel de módulo) y de un único destino. Regla: gana la primera operación **aceptada**; `saving` y `canceling` nunca coexisten, así que no hay carrera que arbitrar. `ResetPasswordScreen` quedó controlada y los tres hosts sin efectos de recuperación; `useRecoveryPhase` se borró. Precio deliberado sin timeout: mientras guarda no se puede cancelar, volver ni cerrar. El `--randomize`, exigido por GPT, dejó estable `AuthModal` (mock de `@gorhom/bottom-sheet`, `await fireEvent`, `afterEach` con `await cleanup()` + drenaje); la deuda de orden de `useLegalSessionGate` y `AddFirstTransactionStep` es preexistente y quedó documentada. Validación actual: **136 suites / 1002
+pruebas / EXIT=0**. Queda el veredicto de la entrega (GPT) y, solo
 después, el smoke físico (recuperación de contraseña incluida, y con
 `enable_confirmations` activado en local para los pasos del OTP) antes de
 marcar la tarea cerrada.
