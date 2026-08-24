@@ -163,7 +163,13 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
       <View style={styles.container}>
         <View style={styles.header}>
           {step.screen !== 'entry' ? (
-            <ModalCloseButton onPress={goBack} variant="back" />
+            // I1: mientras `saving` la máquina rechaza la salida; el botón se
+            // deshabilita de verdad, no solo se ignora.
+            <ModalCloseButton
+              disabled={recovery.state.kind === 'saving'}
+              onPress={goBack}
+              variant="back"
+            />
           ) : null}
           <Text
             accessibilityRole="header"

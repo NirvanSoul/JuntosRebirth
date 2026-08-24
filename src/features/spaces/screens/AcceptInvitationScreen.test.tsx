@@ -232,7 +232,7 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
     it('completar el restablecimiento libera la pausa y acepta exactamente una vez (ADR-084)', async () => {
       const screen = await llegarAlRestablecimientoConSesion();
 
-      fireEvent.press(screen.getByTestId('stub-reset-submit'));
+      await fireEvent.press(screen.getByTestId('stub-reset-submit'));
 
       // El éxito termina en `completed`, no en `inactive`: la autoaceptación se
       // consulta con la semántica compartida de la pausa, no comparando
@@ -261,6 +261,8 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
     it('si el cierre local falla, conserva el subflujo, muestra el error y no acepta', async () => {
       const screen = await llegarAlRestablecimientoConSesion();
       mockSignOut.mockRejectedValue(new Error('No pudimos cerrar sesión.'));
+      // El fallo de GoTrue no eliminó la sesión: hay un cancelError real.
+      mockGetSession.mockResolvedValue(createOtpSession('user-recovery'));
 
       await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
 
@@ -279,10 +281,10 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
       );
       const screen = await llegarAlRestablecimientoConSesion();
 
-      fireEvent.press(screen.getByTestId('stub-reset-submit'));
+      await fireEvent.press(screen.getByTestId('stub-reset-submit'));
       await screen.findByTestId('stub-reset-saving');
 
-      fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
       expect(mockSignOut).not.toHaveBeenCalled();
       expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
 
@@ -297,8 +299,10 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
     it('tras un fallo de cancelación el mismo control reintenta y cierra el episodio (ADR-084)', async () => {
       const screen = await llegarAlRestablecimientoConSesion();
       mockSignOut.mockRejectedValueOnce(new Error('No pudimos cerrar sesión.'));
+      // El fallo no eliminó la sesión; el reintento sí la elimina.
+      mockGetSession.mockResolvedValue(createOtpSession('user-recovery'));
 
-      fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
       await screen.findByTestId('stub-reset-error');
 
       // `canRetryCancel` mantiene vivo el control: sin eso, la invitación no
@@ -306,7 +310,8 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
       mockSignOut.mockImplementation(async () => {
         mockSetSession?.(null);
       });
-      fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      mockGetSession.mockResolvedValue(null);
+      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
 
       expect(await screen.findByTestId('stub-login-screen')).toBeTruthy();
       expect(mockSignOut).toHaveBeenCalledTimes(2);

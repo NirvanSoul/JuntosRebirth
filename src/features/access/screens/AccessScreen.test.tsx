@@ -28,6 +28,11 @@ jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
   }),
 }));
 
+/** Sesión que `getSession` reporta cuando el `signOut` no llegó a eliminarla. */
+const recoverySession = {
+  user: { id: 'user-1' },
+} as unknown as Session;
+
 function createGateMock() {
   return {
     session: null as Session | null,
@@ -96,7 +101,7 @@ describe('AccessScreen', () => {
   it('mantiene visible la entrada como invitado y la persiste al elegirla', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('access-continue-guest'));
+    await fireEvent.press(screen.getByTestId('access-continue-guest'));
 
     expect(mockMarkGuestComplete).toHaveBeenCalledTimes(1);
   });
@@ -104,7 +109,7 @@ describe('AccessScreen', () => {
   it('abre el paso de crear cuenta con su origen y el progreso de 6 pasos', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('access-open-signup'));
+    await fireEvent.press(screen.getByTestId('access-open-signup'));
 
     expect(screen.getByText('Crear cuenta')).toBeTruthy();
     // Origen legal del registro desde el acceso inicial y progreso extendido.
@@ -118,8 +123,8 @@ describe('AccessScreen', () => {
     it('del inicio de sesión lleva a recuperar contraseña', async () => {
       const screen = await renderWithTheme(<AccessScreen />);
 
-      fireEvent.press(screen.getByTestId('access-open-login'));
-      fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+      await fireEvent.press(screen.getByTestId('access-open-login'));
+      await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
 
       expect(await screen.findByText('Recuperar contraseña')).toBeTruthy();
       expect(screen.getByTestId('stub-forgot-screen')).toBeTruthy();
@@ -128,13 +133,13 @@ describe('AccessScreen', () => {
     it('completa la cadena de recuperación hasta nueva contraseña', async () => {
       const screen = await renderWithTheme(<AccessScreen />);
 
-      fireEvent.press(screen.getByTestId('access-open-login'));
-      fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-      fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+      await fireEvent.press(screen.getByTestId('access-open-login'));
+      await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+      await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
 
       expect(await screen.findByText('recovery')).toBeTruthy();
 
-      fireEvent.press(await screen.findByTestId('stub-verify-success'));
+      await fireEvent.press(await screen.findByTestId('stub-verify-success'));
 
       expect(await screen.findByText('Nueva contraseña')).toBeTruthy();
       expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
@@ -143,13 +148,13 @@ describe('AccessScreen', () => {
     it('la pausa legal se sostiene durante todo el episodio y solo cae al terminar (ADR-084)', async () => {
       const screen = await renderWithTheme(<AccessScreen />);
 
-      fireEvent.press(screen.getByTestId('access-open-login'));
-      fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+      await fireEvent.press(screen.getByTestId('access-open-login'));
+      await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
       await screen.findByTestId('stub-forgot-screen');
-      fireEvent.press(screen.getByTestId('stub-forgot-send'));
+      await fireEvent.press(screen.getByTestId('stub-forgot-send'));
       await screen.findByText('recovery');
 
-      fireEvent.press(await screen.findByTestId('stub-verify-success'));
+      await fireEvent.press(await screen.findByTestId('stub-verify-success'));
       await screen.findByText('Nueva contraseña');
 
       // Ni un solo `false` entre el inicio del episodio y su desenlace: con el
@@ -158,7 +163,7 @@ describe('AccessScreen', () => {
       expect(holds.slice(holds.indexOf(true))).toEqual([true]);
 
       // Cancelar cierra el episodio y solo entonces se libera.
-      fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
       await screen.findByText('Iniciar sesión');
       await waitFor(() =>
         expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(
@@ -171,11 +176,13 @@ describe('AccessScreen', () => {
     it('desde la verificación de registro, recuperar contraseña lleva al flujo de recuperación', async () => {
       const screen = await renderWithTheme(<AccessScreen />);
 
-      fireEvent.press(screen.getByTestId('access-open-signup'));
-      fireEvent.press(await screen.findByTestId('stub-signup-complete'));
+      await fireEvent.press(screen.getByTestId('access-open-signup'));
+      await fireEvent.press(await screen.findByTestId('stub-signup-complete'));
       expect(await screen.findByText('signup')).toBeTruthy();
 
-      fireEvent.press(await screen.findByTestId('stub-verify-go-recovery'));
+      await fireEvent.press(
+        await screen.findByTestId('stub-verify-go-recovery'),
+      );
 
       expect(await screen.findByText('Recuperar contraseña')).toBeTruthy();
     });
@@ -183,9 +190,9 @@ describe('AccessScreen', () => {
     it('desde la verificación de registro, iniciar sesión vuelve al inicio de sesión', async () => {
       const screen = await renderWithTheme(<AccessScreen />);
 
-      fireEvent.press(screen.getByTestId('access-open-signup'));
-      fireEvent.press(await screen.findByTestId('stub-signup-complete'));
-      fireEvent.press(await screen.findByTestId('stub-verify-go-login'));
+      await fireEvent.press(screen.getByTestId('access-open-signup'));
+      await fireEvent.press(await screen.findByTestId('stub-signup-complete'));
+      await fireEvent.press(await screen.findByTestId('stub-verify-go-login'));
 
       expect(await screen.findByText('Iniciar sesión')).toBeTruthy();
     });
@@ -194,18 +201,18 @@ describe('AccessScreen', () => {
   it('cancelar el restablecimiento cierra la sesión local creada por el OTP (B7): no se puede cancelar y entrar igualmente', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('access-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(screen.getByTestId('access-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
     await screen.findByText('recovery');
 
     // El código se verifica y el OTP crea la sesión a mitad del flujo: al
     // cancelar, esa sesión debe cerrarse en local (transición real).
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
     mockGateState.session = mockOtpSession;
 
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith('local'));
     expect(await screen.findByText('Iniciar sesión')).toBeTruthy();
@@ -221,19 +228,31 @@ describe('AccessScreen', () => {
     );
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('access-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(screen.getByTestId('access-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
     await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
 
-    fireEvent.press(screen.getByTestId('stub-reset-submit'));
+    await fireEvent.press(screen.getByTestId('stub-reset-submit'));
     await screen.findByTestId('stub-reset-saving');
 
+    // I1: el chrome está DESHABILITADO accesiblemente, no solo inerte. Se valida
+    // con la consulta por rol y estado de RNTL, no con raw props del host.
+    expect(
+      screen.getByRole('button', { name: 'Volver', disabled: true }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', {
+        name: 'Cancelar restablecimiento',
+        disabled: true,
+      }),
+    ).toBeTruthy();
+
     // Cancelar desde la pantalla y «Atrás» del anfitrión: los dos se ignoran.
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-    fireEvent.press(screen.getByLabelText('Volver'));
+    await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await fireEvent.press(screen.getByLabelText('Volver'));
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
 
@@ -245,16 +264,18 @@ describe('AccessScreen', () => {
 
   it('la cancelación que falla deja el mensaje visible y el reintento cierra el episodio (ADR-084)', async () => {
     mockSignOut.mockRejectedValueOnce(new Error('Sin conexión con la red.'));
+    // El fallo de GoTrue NO eliminó la sesión: `getSession` la sigue viendo.
+    mockGetSession.mockResolvedValue(recoverySession);
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('access-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(screen.getByTestId('access-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
     await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
 
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
     await screen.findByTestId('stub-reset-error');
     // La pausa NO cae con la sesión posiblemente viva.
     expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(
@@ -264,7 +285,9 @@ describe('AccessScreen', () => {
 
     // El mismo control reintenta, porque `canRetryCancel` lo mantiene vivo.
     mockSignOut.mockResolvedValue(undefined);
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    // El reintento ya cierra: esta vez la sesión desapareció.
+    mockGetSession.mockResolvedValue(null);
+    await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
     await screen.findByText('Iniciar sesión');
     expect(mockSignOut).toHaveBeenCalledTimes(2);
   });
@@ -272,12 +295,12 @@ describe('AccessScreen', () => {
   it('desde verify-recovery, Atrás vuelve a pedir el código sin abandonar el episodio (ADR-084)', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('access-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(screen.getByTestId('access-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
     await screen.findByText('recovery');
 
-    fireEvent.press(screen.getByLabelText('Volver'));
+    await fireEvent.press(screen.getByLabelText('Volver'));
 
     expect(await screen.findByTestId('stub-forgot-screen')).toBeTruthy();
     // Sigue dentro del episodio: la pausa no se ha liberado.

@@ -131,6 +131,9 @@ export function AccessScreen() {
             ) : (
               <ModalPrimaryAction
                 accessibilityLabel="Volver"
+                // I1: durante `saving` la máquina rechaza la salida; el botón se
+                // deshabilita de verdad, no solo se ignora.
+                disabled={recovery.state.kind === 'saving'}
                 label="Atrás"
                 onPress={goBack}
                 style={styles.backAction}

@@ -10,6 +10,7 @@ import {
   resetLegalSessionGateForTests,
   useLegalSessionGate,
 } from '@/features/legal/hooks/useLegalSessionGate';
+import { isRecoveryHalted } from '@/features/legal/hooks/recoveryHoldRegistry';
 import type { PendingLegalAcceptanceNew } from '@/features/legal/model/types';
 
 /**
@@ -325,7 +326,7 @@ describe('useLegalSessionGate — sesión legalmente habilitada', () => {
     expect(result.current.isLegallyEnabled).toBe(true);
   });
 
-  it('un cierre de sesión tras una pausa de recuperación libera la pausa para el siguiente inicio (B3)', async () => {
+  it('un cierre de sesión tras una pausa libera la pausa para el siguiente inicio cuando su dueño termina (B3)', async () => {
     acceptanceBuilder();
     const { result } = await renderHook(() => useLegalSessionGate());
 
@@ -337,16 +338,43 @@ describe('useLegalSessionGate — sesión legalmente habilitada', () => {
     });
     expect(result.current.status.kind).toBe('halted');
 
-    // Cancelar la recuperación cierra solo la sesión local: la pausa se libera
-    // y el siguiente inicio vuelve a comprobar (no queda colgada para nadie).
+    // La sesión se va (el cierre la eliminó): la puerta publica «sin sesión».
+    // La pausa NO se borra por eso: la libera su DUEÑO cuando el episodio
+    // termina — la cancelación que cerró la sesión resuelve cancelSucceeded y
+    // suelta la concesión (I2: nada de borrados globales).
     await act(async () => {
       mockSetSession?.(null);
     });
     await waitFor(() => expect(result.current.status.kind).toBe('no-session'));
 
+    await act(async () => {
+      result.current.setRecoveryHold('b3', false);
+    });
+
     await aparecerSesion(createOtpSession('otra@ejemplo.com'));
     await waitFor(() => expect(result.current.status.kind).toBe('required'));
     expect(result.current.rawSession?.user.email).toBe('otra@ejemplo.com');
+  });
+
+  it('I2: una sesión que se va no borra la concesión de un controlador que sigue activo', async () => {
+    acceptanceBuilder();
+    const { result } = await renderHook(() => useLegalSessionGate());
+
+    await aparecerSesion(createOtpSession('ana@ejemplo.com'));
+    await waitFor(() => expect(result.current.status.kind).toBe('required'));
+
+    await act(async () => {
+      result.current.setRecoveryHold('a', true);
+    });
+    expect(result.current.status.kind).toBe('halted');
+
+    // La sesión desaparece por otra vía: la puerta lo observa y publica
+    // «sin sesión», pero el registro de concesiones NO se reconcilia en global.
+    await act(async () => {
+      mockSetSession?.(null);
+    });
+    await waitFor(() => expect(result.current.status.kind).toBe('no-session'));
+    expect(isRecoveryHalted()).toBe(true);
   });
 
   it('submitRegularization rechaza una decisión que no cubre los documentos pendientes (B4)', async () => {

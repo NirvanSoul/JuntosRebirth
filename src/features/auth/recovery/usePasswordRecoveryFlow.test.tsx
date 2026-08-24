@@ -1,3 +1,4 @@
+import type { Session } from '@supabase/supabase-js';
 import { act, renderHook } from '@testing-library/react-native';
 
 import { usePasswordRecoveryFlow } from '@/features/auth/recovery/usePasswordRecoveryFlow';
@@ -8,9 +9,18 @@ jest.mock('@/features/auth/services/resetPasswordService', () => ({
 }));
 
 const mockSignOut = jest.fn();
+const mockGetSession = jest.fn();
 jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
-  createSupabaseAuthGateway: () => ({ signOut: mockSignOut }),
+  createSupabaseAuthGateway: () => ({
+    getSession: mockGetSession,
+    signOut: mockSignOut,
+  }),
 }));
+
+/** Sesión que `getSession` reporta cuando el `signOut` no la eliminó. */
+const recoverySession = {
+  user: { id: 'user-1' },
+} as unknown as Session;
 
 const mockSetRecoveryHold = jest.fn();
 jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
@@ -64,6 +74,8 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
     mockSetNewPassword.mockResolvedValue(undefined);
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
+    mockGetSession.mockReset();
+    mockGetSession.mockResolvedValue(null);
     mockSetRecoveryHold.mockReset();
   });
 
@@ -177,6 +189,8 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
 
   it('la cancelación que falla sostiene la pausa y solo el reintento cierra el episodio', async () => {
     mockSignOut.mockRejectedValueOnce(new Error('Sin conexión.'));
+    // El fallo de GoTrue NO eliminó la sesión: `getSession` la sigue viendo.
+    mockGetSession.mockResolvedValue(recoverySession);
     const { onCanceled, result } = await renderFlow();
     await arriveAtReady(result);
 
@@ -188,11 +202,59 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
     expect(lastHold()).toBe(true);
 
     mockSignOut.mockResolvedValue(undefined);
+    // El reintento ya cierra: esta vez la sesión desapareció.
+    mockGetSession.mockResolvedValue(null);
     await act(async () => result.current.requestCancel());
 
     expect(result.current.state.kind).toBe('canceled');
     expect(onCanceled).toHaveBeenCalledTimes(1);
     expect(lastHold()).toBe(false);
+  });
+
+  // ─── B15: el desenlace de la cancelación se decide por la postcondición ──
+
+  it('B15: signOut falla pero getSession → null: la cancelación se completa igualmente', async () => {
+    mockSignOut.mockRejectedValue(new Error('No pudimos cerrar sesión.'));
+    // GoTrue eliminó la sesión local antes de devolver el error.
+    mockGetSession.mockResolvedValue(null);
+    const { onCanceled, onCompleted, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestCancel());
+
+    expect(result.current.state.kind).toBe('canceled');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    expect(onCompleted).not.toHaveBeenCalled();
+    // No hay error visible ni se ofrece reintento sobre una sesión inexistente.
+    expect(result.current.errorMessage).toBeNull();
+    expect(result.current.canRetryCancel).toBe(false);
+  });
+
+  it('B15: signOut resuelve pero getSession sigue viendo la sesión: cancelError, no se asume nada', async () => {
+    mockSignOut.mockResolvedValue(undefined);
+    mockGetSession.mockResolvedValue(recoverySession);
+    const { onCanceled, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestCancel());
+
+    expect(result.current.state.kind).toBe('cancelError');
+    expect(onCanceled).not.toHaveBeenCalled();
+  });
+
+  it('B15: getSession falla (estado desconocido): cancelError observable, nunca asumir que se cerró', async () => {
+    mockSignOut.mockResolvedValue(undefined);
+    mockGetSession.mockRejectedValue(
+      new Error('No pudimos recuperar tu sesión.'),
+    );
+    const { onCanceled, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestCancel());
+
+    expect(result.current.state.kind).toBe('cancelError');
+    expect(result.current.errorMessage).toBe('No pudimos recuperar tu sesión.');
+    expect(onCanceled).not.toHaveBeenCalled();
   });
 
   // ─── Pausa legal e identidad del episodio ───────────────────────────────
@@ -350,6 +412,8 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
 
   it('el reintento tras cancelError conserva la intención con la que se aceptó la cancelación', async () => {
     mockSignOut.mockRejectedValueOnce(new Error('Sin conexión.'));
+    // El fallo de GoTrue no eliminó la sesión: hay un cancelError real.
+    mockGetSession.mockResolvedValue(recoverySession);
     const { onCanceled, result } = await renderFlow();
     await arriveAtReady(result);
 
@@ -358,6 +422,7 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
 
     // El reintento llega desde otro control y con otra etiqueta: no la cambia.
     mockSignOut.mockResolvedValue(undefined);
+    mockGetSession.mockResolvedValue(null);
     await act(async () => result.current.requestCancel('cerrar-modal'));
 
     expect(result.current.state.kind).toBe('canceled');

@@ -314,12 +314,11 @@ export function useLegalSessionGate(): LegalSessionGate {
     if (!isReady) return;
 
     if (!session) {
-      // «Sin sesión» es un estado propio. Además libera cualquier pausa de
-      // recuperación huérfana (B3): un host desmontado a mitad de
-      // restablecimiento no deja la puerta colgada para los siguientes.
+      // «Sin sesión» es un estado propio. I2: la pausa NO se borra en global
+      // cuando la sesión desaparece —eso rompería la concesión de un controlador
+      // que sigue activo—; cada dueño libera la suya al terminar su episodio.
       checkRunId += 1;
       latestRequestedSession = null;
-      clearRecoveryHolds();
       publish({
         ...noSessionSnapshot,
         isReady: true,

@@ -1,3 +1,4 @@
+import type { Session } from '@supabase/supabase-js';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 
 import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
@@ -155,15 +156,28 @@ export function usePasswordRecoveryFlow(
   }, [episodeId, savingPassword]);
 
   // `canceling`: el controlador cierra la sesión local. Guardar está rechazado
-  // mientras dure.
+  // mientras dure. El desenlace se decide por la POSTCONDICIÓN real, no por el
+  // éxito/fallo del `signOut('local')`: GoTrue elimina la sesión local también
+  // en la mayoría de errores, así que una excepción no prueba que siga viva
+  // (B15, el contrato que había corregido B11).
   useEffect(() => {
     if (!isCanceling) return;
     let abandoned = false;
     void (async () => {
+      let signOutError: unknown = null;
       try {
         await createSupabaseAuthGateway().signOut('local');
-        if (!abandoned) dispatch({ type: 'cancelSucceeded', episodeId });
       } catch (caught) {
+        signOutError = caught;
+      }
+      if (abandoned) return;
+
+      let liveSession: Session | null;
+      try {
+        liveSession = await createSupabaseAuthGateway().getSession();
+      } catch (caught) {
+        // Estado de sesión desconocido: fallo observable seguro; nunca se asume
+        // que la sesión se cerró.
         if (abandoned) return;
         dispatch({
           type: 'cancelFailed',
@@ -171,9 +185,26 @@ export function usePasswordRecoveryFlow(
           message:
             caught instanceof Error
               ? caught.message
-              : 'No pudimos cerrar la sesión de recuperación.',
+              : 'No pudimos confirmar el estado de sesión.',
         });
+        return;
       }
+      if (abandoned) return;
+
+      if (liveSession === null) {
+        // Cancelación completada, aunque el signOut haya fallado: la sesión ya
+        // no existe y no hay nada que reintentar.
+        dispatch({ type: 'cancelSucceeded', episodeId });
+        return;
+      }
+      dispatch({
+        type: 'cancelFailed',
+        episodeId,
+        message:
+          signOutError instanceof Error
+            ? signOutError.message
+            : 'No pudimos cerrar la sesión de recuperación.',
+      });
     })();
     return () => {
       abandoned = true;

@@ -1,3 +1,4 @@
+import type { Session } from '@supabase/supabase-js';
 import {
   act,
   cleanup,
@@ -64,6 +65,11 @@ jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
     signOut: mockSignOut,
   }),
 }));
+
+/** Sesión que `getSession` reporta cuando el `signOut` no llegó a eliminarla. */
+const mockOtpSession = {
+  user: { id: 'user-1' },
+} as unknown as Session;
 
 function createGateMock() {
   return {
@@ -235,6 +241,8 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
 
   it('la cancelación que falla deja el mensaje visible y el reintento cierra el episodio (ADR-084)', async () => {
     mockSignOut.mockRejectedValueOnce(new Error('Sin conexión con la red.'));
+    // El fallo de GoTrue NO eliminó la sesión: `getSession` la sigue viendo.
+    mockGetSession.mockResolvedValue(mockOtpSession);
     const onCloseSpy = jest.fn();
     const screen = await renderWithTheme(
       <AuthModal onClose={onCloseSpy} visible />,
@@ -255,6 +263,8 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     );
 
     mockSignOut.mockResolvedValue(undefined);
+    // El reintento ya cierra: esta vez la sesión efectivamente desapareció.
+    mockGetSession.mockResolvedValue(null);
     await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(2));
   });
@@ -336,6 +346,18 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     await fireEvent.press(screen.getByTestId('stub-reset-submit'));
     await screen.findByTestId('stub-reset-saving');
 
+    // I1: el chrome está DESHABILITADO accesiblemente, no solo inerte. Se valida
+    // con la consulta por rol y estado de RNTL, no con raw props del host.
+    expect(
+      screen.getByRole('button', { name: 'Volver', disabled: true }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', {
+        name: 'Cancelar restablecimiento',
+        disabled: true,
+      }),
+    ).toBeTruthy();
+
     // Guardar de nuevo, cancelar y «Atrás»: los tres se ignoran.
     await fireEvent.press(screen.getByTestId('stub-reset-submit'));
     await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
@@ -353,5 +375,28 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     // para que la pila interna de `BottomSheetModal` no impida montar el de la
     // prueba siguiente.
     screen.unmount();
+  });
+
+  it('B15: signOut falla pero la sesión ya no existe — la cancelación se completa: destino y pausa liberada sin mensaje de error', async () => {
+    mockSignOut.mockRejectedValue(new Error('Sin conexión con la red.'));
+    // GoTrue eliminó la sesión local antes de devolver el error (contrato real).
+    mockGetSession.mockResolvedValue(null);
+    const onCloseSpy = jest.fn();
+    const screen = await renderWithTheme(
+      <AuthModal onClose={onCloseSpy} visible />,
+    );
+
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+
+    // «Atrás» cancela con destino «volver a login»: la postcondición dice que
+    // la sesión ya no existe, así que la cancelación se completa sin cancelError.
+    await fireEvent.press(screen.getByLabelText('Volver'));
+    await screen.findByText('Iniciar sesión');
+    expect(screen.queryByTestId('stub-reset-error')).toBeNull();
+    expect(mockSetRecoveryHold.mock.calls.at(-1)?.[1]).toBe(false);
   });
 });

@@ -9,12 +9,14 @@ import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ModalCloseButtonProps = {
+  disabled?: boolean;
   onPress: () => void;
   testID?: string;
   variant?: 'back' | 'close';
 };
 
 export function ModalCloseButton({
+  disabled = false,
   onPress,
   testID,
   variant = 'close',
@@ -27,11 +29,14 @@ export function ModalCloseButton({
     <Pressable
       accessibilityLabel={isBack ? 'Volver' : 'Cerrar'}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       hitSlop={spacing.sm}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
         isBack && styles.backButton,
+        disabled && styles.disabled,
         pressed && styles.pressed,
       ]}
       testID={testID}
@@ -61,6 +66,7 @@ function createStyles(colors: ColorTokens) {
       borderWidth: 0,
       backgroundColor: 'transparent',
     },
+    disabled: { opacity: 0.4 },
     pressed: { opacity: 0.7 },
   });
 }

@@ -122,6 +122,8 @@ export function ResetPasswordScreenStub(props: {
       ) : null}
       {props.onCancel ? (
         <Pressable
+          accessibilityLabel="Cancelar restablecimiento"
+          accessibilityRole="button"
           disabled={props.canCancel === false}
           onPress={() => props.onCancel?.()}
           testID="stub-reset-cancel"
