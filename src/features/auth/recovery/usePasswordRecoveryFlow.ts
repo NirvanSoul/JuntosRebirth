@@ -7,7 +7,6 @@ import {
   canSave as canSaveIn,
   initialRecoveryEpisode,
   isLegalGateHalted,
-  isTerminal,
   recoveryReducer,
   type RecoveryState,
 } from '@/features/auth/recovery/recoveryMachine';
@@ -45,12 +44,15 @@ export type PasswordRecoveryFlow = {
   canRetryCancel: boolean;
 };
 
+/** Identidad de cada controlador montado, para su concesión de pausa. */
+let recoveryOwnerSequence = 0;
+
 /**
  * Controlador del episodio de recuperación (ADR-084). Es el **único** dueño de:
  *
  * - `setNewPassword` y `signOut('local')` —los anfitriones ya no los invocan—;
  * - la identidad del episodio, que descarta resultados tardíos;
- * - la pausa de la puerta legal, que vive y muere con el episodio;
+ * - su concesión de pausa de la puerta legal;
  * - el destino final, exactamente uno.
  *
  * Los anfitriones solo renderizan y entregan sus dos destinos. Sustituye a
@@ -64,7 +66,7 @@ export function usePasswordRecoveryFlow(
     recoveryReducer,
     initialRecoveryEpisode,
   );
-  const { setRecoveryHalted } = useLegalSessionGate();
+  const { setRecoveryHold } = useLegalSessionGate();
 
   const { episodeId, state } = episode;
 
@@ -73,25 +75,52 @@ export function usePasswordRecoveryFlow(
   const destinationsRef = useRef(destinations);
   destinationsRef.current = destinations;
 
-  const passwordRef = useRef<string>('');
+  const setRecoveryHoldRef = useRef(setRecoveryHold);
+  setRecoveryHoldRef.current = setRecoveryHold;
+
+  /** Concesión propia: liberar la de otro anfitrión sería soltar su pausa. */
+  const ownerIdRef = useRef<string | null>(null);
+  if (ownerIdRef.current === null) {
+    recoveryOwnerSequence += 1;
+    ownerIdRef.current = `recovery-${recoveryOwnerSequence}`;
+  }
+  const ownerId = ownerIdRef.current;
+
   /** Episodio cuyo destino terminal ya se ejecutó: garantiza «exactamente uno». */
   const settledEpisodeRef = useRef<number | null>(null);
 
-  // Invariante 4: la pausa pertenece al episodio. Se deriva del estado y no la
-  // libera ningún anfitrión al cerrarse. El cleanup cubre el desmontaje.
-  useEffect(() => {
-    setRecoveryHalted(isLegalGateHalted(state));
-    return () => setRecoveryHalted(false);
-  }, [setRecoveryHalted, state]);
+  const halted = isLegalGateHalted(state);
+  const savingPassword = state.kind === 'saving' ? state.password : null;
+  const isCanceling = state.kind === 'canceling';
+  const terminalKind =
+    state.kind === 'completed' || state.kind === 'canceled' ? state.kind : null;
 
-  // `saving`: el controlador ejecuta el guardado. La cancelación está
-  // rechazada por la máquina mientras dure, así que no hay carrera que arbitrar.
+  // Invariante 4: la pausa se actualiza SOLO cuando cambia el booleano
+  // derivado. Con el `cleanup` en el mismo efecto, React lo ejecutaba en cada
+  // transición y la pausa caía un instante entre `requestingCode` y
+  // `verifyingCode`, o entre `verifyingCode` y `ready`: un `false` intermedio
+  // que podía reanudar brevemente la comprobación de sesión.
   useEffect(() => {
-    if (state.kind !== 'saving') return;
+    setRecoveryHoldRef.current(ownerId, halted);
+  }, [halted, ownerId]);
+
+  // Liberación por desmontaje, y solo por desmontaje: efecto aparte para que no
+  // se ejecute entre transiciones. Libera únicamente la concesión propia.
+  useEffect(() => {
+    return () => {
+      setRecoveryHoldRef.current(ownerId, false);
+    };
+  }, [ownerId]);
+
+  // `saving`: el controlador ejecuta el guardado con la contraseña que viaja en
+  // el propio estado. La cancelación está rechazada por la máquina mientras
+  // dure, así que no hay carrera que arbitrar.
+  useEffect(() => {
+    if (savingPassword === null) return;
     let abandoned = false;
     void (async () => {
       try {
-        await setNewPassword(passwordRef.current);
+        await setNewPassword(savingPassword);
         if (!abandoned) dispatch({ type: 'saveSucceeded', episodeId });
       } catch (caught) {
         if (abandoned) return;
@@ -106,16 +135,16 @@ export function usePasswordRecoveryFlow(
       }
     })();
     return () => {
-      // Al desmontar no se despacha, pero el resultado tampoco se pierde para
-      // otro episodio: el `episodeId` lo descartaría igualmente (invariante 2).
+      // Al desmontar no se despacha; y el resultado tampoco puede ensuciar otro
+      // episodio, porque el `episodeId` lo descartaría (invariante 2).
       abandoned = true;
     };
-  }, [episodeId, state.kind]);
+  }, [episodeId, savingPassword]);
 
   // `canceling`: el controlador cierra la sesión local. Guardar está rechazado
   // mientras dure.
   useEffect(() => {
-    if (state.kind !== 'canceling') return;
+    if (!isCanceling) return;
     let abandoned = false;
     void (async () => {
       try {
@@ -136,20 +165,20 @@ export function usePasswordRecoveryFlow(
     return () => {
       abandoned = true;
     };
-  }, [episodeId, state.kind]);
+  }, [episodeId, isCanceling]);
 
   // Invariante 3: un destino por episodio. La ref lo garantiza aunque el efecto
   // se reevalúe.
   useEffect(() => {
-    if (!isTerminal(state)) return;
+    if (terminalKind === null) return;
     if (settledEpisodeRef.current === episodeId) return;
     settledEpisodeRef.current = episodeId;
-    if (state.kind === 'completed') {
+    if (terminalKind === 'completed') {
       destinationsRef.current.onCompleted();
     } else {
       destinationsRef.current.onCanceled();
     }
-  }, [episodeId, state]);
+  }, [episodeId, terminalKind]);
 
   const start = useCallback(() => dispatch({ type: 'start' }), []);
   const codeSent = useCallback(() => dispatch({ type: 'codeSent' }), []);
@@ -158,10 +187,13 @@ export function usePasswordRecoveryFlow(
     [],
   );
 
-  const requestSave = useCallback((password: string) => {
-    passwordRef.current = password;
-    dispatch({ type: 'saveRequested' });
-  }, []);
+  // La contraseña viaja con el evento: el reductor acepta operación y payload
+  // de forma atómica, así que una segunda petición en el mismo tick no puede
+  // sustituir el payload de la que ganó.
+  const requestSave = useCallback(
+    (password: string) => dispatch({ type: 'saveRequested', password }),
+    [],
+  );
 
   const requestCancel = useCallback(
     () => dispatch({ type: 'cancelRequested' }),

@@ -20,7 +20,7 @@ const states: Record<RecoveryState['kind'], RecoveryState> = {
   requestingCode: { kind: 'requestingCode' },
   verifyingCode: { kind: 'verifyingCode' },
   ready: { kind: 'ready' },
-  saving: { kind: 'saving' },
+  saving: { kind: 'saving', password: 'contraseñaEnVuelo' },
   saveError: { kind: 'saveError', message: 'sin red' },
   canceling: { kind: 'canceling' },
   cancelError: { kind: 'cancelError', message: 'sin red' },
@@ -33,7 +33,7 @@ const events: Record<RecoveryEvent['type'], RecoveryEvent> = {
   start: { type: 'start' },
   codeSent: { type: 'codeSent' },
   codeVerified: { type: 'codeVerified' },
-  saveRequested: { type: 'saveRequested' },
+  saveRequested: { type: 'saveRequested', password: 'contraseñaNueva' },
   saveSucceeded: { type: 'saveSucceeded', episodeId },
   saveFailed: { type: 'saveFailed', episodeId, message: 'guardado falló' },
   cancelRequested: { type: 'cancelRequested' },
@@ -104,7 +104,7 @@ describe('recoveryMachine — invariantes', () => {
     // Orden A: guardar primero. Cancelar se rechaza mientras dura.
     const saving = recoveryReducer(
       { episodeId, state: { kind: 'ready' } },
-      { type: 'saveRequested' },
+      { type: 'saveRequested', password: 'contraseñaNueva' },
     );
     expect(saving.state.kind).toBe('saving');
     expect(recoveryReducer(saving, { type: 'cancelRequested' })).toBe(saving);
@@ -115,13 +115,16 @@ describe('recoveryMachine — invariantes', () => {
       { type: 'cancelRequested' },
     );
     expect(canceling.state.kind).toBe('canceling');
-    expect(recoveryReducer(canceling, { type: 'saveRequested' })).toBe(
-      canceling,
-    );
+    expect(
+      recoveryReducer(canceling, {
+        type: 'saveRequested',
+        password: 'contraseñaNueva',
+      }),
+    ).toBe(canceling);
   });
 
   it('2: un resultado de otro episodio se ignora y no toca el actual', () => {
-    const saving: RecoveryEpisode = { episodeId, state: { kind: 'saving' } };
+    const saving: RecoveryEpisode = { episodeId, state: states.saving };
 
     // El resultado tardío del episodio anterior (B14 con otra cara).
     const stale = recoveryReducer(saving, {
@@ -158,7 +161,7 @@ describe('recoveryMachine — invariantes', () => {
     ).toBe(completed);
     expect(isTerminal(completed.state)).toBe(true);
     expect(isTerminal({ kind: 'canceled' })).toBe(true);
-    expect(isTerminal({ kind: 'saving' })).toBe(false);
+    expect(isTerminal(states.saving)).toBe(false);
   });
 
   it('4: la pausa legal cubre todo el episodio y cae solo en los terminales', () => {
@@ -205,7 +208,7 @@ describe('recoveryMachine — invariantes', () => {
 
 describe('recoveryMachine — permisos que los anfitriones consultan', () => {
   it('bloquea cancelar, y por tanto atrás y cerrar, mientras el guardado está en vuelo', () => {
-    expect(canCancel({ kind: 'saving' })).toBe(false);
+    expect(canCancel(states.saving)).toBe(false);
     expect(canCancel({ kind: 'canceling' })).toBe(false);
     expect(canCancel({ kind: 'ready' })).toBe(true);
     expect(canCancel(states.saveError)).toBe(true);
@@ -236,7 +239,7 @@ describe('recoveryMachine — recorridos completos', () => {
       { type: 'start' },
       { type: 'codeSent' },
       { type: 'codeVerified' },
-      { type: 'saveRequested' },
+      { type: 'saveRequested', password: 'contraseñaNueva' },
       { type: 'saveSucceeded', episodeId: 1 },
     ]);
     expect(end.state.kind).toBe('completed');
@@ -279,7 +282,7 @@ describe('recoveryMachine — recorridos completos', () => {
       { type: 'start' },
       { type: 'codeSent' },
       { type: 'codeVerified' },
-      { type: 'saveRequested' },
+      { type: 'saveRequested', password: 'contraseñaNueva' },
       { type: 'saveFailed', episodeId: 1, message: 'contraseña débil' },
     ]);
     expect(failed.state.kind).toBe('saveError');

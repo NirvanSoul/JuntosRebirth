@@ -48,8 +48,15 @@ export type RecoveryState =
   | { kind: 'verifyingCode' }
   /** Código verificado: la sesión del OTP existe y la pantalla pide contraseña. */
   | { kind: 'ready' }
-  /** `setNewPassword` en vuelo. No admite cancelar, volver ni cerrar. */
-  | { kind: 'saving' }
+  /**
+   * `setNewPassword` en vuelo. No admite cancelar, volver ni cerrar.
+   *
+   * La contraseña viaja EN EL ESTADO, no en una ref del controlador: la
+   * operación ganadora y su payload se aceptan de forma atómica. Con una ref,
+   * dos peticiones en el mismo tick dejaban que el reductor aceptase la primera
+   * y el efecto guardase la segunda. Al salir de `saving` desaparece.
+   */
+  | { kind: 'saving'; password: string }
   /** El guardado falló: se puede reintentar o cancelar. */
   | { kind: 'saveError'; message: string }
   /** `signOut('local')` en vuelo. No admite guardar. */
@@ -65,7 +72,7 @@ export type RecoveryEvent =
   | { type: 'start' }
   | { type: 'codeSent' }
   | { type: 'codeVerified' }
-  | { type: 'saveRequested' }
+  | { type: 'saveRequested'; password: string }
   | { type: 'saveSucceeded'; episodeId: RecoveryEpisodeId }
   | { type: 'saveFailed'; episodeId: RecoveryEpisodeId; message: string }
   | { type: 'cancelRequested' }
@@ -171,7 +178,7 @@ export function recoveryReducer(
     case 'saveRequested':
       // Invariante 1: jamás desde `canceling`/`cancelError`.
       if (!canSave(state)) return episode;
-      return { episodeId, state: { kind: 'saving' } };
+      return { episodeId, state: { kind: 'saving', password: event.password } };
 
     case 'saveSucceeded':
       if (state.kind !== 'saving') return episode;

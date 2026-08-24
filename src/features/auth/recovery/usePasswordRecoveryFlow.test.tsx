@@ -12,10 +12,21 @@ jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
   createSupabaseAuthGateway: () => ({ signOut: mockSignOut }),
 }));
 
-const mockSetRecoveryHalted = jest.fn();
+const mockSetRecoveryHold = jest.fn();
 jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
-  useLegalSessionGate: () => ({ setRecoveryHalted: mockSetRecoveryHalted }),
+  useLegalSessionGate: () => ({ setRecoveryHold: mockSetRecoveryHold }),
 }));
+
+/** Último valor de la concesión de pausa, ignorando el identificador de dueño. */
+function lastHold(): boolean | undefined {
+  const calls = mockSetRecoveryHold.mock.calls;
+  return calls.length === 0 ? undefined : calls[calls.length - 1][1];
+}
+
+/** Todos los valores de pausa publicados, en orden. */
+function holdSequence(): boolean[] {
+  return mockSetRecoveryHold.mock.calls.map((call) => call[1] as boolean);
+}
 
 /** Promesa que la prueba resuelve o rechaza cuando quiere. */
 function deferred() {
@@ -53,7 +64,7 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
     mockSetNewPassword.mockResolvedValue(undefined);
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
-    mockSetRecoveryHalted.mockReset();
+    mockSetRecoveryHold.mockReset();
   });
 
   it('guardar con éxito: un solo destino de terminación y ninguno de cancelación', async () => {
@@ -174,14 +185,14 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
     expect(result.current.errorMessage).toBe('Sin conexión.');
     expect(onCanceled).not.toHaveBeenCalled();
     // La pausa NO cae con la sesión posiblemente viva.
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+    expect(lastHold()).toBe(true);
 
     mockSignOut.mockResolvedValue(undefined);
     await act(async () => result.current.requestCancel());
 
     expect(result.current.state.kind).toBe('canceled');
     expect(onCanceled).toHaveBeenCalledTimes(1);
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+    expect(lastHold()).toBe(false);
   });
 
   // ─── Pausa legal e identidad del episodio ───────────────────────────────
@@ -189,14 +200,14 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
   it('la pausa vive y muere con el episodio, y ningún terminal la deja colgada', async () => {
     const { result } = await renderFlow();
     await act(async () => result.current.start());
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+    expect(lastHold()).toBe(true);
 
     await act(async () => result.current.codeSent());
     await act(async () => result.current.codeVerified());
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+    expect(lastHold()).toBe(true);
 
     await act(async () => result.current.requestSave('contraseñaNueva1'));
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+    expect(lastHold()).toBe(false);
   });
 
   it('un episodio nuevo tras uno cancelado vuelve a admitir guardado y ejecuta su propio destino', async () => {
@@ -236,5 +247,64 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
     await arriveAtReady(result);
     expect(result.current.state.kind).toBe('ready');
     expect(onCompleted).not.toHaveBeenCalled();
+  });
+
+  // ─── Atomicidad del payload y continuidad de la pausa ────────────────────
+
+  it('dos peticiones de guardado en el mismo tick guardan la contraseña de la que GANÓ', async () => {
+    const save = deferred();
+    mockSetNewPassword.mockReturnValue(save.promise);
+    const { result } = await renderFlow();
+    await arriveAtReady(result);
+
+    // Con la contraseña en una ref del controlador, la segunda llamada
+    // sobrescribía el payload de la primera aunque el reductor la rechazara.
+    await act(async () => {
+      result.current.requestSave('primera');
+      result.current.requestSave('segunda');
+    });
+
+    expect(mockSetNewPassword).toHaveBeenCalledTimes(1);
+    expect(mockSetNewPassword).toHaveBeenCalledWith('primera');
+
+    await act(async () => {
+      save.resolve();
+      await save.promise;
+    });
+    expect(result.current.state.kind).toBe('completed');
+  });
+
+  it('la pausa no cae en ningún momento intermedio entre el inicio y el terminal', async () => {
+    const { result } = await renderFlow();
+
+    await act(async () => result.current.start());
+    await act(async () => result.current.codeSent());
+    await act(async () => result.current.codeVerified());
+    await act(async () => result.current.requestSave('contraseñaNueva1'));
+
+    const sequence = holdSequence();
+    // Desde que el episodio abre la pausa hasta que llega al terminal: un solo
+    // `true` y un solo `false`, sin oscilación. El `false` previo es la
+    // publicación de montaje, con el episodio todavía en `inactive`.
+    // Con el cleanup dentro del mismo efecto, aquí aparecía un `false` en cada
+    // transición: requestingCode → false → verifyingCode → false → ready…
+    expect(sequence.slice(sequence.indexOf(true))).toEqual([true, false]);
+    expect(result.current.state.kind).toBe('completed');
+  });
+
+  it('la concesión de un controlador no la libera otro: cada uno suelta la suya', async () => {
+    const first = await renderFlow();
+    await act(async () => first.result.current.start());
+    const firstOwner = mockSetRecoveryHold.mock.calls.at(-1)?.[0];
+
+    const second = await renderFlow();
+    await act(async () => second.result.current.start());
+    const secondOwner = mockSetRecoveryHold.mock.calls.at(-1)?.[0];
+    expect(secondOwner).not.toBe(firstOwner);
+
+    // Al desmontar el segundo solo libera su propia concesión.
+    await act(async () => second.unmount());
+    expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(secondOwner, false);
+    expect(mockSetRecoveryHold).not.toHaveBeenLastCalledWith(firstOwner, false);
   });
 });

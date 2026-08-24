@@ -4,6 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import {
+  applyRecoveryHold,
+  clearRecoveryHolds,
+  isRecoveryHalted,
+} from '@/features/legal/hooks/recoveryHoldRegistry';
+import {
   consumePendingLegalAcceptance,
   getMissingCurrentLegalDocuments,
   LegalAcceptanceEmailMismatchError,
@@ -52,6 +57,11 @@ export type LegalSessionGate = {
    * restablecimiento.
    */
   setRecoveryHalted: (halted: boolean) => void;
+  /**
+   * ADR-084: concesión con dueño. Cada controlador de recuperación sostiene la
+   * suya y solo libera la propia; la puerta sigue en pausa mientras quede otra.
+   */
+  setRecoveryHold: (ownerId: string, held: boolean) => void;
 };
 
 const noSessionSnapshot = {
@@ -67,7 +77,11 @@ const noSessionSnapshot = {
 
 type GateSnapshot = Omit<
   LegalSessionGate,
-  'retryGate' | 'submitRegularization' | 'abandonSession' | 'setRecoveryHalted'
+  | 'retryGate'
+  | 'submitRegularization'
+  | 'abandonSession'
+  | 'setRecoveryHalted'
+  | 'setRecoveryHold'
 >;
 
 let currentSnapshot: GateSnapshot = { ...noSessionSnapshot };
@@ -88,7 +102,8 @@ function subscribe(listener: () => void): () => void {
 let checkRunId = 0;
 let latestRequestedSession: Session | null = null;
 let checkLoop: Promise<void> | null = null;
-let recoveryHalted = false;
+/** Dueño de las llamadas heredadas `setRecoveryHalted(boolean)`. */
+const legacyRecoveryOwner = 'legacy';
 
 /**
  * Solo para pruebas: reinicia el estado global del controlador (instantánea,
@@ -100,7 +115,7 @@ export function resetLegalSessionGateForTests(): void {
   checkRunId += 1;
   latestRequestedSession = null;
   checkLoop = null;
-  recoveryHalted = false;
+  clearRecoveryHolds();
   currentSnapshot = { ...noSessionSnapshot };
 }
 
@@ -277,7 +292,7 @@ export function useLegalSessionGate(): LegalSessionGate {
       // restablecimiento no deja la puerta colgada para los siguientes.
       checkRunId += 1;
       latestRequestedSession = null;
-      recoveryHalted = false;
+      clearRecoveryHolds();
       publish({
         ...noSessionSnapshot,
         isReady: true,
@@ -285,13 +300,20 @@ export function useLegalSessionGate(): LegalSessionGate {
       });
       return;
     }
-    if (recoveryHalted) return;
+    if (isRecoveryHalted()) return;
 
     requestGateCheck(session);
   }, [isReady, retryToken, session]);
 
-  const setRecoveryHalted = useCallback((halted: boolean) => {
-    recoveryHalted = halted;
+  /**
+   * ADR-084: concesión con dueño. La puerta queda en pausa mientras exista
+   * alguna, y solo se reanuda cuando se libera la última: un anfitrión que se
+   * desmonta ya no puede soltar la pausa de otro que sigue restableciendo.
+   * Solo se actúa cuando el valor derivado cambia, para no republicar de más.
+   */
+  const setRecoveryHold = useCallback((ownerId: string, held: boolean) => {
+    const { isHalted: halted, wasHalted } = applyRecoveryHold(ownerId, held);
+    if (wasHalted === halted) return;
     if (halted) {
       // La pausa descarta la comprobación en vuelo: ningún resultado puede
       // publicarse mientras el restablecimiento está a mitad.
@@ -317,6 +339,16 @@ export function useLegalSessionGate(): LegalSessionGate {
       publish({ ...noSessionSnapshot, isReady: true, rawSession: null });
     }
   }, []);
+
+  /**
+   * Camino heredado de los anfitriones que aún usan `useRecoveryPhase`. Todos
+   * comparten el mismo dueño, así que entre ellos el comportamiento es el de
+   * antes; desaparece al sustituirlos por `usePasswordRecoveryFlow`.
+   */
+  const setRecoveryHalted = useCallback(
+    (halted: boolean) => setRecoveryHold(legacyRecoveryOwner, halted),
+    [setRecoveryHold],
+  );
 
   const retryGate = useCallback(() => {
     setRetryToken((token) => token + 1);
@@ -393,5 +425,6 @@ export function useLegalSessionGate(): LegalSessionGate {
     submitRegularization,
     abandonSession,
     setRecoveryHalted,
+    setRecoveryHold,
   };
 }

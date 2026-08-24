@@ -38,6 +38,7 @@ function createGateState(kind: 'no-session' | 'cleared'): LegalSessionGate {
     submitRegularization: jest.fn(),
     abandonSession: jest.fn(),
     setRecoveryHalted: jest.fn(),
+    setRecoveryHold: jest.fn(),
   };
 }
 
