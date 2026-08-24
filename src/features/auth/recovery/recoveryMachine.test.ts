@@ -22,10 +22,10 @@ const states: Record<RecoveryState['kind'], RecoveryState> = {
   ready: { kind: 'ready' },
   saving: { kind: 'saving', password: 'contraseñaEnVuelo' },
   saveError: { kind: 'saveError', message: 'sin red' },
-  canceling: { kind: 'canceling' },
-  cancelError: { kind: 'cancelError', message: 'sin red' },
+  canceling: { kind: 'canceling', intent: 'volver' },
+  cancelError: { kind: 'cancelError', intent: 'volver', message: 'sin red' },
   completed: { kind: 'completed' },
-  canceled: { kind: 'canceled' },
+  canceled: { kind: 'canceled', intent: 'volver' },
 };
 
 /** Un ejemplar de cada evento, con el `episodeId` vigente. */
@@ -141,7 +141,7 @@ describe('recoveryMachine — invariantes', () => {
   it('2 bis: `start` incrementa el episodio, de modo que lo anterior queda obsoleto', () => {
     const first = recoveryReducer(initialRecoveryEpisode, { type: 'start' });
     const canceledFirst = recoveryReducer(
-      { episodeId: first.episodeId, state: { kind: 'canceled' } },
+      { episodeId: first.episodeId, state: states.canceled },
       { type: 'start' },
     );
     expect(canceledFirst.episodeId).toBe(first.episodeId + 1);
@@ -160,7 +160,7 @@ describe('recoveryMachine — invariantes', () => {
       recoveryReducer(completed, { type: 'saveSucceeded', episodeId }),
     ).toBe(completed);
     expect(isTerminal(completed.state)).toBe(true);
-    expect(isTerminal({ kind: 'canceled' })).toBe(true);
+    expect(isTerminal(states.canceled)).toBe(true);
     expect(isTerminal(states.saving)).toBe(false);
   });
 
@@ -180,7 +180,7 @@ describe('recoveryMachine — invariantes', () => {
       expect(isLegalGateHalted(states[kind])).toBe(true);
     });
     expect(isLegalGateHalted({ kind: 'completed' })).toBe(false);
-    expect(isLegalGateHalted({ kind: 'canceled' })).toBe(false);
+    expect(isLegalGateHalted(states.canceled)).toBe(false);
   });
 
   it('5: cancelar antes del OTP no cierra sesión; después del OTP siempre pasa por `canceling`', () => {
@@ -209,13 +209,13 @@ describe('recoveryMachine — invariantes', () => {
 describe('recoveryMachine — permisos que los anfitriones consultan', () => {
   it('bloquea cancelar, y por tanto atrás y cerrar, mientras el guardado está en vuelo', () => {
     expect(canCancel(states.saving)).toBe(false);
-    expect(canCancel({ kind: 'canceling' })).toBe(false);
+    expect(canCancel(states.canceling)).toBe(false);
     expect(canCancel({ kind: 'ready' })).toBe(true);
     expect(canCancel(states.saveError)).toBe(true);
   });
 
   it('bloquea guardar cuando la cancelación ya decidió el episodio', () => {
-    expect(canSave({ kind: 'canceling' })).toBe(false);
+    expect(canSave(states.canceling)).toBe(false);
     expect(canSave(states.cancelError)).toBe(false);
     expect(canSave({ kind: 'completed' })).toBe(false);
     expect(canSave({ kind: 'ready' })).toBe(true);
@@ -224,7 +224,7 @@ describe('recoveryMachine — permisos que los anfitriones consultan', () => {
 
   it('el reintento de cancelación solo existe desde el fallo observable', () => {
     expect(canRetryCancel(states.cancelError)).toBe(true);
-    expect(canRetryCancel({ kind: 'canceling' })).toBe(false);
+    expect(canRetryCancel(states.canceling)).toBe(false);
     expect(canRetryCancel({ kind: 'ready' })).toBe(false);
   });
 });

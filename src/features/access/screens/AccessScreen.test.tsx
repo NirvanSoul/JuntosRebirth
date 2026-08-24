@@ -14,6 +14,11 @@ jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
   }),
 }));
 
+const mockSetNewPassword = jest.fn();
+jest.mock('@/features/auth/services/resetPasswordService', () => ({
+  setNewPassword: (password: string) => mockSetNewPassword(password),
+}));
+
 const mockSignOut = jest.fn();
 const mockGetSession = jest.fn();
 jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
@@ -36,12 +41,12 @@ function createGateMock() {
     retryGate: jest.fn(),
     submitRegularization: jest.fn(),
     abandonSession: jest.fn(),
-    setRecoveryHalted: jest.fn(),
+    setRecoveryHold: jest.fn(),
   };
 }
 
 let mockGateState = createGateMock();
-let mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
+let mockSetRecoveryHold = mockGateState.setRecoveryHold;
 
 /** Sesión que el OTP de recuperación crea al verificarse el código (B7). */
 const mockOtpSession = {
@@ -50,6 +55,7 @@ const mockOtpSession = {
 
 jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
   useLegalSessionGate: () => mockGateState,
+  useRecoveryHold: () => mockGateState.setRecoveryHold,
   resetLegalSessionGateForTests: jest.fn(),
 }));
 
@@ -78,7 +84,9 @@ describe('AccessScreen', () => {
     mockMarkAuthenticated.mockReset();
     mockMarkGuestComplete.mockReset();
     mockGateState = createGateMock();
-    mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
+    mockSetRecoveryHold = mockGateState.setRecoveryHold;
+    mockSetNewPassword.mockReset();
+    mockSetNewPassword.mockResolvedValue(undefined);
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
     mockGetSession.mockReset();
@@ -132,25 +140,32 @@ describe('AccessScreen', () => {
       expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
     });
 
-    it('pausa la puerta legal durante la recuperación (B3): el OTP va a crear una sesión y el restablecimiento no puede cortocircuitarse', async () => {
+    it('la pausa legal se sostiene durante todo el episodio y solo cae al terminar (ADR-084)', async () => {
       const screen = await renderWithTheme(<AccessScreen />);
 
       fireEvent.press(screen.getByTestId('access-open-login'));
       fireEvent.press(await screen.findByTestId('stub-login-forgot'));
       await screen.findByTestId('stub-forgot-screen');
       fireEvent.press(screen.getByTestId('stub-forgot-send'));
-
       await screen.findByText('recovery');
-      expect(mockSetRecoveryHalted).toHaveBeenCalledWith(true);
 
       fireEvent.press(await screen.findByTestId('stub-verify-success'));
       await screen.findByText('Nueva contraseña');
-      expect(mockSetRecoveryHalted).toHaveBeenCalledWith(true);
 
-      // Salir del restablecimiento vuelve al acceso y libera la pausa.
+      // Ni un solo `false` entre el inicio del episodio y su desenlace: con el
+      // cleanup dentro del efecto de la pausa aparecía uno en cada transición.
+      const holds = mockSetRecoveryHold.mock.calls.map((call) => call[1]);
+      expect(holds.slice(holds.indexOf(true))).toEqual([true]);
+
+      // Cancelar cierra el episodio y solo entonces se libera.
       fireEvent.press(screen.getByTestId('stub-reset-cancel'));
       await screen.findByText('Iniciar sesión');
-      expect(mockSetRecoveryHalted).toHaveBeenCalledWith(false);
+      await waitFor(() =>
+        expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(
+          expect.any(String),
+          false,
+        ),
+      );
     });
 
     it('desde la verificación de registro, recuperar contraseña lleva al flujo de recuperación', async () => {
@@ -196,7 +211,14 @@ describe('AccessScreen', () => {
     expect(await screen.findByText('Iniciar sesión')).toBeTruthy();
   });
 
-  it('terminar el restablecimiento conserva la sesión del OTP: solo cancelar la cierra (B7)', async () => {
+  it('mientras guarda, Cancelar y Atrás quedan bloqueados: la carrera no puede empezar (ADR-084)', async () => {
+    let resolveSave: (() => void) | undefined;
+    mockSetNewPassword.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
     const screen = await renderWithTheme(<AccessScreen />);
 
     fireEvent.press(screen.getByTestId('access-open-login'));
@@ -205,15 +227,24 @@ describe('AccessScreen', () => {
     await screen.findByText('recovery');
     fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
-    mockGateState.session = mockOtpSession;
 
-    fireEvent.press(screen.getByTestId('stub-reset-success'));
+    fireEvent.press(screen.getByTestId('stub-reset-submit'));
+    await screen.findByTestId('stub-reset-saving');
 
+    // Cancelar desde la pantalla y «Atrás» del anfitrión: los dos se ignoran.
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    fireEvent.press(screen.getByLabelText('Volver'));
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
+
+    resolveSave?.();
     await screen.findByText('Iniciar sesión');
+    // Terminar no cierra la sesión: solo cancelar lo hace.
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
-  it('B9: si cancelar falla y luego se guarda la contraseña, la recuperación termina por éxito: pausa liberada y login sin cerrar la sesión', async () => {
+  it('la cancelación que falla deja el mensaje visible y el reintento cierra el episodio (ADR-084)', async () => {
+    mockSignOut.mockRejectedValueOnce(new Error('Sin conexión con la red.'));
     const screen = await renderWithTheme(<AccessScreen />);
 
     fireEvent.press(screen.getByTestId('access-open-login'));
@@ -223,66 +254,37 @@ describe('AccessScreen', () => {
     fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
 
-    // Cancelar falla: el error queda visible y la pausa se sostiene.
-    mockSignOut.mockRejectedValue(new Error('Sin conexión con la red.'));
     fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-    await screen.findByText('Sin conexión con la red.');
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+    await screen.findByTestId('stub-reset-error');
+    // La pausa NO cae con la sesión posiblemente viva.
+    expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(
+      expect.any(String),
+      true,
+    );
 
-    // Guardar la contraseña nueva termina el restablecimiento pese al error de
-    // cancelación pendiente: la salida a login no toca la sesión (el único
-    // signOut fue el intento fallido) y la pausa se libera.
-    fireEvent.press(screen.getByTestId('stub-reset-success'));
+    // El mismo control reintenta, porque `canRetryCancel` lo mantiene vivo.
+    mockSignOut.mockResolvedValue(undefined);
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
     await screen.findByText('Iniciar sesión');
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+    expect(mockSignOut).toHaveBeenCalledTimes(2);
   });
 
-  it('B11: guardar la contraseña durante una cancelación en vuelo con la sesión realmente conservada — login sin liberar la pausa hasta resolver el signOut, y sin cerrar la sesión aunque falle', async () => {
-    let rejectSignOut: (() => void) | undefined;
-    mockSignOut.mockImplementation(
-      () =>
-        new Promise<void>((_resolve, reject) => {
-          rejectSignOut = () => reject(new Error('Sin conexión con la red.'));
-        }),
-    );
-    // El signOut falló pero la sesión sigue viva (B11): la terminación gana.
-    mockGetSession.mockResolvedValue(mockOtpSession);
+  it('desde verify-recovery, Atrás vuelve a pedir el código sin abandonar el episodio (ADR-084)', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
     fireEvent.press(screen.getByTestId('access-open-login'));
     fireEvent.press(await screen.findByTestId('stub-login-forgot'));
     fireEvent.press(await screen.findByTestId('stub-forgot-send'));
     await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
-    await screen.findByText('Nueva contraseña');
 
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+    fireEvent.press(screen.getByLabelText('Volver'));
 
-    // Guardar mientras el signOut pende: la navegación de éxito no libera la
-    // pausa prematuramente (la transición sigue en vuelo) ni reabre la sesión.
-    // B13(r8): la navegación tampoco ocurre ya: queda ENCOLADA junto con la
-    // terminación. Con la carrera sin resolver nadie sabe todavía quién gana, y
-    // navegar aquí era ejecutar el destino de éxito a ciegas.
-    fireEvent.press(screen.getByTestId('stub-reset-success'));
-    // Se deja que React vacíe la cola: una navegación ansiosa habría llegado a
-    // renderizarse aquí. Comprobarlo de forma síncrona no distinguía nada,
-    // porque el render posterior al evento aún no había ocurrido.
-    await waitFor(() =>
-      expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true),
+    expect(await screen.findByTestId('stub-forgot-screen')).toBeTruthy();
+    // Sigue dentro del episodio: la pausa no se ha liberado.
+    expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(
+      expect.any(String),
+      true,
     );
-    expect(screen.queryByTestId('stub-reset-screen')).not.toBeNull();
-    expect(screen.queryByText('Iniciar sesión')).toBeNull();
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-
-    // El signOut falla con la sesión viva: la terminación encolada gana →
-    // inactive, y solo ahora se ejecuta su destino, exactamente una vez.
-    rejectSignOut?.();
-    await waitFor(() =>
-      expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false),
-    );
-    await screen.findByText('Iniciar sesión');
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 });

@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
-import { setNewPassword } from '@/features/auth/services/resetPasswordService';
 import {
   isValidPassword,
   minPasswordLength,
@@ -13,9 +12,22 @@ import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
+/**
+ * ADR-084: la pantalla es CONTROLADA. Ya no llama a `setNewPassword` ni decide
+ * cuándo terminó el restablecimiento: valida el formulario y entrega la
+ * contraseña al controlador del episodio, que es el único dueño de la operación
+ * y del destino. `isSubmitting` y `errorMessage` llegan de fuera.
+ *
+ * `canCancel` también viene del controlador: mientras el guardado está en vuelo
+ * no se puede cancelar —ni desde aquí ni desde el «Atrás» del anfitrión—, que es
+ * lo que elimina la carrera entre las dos operaciones asíncronas.
+ */
 type ResetPasswordScreenProps = {
+  canCancel: boolean;
+  errorMessage: string | null;
+  isSubmitting: boolean;
   onCancel: () => void;
-  onSuccess: () => void;
+  onSubmit: (password: string) => void;
 };
 
 type ResetPasswordFieldErrors = {
@@ -23,23 +35,19 @@ type ResetPasswordFieldErrors = {
   confirmation?: string;
 };
 
-type ResetPasswordState =
-  | { step: 'idle' }
-  | { step: 'submitting' }
-  | { step: 'error'; message: string };
-
 export function ResetPasswordScreen({
+  canCancel,
+  errorMessage,
+  isSubmitting,
   onCancel,
-  onSuccess,
+  onSubmit,
 }: ResetPasswordScreenProps) {
   const styles = useThemedStyles(createStyles);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [fieldErrors, setFieldErrors] = useState<ResetPasswordFieldErrors>({});
-  const [state, setState] = useState<ResetPasswordState>({ step: 'idle' });
-  const isSubmitting = state.step === 'submitting';
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (isSubmitting) return;
 
     const errors: ResetPasswordFieldErrors = {};
@@ -51,19 +59,7 @@ export function ResetPasswordScreen({
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
-    setState({ step: 'submitting' });
-    try {
-      await setNewPassword(password);
-      onSuccess();
-    } catch (caught) {
-      setState({
-        step: 'error',
-        message:
-          caught instanceof Error
-            ? caught.message
-            : 'No pudimos actualizar tu contraseña.',
-      });
-    }
+    onSubmit(password);
   };
 
   return (
@@ -90,7 +86,7 @@ export function ResetPasswordScreen({
         error={fieldErrors.confirmation}
         label="Confirmar contraseña"
         onChangeText={setConfirmation}
-        onSubmitEditing={() => void handleSubmit()}
+        onSubmitEditing={handleSubmit}
         placeholder="Repite la contraseña"
         returnKeyType="done"
         secureTextEntry
@@ -99,9 +95,9 @@ export function ResetPasswordScreen({
         value={confirmation}
       />
 
-      {state.step === 'error' ? (
-        <Text tone="expense" variant="footnote">
-          {state.message}
+      {errorMessage !== null ? (
+        <Text testID="reset-password-error" tone="expense" variant="footnote">
+          {errorMessage}
         </Text>
       ) : null}
 
@@ -109,16 +105,19 @@ export function ResetPasswordScreen({
         accessibilityLabel="Guardar nueva contraseña"
         disabled={isSubmitting}
         label={isSubmitting ? 'Guardando…' : 'Guardar contraseña'}
-        onPress={() => void handleSubmit()}
+        onPress={handleSubmit}
         testID="reset-password-submit"
         variant="cta"
       />
 
       <Pressable
         accessibilityRole="button"
-        disabled={isSubmitting}
+        // El controlador decide: mientras guarda, cancelar está cerrado aquí y
+        // en el chrome del anfitrión, por la misma fuente de verdad.
+        disabled={!canCancel}
         onPress={onCancel}
         style={styles.linkButton}
+        testID="reset-password-cancel"
       >
         <Text tone="muted" variant="footnote">
           Cancelar

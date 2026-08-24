@@ -96,17 +96,36 @@ export function ForgotPasswordScreenStub(props: AnyProps) {
   );
 }
 
+/**
+ * ADR-084: la pantalla es controlada. `stub-reset-submit` entrega una
+ * contraseña al controlador —que es quien decide el destino—, y `canCancel`
+ * refleja el bloqueo real: mientras el guardado está en vuelo no hay salida.
+ */
 export function ResetPasswordScreenStub(props: {
+  canCancel?: boolean;
+  errorMessage?: string | null;
+  isSubmitting?: boolean;
   onCancel?: () => void;
-  onSuccess?: () => void;
+  onSubmit?: (password: string) => void;
 }) {
   return (
     <View testID="stub-reset-screen">
-      {props.onSuccess ? (
-        <Pressable onPress={props.onSuccess} testID="stub-reset-success" />
+      {props.isSubmitting ? <View testID="stub-reset-saving" /> : null}
+      {props.errorMessage ? (
+        <Text testID="stub-reset-error">{props.errorMessage}</Text>
+      ) : null}
+      {props.onSubmit ? (
+        <Pressable
+          onPress={() => props.onSubmit?.('contraseñaNueva1')}
+          testID="stub-reset-submit"
+        />
       ) : null}
       {props.onCancel ? (
-        <Pressable onPress={props.onCancel} testID="stub-reset-cancel" />
+        <Pressable
+          disabled={props.canCancel === false}
+          onPress={() => props.onCancel?.()}
+          testID="stub-reset-cancel"
+        />
       ) : null}
     </View>
   );

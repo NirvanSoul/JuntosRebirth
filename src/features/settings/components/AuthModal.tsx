@@ -9,7 +9,7 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { StepProgressBar } from '@/components/ui/StepProgressBar/StepProgressBar';
 import { Text } from '@/components/ui/Text/Text';
 import { ForgotPasswordScreen } from '@/features/auth/screens/ForgotPasswordScreen';
-import { useRecoveryPhase } from '@/features/auth/hooks/useRecoveryPhase';
+import { usePasswordRecoveryFlow } from '@/features/auth/recovery/usePasswordRecoveryFlow';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
 import { ResetPasswordScreen } from '@/features/auth/screens/ResetPasswordScreen';
 import {
@@ -18,7 +18,6 @@ import {
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
 import { useDeferredAuthenticatedMark } from '@/features/legal/hooks/useDeferredAuthenticatedMark';
-import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -27,6 +26,9 @@ type AuthModalProps = {
   onClose: () => void;
   visible: boolean;
 };
+
+/** A dónde lleva la cancelación del episodio en este anfitrión. */
+type ExitIntent = 'close' | 'back-to-login';
 
 type AuthModalStep =
   | { screen: 'entry' }
@@ -56,26 +58,28 @@ const stepTitles: Record<AuthModalStep['screen'], string> = {
 export function AuthModal({ onClose, visible }: AuthModalProps) {
   const styles = useThemedStyles(createStyles);
   const { scheduleMarkAuthenticated } = useDeferredAuthenticatedMark();
-  const { setRecoveryHalted } = useLegalSessionGate();
-  const {
-    cancelReset,
-    completeRecovery,
-    finishRecovery,
-    phase: recoveryPhase,
-    startRecovery,
-  } = useRecoveryPhase();
   const [step, setStep] = useState<AuthModalStep>({ screen: 'entry' });
 
-  // B3 + B7 + B7(r4): la pausa deriva solo de la fase de recuperación, nunca de
-  // `visible`. Mientras existe la sesión del OTP se sostiene durante
-  // `canceling` y `cancelError`; solo cae al pasar a `inactive` —tras un
-  // signOut('local') con éxito o al terminar el restablecimiento— o al
-  // desmontar el host. Cerrar el modal ya no puede despausar la puerta por
-  // orden de efectos antes de que el signOut asíncrono termine.
-  useEffect(() => {
-    setRecoveryHalted(recoveryPhase.kind !== 'inactive');
-    return () => setRecoveryHalted(false);
-  }, [recoveryPhase.kind, setRecoveryHalted]);
+  // ADR-084: el anfitrión ya no coordina nada, y tampoco recuerda a dónde iba.
+  // La intención viaja con la petición y la custodia la MÁQUINA, que solo la
+  // guarda si acepta la transición: gana la primera aceptada. Guardarla aquí
+  // antes de despachar no servía —`canCancel` viene del render anterior, así que
+  // tras aceptar un guardado una cancelación rechazada dejaba su intención
+  // escrita y ganaba más tarde a la que sí se aceptaba—.
+  const recovery = usePasswordRecoveryFlow({
+    onCanceled: (intent) => {
+      if (intent === 'back-to-login') {
+        setStep({ screen: 'login' });
+        return;
+      }
+      onClose();
+    },
+    onCompleted: onClose,
+  });
+
+  const requestCancelWith = (intent: ExitIntent) => {
+    recovery.requestCancel(intent);
+  };
 
   useEffect(() => {
     if (visible) {
@@ -83,42 +87,26 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
     }
   }, [visible]);
 
-  // B7(r4)+B10(r6): si `visible` cae a mitad de recuperación por una vía que no
-  // pasa por requestClose (el padre fuerza el cierre), la sesión del OTP se
-  // sigue cancelando solo cuando NO hay ya una cancelación en vuelo ni una
-  // terminación encolada (`canceling`/`cancelingCompletion`): re-llamar
-  // `cancelReset` ahí abriría un segundo signOut. La pausa no la libera el
-  // cierre: la gobierna solo la fase, así que se mantiene mientras el signOut
-  // está pendiente y si este falla.
-  //
-  // B13(r8): `cancelError` ya NO dispara aquí. Reintentar solo se hace a
-  // petición de la persona, con el mensaje delante: un reintento automático es
-  // invisible, y encadenado con un fallo persistente formaba el ciclo
-  // cancelError → canceling → cancelError a espaldas de todos. Si el padre
-  // fuerza el cierre estando en `cancelError`, la fase se sostiene y con ella la
-  // pausa de la puerta: la sesión del OTP nunca queda habilitada. Falla cerrado.
-  useEffect(() => {
-    if (!visible && recoveryPhase.kind === 'active') {
-      void cancelReset(() => undefined);
-    }
-  }, [cancelReset, recoveryPhase.kind, visible]);
+  /** Un episodio terminado ya no gobierna nada: cerrar es cerrar. */
+  const isEpisodeOver =
+    recovery.state.kind === 'inactive' ||
+    recovery.state.kind === 'completed' ||
+    recovery.state.kind === 'canceled';
 
-  // B7(r4)+B9(r5): toda salida por cancelación posterior a la creación de la
-  // sesión del OTP pasa por `cancelReset`. `requestClose` es el único camino de
-  // cancelación hacia `onClose` —si la fase sigue viva, primero se cierra la
-  // sesión local y solo tras el éxito el modal se oculta; si el signOut falla,
-  // el modal permanece con el mensaje visible y el mismo botón reintenta—. El
-  // cierre por éxito es una transición distinta: el `onSuccess` de
-  // `ResetPasswordScreen` ENTREGA `onClose` a `completeRecovery` y es el hook
-  // quien lo ejecuta —de inmediato si no hay cancelación en vuelo, o al resolver
-  // la carrera si la hay, y nunca si ya ganó la cancelación (B13/B14)—. El host
-  // no cierra por su cuenta ni pasa por `requestClose` en ese camino.
+  // ADR-084: cerrar con un episodio VIVO es pedir su cancelación, y el
+  // controlador decide. El modal no se oculta por su cuenta: lo hará cuando el
+  // episodio llegue a un terminal y ejecute el destino. Si el guardado está en
+  // vuelo, `canCancel` es falso y la petición se ignora —ni cierre, ni carrera—.
+  //
+  // Con el episodio ya terminado se cierra directamente: pedir otra cancelación
+  // ahí sería un `no-op` del reductor y el modal quedaría atrapado —tras
+  // cancelar con destino «volver a login», el estado se queda en `canceled`—.
   const requestClose = () => {
-    if (recoveryPhase.kind !== 'inactive') {
-      void cancelReset(onClose);
-    } else {
+    if (isEpisodeOver) {
       onClose();
+      return;
     }
+    requestCancelWith('close');
   };
 
   const goBack = () => {
@@ -136,21 +124,18 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
       case 'verify-signup':
         setStep({ screen: 'signup', step: 1 });
         return;
-      case 'forgot':
-        // Hasta aquí nunca existe la sesión del OTP (solo se crea al verificar
-        // el código): salir de la recuperación solo normaliza la fase.
-        finishRecovery();
-        setStep({ screen: 'login' });
-        return;
       case 'verify-recovery':
+        // Navegación interna del episodio: volver a pedir el código NO lo
+        // abandona. Se conserva tal como estaba antes del rediseño.
         setStep({ screen: 'forgot' });
         return;
+      case 'forgot':
       case 'reset':
-        // B7(r4) ruta 1: volver desde «nueva contraseña» sin ponerla es
-        // cancelar. La vuelta a forgot espera al signOut('local') con éxito; si
-        // falla, queda `cancelError` con el mensaje visible y el mismo botón
-        // reintenta, y la pausa jamás se libera con la sesión del OTP viva.
-        void cancelReset(() => setStep({ screen: 'forgot' }));
+        // ADR-084: aquí «Atrás» sí abandona el episodio, y la máquina sabe si
+        // hay sesión del OTP que cerrar y si el momento lo admite. Desde
+        // `reset` con el guardado en vuelo se ignora, que es exactamente lo que
+        // cierra la carrera.
+        requestCancelWith('back-to-login');
         return;
       case 'entry':
         requestClose();
@@ -167,7 +152,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
 
   return (
     <AppModal
-      allowManualDismiss={recoveryPhase.kind === 'inactive'}
+      allowManualDismiss={isEpisodeOver || recovery.canCancel}
       containsScrollable
       onClose={requestClose}
       stackBehavior="push"
@@ -192,9 +177,9 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
           ) : null}
         </View>
 
-        {recoveryPhase.kind === 'cancelError' ? (
+        {recovery.errorMessage !== null && step.screen !== 'reset' ? (
           <Text style={styles.cancelError} tone="expense" variant="footnote">
-            {recoveryPhase.message}
+            {recovery.errorMessage}
           </Text>
         ) : null}
 
@@ -241,7 +226,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
               <LoginScreen
                 onCancel={requestClose}
                 onNavigateToForgotPassword={() => {
-                  startRecovery();
+                  recovery.start();
                   setStep({ screen: 'forgot' });
                 }}
                 onNavigateToSignUp={() =>
@@ -271,7 +256,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
                 onCancel={requestClose}
                 onGoToLogin={() => setStep({ screen: 'login' })}
                 onGoToRecovery={() => {
-                  startRecovery();
+                  recovery.start();
                   setStep({ screen: 'forgot' });
                 }}
                 onSuccess={() => void handleAuthenticated()}
@@ -282,13 +267,11 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
             {step.screen === 'forgot' ? (
               <ForgotPasswordScreen
                 onCancel={requestClose}
-                onNavigateToLogin={() => {
-                  finishRecovery();
-                  setStep({ screen: 'login' });
+                onNavigateToLogin={() => requestCancelWith('back-to-login')}
+                onSuccess={({ email }) => {
+                  recovery.codeSent();
+                  setStep({ screen: 'verify-recovery', email });
                 }}
-                onSuccess={({ email }) =>
-                  setStep({ screen: 'verify-recovery', email })
-                }
               />
             ) : null}
 
@@ -296,23 +279,26 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
               <VerifyCodeScreen
                 email={step.email}
                 onCancel={requestClose}
-                onSuccess={() => setStep({ screen: 'reset' })}
+                onSuccess={() => {
+                  // A partir de aquí existe la sesión del OTP: la máquina lo
+                  // sabe y cancelar pasará siempre por `signOut('local')`.
+                  recovery.codeVerified();
+                  setStep({ screen: 'reset' });
+                }}
                 purpose="recovery"
               />
             ) : null}
 
             {step.screen === 'reset' ? (
+              // ADR-084: pantalla controlada. Ni llama a `setNewPassword` ni
+              // decide el destino; entrega la contraseña y el controlador hace
+              // el resto. `canCancel` cierra la salida mientras guarda.
               <ResetPasswordScreen
-                onCancel={() => void cancelReset(onClose)}
-                // B9: el éxito real de setNewPassword termina por la transición
-                // distinguida (completeRecovery), no vuelve a intentar cerrar la
-                // sesión aunque un cancelar anterior haya fallado.
-                // B13(r8): el cierre por éxito se ENTREGA al hook en vez de
-                // ejecutarse aquí. Sin cancelación en vuelo se ejecuta de
-                // inmediato; con una en vuelo queda encolado y solo lo ejecuta la
-                // resolución si gana la terminación. Así nunca se cierra el modal
-                // antes de conocer al ganador ni se ocultan dos destinos.
-                onSuccess={() => completeRecovery(onClose)}
+                canCancel={recovery.canCancel || recovery.canRetryCancel}
+                errorMessage={recovery.errorMessage}
+                isSubmitting={recovery.state.kind === 'saving'}
+                onCancel={() => requestCancelWith('back-to-login')}
+                onSubmit={recovery.requestSave}
               />
             ) : null}
           </Animated.View>

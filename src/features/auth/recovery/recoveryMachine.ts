@@ -27,6 +27,9 @@
  * 5. Antes de verificar el código no existe sesión: cancelar ahí es abandonar,
  *    sin `signOut`. Después de verificarlo, cancelar **siempre** cierra la
  *    sesión local (B7).
+ * 6. La intención de salida del anfitrión viaja con `cancelRequested` y solo se
+ *    guarda si la transición se ACEPTA: gana la primera aceptada, no la primera
+ *    solicitada. El reintento desde `cancelError` conserva la suya.
  *
  * ## Precio deliberado
  *
@@ -60,13 +63,25 @@ export type RecoveryState =
   /** El guardado falló: se puede reintentar o cancelar. */
   | { kind: 'saveError'; message: string }
   /** `signOut('local')` en vuelo. No admite guardar. */
-  | { kind: 'canceling' }
+  | { kind: 'canceling'; intent: RecoveryCancelIntent }
   /** La cancelación falló: la sesión puede seguir viva, solo cabe reintentar. */
-  | { kind: 'cancelError'; message: string }
+  | { kind: 'cancelError'; message: string; intent: RecoveryCancelIntent }
   /** Terminal: contraseña puesta, la sesión queda legítimamente habilitada. */
   | { kind: 'completed' }
   /** Terminal: episodio abandonado; si había sesión, ya se cerró. */
-  | { kind: 'canceled' };
+  | { kind: 'canceled'; intent: RecoveryCancelIntent };
+
+/**
+ * Adónde quiere ir el anfitrión cuando la cancelación resuelva. La máquina la
+ * trata como una etiqueta OPACA: no sabe de navegación, solo la custodia.
+ *
+ * Viaja con el evento y se guarda únicamente si la transición se ACEPTA, que es
+ * lo que la hace atómica. Guardarla en el anfitrión antes de despachar no sirve:
+ * su `canCancel` viene del render anterior y dentro del mismo tick puede mentir
+ * —tras aceptar un `saveRequested`, una cancelación rechazada seguía dejando su
+ * intención escrita y ganaba más tarde a la que sí se aceptaba—.
+ */
+export type RecoveryCancelIntent = string | null;
 
 export type RecoveryEvent =
   | { type: 'start' }
@@ -75,7 +90,7 @@ export type RecoveryEvent =
   | { type: 'saveRequested'; password: string }
   | { type: 'saveSucceeded'; episodeId: RecoveryEpisodeId }
   | { type: 'saveFailed'; episodeId: RecoveryEpisodeId; message: string }
-  | { type: 'cancelRequested' }
+  | { type: 'cancelRequested'; intent?: RecoveryCancelIntent }
   | { type: 'cancelSucceeded'; episodeId: RecoveryEpisodeId }
   | { type: 'cancelFailed'; episodeId: RecoveryEpisodeId; message: string };
 
@@ -191,24 +206,34 @@ export function recoveryReducer(
         state: { kind: 'saveError', message: event.message },
       };
 
-    case 'cancelRequested':
+    case 'cancelRequested': {
       // Invariante 1: jamás desde `saving`.
       if (!canCancel(state) && !canRetryCancel(state)) return episode;
+      // Invariante 6: gana la primera intención ACEPTADA. Un reintento desde
+      // `cancelError` conserva la que se aceptó al abrir la cancelación; una
+      // petición rechazada nunca llega hasta aquí y por tanto no deja rastro.
+      const intent =
+        state.kind === 'cancelError' ? state.intent : (event.intent ?? null);
       // Invariante 5: sin sesión del OTP no hay nada que cerrar.
       if (!hasOtpSession(state)) {
-        return { episodeId, state: { kind: 'canceled' } };
+        return { episodeId, state: { kind: 'canceled', intent } };
       }
-      return { episodeId, state: { kind: 'canceling' } };
+      return { episodeId, state: { kind: 'canceling', intent } };
+    }
 
     case 'cancelSucceeded':
       if (state.kind !== 'canceling') return episode;
-      return { episodeId, state: { kind: 'canceled' } };
+      return { episodeId, state: { kind: 'canceled', intent: state.intent } };
 
     case 'cancelFailed':
       if (state.kind !== 'canceling') return episode;
       return {
         episodeId,
-        state: { kind: 'cancelError', message: event.message },
+        state: {
+          kind: 'cancelError',
+          intent: state.intent,
+          message: event.message,
+        },
       };
   }
 }

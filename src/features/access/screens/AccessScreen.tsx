@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -8,7 +8,7 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { StepProgressBar } from '@/components/ui/StepProgressBar/StepProgressBar';
 import { Text } from '@/components/ui/Text/Text';
 import { ForgotPasswordScreen } from '@/features/auth/screens/ForgotPasswordScreen';
-import { useRecoveryPhase } from '@/features/auth/hooks/useRecoveryPhase';
+import { usePasswordRecoveryFlow } from '@/features/auth/recovery/usePasswordRecoveryFlow';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
 import { ResetPasswordScreen } from '@/features/auth/screens/ResetPasswordScreen';
 import {
@@ -17,7 +17,6 @@ import {
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
 import { useDeferredAuthenticatedMark } from '@/features/legal/hooks/useDeferredAuthenticatedMark';
-import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
 import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
@@ -47,25 +46,18 @@ export function AccessScreen() {
   const styles = useThemedStyles(createStyles);
   const { markGuestComplete } = useOnboardingStatus();
   const { scheduleMarkAuthenticated } = useDeferredAuthenticatedMark();
-  const { setRecoveryHalted } = useLegalSessionGate();
-  const {
-    cancelReset,
-    completeRecovery,
-    finishRecovery,
-    phase: recoveryPhase,
-    startRecovery,
-  } = useRecoveryPhase();
   const [step, setStep] = useState<AccessStep>({ screen: 'entry' });
   const [isCompletingGuest, setCompletingGuest] = useState(false);
 
-  // B3 + B7: mientras el subflujo de recuperación está activo, la sesión que
-  // creará el OTP queda en pausa (ni la puerta legal ni la navegación por
-  // sesión cruda pueden desmontar el restablecimiento a mitad). El cleanup
-  // libera la pausa al salir o al desmontar el host.
-  useEffect(() => {
-    setRecoveryHalted(recoveryPhase.kind !== 'inactive');
-    return () => setRecoveryHalted(false);
-  }, [recoveryPhase.kind, setRecoveryHalted]);
+  // ADR-084: los dos desenlaces llevan al mismo sitio en este anfitrión, así
+  // que basta con entregar el destino. La pausa de la puerta, `setNewPassword`,
+  // `signOut('local')` y la identidad del episodio los gobierna el controlador:
+  // aquí no queda ningún efecto de recuperación.
+  const backToLogin = () => setStep({ screen: 'login' });
+  const recovery = usePasswordRecoveryFlow({
+    onCanceled: backToLogin,
+    onCompleted: backToLogin,
+  });
 
   // El marcado de «autenticado» se difiere hasta que la puerta legal habilite
   // la sesión: mientras falte evidencia no se marca el onboarding.
@@ -80,7 +72,7 @@ export function AccessScreen() {
   };
 
   const goToForgot = () => {
-    startRecovery();
+    recovery.start();
     setStep({ screen: 'forgot' });
   };
 
@@ -99,17 +91,17 @@ export function AccessScreen() {
       case 'verify-signup':
         setStep({ screen: 'signup', step: 1 });
         return;
-      case 'forgot':
-        finishRecovery();
-        setStep({ screen: 'login' });
-        return;
-      case 'reset':
-        // B7: volver desde «nueva contraseña» sin ponerla es cancelar; la
-        // sesión que creó el OTP se cierra en local, no se queda habilitada.
-        void cancelReset(() => setStep({ screen: 'login' }));
-        return;
       case 'verify-recovery':
+        // Navegación interna del episodio: volver a pedir el código NO lo
+        // abandona. Se conserva tal como estaba antes del rediseño.
         setStep({ screen: 'forgot' });
+        return;
+      case 'forgot':
+      case 'reset':
+        // ADR-084: aquí «Atrás» sí abandona el episodio. La máquina sabe si hay
+        // sesión del OTP que cerrar, y con el guardado en vuelo lo ignora. La
+        // navegación la hace el destino, no esta línea.
+        recovery.requestCancel();
         return;
       case 'entry':
         return;
@@ -151,9 +143,9 @@ export function AccessScreen() {
           </Text>
         </View>
 
-        {recoveryPhase.kind === 'cancelError' ? (
+        {recovery.errorMessage !== null && step.screen !== 'reset' ? (
           <Text tone="expense" variant="footnote">
-            {recoveryPhase.message}
+            {recovery.errorMessage}
           </Text>
         ) : null}
 
@@ -236,13 +228,11 @@ export function AccessScreen() {
           {step.screen === 'forgot' ? (
             <ForgotPasswordScreen
               onCancel={goBack}
-              onNavigateToLogin={() => {
-                finishRecovery();
-                setStep({ screen: 'login' });
+              onNavigateToLogin={() => recovery.requestCancel()}
+              onSuccess={({ email }) => {
+                recovery.codeSent();
+                setStep({ screen: 'verify-recovery', email });
               }}
-              onSuccess={({ email }) =>
-                setStep({ screen: 'verify-recovery', email })
-              }
             />
           ) : null}
 
@@ -250,25 +240,24 @@ export function AccessScreen() {
             <VerifyCodeScreen
               email={step.email}
               onCancel={goBack}
-              onSuccess={() => setStep({ screen: 'reset' })}
+              onSuccess={() => {
+                // A partir de aquí existe la sesión del OTP: cancelar pasará
+                // siempre por `signOut('local')`.
+                recovery.codeVerified();
+                setStep({ screen: 'reset' });
+              }}
               purpose="recovery"
             />
           ) : null}
 
           {step.screen === 'reset' ? (
+            // ADR-084: pantalla controlada, igual que en Ajustes.
             <ResetPasswordScreen
-              onCancel={() =>
-                void cancelReset(() => setStep({ screen: 'login' }))
-              }
-              // B9: el éxito real de setNewPassword termina por la transición
-              // distinguida (completeRecovery): publica `inactive` sin cerrar la
-              // sesión, aunque un intento de cancelar haya fallado.
-              // B13(r8): la navegación se entrega al hook, igual que en Ajustes.
-              // Con una cancelación en vuelo queda encolada y solo se ejecuta si
-              // gana la terminación; nunca se navega antes de conocer al ganador.
-              onSuccess={() =>
-                completeRecovery(() => setStep({ screen: 'login' }))
-              }
+              canCancel={recovery.canCancel || recovery.canRetryCancel}
+              errorMessage={recovery.errorMessage}
+              isSubmitting={recovery.state.kind === 'saving'}
+              onCancel={() => recovery.requestCancel()}
+              onSubmit={recovery.requestSave}
             />
           ) : null}
         </Animated.View>

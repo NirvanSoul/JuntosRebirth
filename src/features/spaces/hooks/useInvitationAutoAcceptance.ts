@@ -1,8 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useRef } from 'react';
 
-import type { RecoveryPhase } from '@/features/auth/hooks/useRecoveryPhase';
-
 type InvitationAuthFlowSnapshot = {
   isAuthReady: boolean;
   session: Session | null;
@@ -11,7 +9,14 @@ type InvitationAuthFlowSnapshot = {
     preview?: { status: string };
   };
   acceptState: { status: string };
-  recoveryPhaseKind: RecoveryPhase['kind'];
+  /** ADR-084: estado del episodio de recuperación;  es «sin pausa». */
+  /**
+   * ADR-084: la pausa se consulta con la semántica compartida de la máquina
+   * (`isLegalGateHalted`), no comparando cadenas. El éxito termina en
+   * `completed`, no en `inactive`: con la comparación anterior la pausa caía
+   * pero la autoaceptación seguía bloqueada para siempre.
+   */
+  isRecoveryHalted: boolean;
   onAccept: () => void;
 };
 
@@ -27,7 +32,7 @@ export function useInvitationAutoAcceptance({
   isAuthReady,
   onAccept,
   previewState,
-  recoveryPhaseKind,
+  isRecoveryHalted,
   session,
 }: InvitationAuthFlowSnapshot): void {
   const hasAutoAcceptedRef = useRef(false);
@@ -45,7 +50,7 @@ export function useInvitationAutoAcceptance({
       return;
     if (!session) return;
     // Pausa: la sesión del OTP de recuperación no debe autoaceptar.
-    if (recoveryPhaseKind !== 'inactive') return;
+    if (isRecoveryHalted) return;
     if (
       previewState.status !== 'loaded' ||
       previewState.preview?.status !== 'pending'
@@ -56,5 +61,5 @@ export function useInvitationAutoAcceptance({
 
     hasAutoAcceptedRef.current = true;
     onAccept();
-  }, [acceptState.status, onAccept, previewState, recoveryPhaseKind, session]);
+  }, [acceptState.status, isRecoveryHalted, onAccept, previewState, session]);
 }

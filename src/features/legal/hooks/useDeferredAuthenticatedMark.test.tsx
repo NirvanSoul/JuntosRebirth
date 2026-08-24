@@ -16,6 +16,7 @@ let mockGateState: LegalSessionGate;
 
 jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
   useLegalSessionGate: () => mockGateState,
+  useRecoveryHold: () => mockGateState.setRecoveryHold,
   resetLegalSessionGateForTests: jest.fn(),
 }));
 
@@ -37,7 +38,6 @@ function createGateState(kind: 'no-session' | 'cleared'): LegalSessionGate {
     retryGate: jest.fn(),
     submitRegularization: jest.fn(),
     abandonSession: jest.fn(),
-    setRecoveryHalted: jest.fn(),
     setRecoveryHold: jest.fn(),
   };
 }

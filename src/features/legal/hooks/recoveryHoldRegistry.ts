@@ -1,11 +1,11 @@
 /**
- * Registro de concesiones de pausa de la puerta legal (ADR-084).
+ * Pausa de la puerta legal por recuperación de contraseña (ADR-084).
  *
- * La pausa por recuperación de contraseña era un booleano de módulo. Con más de
- * un anfitrión montado a la vez —Ajustes y la invitación pueden coexistir—, el
- * segundo liberaba la pausa del primero al desmontarse. Aquí cada controlador
- * sostiene una concesión con su propio identificador y solo libera la suya: la
- * puerta sigue en pausa mientras quede alguna viva.
+ * La pausa: era un booleano de módulo. Con más de un anfitrión montado a la vez
+ * —Ajustes y la invitación pueden coexistir—, el segundo liberaba la pausa del
+ * primero al desmontarse. Aquí cada controlador sostiene una concesión con su
+ * propio identificador y solo libera la suya: la puerta sigue en pausa mientras
+ * quede alguna viva.
  */
 const holds = new Set<string>();
 
@@ -28,6 +28,35 @@ export function applyRecoveryHold(
     holds.delete(ownerId);
   }
   return { isHalted: isRecoveryHalted(), wasHalted };
+}
+
+/** Efectos que la puerta legal registra para publicar la pausa/reanudación. */
+export type RecoveryHoldEffects = {
+  onHalt: () => void;
+  onResume: () => void;
+};
+
+let effects: RecoveryHoldEffects = { onHalt: () => {}, onResume: () => {} };
+
+/** La puerta registra sus publicaciones una vez, al importarse el módulo. */
+export function registerRecoveryHoldEffects(next: RecoveryHoldEffects): void {
+  effects = next;
+}
+
+/**
+ * Concesión con dueño, a nivel de módulo. La puerta queda en pausa mientras
+ * exista alguna y solo se reanuda al liberar la última: un anfitrión que se
+ * desmonta ya no puede soltar la pausa de otro que sigue restableciendo. Solo
+ * se actúa cuando el valor derivado cambia, para no republicar de más.
+ */
+export function commitRecoveryHold(ownerId: string, held: boolean): void {
+  const { isHalted: halted, wasHalted } = applyRecoveryHold(ownerId, held);
+  if (wasHalted === halted) return;
+  if (halted) {
+    effects.onHalt();
+    return;
+  }
+  effects.onResume();
 }
 
 /** Solo para pruebas: vacía el registro entre suites. */

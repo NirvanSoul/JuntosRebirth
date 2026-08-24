@@ -41,7 +41,6 @@ function mockAuthSession(session: Session | null) {
     retryGate: jest.fn(),
     submitRegularization: jest.fn(),
     abandonSession: jest.fn(),
-    setRecoveryHalted: jest.fn(),
     setRecoveryHold: jest.fn(),
   });
 }

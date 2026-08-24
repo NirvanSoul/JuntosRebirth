@@ -14,7 +14,7 @@ jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
 
 const mockSetRecoveryHold = jest.fn();
 jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
-  useLegalSessionGate: () => ({ setRecoveryHold: mockSetRecoveryHold }),
+  useRecoveryHold: () => mockSetRecoveryHold,
 }));
 
 /** Último valor de la concesión de pausa, ignorando el identificador de dueño. */
@@ -306,5 +306,62 @@ describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operac
     await act(async () => second.unmount());
     expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(secondOwner, false);
     expect(mockSetRecoveryHold).not.toHaveBeenLastCalledWith(firstOwner, false);
+  });
+
+  // ─── Atomicidad de la intención de salida ────────────────────────────────
+
+  /**
+   * Gana la primera intención ACEPTADA, no la primera solicitada. El anfitrión
+   * no puede decidirlo: su `canCancel` viene del render anterior, así que dentro
+   * del mismo tick, tras aceptar un guardado, sigue viendo que puede cancelar.
+   * Esa cancelación la rechaza la máquina —correctamente— pero su intención no
+   * puede quedar registrada, o ganaría a la cancelación real posterior.
+   */
+  it('una intención cuya cancelación fue rechazada no gana a la de la cancelación aceptada después', async () => {
+    const save = deferred();
+    mockSetNewPassword.mockReturnValue(save.promise);
+    const { onCanceled, onCompleted, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    // Mismo tick: guardar gana, y la salida que llega detrás se rechaza.
+    await act(async () => {
+      result.current.requestSave('contraseñaNueva1');
+      result.current.requestCancel('cerrar-modal');
+    });
+    expect(result.current.state.kind).toBe('saving');
+    expect(mockSignOut).not.toHaveBeenCalled();
+
+    // El guardado falla y devuelve el control.
+    await act(async () => {
+      save.reject(new Error('Sin red.'));
+      await save.promise.catch(() => undefined);
+    });
+    expect(result.current.state.kind).toBe('saveError');
+
+    // Ahora sí se acepta una cancelación, con OTRO destino.
+    await act(async () => result.current.requestCancel('volver-a-login'));
+
+    expect(result.current.state.kind).toBe('canceled');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    // El destino es el de la cancelación ACEPTADA, no el de la rechazada.
+    expect(onCanceled).toHaveBeenCalledWith('volver-a-login');
+    expect(onCompleted).not.toHaveBeenCalled();
+  });
+
+  it('el reintento tras cancelError conserva la intención con la que se aceptó la cancelación', async () => {
+    mockSignOut.mockRejectedValueOnce(new Error('Sin conexión.'));
+    const { onCanceled, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestCancel('volver-a-login'));
+    expect(result.current.state.kind).toBe('cancelError');
+
+    // El reintento llega desde otro control y con otra etiqueta: no la cambia.
+    mockSignOut.mockResolvedValue(undefined);
+    await act(async () => result.current.requestCancel('cerrar-modal'));
+
+    expect(result.current.state.kind).toBe('canceled');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    expect(onCanceled).toHaveBeenCalledWith('volver-a-login');
   });
 });

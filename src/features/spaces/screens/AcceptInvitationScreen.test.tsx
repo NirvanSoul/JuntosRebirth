@@ -39,6 +39,11 @@ jest.mock('@/features/spaces/gateways/supabaseInvitationGateway', () => ({
   }),
 }));
 
+const mockSetNewPassword = jest.fn();
+jest.mock('@/features/auth/services/resetPasswordService', () => ({
+  setNewPassword: (password: string) => mockSetNewPassword(password),
+}));
+
 const mockSignOut = jest.fn();
 const mockGetSession = jest.fn();
 jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
@@ -109,6 +114,8 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
     mockAcceptInvitation.mockReset();
     mockAcceptInvitation.mockResolvedValue({ spaceName: 'Nuestro hogar' });
     mockSignOut.mockReset();
+    mockSetNewPassword.mockReset();
+    mockSetNewPassword.mockResolvedValue(undefined);
     mockSignOut.mockResolvedValue(undefined);
     mockGetSession.mockReset();
     mockGetSession.mockResolvedValue(null);
@@ -222,11 +229,14 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
       expect(mockAcceptInvitation).not.toHaveBeenCalled();
     });
 
-    it('completar el restablecimiento libera la pausa y acepta exactamente una vez', async () => {
+    it('completar el restablecimiento libera la pausa y acepta exactamente una vez (ADR-084)', async () => {
       const screen = await llegarAlRestablecimientoConSesion();
 
-      await fireEvent.press(screen.getByTestId('stub-reset-success'));
+      fireEvent.press(screen.getByTestId('stub-reset-submit'));
 
+      // El éxito termina en `completed`, no en `inactive`: la autoaceptación se
+      // consulta con la semántica compartida de la pausa, no comparando
+      // cadenas, o se quedaría bloqueada para siempre.
       await waitFor(() =>
         expect(mockAcceptInvitation).toHaveBeenCalledTimes(1),
       );
@@ -259,115 +269,48 @@ describe('AcceptInvitationScreen — cableado de autenticación', () => {
       expect(mockAcceptInvitation).not.toHaveBeenCalled();
     });
 
-    it('pese al fallo de cancelación, guardar la contraseña termina la recuperación y la invitación se acepta una vez sin cerrar la sesión (B9)', async () => {
-      const screen = await llegarAlRestablecimientoConSesion();
-      mockSignOut.mockRejectedValue(new Error('No pudimos cerrar sesión.'));
-
-      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-      expect(await screen.findByText('No pudimos cerrar sesión.')).toBeTruthy();
-
-      // El éxito real de setNewPassword termina por la transición explícita
-      // completeRecovery: publica `inactive` sin signOut. La pausa cae, la
-      // sesión del OTP queda habilitada y la autoaceptación ocurre una vez.
-      await fireEvent.press(screen.getByTestId('stub-reset-success'));
-      await waitFor(() =>
-        expect(mockAcceptInvitation).toHaveBeenCalledTimes(1),
-      );
-      expect(await screen.findByTestId('accept-invitation-done')).toBeTruthy();
-      expect(mockSignOut).toHaveBeenCalledTimes(1);
-    });
-
-    it('B11 fiel 3: signOut fallido con la sesión realmente presente — la terminación encolada gana: la invitación se acepta una vez y se conserva la sesión', async () => {
-      const screen = await llegarAlRestablecimientoConSesion();
-      let rejectSignOut: (() => void) | undefined;
-      mockSignOut.mockImplementation(
-        () =>
-          new Promise<void>((_resolve, reject) => {
-            rejectSignOut = () =>
-              reject(new Error('No pudimos cerrar sesión.'));
-          }),
-      );
-      // El fallo de GoTrue no eliminó la sesión (B11): sigue viva.
-      mockGetSession.mockResolvedValue(createOtpSession('user-recovery'));
-
-      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-      await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
-
-      // Guardar mientras el signOut pende: sigue en reset y sin autoaceptar
-      // hasta que la transición encolada resuelva con el estado real.
-      await fireEvent.press(screen.getByTestId('stub-reset-success'));
-      expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
-      expect(mockAcceptInvitation).not.toHaveBeenCalled();
-
-      await act(async () => {
-        rejectSignOut?.();
-      });
-      await waitFor(() =>
-        expect(mockAcceptInvitation).toHaveBeenCalledTimes(1),
-      );
-      expect(await screen.findByTestId('accept-invitation-done')).toBeTruthy();
-      expect(mockSignOut).toHaveBeenCalledTimes(1);
-    });
-
-    it('B11 fiel 1: signOut con éxito elimina la sesión local — aunque la contraseña se haya guardado, la invitación NO se autoacepta y vuelve al destino de cancelación', async () => {
-      const screen = await llegarAlRestablecimientoConSesion();
-      let resolveSignOut: (() => void) | undefined;
-      mockSignOut.mockImplementation(
+    it('mientras guarda, cancelar queda bloqueado y no se abre ningún signOut (ADR-084)', async () => {
+      let resolveSave: (() => void) | undefined;
+      mockSetNewPassword.mockImplementation(
         () =>
           new Promise<void>((resolve) => {
-            resolveSignOut = () => {
-              // GoTrue con éxito ya eliminó la sesión local antes de resolver.
-              mockSetSession?.(null);
-              resolve();
-            };
+            resolveSave = resolve;
           }),
       );
-      mockGetSession.mockResolvedValue(null);
+      const screen = await llegarAlRestablecimientoConSesion();
 
-      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-      await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+      fireEvent.press(screen.getByTestId('stub-reset-submit'));
+      await screen.findByTestId('stub-reset-saving');
 
-      // Guardar mientras el signOut pende deja la terminación encolada.
-      await fireEvent.press(screen.getByTestId('stub-reset-success'));
+      fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      expect(mockSignOut).not.toHaveBeenCalled();
       expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
 
-      await act(async () => {
-        resolveSignOut?.();
-      });
-
-      // La sesión ya no existe: ganó la cancelación; vuelve a login sin aceptar.
-      expect(await screen.findByTestId('stub-login-screen')).toBeTruthy();
-      expect(mockAcceptInvitation).not.toHaveBeenCalled();
-      expect(mockSignOut).toHaveBeenCalledTimes(1);
+      resolveSave?.();
+      await waitFor(() =>
+        expect(mockAcceptInvitation).toHaveBeenCalledTimes(1),
+      );
+      // Terminar nunca cierra la sesión del OTP.
+      expect(mockSignOut).not.toHaveBeenCalled();
     });
 
-    it('B11 fiel 2: signOut rechaza pero también deja la sesión eliminada — mismo resultado de cancelación', async () => {
+    it('tras un fallo de cancelación el mismo control reintenta y cierra el episodio (ADR-084)', async () => {
       const screen = await llegarAlRestablecimientoConSesion();
-      let rejectSignOut: (() => void) | undefined;
-      mockSignOut.mockImplementation(
-        () =>
-          new Promise<void>((_resolve, reject) => {
-            rejectSignOut = () => {
-              // GoTrue borra la sesión local también en la mayoría de errores
-              // del _signOut (B11): la excepción no prueba que siga viva.
-              mockSetSession?.(null);
-              reject(new Error('No pudimos cerrar sesión.'));
-            };
-          }),
-      );
-      mockGetSession.mockResolvedValue(null);
+      mockSignOut.mockRejectedValueOnce(new Error('No pudimos cerrar sesión.'));
 
-      await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-      await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
-      await fireEvent.press(screen.getByTestId('stub-reset-success'));
+      fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+      await screen.findByTestId('stub-reset-error');
 
-      await act(async () => {
-        rejectSignOut?.();
+      // `canRetryCancel` mantiene vivo el control: sin eso, la invitación no
+      // tiene otra navegación y quedaría atrapada en el restablecimiento.
+      mockSignOut.mockImplementation(async () => {
+        mockSetSession?.(null);
       });
+      fireEvent.press(screen.getByTestId('stub-reset-cancel'));
 
       expect(await screen.findByTestId('stub-login-screen')).toBeTruthy();
+      expect(mockSignOut).toHaveBeenCalledTimes(2);
       expect(mockAcceptInvitation).not.toHaveBeenCalled();
-      expect(mockSignOut).toHaveBeenCalledTimes(1);
     });
 
     it('la sesión creada por el registro conserva la autoaceptación', async () => {

@@ -333,7 +333,7 @@ describe('useLegalSessionGate — sesión legalmente habilitada', () => {
     await waitFor(() => expect(result.current.status.kind).toBe('required'));
 
     await act(async () => {
-      result.current.setRecoveryHalted(true);
+      result.current.setRecoveryHold('b3', true);
     });
     expect(result.current.status.kind).toBe('halted');
 

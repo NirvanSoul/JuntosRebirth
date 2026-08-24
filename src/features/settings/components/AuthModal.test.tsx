@@ -1,12 +1,59 @@
-import type { Session } from '@supabase/supabase-js';
-import { act, fireEvent, waitFor } from '@testing-library/react-native';
-import { useState } from 'react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
+import { type ReactNode, useState } from 'react';
 
 import { AuthModal } from '@/features/settings/components/AuthModal';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
+// AuthModal usa AppModal/BottomSheetScrollView reales de gorhom. La cola de
+// presentación de BottomSheetModal es global al proceso y sobrevivía al
+// `cleanup()` entre tests: con --randomize la hoja del test siguiente no
+// montaba el contenido y la suite caía por el orden. Se mockea la librería
+// como hace AppModal.test, y el estado queda por instancia.
+jest.mock('@gorhom/bottom-sheet', () => {
+  const React = jest.requireActual('react');
+  const { ScrollView, View } = jest.requireActual('react-native');
+
+  const BottomSheetModal = React.forwardRef(
+    (
+      { children }: { children?: ReactNode },
+      ref: React.ForwardedRef<{
+        present: () => void;
+        dismiss: () => void;
+      }>,
+    ) => {
+      React.useImperativeHandle(ref, () => ({
+        present: jest.fn(),
+        dismiss: jest.fn(),
+      }));
+      return <View>{children}</View>;
+    },
+  );
+  BottomSheetModal.displayName = 'BottomSheetModalMock';
+
+  return {
+    BottomSheetModal,
+    BottomSheetScrollView: ({ children }: { children?: ReactNode }) => (
+      <ScrollView>{children}</ScrollView>
+    ),
+    BottomSheetView: ({ children }: { children?: ReactNode }) => (
+      <View>{children}</View>
+    ),
+    BottomSheetBackdrop: () => null,
+  };
+});
+
 jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
   useOnboardingStatus: () => ({ markAuthenticated: jest.fn() }),
+}));
+
+const mockSetNewPassword = jest.fn();
+jest.mock('@/features/auth/services/resetPasswordService', () => ({
+  setNewPassword: (password: string) => mockSetNewPassword(password),
 }));
 
 const mockSignOut = jest.fn();
@@ -17,11 +64,6 @@ jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
     signOut: mockSignOut,
   }),
 }));
-
-/** Sesión que `getSession` reporta cuando el `signOut` no la eliminó. */
-const mockOtpSession = {
-  user: { id: 'user-1' },
-} as unknown as Session;
 
 function createGateMock() {
   return {
@@ -36,15 +78,16 @@ function createGateMock() {
     retryGate: jest.fn(),
     submitRegularization: jest.fn(),
     abandonSession: jest.fn(),
-    setRecoveryHalted: jest.fn(),
+    setRecoveryHold: jest.fn(),
   };
 }
 
 let mockGateState = createGateMock();
-let mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
+let mockSetRecoveryHold = mockGateState.setRecoveryHold;
 
 jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
   useLegalSessionGate: () => mockGateState,
+  useRecoveryHold: () => mockGateState.setRecoveryHold,
   resetLegalSessionGateForTests: jest.fn(),
 }));
 
@@ -69,9 +112,23 @@ jest.mock('@/features/auth/screens/ResetPasswordScreen', () => ({
 }));
 
 describe('AuthModal — cableado de navegación de autenticación', () => {
+  // Cada prueba deja cadenas asincronas reales a medio camino (signOut y
+  // setNewPassword diferidos) y fireEvent sin await. Se desmonta entre casos y
+  // se drena el ámbito de `act`: `cleanup()` es async en RNTL v14, así que
+  // primero se espera y después se vacía el act global; lanzar el act antes de
+  // que `cleanup()` resolviera producía «overlapping act() calls» y rompía el
+  // render de la prueba siguiente —lo que --randomize destapaba como fallos de
+  // montaje del modal—.
+  afterEach(async () => {
+    await cleanup();
+    await act(async () => {});
+  });
+
   beforeEach(() => {
     mockGateState = createGateMock();
-    mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
+    mockSetRecoveryHold = mockGateState.setRecoveryHold;
+    mockSetNewPassword.mockReset();
+    mockSetNewPassword.mockResolvedValue(undefined);
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
     mockGetSession.mockReset();
@@ -83,7 +140,7 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
       <AuthModal onClose={jest.fn()} visible />,
     );
 
-    fireEvent.press(await screen.findByTestId('auth-modal-open-signup'));
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-signup'));
 
     const source = await screen.findByTestId('stub-signup-source');
     expect(source.props.children).toBe('settings-signup');
@@ -96,8 +153,8 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
       <AuthModal onClose={jest.fn()} visible />,
     );
 
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
 
     expect(await screen.findByText('Recuperar contraseña')).toBeTruthy();
     expect(screen.getByTestId('stub-forgot-screen')).toBeTruthy();
@@ -108,43 +165,16 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
       <AuthModal onClose={jest.fn()} visible />,
     );
 
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
 
     expect(await screen.findByText('recovery')).toBeTruthy();
 
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
 
     expect(await screen.findByText('Nueva contraseña')).toBeTruthy();
     expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
-  });
-
-  it('pausa la puerta legal durante la recuperación (B3) y la libera al cerrar el modal', async () => {
-    function ModalHarness() {
-      const [visible, setVisible] = useState(true);
-      return <AuthModal onClose={() => setVisible(false)} visible={visible} />;
-    }
-    const screen = await renderWithTheme(<ModalHarness />);
-
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    await screen.findByTestId('stub-forgot-screen');
-    fireEvent.press(screen.getByTestId('stub-forgot-send'));
-
-    await screen.findByText('recovery');
-    expect(mockSetRecoveryHalted).toHaveBeenCalledWith(true);
-
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
-    await screen.findByText('Nueva contraseña');
-    expect(mockSetRecoveryHalted).toHaveBeenCalledWith(true);
-
-    // Cerrar el modal a mitad de restablecimiento libera la pausa: la puerta
-    // vuelve a gobernar la sesión creada por el OTP.
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-    await waitFor(() =>
-      expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false),
-    );
   });
 
   it('desde la verificación de registro, recuperar contraseña lleva al flujo de recuperación', async () => {
@@ -152,11 +182,11 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
       <AuthModal onClose={jest.fn()} visible />,
     );
 
-    fireEvent.press(await screen.findByTestId('auth-modal-open-signup'));
-    fireEvent.press(await screen.findByTestId('stub-signup-complete'));
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-signup'));
+    await fireEvent.press(await screen.findByTestId('stub-signup-complete'));
     expect(await screen.findByText('signup')).toBeTruthy();
 
-    fireEvent.press(await screen.findByTestId('stub-verify-go-recovery'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-go-recovery'));
 
     expect(await screen.findByText('Recuperar contraseña')).toBeTruthy();
   });
@@ -166,266 +196,162 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
       <AuthModal onClose={jest.fn()} visible />,
     );
 
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
     await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
 
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith('local'));
   });
 
-  it('ruta 2 (B7 r4): con signOut diferido, el cierre manual sostiene la pausa hasta que signOut resuelve', async () => {
-    let resolveSignOut: (() => void) | undefined;
-    mockSignOut.mockImplementation(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveSignOut = resolve;
-        }),
-    );
-    let closeModal: (() => void) | null = null;
-    function ModalHarness() {
-      const [visible, setVisible] = useState(true);
-      closeModal = () => setVisible(false);
-      return <AuthModal onClose={() => setVisible(false)} visible={visible} />;
-    }
-    const screen = await renderWithTheme(<ModalHarness />);
-
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
-    await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
-    await screen.findByText('Nueva contraseña');
-
-    // Cierre manual (visible → false) con la sesión del OTP viva: el signOut
-    // está en vuelo y la pausa NO se libera hasta que resuelve. Antes, el
-    // efecto `visible && phase` la soltaba de inmediato por orden de efectos.
-    await act(async () => {
-      if (closeModal) closeModal();
-    });
-    await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith('local'));
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
-
-    await act(async () => resolveSignOut?.());
-
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
-  });
-
-  it('terminar el restablecimiento conserva la sesión: solo cancelar la cierra (B7)', async () => {
+  it('la pausa legal se sostiene durante todo el episodio y solo cae al terminar (ADR-084)', async () => {
     const screen = await renderWithTheme(
       <AuthModal onClose={jest.fn()} visible />,
     );
 
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
     await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
 
-    fireEvent.press(screen.getByTestId('stub-reset-success'));
+    const holds = mockSetRecoveryHold.mock.calls.map((call) => call[1]);
+    expect(holds.slice(holds.indexOf(true))).toEqual([true]);
 
+    await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await waitFor(() =>
+      expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(
+        expect.any(String),
+        false,
+      ),
+    );
+    expect(mockSignOut).toHaveBeenCalledWith('local');
+  });
+
+  it('la cancelación que falla deja el mensaje visible y el reintento cierra el episodio (ADR-084)', async () => {
+    mockSignOut.mockRejectedValueOnce(new Error('Sin conexión con la red.'));
+    const onCloseSpy = jest.fn();
+    const screen = await renderWithTheme(
+      <AuthModal onClose={onCloseSpy} visible />,
+    );
+
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+
+    await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await screen.findByTestId('stub-reset-error');
+    expect(onCloseSpy).not.toHaveBeenCalled();
+    expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(
+      expect.any(String),
+      true,
+    );
+
+    mockSignOut.mockResolvedValue(undefined);
+    await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(2));
+  });
+
+  it('desde verify-recovery, Atrás vuelve a pedir el código sin abandonar el episodio (ADR-084)', async () => {
+    const screen = await renderWithTheme(
+      <AuthModal onClose={jest.fn()} visible />,
+    );
+
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+
+    await fireEvent.press(screen.getByLabelText('Volver'));
+
+    expect(await screen.findByTestId('stub-forgot-screen')).toBeTruthy();
+    expect(mockSetRecoveryHold).toHaveBeenLastCalledWith(
+      expect.any(String),
+      true,
+    );
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
-  it('ruta 1 (B7 r4): reset → atrás → forgot → Cancelar/Iniciar sesión cierra la sesión local y solo tras el signOut se libera la pausa', async () => {
-    let resolveSignOut: (() => void) | undefined;
-    mockSignOut.mockImplementation(
+  it('tras un episodio terminado el modal se cierra y se reabre con normalidad (ADR-084)', async () => {
+    const onCloseSpy = jest.fn();
+    function ModalHarness() {
+      const [visible, setVisible] = useState(true);
+      return (
+        <AuthModal
+          onClose={() => {
+            onCloseSpy();
+            setVisible(false);
+          }}
+          visible={visible}
+        />
+      );
+    }
+    const screen = await renderWithTheme(<ModalHarness />);
+
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+
+    // «Atrás» cancela con destino «volver a login»: el episodio queda en
+    // `canceled` y el modal sigue abierto en inicio de sesión.
+    await fireEvent.press(screen.getByLabelText('Volver'));
+    await screen.findByText('Iniciar sesión');
+    expect(onCloseSpy).not.toHaveBeenCalled();
+
+    // Y desde ahí se puede cerrar: con el episodio terminado, pedir otra
+    // cancelación sería un no-op del reductor y el modal quedaba atrapado.
+    await fireEvent.press(screen.getByLabelText('Volver'));
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    expect(await screen.findByTestId('stub-login-forgot')).toBeTruthy();
+  });
+
+  it('mientras guarda, Cancelar, Atrás y el cierre quedan bloqueados (ADR-084)', async () => {
+    let resolveSave: (() => void) | undefined;
+    mockSetNewPassword.mockImplementation(
       () =>
         new Promise<void>((resolve) => {
-          resolveSignOut = resolve;
+          resolveSave = resolve;
         }),
     );
-    const onClose = jest.fn();
-    const screen = await renderWithTheme(
-      <AuthModal onClose={onClose} visible />,
-    );
-
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
-    await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
-    await screen.findByText('Nueva contraseña');
-
-    // Atrás desde «Nueva contraseña» es una salida con la sesión del OTP viva:
-    // pasa por cancelReset y no navega hasta que signOut('local') resuelve.
-    fireEvent.press(screen.getByLabelText('Volver'));
-    await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith('local'));
-    expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
-    expect(onClose).not.toHaveBeenCalled();
-
-    await act(async () => resolveSignOut?.());
-
-    // Llega a forgot solo tras el éxito, y la pausa cae después del signOut.
-    await screen.findByText('Recuperar contraseña');
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-
-    // Desde forgot, Cancelar tampoco reabre la sesión: ya se cerró antes de
-    // liberar la pausa, así que no vuelve a disparar signOut.
-    fireEvent.press(screen.getByTestId('stub-forgot-cancel'));
-    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-
-    // La misma cadena saliendo por «Iniciar sesión»: el back ya cerró la
-    // sesión antes, entrar en login no dispara otro signOut.
-    mockSignOut.mockResolvedValue(undefined);
-    const loginScreen = await renderWithTheme(
-      <AuthModal onClose={onClose} visible />,
-    );
-    fireEvent.press(await loginScreen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await loginScreen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await loginScreen.findByTestId('stub-forgot-send'));
-    await loginScreen.findByText('recovery');
-    fireEvent.press(await loginScreen.findByTestId('stub-verify-success'));
-    await loginScreen.findByText('Nueva contraseña');
-    fireEvent.press(loginScreen.getByLabelText('Volver'));
-    await loginScreen.findByText('Recuperar contraseña');
-
-    fireEvent.press(loginScreen.getByTestId('stub-forgot-login'));
-    await loginScreen.findByText('Iniciar sesión');
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
-    expect(mockSignOut).toHaveBeenCalledTimes(2);
-  });
-
-  it('ruta 3 (B7 r4): si signOut falla, la sesión no se habilita: pausa sostenida, mensaje visible y reintentar cierra', async () => {
-    mockSignOut.mockRejectedValue(new Error('Sin conexión con la red.'));
-    const onClose = jest.fn();
-    const screen = await renderWithTheme(
-      <AuthModal onClose={onClose} visible />,
-    );
-
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
-    await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
-    await screen.findByText('Nueva contraseña');
-
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-
-    // El modal no se oculta, el error queda visible y la pausa se sostiene:
-    // la sesión del OTP no puede quedar habilitada.
-    await screen.findByText('Sin conexión con la red.');
-    expect(onClose).not.toHaveBeenCalled();
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
-
-    // Reintentar con el mismo botón: el signOut llega a término y recién ahí
-    // se libera la pausa y se cierra el modal.
-    mockSignOut.mockResolvedValue(undefined);
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
-  });
-
-  it('ruta 4 (B9 r5): cancelación fallida y luego contraseña guardada — termina por éxito: pausa liberada, sesión no cerrada y modal cerrado sin cancelar', async () => {
-    mockSignOut.mockRejectedValue(new Error('Sin conexión con la red.'));
-    let closeModal: (() => void) | null = null;
     const onCloseSpy = jest.fn();
-    function ModalHarness() {
-      const [visible, setVisible] = useState(true);
-      closeModal = () => setVisible(false);
-      return (
-        <AuthModal
-          onClose={() => {
-            onCloseSpy();
-            setVisible(false);
-          }}
-          visible={visible}
-        />
-      );
-    }
-    const screen = await renderWithTheme(<ModalHarness />);
-
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
-    await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
-    await screen.findByText('Nueva contraseña');
-
-    // Cancelar falla: el error queda visible y la pausa se sostiene.
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-    await screen.findByText('Sin conexión con la red.');
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
-
-    // Guardar la contraseña nueva completa el restablecimiento PESE al error
-    // de cancelación pendiente: el éxito termina por una transición distinta
-    // (completeRecovery), no vuelve a intentar cerrar la sesión.
-    expect(closeModal).not.toBeNull();
-    fireEvent.press(screen.getByTestId('stub-reset-success'));
-    await waitFor(() => expect(onCloseSpy).toHaveBeenCalledTimes(1));
-
-    // B9: la sesión no se toca (el único signOut fue el intento de cancelar que
-    // falló) y la pausa se libera. Aunque `visible` cae, el cierre por éxito no
-    // dispara la cancelación de nuevo: la fase ya es `inactive`.
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
-  });
-
-  it('ruta 5 (B11 r7): guardar la contraseña durante una cancelación en vuelo con la sesión realmente conservada — la terminación encolada gana: pausa liberada y cierre por éxito aunque el signOut falle', async () => {
-    let rejectSignOut: (() => void) | undefined;
-    mockSignOut.mockImplementation(
-      () =>
-        new Promise<void>((_resolve, reject) => {
-          rejectSignOut = () => reject(new Error('Sin conexión con la red.'));
-        }),
+    const screen = await renderWithTheme(
+      <AuthModal onClose={onCloseSpy} visible />,
     );
-    // El signOut falló pero la sesión sigue viva (B11): la terminación gana.
-    mockGetSession.mockResolvedValue(mockOtpSession);
-    const onCloseSpy = jest.fn();
-    function ModalHarness() {
-      const [visible, setVisible] = useState(true);
-      return (
-        <AuthModal
-          onClose={() => {
-            onCloseSpy();
-            setVisible(false);
-          }}
-          visible={visible}
-        />
-      );
-    }
-    const screen = await renderWithTheme(<ModalHarness />);
 
-    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
-    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
-    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
-    await screen.findByText('recovery');
-    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    await fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    await fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
 
-    // Cancelar deja el signOut del OTP en vuelo (diferido).
-    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
-    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
-    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+    await fireEvent.press(screen.getByTestId('stub-reset-submit'));
+    await screen.findByTestId('stub-reset-saving');
 
-    // Guardar la contraseña mientras la cancelación sigue pendiente: el éxito
-    // de setNewPassword encola la terminación. El host no re-abre la sesión ni
-    // el cierre por visible=false lanza una segunda cancelación.
-    // B13(r8): el cierre se encola JUNTO con la terminación. Aquí todavía no
-    // puede haber ocurrido: la carrera sigue sin resolver y nadie sabe si gana
-    // la terminación o la cancelación. Antes esta línea esperaba el cierre
-    // inmediato, que era precisamente el defecto.
-    fireEvent.press(screen.getByTestId('stub-reset-success'));
+    // Guardar de nuevo, cancelar y «Atrás»: los tres se ignoran.
+    await fireEvent.press(screen.getByTestId('stub-reset-submit'));
+    await fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await fireEvent.press(screen.getByLabelText('Volver'));
+    expect(mockSetNewPassword).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).not.toHaveBeenCalled();
     expect(onCloseSpy).not.toHaveBeenCalled();
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
 
-    // La cancelación pendiente falla y la sesión sigue viva: la terminación
-    // encolada gana —inactive, nada de cancelError con el modal ya cerrado—.
-    await act(async () => {
-      rejectSignOut?.();
-    });
-    await waitFor(() =>
-      expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false),
-    );
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(onCloseSpy).toHaveBeenCalledTimes(1);
+    resolveSave?.();
+    await waitFor(() => expect(onCloseSpy).toHaveBeenCalledTimes(1));
+    // Terminar nunca cierra la sesión del OTP.
+    expect(mockSignOut).not.toHaveBeenCalled();
+
+    // `onClose` es un espía aquí, así que el modal sigue presentado. Se desmonta
+    // para que la pila interna de `BottomSheetModal` no impida montar el de la
+    // prueba siguiente.
+    screen.unmount();
   });
 });

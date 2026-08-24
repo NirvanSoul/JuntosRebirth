@@ -21,7 +21,8 @@ import {
   type InvitationPreview,
 } from '@/features/spaces/gateways/supabaseInvitationGateway';
 import { useInvitationAutoAcceptance } from '@/features/spaces/hooks/useInvitationAutoAcceptance';
-import { useRecoveryPhase } from '@/features/auth/hooks/useRecoveryPhase';
+import { isLegalGateHalted } from '@/features/auth/recovery/recoveryMachine';
+import { usePasswordRecoveryFlow } from '@/features/auth/recovery/usePasswordRecoveryFlow';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -95,11 +96,7 @@ export function AcceptInvitationScreen({
 }: AcceptInvitationScreenProps) {
   const styles = useThemedStyles(createStyles);
   const { colors } = useTheme();
-  const {
-    isReady: isAuthReady,
-    session,
-    setRecoveryHalted,
-  } = useLegalSessionGate();
+  const { isReady: isAuthReady, session } = useLegalSessionGate();
   const [previewState, setPreviewState] = useState<PreviewState>({
     status: 'loading',
   });
@@ -107,30 +104,20 @@ export function AcceptInvitationScreen({
     status: 'idle',
   });
   const [authStep, setAuthStep] = useState<AuthFlowStep>({ screen: 'login' });
-  const {
-    cancelReset,
-    completeRecovery,
-    finishRecovery,
-    phase: recoveryPhase,
-    startRecovery,
-  } = useRecoveryPhase();
-
-  // Mientras hay un subflujo de recuperación, la sesión del OTP queda en pausa:
-  // ni la puerta legal ni la autoaceptación pueden cortocircuitar el
-  // restablecimiento. El cleanup libera la pausa al salir o si esta pantalla se
-  // desmonta a mitad (B3): la puerta nunca queda colgada para nadie.
-  useEffect(() => {
-    setRecoveryHalted(recoveryPhase.kind !== 'inactive');
-    return () => setRecoveryHalted(false);
-  }, [recoveryPhase.kind, setRecoveryHalted]);
-  const goToForgot = useCallback(() => {
-    startRecovery();
+  // ADR-084: este anfitrión no navega a ningún destino propio al terminar: la
+  // pausa cae y la autoaceptación reacciona sola. Al cancelar vuelve al inicio
+  // de sesión. La pausa, las dos operaciones y la identidad del episodio son del
+  // controlador: aquí no queda ningún efecto de recuperación.
+  const backToLogin = useCallback(() => setAuthStep({ screen: 'login' }), []);
+  const recovery = usePasswordRecoveryFlow({
+    onCanceled: backToLogin,
+    onCompleted: backToLogin,
+  });
+  const goToForgot = () => {
+    recovery.start();
     setAuthStep({ screen: 'forgot' });
-  }, [startRecovery]);
-  const goToLogin = useCallback(() => {
-    finishRecovery();
-    setAuthStep({ screen: 'login' });
-  }, [finishRecovery]);
+  };
+  const goToLogin = () => recovery.requestCancel();
 
   useEffect(() => {
     let isMounted = true;
@@ -172,7 +159,7 @@ export function AcceptInvitationScreen({
     isAuthReady,
     onAccept: handleAccept,
     previewState,
-    recoveryPhaseKind: recoveryPhase.kind,
+    isRecoveryHalted: isLegalGateHalted(recovery.state),
     session,
   });
 
@@ -255,7 +242,7 @@ export function AcceptInvitationScreen({
   }
 
   // La sesión del OTP no cortocircuita mientras haya subflujo de recuperación.
-  if (session && recoveryPhase.kind === 'inactive') {
+  if (session && !isLegalGateHalted(recovery.state)) {
     const isAccepting = acceptState.status === 'accepting';
     return (
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
@@ -318,9 +305,9 @@ export function AcceptInvitationScreen({
             Inicia sesión o crea una cuenta para aceptarla.
           </Text>
 
-          {recoveryPhase.kind === 'cancelError' ? (
+          {recovery.errorMessage !== null && authStep.screen !== 'reset' ? (
             <Text tone="expense" variant="footnote">
-              {recoveryPhase.message}
+              {recovery.errorMessage}
             </Text>
           ) : null}
 
@@ -377,9 +364,10 @@ export function AcceptInvitationScreen({
             <ForgotPasswordScreen
               onCancel={goToLogin}
               onNavigateToLogin={goToLogin}
-              onSuccess={({ email }) =>
-                setAuthStep({ screen: 'verify-recovery', email })
-              }
+              onSuccess={({ email }) => {
+                recovery.codeSent();
+                setAuthStep({ screen: 'verify-recovery', email });
+              }}
             />
           ) : null}
 
@@ -387,22 +375,25 @@ export function AcceptInvitationScreen({
             <VerifyCodeScreen
               email={authStep.email}
               onCancel={() => setAuthStep({ screen: 'forgot' })}
-              onSuccess={() => setAuthStep({ screen: 'reset' })}
+              onSuccess={() => {
+                // A partir de aquí existe la sesión del OTP: cancelar pasará
+                // siempre por `signOut('local')`.
+                recovery.codeVerified();
+                setAuthStep({ screen: 'reset' });
+              }}
               purpose="recovery"
             />
           ) : null}
 
           {authStep.screen === 'reset' ? (
+            // ADR-084: pantalla controlada. Al terminar, la pausa cae y la
+            // autoaceptación reacciona sola; no hay destino propio que navegar.
             <ResetPasswordScreen
-              onCancel={() =>
-                void cancelReset(() => setAuthStep({ screen: 'login' }))
-              }
-              // B9: el éxito de setNewPassword termina por completeRecovery:
-              // libera la pausa sin cerrar la sesión aunque cancelar haya
-              // fallado, y recién entonces la autoaceptación puede ocurrir.
-              // B13(r8): sin destino propio, y envuelto para no pasar el evento
-              // del Pressable como si fuera la continuación.
-              onSuccess={() => completeRecovery()}
+              canCancel={recovery.canCancel || recovery.canRetryCancel}
+              errorMessage={recovery.errorMessage}
+              isSubmitting={recovery.state.kind === 'saving'}
+              onCancel={() => recovery.requestCancel()}
+              onSubmit={recovery.requestSave}
             />
           ) : null}
         </View>

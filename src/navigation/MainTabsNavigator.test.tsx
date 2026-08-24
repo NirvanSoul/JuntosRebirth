@@ -40,6 +40,7 @@ jest.mock('@/features/spaces/hooks/useSpaces', () => ({
 }));
 
 jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
+  useRecoveryHold: () => jest.fn(),
   useLegalSessionGate: () => ({
     isReady: true,
     gateReady: true,
@@ -53,6 +54,7 @@ jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
     submitRegularization: jest.fn(),
     abandonSession: jest.fn(),
     setRecoveryHalted: jest.fn(),
+    setRecoveryHold: jest.fn(),
   }),
 }));
 

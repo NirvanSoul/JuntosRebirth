@@ -8,10 +8,11 @@ import {
   initialRecoveryEpisode,
   isLegalGateHalted,
   recoveryReducer,
+  type RecoveryCancelIntent,
   type RecoveryState,
 } from '@/features/auth/recovery/recoveryMachine';
 import { setNewPassword } from '@/features/auth/services/resetPasswordService';
-import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate';
+import { useRecoveryHold } from '@/features/legal/hooks/useLegalSessionGate';
 
 /**
  * Destinos del anfitrión. El controlador ejecuta **uno solo** por episodio, al
@@ -20,12 +21,18 @@ import { useLegalSessionGate } from '@/features/legal/hooks/useLegalSessionGate'
 export type RecoveryDestinations = {
   /** Contraseña puesta: la sesión queda legítimamente habilitada. */
   onCompleted: () => void;
-  /** Episodio abandonado: si había sesión del OTP, ya está cerrada. */
-  onCanceled: () => void;
+  /**
+   * Episodio abandonado: si habia sesion del OTP, ya esta cerrada. Recibe la
+   * intencion que la maquina custodio al ACEPTAR la cancelacion, no la que el
+   * anfitrion creyera vigente al pedirla.
+   */
+  onCanceled: (intent: RecoveryCancelIntent) => void;
 };
 
 export type PasswordRecoveryFlow = {
   state: RecoveryState;
+  /** Identidad del episodio en curso: los anfitriones indexan por ella. */
+  episodeId: number;
   /** Mensaje observable del último fallo, de guardado o de cancelación. */
   errorMessage: string | null;
   /** Abre un episodio nuevo («Olvidé mi contraseña»). */
@@ -36,8 +43,11 @@ export type PasswordRecoveryFlow = {
   codeVerified: () => void;
   /** Pide guardar. Se ignora si el episodio no lo admite. */
   requestSave: (password: string) => void;
-  /** Pide cancelar (también «Atrás» y el cierre). Se ignora si no lo admite. */
-  requestCancel: () => void;
+  /**
+   * Pide cancelar (tambien «Atras» y el cierre). Se ignora si no lo admite, y en
+   * ese caso la intencion NO se guarda.
+   */
+  requestCancel: (intent?: RecoveryCancelIntent) => void;
   /** El anfitrión deshabilita su chrome con estos, no con heurísticas propias. */
   canSave: boolean;
   canCancel: boolean;
@@ -66,7 +76,7 @@ export function usePasswordRecoveryFlow(
     recoveryReducer,
     initialRecoveryEpisode,
   );
-  const { setRecoveryHold } = useLegalSessionGate();
+  const setRecoveryHold = useRecoveryHold();
 
   const { episodeId, state } = episode;
 
@@ -94,6 +104,9 @@ export function usePasswordRecoveryFlow(
   const isCanceling = state.kind === 'canceling';
   const terminalKind =
     state.kind === 'completed' || state.kind === 'canceled' ? state.kind : null;
+  // La intención la custodió la máquina al aceptar la cancelación; el anfitrión
+  // no la recuerda por su cuenta.
+  const terminalIntent = state.kind === 'canceled' ? state.intent : null;
 
   // Invariante 4: la pausa se actualiza SOLO cuando cambia el booleano
   // derivado. Con el `cleanup` en el mismo efecto, React lo ejecutaba en cada
@@ -176,9 +189,9 @@ export function usePasswordRecoveryFlow(
     if (terminalKind === 'completed') {
       destinationsRef.current.onCompleted();
     } else {
-      destinationsRef.current.onCanceled();
+      destinationsRef.current.onCanceled(terminalIntent);
     }
-  }, [episodeId, terminalKind]);
+  }, [episodeId, terminalIntent, terminalKind]);
 
   const start = useCallback(() => dispatch({ type: 'start' }), []);
   const codeSent = useCallback(() => dispatch({ type: 'codeSent' }), []);
@@ -196,7 +209,8 @@ export function usePasswordRecoveryFlow(
   );
 
   const requestCancel = useCallback(
-    () => dispatch({ type: 'cancelRequested' }),
+    (intent?: RecoveryCancelIntent) =>
+      dispatch({ type: 'cancelRequested', intent }),
     [],
   );
 
@@ -207,6 +221,7 @@ export function usePasswordRecoveryFlow(
 
   return {
     state,
+    episodeId,
     errorMessage,
     start,
     codeSent,

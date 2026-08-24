@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import {
-  applyRecoveryHold,
   clearRecoveryHolds,
+  commitRecoveryHold,
   isRecoveryHalted,
+  registerRecoveryHoldEffects,
 } from '@/features/legal/hooks/recoveryHoldRegistry';
 import {
   consumePendingLegalAcceptance,
@@ -52,12 +53,6 @@ export type LegalSessionGate = {
   /** Cierra solo la sesión local: sin aceptación y sin revocar otros dispositivos. */
   abandonSession: () => Promise<void>;
   /**
-   * Pausa la puerta mientras una sesión de OTP de recuperación está activa:
-   * no se muestra la puerta ni se habilitan efectos hasta que termine el
-   * restablecimiento.
-   */
-  setRecoveryHalted: (halted: boolean) => void;
-  /**
    * ADR-084: concesión con dueño. Cada controlador de recuperación sostiene la
    * suya y solo libera la propia; la puerta sigue en pausa mientras quede otra.
    */
@@ -77,11 +72,7 @@ const noSessionSnapshot = {
 
 type GateSnapshot = Omit<
   LegalSessionGate,
-  | 'retryGate'
-  | 'submitRegularization'
-  | 'abandonSession'
-  | 'setRecoveryHalted'
-  | 'setRecoveryHold'
+  'retryGate' | 'submitRegularization' | 'abandonSession' | 'setRecoveryHold'
 >;
 
 let currentSnapshot: GateSnapshot = { ...noSessionSnapshot };
@@ -102,8 +93,9 @@ function subscribe(listener: () => void): () => void {
 let checkRunId = 0;
 let latestRequestedSession: Session | null = null;
 let checkLoop: Promise<void> | null = null;
-/** Dueño de las llamadas heredadas `setRecoveryHalted(boolean)`. */
-const legacyRecoveryOwner = 'legacy';
+
+/** Última sesión cruda conocida; la concesión de pausa no depende de instancias. */
+let latestRawSession: Session | null = null;
 
 /**
  * Solo para pruebas: reinicia el estado global del controlador (instantánea,
@@ -271,6 +263,40 @@ function requestGateCheck(session: Session): void {
   })();
 }
 
+// ADR-084: la concesión de pausa vive en `recoveryHoldRegistry`; aquí se
+// registran sus efectos de publicación (estado de módulo, no instancias). Al
+// pausar se descarta la comprobación en vuelo; al reanudar, se re-comprueba.
+registerRecoveryHoldEffects({
+  onHalt: () => {
+    checkRunId += 1;
+    latestRequestedSession = null;
+    publish({
+      ...currentSnapshot,
+      session: null,
+      rawSession: latestRawSession,
+      isReady: true,
+      gateReady: true,
+      isLegallyEnabled: false,
+      status: { kind: 'halted' },
+      error: null,
+      missingDocuments: [],
+    });
+  },
+  onResume: () => {
+    const resumedSession = currentSnapshot.rawSession ?? latestRawSession;
+    if (resumedSession) {
+      requestGateCheck(resumedSession);
+    } else {
+      publish({ ...noSessionSnapshot, isReady: true, rawSession: null });
+    }
+  },
+});
+
+/** Solo la concesión de pausa, sin suscribirse al resto de la puerta. */
+export function useRecoveryHold(): (ownerId: string, held: boolean) => void {
+  return commitRecoveryHold;
+}
+
 export function useLegalSessionGate(): LegalSessionGate {
   const { isReady, session } = useAuthSession();
   const [snapshot, setSnapshot] = useState<GateSnapshot>(() => ({
@@ -279,6 +305,7 @@ export function useLegalSessionGate(): LegalSessionGate {
   }));
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  latestRawSession = session;
   const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => subscribe(() => setSnapshot({ ...currentSnapshot })), []);
@@ -305,50 +332,7 @@ export function useLegalSessionGate(): LegalSessionGate {
     requestGateCheck(session);
   }, [isReady, retryToken, session]);
 
-  /**
-   * ADR-084: concesión con dueño. La puerta queda en pausa mientras exista
-   * alguna, y solo se reanuda cuando se libera la última: un anfitrión que se
-   * desmonta ya no puede soltar la pausa de otro que sigue restableciendo.
-   * Solo se actúa cuando el valor derivado cambia, para no republicar de más.
-   */
-  const setRecoveryHold = useCallback((ownerId: string, held: boolean) => {
-    const { isHalted: halted, wasHalted } = applyRecoveryHold(ownerId, held);
-    if (wasHalted === halted) return;
-    if (halted) {
-      // La pausa descarta la comprobación en vuelo: ningún resultado puede
-      // publicarse mientras el restablecimiento está a mitad.
-      checkRunId += 1;
-      latestRequestedSession = null;
-      publish({
-        ...currentSnapshot,
-        session: null,
-        rawSession: sessionRef.current,
-        isReady: true,
-        gateReady: true,
-        isLegallyEnabled: false,
-        status: { kind: 'halted' },
-        error: null,
-        missingDocuments: [],
-      });
-      return;
-    }
-    const resumedSession = currentSnapshot.rawSession ?? sessionRef.current;
-    if (resumedSession) {
-      requestGateCheck(resumedSession);
-    } else {
-      publish({ ...noSessionSnapshot, isReady: true, rawSession: null });
-    }
-  }, []);
-
-  /**
-   * Camino heredado de los anfitriones que aún usan `useRecoveryPhase`. Todos
-   * comparten el mismo dueño, así que entre ellos el comportamiento es el de
-   * antes; desaparece al sustituirlos por `usePasswordRecoveryFlow`.
-   */
-  const setRecoveryHalted = useCallback(
-    (halted: boolean) => setRecoveryHold(legacyRecoveryOwner, halted),
-    [setRecoveryHold],
-  );
+  const setRecoveryHold = commitRecoveryHold;
 
   const retryGate = useCallback(() => {
     setRetryToken((token) => token + 1);
@@ -424,7 +408,6 @@ export function useLegalSessionGate(): LegalSessionGate {
     retryGate,
     submitRegularization,
     abandonSession,
-    setRecoveryHalted,
     setRecoveryHold,
   };
 }
