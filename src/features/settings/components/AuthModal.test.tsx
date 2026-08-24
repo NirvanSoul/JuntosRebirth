@@ -1,4 +1,3 @@
-import type { Session } from '@supabase/supabase-js';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { useState } from 'react';
 
@@ -16,8 +15,8 @@ jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
 
 function createGateMock() {
   return {
-    session: null as Session | null,
-    rawSession: null as Session | null,
+    session: null,
+    rawSession: null,
     isReady: true,
     gateReady: true,
     isLegallyEnabled: true,
@@ -33,11 +32,6 @@ function createGateMock() {
 
 let mockGateState = createGateMock();
 let mockSetRecoveryHalted = mockGateState.setRecoveryHalted;
-
-/** Sesión que el OTP de recuperación crea al verificarse el código (B7). */
-const mockOtpSession = {
-  user: { id: 'user-1', email: 'persona@ejemplo.com' },
-} as unknown as Session;
 
 jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
   useLegalSessionGate: () => mockGateState,
@@ -166,14 +160,20 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     await screen.findByText('recovery');
     fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
-    mockGateState.session = mockOtpSession;
 
     fireEvent.press(screen.getByTestId('stub-reset-cancel'));
 
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith('local'));
   });
 
-  it('cerrar el modal a mitad de restablecimiento también cierra la sesión local del OTP (B7)', async () => {
+  it('ruta 2 (B7 r4): con signOut diferido, el cierre manual sostiene la pausa hasta que signOut resuelve', async () => {
+    let resolveSignOut: (() => void) | undefined;
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSignOut = resolve;
+        }),
+    );
     let closeModal: (() => void) | null = null;
     function ModalHarness() {
       const [visible, setVisible] = useState(true);
@@ -188,15 +188,19 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     await screen.findByText('recovery');
     fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
-    mockGateState.session = mockOtpSession;
 
-    // La X del modal llama a onClose: visible pasa a false con la sesión del
-    // OTP viva, lo mismo que cancelar el restablecimiento.
+    // Cierre manual (visible → false) con la sesión del OTP viva: el signOut
+    // está en vuelo y la pausa NO se libera hasta que resuelve. Antes, el
+    // efecto `visible && phase` la soltaba de inmediato por orden de efectos.
     await act(async () => {
       if (closeModal) closeModal();
     });
-
     await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith('local'));
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+
+    await act(async () => resolveSignOut?.());
+
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
   });
 
   it('terminar el restablecimiento conserva la sesión: solo cancelar la cierra (B7)', async () => {
@@ -210,10 +214,101 @@ describe('AuthModal — cableado de navegación de autenticación', () => {
     await screen.findByText('recovery');
     fireEvent.press(await screen.findByTestId('stub-verify-success'));
     await screen.findByText('Nueva contraseña');
-    mockGateState.session = mockOtpSession;
 
     fireEvent.press(screen.getByTestId('stub-reset-success'));
 
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('ruta 1 (B7 r4): reset → atrás → forgot → Cancelar/Iniciar sesión cierra la sesión local y solo tras el signOut se libera la pausa', async () => {
+    let resolveSignOut: (() => void) | undefined;
+    mockSignOut.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSignOut = resolve;
+        }),
+    );
+    const onClose = jest.fn();
+    const screen = await renderWithTheme(
+      <AuthModal onClose={onClose} visible />,
+    );
+
+    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+
+    // Atrás desde «Nueva contraseña» es una salida con la sesión del OTP viva:
+    // pasa por cancelReset y no navega hasta que signOut('local') resuelve.
+    fireEvent.press(screen.getByLabelText('Volver'));
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledWith('local'));
+    expect(screen.getByTestId('stub-reset-screen')).toBeTruthy();
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => resolveSignOut?.());
+
+    // Llega a forgot solo tras el éxito, y la pausa cae después del signOut.
+    await screen.findByText('Recuperar contraseña');
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+
+    // Desde forgot, Cancelar tampoco reabre la sesión: ya se cerró antes de
+    // liberar la pausa, así que no vuelve a disparar signOut.
+    fireEvent.press(screen.getByTestId('stub-forgot-cancel'));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+
+    // La misma cadena saliendo por «Iniciar sesión»: el back ya cerró la
+    // sesión antes, entrar en login no dispara otro signOut.
+    mockSignOut.mockResolvedValue(undefined);
+    const loginScreen = await renderWithTheme(
+      <AuthModal onClose={onClose} visible />,
+    );
+    fireEvent.press(await loginScreen.findByTestId('auth-modal-open-login'));
+    fireEvent.press(await loginScreen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await loginScreen.findByTestId('stub-forgot-send'));
+    await loginScreen.findByText('recovery');
+    fireEvent.press(await loginScreen.findByTestId('stub-verify-success'));
+    await loginScreen.findByText('Nueva contraseña');
+    fireEvent.press(loginScreen.getByLabelText('Volver'));
+    await loginScreen.findByText('Recuperar contraseña');
+
+    fireEvent.press(loginScreen.getByTestId('stub-forgot-login'));
+    await loginScreen.findByText('Iniciar sesión');
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+    expect(mockSignOut).toHaveBeenCalledTimes(2);
+  });
+
+  it('ruta 3 (B7 r4): si signOut falla, la sesión no se habilita: pausa sostenida, mensaje visible y reintentar cierra', async () => {
+    mockSignOut.mockRejectedValue(new Error('Sin conexión con la red.'));
+    const onClose = jest.fn();
+    const screen = await renderWithTheme(
+      <AuthModal onClose={onClose} visible />,
+    );
+
+    fireEvent.press(await screen.findByTestId('auth-modal-open-login'));
+    fireEvent.press(await screen.findByTestId('stub-login-forgot'));
+    fireEvent.press(await screen.findByTestId('stub-forgot-send'));
+    await screen.findByText('recovery');
+    fireEvent.press(await screen.findByTestId('stub-verify-success'));
+    await screen.findByText('Nueva contraseña');
+
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+
+    // El modal no se oculta, el error queda visible y la pausa se sostiene:
+    // la sesión del OTP no puede quedar habilitada.
+    await screen.findByText('Sin conexión con la red.');
+    expect(onClose).not.toHaveBeenCalled();
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+
+    // Reintentar con el mismo botón: el signOut llega a término y recién ahí
+    // se libera la pausa y se cierra el modal.
+    mockSignOut.mockResolvedValue(undefined);
+    fireEvent.press(screen.getByTestId('stub-reset-cancel'));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
   });
 });

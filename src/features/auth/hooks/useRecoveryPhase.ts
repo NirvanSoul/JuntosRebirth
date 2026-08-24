@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
 
@@ -17,14 +17,45 @@ export type RecoveryPhase =
  * igual que abandona la puerta, para no revocar la sesión del usuario en sus
  * otros dispositivos (B7): cancelar un restablecimiento sin haber puesto la
  * contraseña nueva jamás deja la sesión del OTP habilitada.
+ *
+ * B7(r4): las transiciones están blindadas para que ninguna salida pueda
+ * abandonar la recuperación sin pasar por `cancelReset`. Mientras el
+ * `signOut('local')` está en vuelo (`canceling`) los demás escritores quedan
+ * bloqueados —un segundo `cancelReset` no abre otra cuenta de la sesión, y ni
+ * `startRecovery` ni `finishRecovery` pueden cambiar la fase—. Tras un fallo
+ * (`cancelError`) la recuperación queda bloqueada y la pausa retenida hasta
+ * que el mismo `cancelReset` reintente y llegue a término.
  */
 export function useRecoveryPhase() {
   const [phase, setPhase] = useState<RecoveryPhase>({ kind: 'inactive' });
+  const phaseRef = useRef<RecoveryPhase>({ kind: 'inactive' });
+  phaseRef.current = phase;
 
-  const startRecovery = useCallback(() => setPhase({ kind: 'active' }), []);
-  const finishRecovery = useCallback(() => setPhase({ kind: 'inactive' }), []);
+  const startRecovery = useCallback(() => {
+    if (
+      phaseRef.current.kind === 'canceling' ||
+      phaseRef.current.kind === 'cancelError'
+    ) {
+      return;
+    }
+    setPhase({ kind: 'active' });
+  }, []);
+
+  const finishRecovery = useCallback(() => {
+    if (
+      phaseRef.current.kind === 'canceling' ||
+      phaseRef.current.kind === 'cancelError'
+    ) {
+      return;
+    }
+    setPhase({ kind: 'inactive' });
+  }, []);
 
   const cancelReset = useCallback(async (onCanceled: () => void) => {
+    // Idempotente: mientras el signOut local está en vuelo, un segundo
+    // cancelReset (doble toque en Volver o en Cancelar) se ignora; solo desde
+    // `cancelError` se puede invocar de nuevo, y eso es el reintento.
+    if (phaseRef.current.kind === 'canceling') return;
     setPhase({ kind: 'canceling' });
     try {
       await createSupabaseAuthGateway().signOut('local');

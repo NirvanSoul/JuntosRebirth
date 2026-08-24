@@ -65,14 +65,16 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
   } = useRecoveryPhase();
   const [step, setStep] = useState<AuthModalStep>({ screen: 'entry' });
 
-  // B3 + B7: igual que en el resto de hosts, el subflujo de recuperación pausa
-  // la puerta legal mientras el OTP crea una sesión. La pausa solo tiene
-  // sentido con el modal abierto: cerrarlo a mitad de restablecimiento la
-  // libera, y el cleanup desmonta el host sin dejar la puerta colgada.
+  // B3 + B7 + B7(r4): la pausa deriva solo de la fase de recuperación, nunca de
+  // `visible`. Mientras existe la sesión del OTP se sostiene durante
+  // `canceling` y `cancelError`; solo cae al pasar a `inactive` —tras un
+  // signOut('local') con éxito o al terminar el restablecimiento— o al
+  // desmontar el host. Cerrar el modal ya no puede despausar la puerta por
+  // orden de efectos antes de que el signOut asíncrono termine.
   useEffect(() => {
-    setRecoveryHalted(visible && recoveryPhase.kind !== 'inactive');
+    setRecoveryHalted(recoveryPhase.kind !== 'inactive');
     return () => setRecoveryHalted(false);
-  }, [recoveryPhase.kind, setRecoveryHalted, visible]);
+  }, [recoveryPhase.kind, setRecoveryHalted]);
 
   useEffect(() => {
     if (visible) {
@@ -80,13 +82,28 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
     }
   }, [visible]);
 
+  // B7(r4): si `visible` cae a mitad de recuperación por una vía que no pasa
+  // por requestClose (el padre fuerza el cierre), la sesión del OTP se sigue
+  // cancelando. La pausa no la libera el cierre: la gobierna solo la fase, así
+  // que se mantiene mientras el signOut está pendiente y si este falla.
   useEffect(() => {
-    if (!visible && recoveryPhase.kind === 'active') {
-      // B7: cerrar el modal a mitad de restablecimiento equivale a cancelarlo:
-      // la sesión creada por el OTP se cierra en local y no queda habilitada.
+    if (!visible && recoveryPhase.kind !== 'inactive') {
       void cancelReset(() => undefined);
     }
   }, [cancelReset, recoveryPhase.kind, visible]);
+
+  // B7(r4): toda salida posterior a la creación de la sesión del OTP pasa por
+  // cancelReset. `requestClose` es el único camino hacia onClose: si la fase de
+  // recuperación sigue viva, primero se cierra la sesión local y solo tras el
+  // éxito el modal se oculta; si el signOut falla, el modal permanece con el
+  // mensaje visible y el mismo botón reintenta.
+  const requestClose = () => {
+    if (recoveryPhase.kind !== 'inactive') {
+      void cancelReset(onClose);
+    } else {
+      onClose();
+    }
+  };
 
   const goBack = () => {
     switch (step.screen) {
@@ -104,16 +121,23 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
         setStep({ screen: 'signup', step: 1 });
         return;
       case 'forgot':
+        // Hasta aquí nunca existe la sesión del OTP (solo se crea al verificar
+        // el código): salir de la recuperación solo normaliza la fase.
+        finishRecovery();
         setStep({ screen: 'login' });
         return;
       case 'verify-recovery':
         setStep({ screen: 'forgot' });
         return;
       case 'reset':
-        setStep({ screen: 'forgot' });
+        // B7(r4) ruta 1: volver desde «nueva contraseña» sin ponerla es
+        // cancelar. La vuelta a forgot espera al signOut('local') con éxito; si
+        // falla, queda `cancelError` con el mensaje visible y el mismo botón
+        // reintenta, y la pausa jamás se libera con la sesión del OTP viva.
+        void cancelReset(() => setStep({ screen: 'forgot' }));
         return;
       case 'entry':
-        onClose();
+        requestClose();
         return;
     }
   };
@@ -127,8 +151,9 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
 
   return (
     <AppModal
+      allowManualDismiss={recoveryPhase.kind === 'inactive'}
       containsScrollable
-      onClose={onClose}
+      onClose={requestClose}
       stackBehavior="push"
       testID="auth-modal"
       variant="expanded"
@@ -150,6 +175,12 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
             <ModalCloseButton onPress={goBack} variant="close" />
           ) : null}
         </View>
+
+        {recoveryPhase.kind === 'cancelError' ? (
+          <Text style={styles.cancelError} tone="expense" variant="footnote">
+            {recoveryPhase.message}
+          </Text>
+        ) : null}
 
         {step.screen === 'signup' || step.screen === 'verify-signup' ? (
           <StepProgressBar
@@ -192,7 +223,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
 
             {step.screen === 'login' ? (
               <LoginScreen
-                onCancel={onClose}
+                onCancel={requestClose}
                 onNavigateToForgotPassword={() => {
                   startRecovery();
                   setStep({ screen: 'forgot' });
@@ -221,7 +252,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
             {step.screen === 'verify-signup' ? (
               <VerifyCodeScreen
                 email={step.email}
-                onCancel={onClose}
+                onCancel={requestClose}
                 onGoToLogin={() => setStep({ screen: 'login' })}
                 onGoToRecovery={() => {
                   startRecovery();
@@ -234,10 +265,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
 
             {step.screen === 'forgot' ? (
               <ForgotPasswordScreen
-                onCancel={() => {
-                  finishRecovery();
-                  onClose();
-                }}
+                onCancel={requestClose}
                 onNavigateToLogin={() => {
                   finishRecovery();
                   setStep({ screen: 'login' });
@@ -251,10 +279,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
             {step.screen === 'verify-recovery' ? (
               <VerifyCodeScreen
                 email={step.email}
-                onCancel={() => {
-                  finishRecovery();
-                  onClose();
-                }}
+                onCancel={requestClose}
                 onSuccess={() => setStep({ screen: 'reset' })}
                 purpose="recovery"
               />
@@ -279,6 +304,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
 function createStyles() {
   return StyleSheet.create({
     container: { flex: 1, gap: spacing.lg },
+    cancelError: { marginBottom: spacing.sm },
     header: {
       flexDirection: 'row',
       alignItems: 'center',

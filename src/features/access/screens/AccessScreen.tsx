@@ -150,6 +150,12 @@ export function AccessScreen() {
           </Text>
         </View>
 
+        {recoveryPhase.kind === 'cancelError' ? (
+          <Text tone="expense" variant="footnote">
+            {recoveryPhase.message}
+          </Text>
+        ) : null}
+
         {step.screen === 'signup' || step.screen === 'verify-signup' ? (
           <StepProgressBar
             currentStep={

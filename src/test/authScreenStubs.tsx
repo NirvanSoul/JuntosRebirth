@@ -13,6 +13,7 @@ type AnyProps = Record<string, unknown> & {
   onGoToLogin?: () => void;
   onGoToRecovery?: () => void;
   onNavigateToForgotPassword?: () => void;
+  onNavigateToLogin?: () => void;
   onNavigateToSignUp?: () => void;
   onSuccess?: (payload: { email: string }) => void;
   purpose?: string;
@@ -78,6 +79,15 @@ export function VerifyCodeScreenStub(props: AnyProps) {
 export function ForgotPasswordScreenStub(props: AnyProps) {
   return (
     <View testID="stub-forgot-screen">
+      {props.onCancel ? (
+        <Pressable onPress={props.onCancel} testID="stub-forgot-cancel" />
+      ) : null}
+      {props.onNavigateToLogin ? (
+        <Pressable
+          onPress={props.onNavigateToLogin}
+          testID="stub-forgot-login"
+        />
+      ) : null}
       <Pressable
         onPress={() => props.onSuccess?.({ email: 'persona@ejemplo.com' })}
         testID="stub-forgot-send"
