@@ -90,11 +90,16 @@ ya no está aquí: el macrobloque de integración (ADR-083) lo implementó, con 
 puerta de sesión obligatoria, el paso legal en el registro y la intención
 durable. El Gate 2 (ronda 1) rechazó cinco bloqueantes conductuales (B1–B5) y
 dos condiciones (C1–C2); se corrigieron escribiendo primero la tabla de
-transiciones de la puerta y una prueba roja por bloqueante. Validación actual:
-**134 suites / 866 pruebas / EXIT=0**. Queda el segundo veredicto del Gate 2
-sobre este código y, solo después, el smoke físico (recuperación de contraseña
-incluida, y con `enable_confirmations` activado en local para los pasos del
-OTP) antes de marcar la tarea cerrada.
+transiciones de la puerta y una prueba roja por bloqueante. La ronda 2
+(2026-08-24) rechazó B6–B8 —identidad del snapshot, sesión del OTP viva al
+cancelar y ranura única de intención—; los tres están corregidos y commiteados
+(B8 ranura por correo normalizado, B6 identidad en los snapshots autenticados y
+B7 cancelación segura en los tres hosts) con prueba roja previa por defecto y
+evidencia con `COMANDO` + `EXIT=`. Validación actual: **134 suites / 877
+pruebas / EXIT=0**. Queda el veredicto de la ronda 3 del Gate 2 y, solo
+después, el smoke físico (recuperación de contraseña incluida, y con
+`enable_confirmations` activado en local para los pasos del OTP) antes de
+marcar la tarea cerrada.
 
 ## Backend
 

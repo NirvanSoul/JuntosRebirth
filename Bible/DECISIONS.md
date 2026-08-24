@@ -5415,7 +5415,7 @@ del borrado, archivo o disolución del espacio.
 
 # ADR-083 — Integración legal en la autenticación existente: intención durable y puerta de sesión obligatoria
 
-**Estado:** Aceptada (implementada; pendientes smoke físico y verificación de ambos verificadores).
+**Estado:** Aceptada (implementada; Gate 2 ronda 2 con B6–B8 corregidos y commiteados; pendientes el veredicto de ronda 3 y el smoke físico).
 
 ## Contexto
 
@@ -5539,6 +5539,57 @@ Decisiones que cierran cada bloqueante:
 - **C2 — createdAt:** eliminado del esquema v1 (no gobernaba caducidad ni se
   leía). La clave `@juntoss/pending-legal-acceptance/v1` se conserva: una
   intención antigua con el campo extra sigue siendo válida.
+
+## Gate 2 — ronda 2 (2026-08-24): B6–B8 y formato de evidencia
+
+Los verificadores confirmaron la ronda 2 de forma conjunta e independiente:
+Gate 1 reproducible en ambas ejecuciones (**134 suites / 866 pruebas / EXIT=0**)
+y B4 y C2 quedan aprobados sin reservas. B1, B2, B3 y B5 siguen aprobados como
+mecanismos; la ronda 2 rechazó tres defectos nuevos —el escalón siguiente de
+esos mismos mecanismos—, todos con la misma causa de fondo: **estado global sin
+dueño** (una ranura única para algo que es por identidad, sin cotejar la
+identidad antes de usar).
+
+- **B6 — `cleared` sin identidad:** el snapshot autenticado no guardaba de quién
+  era. Con el snapshot `cleared` de A y la sesión cruda de B, la vista derivada
+  solo disparaba para `no-session` y devolvía el permiso de A durante el render
+  previo al efecto de comprobación; RootNavigator combinaba la sesión cruda con
+  ese permiso viejo. Corrección: cada snapshot autenticado lleva su identidad
+  (`rawSession.user.id`) y la vista deriva `checking` siempre que la sesión
+  cruda actual no coincida con ella; el espejo de cierre de sesión (snapshot
+  autenticado sin sesión cruda presente) se presenta como `no-session` y la
+  pausa `halted` se conserva. La suite entera usaba `user-1` para todas las
+  sesiones, así que la prueba roja monta A `cleared` y remonta con B de otra
+  identidad antes de que la puerta pueda reaccionar.
+- **B7 — cancelar la recuperación dejaba viva la sesión del OTP:** el OTP ya
+  había creado sesión; `AccessScreen` y `AuthModal` volvían o cerraban sin
+  `signOut('local')` y, al liberar la pausa, la puerta podía habilitarla sin
+  contraseña nueva. Corrección: `useRecoveryPhase` (movido a
+  `features/auth/hooks`) se reutiliza en los tres hosts; cancelar (`cancelReset`)
+  cierra en local la sesión del OTP, cerrar el modal a mitad de restablecimiento
+  también y terminar (contraseña puesta) jamás cierra. Pruebas con la transición
+  real —sin sesión → el OTP crea sesión → reset → cancelar— comprobando
+  `signOut('local')` (los mocks antiguos no cambiaban de sesión).
+- **B8 — la intención durable seguía siendo una sola ranura:** una clave fija
+  que cada alta sobrescribía; el registro de B pisaba la intención de A y al
+  verificar A ya no existía su aceptación. Corrección: la intención se
+  almacena, consume y borra por correo normalizado
+  (`@juntoss/pending-legal-acceptance/v1:<correo>`); la clave heredada de ranura
+  única se migra al leer solo si su titular es ese correo. El guard de
+  `LegalAcceptanceEmailMismatchError` se conserva como fallo observable ante
+  almacenamiento ajeno. Pruebas: guardar A y B, consumir B conservando A y
+  después consumir A.
+
+**Formato de evidencia (exigencia de los verificadores):** cada fichero de
+evidencia debe contener literalmente el comando ejecutado y `EXIT=<código>`;
+los ficheros de esta ronda (rojo por defecto y verde tras el fix) incluyen
+ambos.
+
+Validación de la ronda 3 sobre el árbol ya commiteado: **134 suites / 877
+pruebas / EXIT=0** (`npm run validate`, post-commit). Prioridad del cierre:
+veredicto de ronda 3 de ambos verificadores y, solo después, el smoke físico
+completo.
+
 ## Consecuencias
 
 - `signUpTotalSteps` pasa de 4 a 5; los tres hosts (AccessScreen, AuthModal,
