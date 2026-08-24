@@ -6059,7 +6059,7 @@ siguiente. `saveError` devuelve el control completo (reintentar o cancelar).
 
 ## Validación y higiene de tests
 
-- `npm run validate` en el árbol commiteado: **136 suites / 1002 pruebas /
+- `npm run validate` en el árbol commiteado: **136 suites / 1007 pruebas /
   EXIT=0**.
 - **`--randomize`**: la suite de `AuthModal` quedó estable (10/10 repetido).
   Tres causas corregidas en los tests, no en producción: el `afterEach` llamaba
