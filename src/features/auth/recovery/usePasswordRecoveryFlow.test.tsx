@@ -1,0 +1,240 @@
+import { act, renderHook } from '@testing-library/react-native';
+
+import { usePasswordRecoveryFlow } from '@/features/auth/recovery/usePasswordRecoveryFlow';
+
+const mockSetNewPassword = jest.fn();
+jest.mock('@/features/auth/services/resetPasswordService', () => ({
+  setNewPassword: (password: string) => mockSetNewPassword(password),
+}));
+
+const mockSignOut = jest.fn();
+jest.mock('@/features/auth/gateways/supabaseAuthGateway', () => ({
+  createSupabaseAuthGateway: () => ({ signOut: mockSignOut }),
+}));
+
+const mockSetRecoveryHalted = jest.fn();
+jest.mock('@/features/legal/hooks/useLegalSessionGate', () => ({
+  useLegalSessionGate: () => ({ setRecoveryHalted: mockSetRecoveryHalted }),
+}));
+
+/** Promesa que la prueba resuelve o rechaza cuando quiere. */
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, reject, resolve };
+}
+
+async function renderFlow() {
+  const onCompleted = jest.fn();
+  const onCanceled = jest.fn();
+  const view = await renderHook(() =>
+    usePasswordRecoveryFlow({ onCanceled, onCompleted }),
+  );
+  return { onCanceled, onCompleted, ...view };
+}
+
+/** Lleva el episodio hasta `ready`: código pedido, enviado y verificado. */
+async function arriveAtReady(result: {
+  current: ReturnType<typeof usePasswordRecoveryFlow>;
+}) {
+  await act(async () => result.current.start());
+  await act(async () => result.current.codeSent());
+  await act(async () => result.current.codeVerified());
+  expect(result.current.state.kind).toBe('ready');
+}
+
+describe('usePasswordRecoveryFlow — el controlador es dueño de las dos operaciones', () => {
+  beforeEach(() => {
+    mockSetNewPassword.mockReset();
+    mockSetNewPassword.mockResolvedValue(undefined);
+    mockSignOut.mockReset();
+    mockSignOut.mockResolvedValue(undefined);
+    mockSetRecoveryHalted.mockReset();
+  });
+
+  it('guardar con éxito: un solo destino de terminación y ninguno de cancelación', async () => {
+    const { onCanceled, onCompleted, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestSave('contraseñaNueva1'));
+
+    expect(mockSetNewPassword).toHaveBeenCalledWith('contraseñaNueva1');
+    expect(result.current.state.kind).toBe('completed');
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(onCanceled).not.toHaveBeenCalled();
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('cancelar tras verificar: cierra la sesión en local y ejecuta un solo destino', async () => {
+    const { onCanceled, onCompleted, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestCancel());
+
+    expect(mockSignOut).toHaveBeenCalledWith('local');
+    expect(result.current.state.kind).toBe('canceled');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    expect(onCompleted).not.toHaveBeenCalled();
+  });
+
+  it('cancelar antes de verificar no cierra ninguna sesión: no hay ninguna que cerrar', async () => {
+    const { onCanceled, result } = await renderFlow();
+    await act(async () => result.current.start());
+    await act(async () => result.current.codeSent());
+
+    await act(async () => result.current.requestCancel());
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(result.current.state.kind).toBe('canceled');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+  });
+
+  // ─── Los dos órdenes de las dos asíncronas ───────────────────────────────
+
+  it('orden A — con el guardado en vuelo, cancelar NO abre un signOut ni cambia el episodio', async () => {
+    const save = deferred();
+    mockSetNewPassword.mockReturnValue(save.promise);
+    const { onCanceled, onCompleted, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestSave('contraseñaNueva1'));
+    expect(result.current.state.kind).toBe('saving');
+    expect(result.current.canCancel).toBe(false);
+
+    // Aquí es donde antes nacían B13 y B14. Ahora la petición se rechaza.
+    await act(async () => result.current.requestCancel());
+    expect(result.current.state.kind).toBe('saving');
+    expect(mockSignOut).not.toHaveBeenCalled();
+
+    await act(async () => {
+      save.resolve();
+      await save.promise;
+    });
+
+    expect(result.current.state.kind).toBe('completed');
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(onCanceled).not.toHaveBeenCalled();
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('orden B — con la cancelación en vuelo, guardar NO llama a setNewPassword', async () => {
+    const cancel = deferred();
+    mockSignOut.mockReturnValue(cancel.promise);
+    const { onCanceled, onCompleted, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestCancel());
+    expect(result.current.state.kind).toBe('canceling');
+    expect(result.current.canSave).toBe(false);
+
+    await act(async () => result.current.requestSave('contraseñaNueva1'));
+    expect(result.current.state.kind).toBe('canceling');
+    expect(mockSetNewPassword).not.toHaveBeenCalled();
+
+    await act(async () => {
+      cancel.resolve();
+      await cancel.promise;
+    });
+
+    expect(result.current.state.kind).toBe('canceled');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(mockSetNewPassword).not.toHaveBeenCalled();
+  });
+
+  // ─── Fallos observables ─────────────────────────────────────────────────
+
+  it('el guardado que falla devuelve el control: mensaje visible, y se puede reintentar o cancelar', async () => {
+    mockSetNewPassword.mockRejectedValueOnce(new Error('Contraseña débil.'));
+    const { onCanceled, onCompleted, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestSave('corta'));
+
+    expect(result.current.state.kind).toBe('saveError');
+    expect(result.current.errorMessage).toBe('Contraseña débil.');
+    expect(result.current.canSave).toBe(true);
+    expect(result.current.canCancel).toBe(true);
+    // Ningún destino todavía: el episodio sigue abierto.
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(onCanceled).not.toHaveBeenCalled();
+  });
+
+  it('la cancelación que falla sostiene la pausa y solo el reintento cierra el episodio', async () => {
+    mockSignOut.mockRejectedValueOnce(new Error('Sin conexión.'));
+    const { onCanceled, result } = await renderFlow();
+    await arriveAtReady(result);
+
+    await act(async () => result.current.requestCancel());
+    expect(result.current.state.kind).toBe('cancelError');
+    expect(result.current.errorMessage).toBe('Sin conexión.');
+    expect(onCanceled).not.toHaveBeenCalled();
+    // La pausa NO cae con la sesión posiblemente viva.
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+
+    mockSignOut.mockResolvedValue(undefined);
+    await act(async () => result.current.requestCancel());
+
+    expect(result.current.state.kind).toBe('canceled');
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+  });
+
+  // ─── Pausa legal e identidad del episodio ───────────────────────────────
+
+  it('la pausa vive y muere con el episodio, y ningún terminal la deja colgada', async () => {
+    const { result } = await renderFlow();
+    await act(async () => result.current.start());
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+
+    await act(async () => result.current.codeSent());
+    await act(async () => result.current.codeVerified());
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(true);
+
+    await act(async () => result.current.requestSave('contraseñaNueva1'));
+    expect(mockSetRecoveryHalted).toHaveBeenLastCalledWith(false);
+  });
+
+  it('un episodio nuevo tras uno cancelado vuelve a admitir guardado y ejecuta su propio destino', async () => {
+    const { onCanceled, onCompleted, result } = await renderFlow();
+    await arriveAtReady(result);
+    await act(async () => result.current.requestCancel());
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+
+    // «Olvidé mi contraseña» otra vez: episodio limpio.
+    await arriveAtReady(result);
+    await act(async () => result.current.requestSave('contraseñaNueva2'));
+
+    expect(result.current.state.kind).toBe('completed');
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    // El destino de cancelación no se repite por el episodio nuevo.
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+  });
+
+  it('el resultado tardío de un episodio abandonado no reabre ni ensucia el siguiente', async () => {
+    const firstSave = deferred();
+    mockSetNewPassword.mockReturnValueOnce(firstSave.promise);
+    const { onCanceled, onCompleted, result } = await renderFlow();
+    await arriveAtReady(result);
+    await act(async () => result.current.requestSave('contraseñaNueva1'));
+    expect(result.current.state.kind).toBe('saving');
+
+    // El guardado del primer episodio falla y devuelve el control; se cancela.
+    await act(async () => {
+      firstSave.reject(new Error('Sin red.'));
+      await firstSave.promise.catch(() => undefined);
+    });
+    expect(result.current.state.kind).toBe('saveError');
+    await act(async () => result.current.requestCancel());
+    expect(onCanceled).toHaveBeenCalledTimes(1);
+
+    // Episodio nuevo; el destino de terminación del anterior nunca ocurrió.
+    await arriveAtReady(result);
+    expect(result.current.state.kind).toBe('ready');
+    expect(onCompleted).not.toHaveBeenCalled();
+  });
+});
