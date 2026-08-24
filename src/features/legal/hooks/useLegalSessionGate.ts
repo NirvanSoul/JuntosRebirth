@@ -348,24 +348,37 @@ export function useLegalSessionGate(): LegalSessionGate {
     await createSupabaseAuthGateway().signOut('local');
   }, []);
 
-  // Visión derivada (B2): «sin sesión» y «sesión aún sin comprobar» son
-  // estados distintos. Si el snapshot sigue siendo el permisivo del invitado
-  // pero ya existe una sesión cruda, se presenta como «checking»: una sesión
-  // sin comprobar nunca se reporta habilitada hacia el resto del árbol.
+  // Visión derivada (B2 + B6): «sin sesión» y «sesión aún sin comprobar» son
+  // estados distintos, y cada snapshot autenticado pertenece a una identidad.
+  // Si la sesión cruda actual no coincide con la identidad del snapshot (el
+  // snapshot sigue siendo el del invitado, o el resultado fue de otro usuario),
+  // el estado viejo no puede presentarse —ni cleared ni required—: se deriva
+  // «checking» hasta que la comprobación de la sesión actual publique su propio
+  // resultado. Un snapshot autenticado sin sesión cruda actual tampoco se
+  // presenta: quedó sin dueño. Una sesión sin comprobar nunca se reporta
+  // habilitada ni exigida hacia el resto del árbol.
+  const sessionUserId = session?.user.id ?? null;
+  const snapshotUserId = snapshot.rawSession?.user.id ?? null;
+  const snapshotOwnsCurrentSession =
+    sessionUserId !== null && snapshotUserId === sessionUserId;
   const viewSnapshot: GateSnapshot =
-    snapshot.status.kind === 'no-session' && session !== null
-      ? {
-          ...snapshot,
-          session: null,
-          rawSession: session,
-          isReady: true,
-          gateReady: true,
-          isLegallyEnabled: false,
-          status: { kind: 'checking' },
-          error: null,
-          missingDocuments: [],
-        }
-      : snapshot;
+    session !== null && !snapshotOwnsCurrentSession
+      ? snapshot.status.kind === 'halted'
+        ? snapshot
+        : {
+            ...snapshot,
+            session: null,
+            rawSession: session,
+            isReady: true,
+            gateReady: true,
+            isLegallyEnabled: false,
+            status: { kind: 'checking' },
+            error: null,
+            missingDocuments: [],
+          }
+      : session === null && snapshotUserId !== null
+        ? { ...noSessionSnapshot, isReady: true }
+        : snapshot;
 
   return {
     session: viewSnapshot.session,

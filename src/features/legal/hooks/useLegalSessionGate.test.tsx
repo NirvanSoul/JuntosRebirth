@@ -405,4 +405,47 @@ describe('useLegalSessionGate — sesión legalmente habilitada', () => {
     await waitFor(() => expect(result.current.status.kind).toBe('cleared'));
     expect(result.current.session?.user.email).toBe('b@ejemplo.com');
   });
+
+  it('un permiso «cleared» de A nunca se reutiliza para la sesión B de otra identidad (B6)', async () => {
+    acceptedRows = [
+      { document_type: 'terms-of-service', document_version: '2026.1' },
+      { document_type: 'privacy-policy', document_version: '2026.1' },
+    ];
+    acceptanceBuilder();
+    mockReady = false;
+    mockInitialSession = createOtpSession('a@ejemplo.com', 'user-a');
+    const first = await renderHook(() => useLegalSessionGate());
+
+    // «A» comprueba y llega a «cleared» con su identidad.
+    await act(async () => {
+      mockSetReady?.(true);
+    });
+    await waitFor(() =>
+      expect(first.result.current.status.kind).toBe('cleared'),
+    );
+    expect(first.result.current.session?.user.id).toBe('user-a');
+    first.unmount();
+
+    // Llega la sesión de B (identidad distinta) y el host se remonta antes de
+    // que la puerta pueda reaccionar (la misma ventana previa al efecto que
+    // protege B2): el «cleared» de A sigue vivo en el ámbito de módulo y no
+    // puede presentarse como si fuera el permiso de B.
+    mockInitialSession = createOtpSession('b@ejemplo.com', 'user-b');
+    mockReady = false;
+    const second = await renderHook(() => useLegalSessionGate());
+
+    expect(second.result.current.status.kind).toBe('checking');
+    expect(second.result.current.session).toBeNull();
+    expect(second.result.current.isLegallyEnabled).toBe(false);
+    expect(second.result.current.rawSession?.user.id).toBe('user-b');
+
+    // Cuando la puerta puede reaccionar, comprueba a B con su propia evidencia.
+    await act(async () => {
+      mockSetReady?.(true);
+    });
+    await waitFor(() =>
+      expect(second.result.current.status.kind).toBe('cleared'),
+    );
+    expect(second.result.current.session?.user.id).toBe('user-b');
+  });
 });
