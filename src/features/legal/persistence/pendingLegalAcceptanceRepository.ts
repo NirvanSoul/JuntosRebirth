@@ -55,12 +55,6 @@ function parseIntention(value: string): PendingLegalAcceptance | null {
     return null;
   }
   if (
-    typeof candidate.createdAt !== 'string' ||
-    candidate.createdAt.length === 0
-  ) {
-    return null;
-  }
-  if (
     !Array.isArray(candidate.documents) ||
     candidate.documents.length === 0 ||
     !candidate.documents.every(isPendingLegalDocumentSnapshot)
@@ -74,7 +68,6 @@ function parseIntention(value: string): PendingLegalAcceptance | null {
     locale: candidate.locale,
     source: candidate.source,
     appVersion: candidate.appVersion,
-    createdAt: candidate.createdAt,
     documents: candidate.documents,
   };
 }
@@ -100,7 +93,6 @@ export async function savePendingLegalAcceptance(
 ): Promise<void> {
   const stored: PendingLegalAcceptance = {
     version: intentionVersion,
-    createdAt: new Date().toISOString(),
     email: normalizeEmailAddress(intention.email),
     locale: intention.locale,
     source: intention.source,

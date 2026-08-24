@@ -90,6 +90,14 @@ describe('pendingLegalAcceptanceRepository', () => {
     expect(raw?.toLowerCase()).not.toContain('contrase');
   });
 
+  it('persiste sin createdAt: el sello de tiempo no gobierna ninguna decisión (C2)', async () => {
+    await savePendingLegalAcceptance(newIntention);
+
+    const raw = await AsyncStorage.getItem(pendingLegalAcceptanceStorageKey);
+
+    expect(raw).not.toContain('createdAt');
+  });
+
   it('clearPendingLegalAcceptance elimina la intención pendiente', async () => {
     await savePendingLegalAcceptance(newIntention);
     expect(await loadPendingLegalAcceptance()).not.toBeNull();

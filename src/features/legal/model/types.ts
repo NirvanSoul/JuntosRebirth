@@ -62,6 +62,30 @@ export type LegalDecision = {
   consultedPrivacy: boolean;
 };
 
+/**
+ * ¿La decisión cubre la acción afirmativa de este documento? B4: la puerta
+ * debe exigir y registrar únicamente los documentos pendientes; una decisión
+ * que no cubre un documento pendiente no puede continuar ni registrar filas.
+ */
+export function decisionCoversDocument(
+  documentId: LegalAcceptanceDocumentId,
+  decision: LegalDecision,
+): boolean {
+  return documentId === 'terms-of-service'
+    ? decision.acceptedTerms
+    : decision.consultedPrivacy;
+}
+
+/** Todas las acciones exigidas para el conjunto de documentos pendientes. */
+export function isLegalDecisionComplete(
+  requiredDocuments: readonly LegalAcceptanceDocumentId[],
+  decision: LegalDecision,
+): boolean {
+  return requiredDocuments.every((documentId) =>
+    decisionCoversDocument(documentId, decision),
+  );
+}
+
 export type LegalDocumentAction = 'accepted' | 'consulted';
 
 /** Instantánea de un documento dentro de una intención pendiente. */
@@ -87,5 +111,4 @@ export type PendingLegalAcceptanceNew = {
 
 export type PendingLegalAcceptance = PendingLegalAcceptanceNew & {
   version: 1;
-  createdAt: string;
 };
