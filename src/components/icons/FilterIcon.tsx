@@ -1,21 +1,20 @@
-import { AssetSvgIcon } from '@/components/icons/AssetSvgIcon';
-import { useTheme } from '@/theme/useTheme';
+import { SlidersHorizontal } from 'phosphor-react-native/src/icons/SlidersHorizontal';
 
-const filterIconSource = require('../../../assets/icons/Filter icon.svg');
+import { useTheme } from '@/theme/useTheme';
 
 type FilterIconProps = {
   size: number;
 };
 
-/** Recurso original: `assets/icons/Filter icon.svg`. */
 export function FilterIcon({ size }: FilterIconProps) {
   const { colors } = useTheme();
 
   return (
-    <AssetSvgIcon
+    <SlidersHorizontal
       color={colors.textPrimary}
       size={size}
-      source={filterIconSource}
+      testID="activity-filter-icon"
+      weight="bold"
     />
   );
 }

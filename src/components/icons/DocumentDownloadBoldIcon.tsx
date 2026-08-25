@@ -1,16 +1,13 @@
+import { FileArrowDown } from 'phosphor-react-native/src/icons/FileArrowDown';
 import { View } from 'react-native';
 
-import { AssetSvgIcon } from '@/components/icons/AssetSvgIcon';
 import { useTheme } from '@/theme/useTheme';
-
-const documentDownloadBoldSource = require('../../../assets/icons/DocDownloadBold.svg');
 
 type DocumentDownloadBoldIconProps = {
   offsetX?: number;
   size: number;
 };
 
-/** Recurso original: `assets/icons/DocDownloadBold.svg`. */
 export function DocumentDownloadBoldIcon({
   offsetX = 0,
   size,
@@ -23,10 +20,11 @@ export function DocumentDownloadBoldIcon({
         offsetX === 0 ? undefined : { transform: [{ translateX: offsetX }] }
       }
     >
-      <AssetSvgIcon
+      <FileArrowDown
         color={colors.textPrimary}
         size={size}
-        source={documentDownloadBoldSource}
+        testID="activity-import-icon"
+        weight="bold"
       />
     </View>
   );
