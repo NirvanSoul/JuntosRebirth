@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ComponentProps, ComponentType, ReactNode } from 'react';
+import type { Icon } from 'phosphor-react-native';
+import type { ComponentProps, ReactNode } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text/Text';
@@ -13,11 +14,7 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 export type SettingsIconName = ComponentProps<typeof Ionicons>['name'];
 
-export type SettingsCustomIcon = ComponentType<{
-  color: string;
-  size: number;
-  testID?: string;
-}>;
+export type SettingsCustomIcon = Icon;
 
 type SettingsSectionProps = {
   children: ReactNode;
@@ -41,15 +38,20 @@ export type SettingsRowProps = SettingsRowBaseProps &
     | { icon?: never; iconComponent: SettingsCustomIcon }
   );
 
-export type SettingsToggleRowProps = {
+type SettingsToggleRowBaseProps = {
   description?: string;
   enabled: boolean;
-  icon: SettingsIconName;
   iconBackgroundColor: string;
   label: string;
   onToggle: (enabled: boolean) => void;
   testID: string;
 };
+
+export type SettingsToggleRowProps = SettingsToggleRowBaseProps &
+  (
+    | { icon: SettingsIconName; iconComponent?: never }
+    | { icon?: never; iconComponent: SettingsCustomIcon }
+  );
 
 const rowIconSize = previewCardLayout.iconSize;
 const rowGlyphSize = iconSize.sm;
@@ -107,6 +109,7 @@ export function SettingsRow({
             color={colors.onBrand}
             size={rowGlyphSize}
             testID={`row-glyph-${label}`}
+            weight="fill"
           />
         ) : icon ? (
           <Ionicons
@@ -172,6 +175,7 @@ export function SettingsToggleRow({
   description,
   enabled,
   icon,
+  iconComponent: IconComponent,
   iconBackgroundColor,
   label,
   onToggle,
@@ -186,13 +190,22 @@ export function SettingsToggleRow({
         style={[styles.rowIcon, { backgroundColor: iconBackgroundColor }]}
         testID={`row-icon-${label}`}
       >
-        <Ionicons
-          color={colors.onBrand}
-          name={icon}
-          size={rowGlyphSize}
-          style={styles.rowGlyphEmphasized}
-          testID={`row-glyph-${label}`}
-        />
+        {IconComponent ? (
+          <IconComponent
+            color={colors.onBrand}
+            size={rowGlyphSize}
+            testID={`row-glyph-${label}`}
+            weight="fill"
+          />
+        ) : icon ? (
+          <Ionicons
+            color={colors.onBrand}
+            name={icon}
+            size={rowGlyphSize}
+            style={styles.rowGlyphEmphasized}
+            testID={`row-glyph-${label}`}
+          />
+        ) : null}
       </View>
       <View style={styles.rowText}>
         <Text tone="primary" variant="label" weight="semibold">

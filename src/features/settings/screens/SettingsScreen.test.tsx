@@ -135,6 +135,12 @@ describe('SettingsScreen', () => {
         .textShadowRadius,
     ).toBe(0.45);
     expect(
+      StyleSheet.flatten(
+        screen.getByTestId('row-glyph-Iniciar sesión o crear cuenta').props
+          .style,
+      ).textShadowRadius,
+    ).toBe(0.45);
+    expect(
       StyleSheet.flatten(screen.getByTestId('settings-header').props.style),
     ).toMatchObject({ justifyContent: 'flex-start' });
     expect(

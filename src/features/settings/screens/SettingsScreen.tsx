@@ -1,5 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
+import { Alarm } from 'phosphor-react-native/src/icons/Alarm';
+import { ChartLineUp } from 'phosphor-react-native/src/icons/ChartLineUp';
+import { Coins } from 'phosphor-react-native/src/icons/Coins';
+import { DeviceMobile } from 'phosphor-react-native/src/icons/DeviceMobile';
+import { EnvelopeSimple } from 'phosphor-react-native/src/icons/EnvelopeSimple';
+import { FileText } from 'phosphor-react-native/src/icons/FileText';
+import { Key } from 'phosphor-react-native/src/icons/Key';
+import { MoonStars } from 'phosphor-react-native/src/icons/MoonStars';
+import { PlayCircle } from 'phosphor-react-native/src/icons/PlayCircle';
+import { ShieldCheck } from 'phosphor-react-native/src/icons/ShieldCheck';
+import { SlidersHorizontal } from 'phosphor-react-native/src/icons/SlidersHorizontal';
+import { Trash } from 'phosphor-react-native/src/icons/Trash';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -363,7 +375,7 @@ export function SettingsScreen({
           title="Preferencias"
         >
           <SettingsRow
-            icon="cash-outline"
+            iconComponent={Coins}
             iconBackgroundColor={categoryColors.green}
             label="Moneda"
             onPress={() => setCurrencyModalVisible(true)}
@@ -373,7 +385,7 @@ export function SettingsScreen({
           <SettingsToggleRow
             description="Compara con el mes anterior"
             enabled={showHomeComparisonIndicators}
-            icon="trending-up-outline"
+            iconComponent={ChartLineUp}
             iconBackgroundColor={categoryColors.green}
             label="Comparación en Inicio"
             onToggle={onToggleHomeComparisonIndicators}
@@ -392,7 +404,7 @@ export function SettingsScreen({
           <SettingsToggleRow
             description="Usa una interfaz oscura"
             enabled={isDark}
-            icon="moon-outline"
+            iconComponent={MoonStars}
             iconBackgroundColor={categoryColors.blue}
             label="Modo oscuro"
             onToggle={(enabled) => {
@@ -404,7 +416,7 @@ export function SettingsScreen({
 
         <SettingsSection icon="notifications-outline" title="Notificaciones">
           <SettingsRow
-            icon="alarm-outline"
+            iconComponent={Alarm}
             iconBackgroundColor={categoryColors.pink}
             label="Recordatorios y alertas"
             onPress={() => setNotificationRulesModalVisible(true)}
@@ -414,7 +426,7 @@ export function SettingsScreen({
 
         <SettingsSection icon="lock-closed-outline" title="Datos y privacidad">
           <SettingsRow
-            icon="phone-portrait-outline"
+            iconComponent={DeviceMobile}
             iconBackgroundColor={categoryColors.violet}
             label="Estado de los datos"
             onPress={() => setDataRightsVisible(true)}
@@ -422,21 +434,21 @@ export function SettingsScreen({
           />
           <SettingsDivider />
           <SettingsRow
-            icon="document-text-outline"
+            iconComponent={FileText}
             iconBackgroundColor={categoryColors.violet}
             label="Cómo usamos tus datos"
             onPress={() => setDataUsageDocVisible(true)}
           />
           <SettingsDivider />
           <SettingsRow
-            icon="options-outline"
+            iconComponent={SlidersHorizontal}
             iconBackgroundColor={categoryColors.green}
             label="Preferencias de privacidad"
             onPress={() => setPrivacyChoicesVisible(true)}
           />
           <SettingsDivider />
           <SettingsRow
-            icon="key-outline"
+            iconComponent={Key}
             iconBackgroundColor={categoryColors.blue}
             label="Permisos de la aplicación"
             onPress={() => setPermissionsVisible(true)}
@@ -447,7 +459,7 @@ export function SettingsScreen({
           <SettingsSection icon="people-outline" title="Espacio de pareja">
             <SettingsRow
               destructive
-              icon="trash-outline"
+              iconComponent={Trash}
               iconBackgroundColor={categoryColors.red}
               label="Salir del espacio de pareja"
               onPress={() => setCoupleSpaceExit({ step: 'confirming' })}
@@ -507,21 +519,21 @@ export function SettingsScreen({
 
         <SettingsSection icon="help-circle-outline" title="Ayuda">
           <SettingsRow
-            icon="play-outline"
+            iconComponent={PlayCircle}
             iconBackgroundColor={categoryColors.green}
             label="Ver onboarding"
             onPress={handleReplayOnboarding}
           />
           <SettingsDivider />
           <SettingsRow
-            icon="mail-outline"
+            iconComponent={EnvelopeSimple}
             iconBackgroundColor={categoryColors.amber}
             label="Contactar con el desarrollador"
             onPress={handleContactDeveloper}
           />
           <SettingsDivider />
           <SettingsRow
-            icon="document-text-outline"
+            iconComponent={ShieldCheck}
             iconBackgroundColor={categoryColors.violet}
             label="Política de privacidad"
             onPress={() => setPrivacyModalVisible(true)}
