@@ -42,6 +42,18 @@ jest.mock('@/features/spaces/hooks/useSpaces', () => ({
   useSpaces: () => mockUseSpaces(),
 }));
 
+jest.mock('@/features/spaces/gateways/supabaseInvitationGateway', () => {
+  const actual = jest.requireActual(
+    '@/features/spaces/gateways/supabaseInvitationGateway',
+  );
+  return {
+    ...actual,
+    createSupabaseInvitationGateway: () => ({
+      getOutgoingInvitation: jest.fn(async () => null),
+    }),
+  };
+});
+
 jest.mock('@/features/auth/hooks/useAuthSession', () => ({
   useAuthSession: () => ({
     session: mockSession,
@@ -210,6 +222,56 @@ describe('MainTabsNavigator', () => {
         },
       ],
     });
+  });
+
+  it('bloquea el botón flotante mientras el espacio espera a la pareja', async () => {
+    const pendingSpace = {
+      currency: 'EUR' as const,
+      id: 'couple-pending',
+      isAwaitingPartner: true,
+      name: 'Juntos',
+      type: 'couple' as const,
+    };
+    mockUseSpaces.mockReturnValue({
+      activeSpace: pendingSpace,
+      createCoupleSpaceInvitation: jest.fn(),
+      createSpace: jest.fn(),
+      error: null,
+      isReady: true,
+      leaveCoupleSpace: jest.fn(),
+      refreshCoupleSpace: jest.fn(async () => undefined),
+      selectSpace: jest.fn(),
+      spaces: [pendingSpace],
+    });
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(await screen.findByTestId('awaiting-partner-screen')).toBeTruthy();
+    expect(
+      screen.getByTestId('floating-create-button-container', {
+        includeHiddenElements: true,
+      }).props.pointerEvents,
+    ).toBe('none');
+
+    fireEvent.press(
+      screen.getByTestId('floating-create-button', {
+        includeHiddenElements: true,
+      }),
+    );
+    expect(screen.queryByLabelText('Crear gasto')).toBeNull();
   });
 
   it('mantiene fijo el selector de espacio al cambiar de pantalla', async () => {

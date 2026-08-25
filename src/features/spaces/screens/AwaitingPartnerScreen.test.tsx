@@ -4,7 +4,10 @@ import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { createSupabaseInvitationGateway } from '@/features/spaces/gateways/supabaseInvitationGateway';
-import { AwaitingPartnerScreen } from '@/features/spaces/screens/AwaitingPartnerScreen';
+import {
+  AwaitingPartnerScreen,
+  getAnimatedWaitingTitle,
+} from '@/features/spaces/screens/AwaitingPartnerScreen';
 import type { Space } from '@/features/spaces/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
@@ -73,7 +76,21 @@ describe('AwaitingPartnerScreen', () => {
         screen.getByText(/pareja@ejemplo\.com.*abra su app de Juntos/s),
       ).toBeTruthy(),
     );
-    expect(screen.getByText('Caduca en 5 días')).toBeTruthy();
+    expect(screen.getByTestId('awaiting-partner-illustration')).toBeTruthy();
+    expect(screen.queryByTestId('awaiting-partner-status')).toBeNull();
+    expect(
+      screen.getByTestId('awaiting-partner-title').props.accessibilityLabel,
+    ).toBe('Invitación enviada, falta que acepten...');
+  });
+
+  it('anima los puntos del título uno por uno y reinicia el ciclo', () => {
+    expect([0, 1, 2, 3, 4].map(getAnimatedWaitingTitle)).toEqual([
+      'Invitación enviada, falta que acepten.',
+      'Invitación enviada, falta que acepten..',
+      'Invitación enviada, falta que acepten...',
+      'Invitación enviada, falta que acepten',
+      'Invitación enviada, falta que acepten.',
+    ]);
   });
 
   it('cae a una redacción sin correo cuando la invitación se compartió por enlace', async () => {

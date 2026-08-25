@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
 
@@ -11,14 +10,19 @@ import {
 } from '@/features/spaces/gateways/supabaseInvitationGateway';
 import type { Space } from '@/features/spaces/types';
 import { useAppForeground } from '@/hooks/useAppForeground';
-import { iconSize, layout } from '@/theme/layout';
+import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
-import type { ColorTokens } from '@/theme/types';
-import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
-const millisecondsPerDay = 24 * 60 * 60 * 1000;
+const ellipsisDotCounts = [1, 2, 3, 0] as const;
+const ellipsisFrameDuration = 400;
+const waitingTitle = 'Invitación enviada, falta que acepten';
+
+export function getAnimatedWaitingTitle(frame: number) {
+  const dotCount = ellipsisDotCounts[frame % ellipsisDotCounts.length] ?? 1;
+  return `${waitingTitle}${'.'.repeat(dotCount)}`;
+}
 
 type AwaitingPartnerScreenProps = {
   onCancelSpace: () => Promise<void>;
@@ -26,15 +30,6 @@ type AwaitingPartnerScreenProps = {
   onRefresh: () => Promise<void>;
   space: Space;
 };
-
-/** "Caduca en 5 días" es más legible de un vistazo que una fecha completa. */
-function describeExpiry(expiresAt: string): string | null {
-  const remainingMs = new Date(expiresAt).getTime() - Date.now();
-  if (Number.isNaN(remainingMs) || remainingMs <= 0) return null;
-
-  const days = Math.ceil(remainingMs / millisecondsPerDay);
-  return days <= 1 ? 'Caduca hoy' : `Caduca en ${days} días`;
-}
 
 /**
  * Inicio de un espacio juntos cuya invitación sigue pendiente. Un espacio de
@@ -48,10 +43,17 @@ export function AwaitingPartnerScreen({
   onRefresh,
   space,
 }: AwaitingPartnerScreenProps) {
-  const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [invitation, setInvitation] = useState<OutgoingInvitation | null>(null);
+  const [ellipsisFrame, setEllipsisFrame] = useState(0);
   const [isRefreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setEllipsisFrame((current) => (current + 1) % ellipsisDotCounts.length);
+    }, ellipsisFrameDuration);
+    return () => clearInterval(intervalId);
+  }, []);
 
   const loadInvitation = useCallback(() => {
     let isMounted = true;
@@ -100,47 +102,34 @@ export function AwaitingPartnerScreen({
     );
   };
 
-  const expiryNotice = invitation ? describeExpiry(invitation.expiresAt) : null;
+  const animatedTitle = getAnimatedWaitingTitle(ellipsisFrame);
 
   return (
     <Screen testID="awaiting-partner-screen">
       <View style={styles.panel}>
-        <Image
-          accessible={false}
-          resizeMode="contain"
-          source={require('../../../../assets/Onboarding/Waiting.png')}
-          style={styles.waitingIllustration}
-          testID="awaiting-partner-illustration"
-        />
+        <View style={styles.waitingMessage}>
+          <Image
+            accessible={false}
+            resizeMode="contain"
+            source={require('../../../../assets/Onboarding/Waiting.png')}
+            style={styles.waitingIllustration}
+            testID="awaiting-partner-illustration"
+          />
 
-        <View style={styles.copy}>
-          <Text align="center" accessibilityRole="header" variant="heading">
-            Falta que acepten
-          </Text>
-          <Text align="center" tone="secondary" variant="body">
-            {invitation?.inviteeEmail
-              ? `Pídele a ${invitation.inviteeEmail} que abra su app de Juntos: en Inicio le espera un aviso para unirse a “${space.name}”.`
-              : `Pídele a la persona que invitaste que abra su app de Juntos: en Inicio le espera un aviso para unirse a “${space.name}”.`}
-          </Text>
-        </View>
-
-        <View style={styles.statusCard} testID="awaiting-partner-status">
-          <View style={styles.statusIcon}>
-            <Ionicons
-              accessibilityElementsHidden
-              color={colors.textSecondary}
-              importantForAccessibility="no-hide-descendants"
-              name="time-outline"
-              size={iconSize.sm}
-            />
-          </View>
-          <View style={styles.statusText}>
-            <Text variant="label" weight="semibold">
-              Invitación enviada
+          <View style={styles.copy}>
+            <Text
+              align="center"
+              accessibilityLabel={`${waitingTitle}...`}
+              accessibilityRole="header"
+              testID="awaiting-partner-title"
+              variant="heading"
+            >
+              {animatedTitle}
             </Text>
-            <Text tone="secondary" variant="footnote">
-              {expiryNotice ??
-                'Aquí verás tus movimientos compartidos en cuanto acepten.'}
+            <Text align="center" tone="secondary" variant="body">
+              {invitation?.inviteeEmail
+                ? `Pídele a ${invitation.inviteeEmail} que abra su app de Juntos: en Inicio le espera un aviso para unirse a “${space.name}”.`
+                : `Pídele a la persona que invitaste que abra su app de Juntos: en Inicio le espera un aviso para unirse a “${space.name}”.`}
             </Text>
           </View>
         </View>
@@ -181,41 +170,23 @@ export function AwaitingPartnerScreen({
   );
 }
 
-function createStyles(colors: ColorTokens) {
+function createStyles() {
   return StyleSheet.create({
     panel: {
       flex: 1,
       alignItems: 'stretch',
-      justifyContent: 'center',
+      justifyContent: 'flex-start',
       gap: spacing.xl,
       paddingBottom: spacing.xxl,
     },
+    waitingMessage: { gap: spacing.sm },
     waitingIllustration: {
       alignSelf: 'center',
       borderRadius: radii.lg,
-      height: 192,
-      width: 128,
+      height: 216,
+      width: 144,
     },
     copy: { gap: spacing.sm },
-    statusCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radii.md,
-      padding: spacing.lg,
-    },
-    statusIcon: {
-      width: iconSize.xl,
-      height: iconSize.xl,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      backgroundColor: colors.surfaceMuted,
-    },
-    statusText: { flex: 1, gap: spacing.xxs },
     actions: { gap: spacing.md },
     cancelButton: {
       minHeight: layout.minTouchTarget,

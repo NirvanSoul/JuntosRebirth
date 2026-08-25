@@ -146,9 +146,7 @@ export function MainTabsNavigator() {
   const [isInvitePartnerVisible, setInvitePartnerVisible] = useState(false);
   const [isSpaceAuthModalVisible, setSpaceAuthModalVisible] = useState(false);
   const coupleSpace = spaces.find((space) => space.type === 'couple') ?? null;
-  // Un espacio juntos sin la otra persona dentro no tiene datos que mostrar ni
-  // que sincronizar: Inicio pasa a la pantalla de espera y toda la maquinaria
-  // compartida (sondeo, realtime, publicación) queda en pausa hasta que acepte.
+  // Un espacio pendiente pausa sus datos compartidos hasta que la pareja acepte.
   const isAwaitingPartner = isAwaitingPartnerSpace(activeSpace);
   const spaceMemberAvatarUris = useSpaceMemberAvatars(activeSpace);
   const {
@@ -622,10 +620,7 @@ export function MainTabsNavigator() {
     setInvitePartnerVisible(true);
   }, [session]);
 
-  /**
-   * Salir de un espacio juntos pendiente deja cero miembros activos, por lo
-   * que el servidor lo borra y `useSpaces` vuelve a Personal.
-   */
+  /** Al cancelar el espacio pendiente, el servidor lo elimina sin miembros. */
   const handleCancelPendingCoupleSpace =
     useCallback(async (): Promise<void> => {
       try {
@@ -1210,13 +1205,13 @@ export function MainTabsNavigator() {
 
               <FloatingCreateButton
                 bottom={insets.bottom + layout.floatingActionTabOffset}
-                onPress={() => setCreateMenuVisible(true)}
-                visible={isFloatingCreateButtonVisible}
+                onPress={() => setCreateMenuVisible(!isAwaitingPartner)}
+                visible={isFloatingCreateButtonVisible && !isAwaitingPartner}
               />
               <QuickCreateMenu
                 onClose={() => setCreateMenuVisible(false)}
                 onSelect={handleCreateAction}
-                visible={isCreateMenuVisible}
+                visible={isCreateMenuVisible && !isAwaitingPartner}
               />
               <CreateTransactionModal
                 activeSpaceId={activeSpace.id}
