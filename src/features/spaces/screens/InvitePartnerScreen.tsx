@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { Pressable, Share, StyleSheet, View } from 'react-native';
+import { Image, Pressable, Share, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
@@ -171,6 +171,16 @@ export function InvitePartnerScreen({
         </View>
 
         {!coupleSpace ? (
+          <Image
+            accessible={false}
+            resizeMode="contain"
+            source={require('../../../../assets/Onboarding/Happy Couple.png')}
+            style={styles.coupleIllustration}
+            testID="invite-partner-couple-illustration"
+          />
+        ) : null}
+
+        {!coupleSpace ? (
           <View style={styles.body}>
             <Text tone="secondary" variant="body">
               Solo puedes tener un espacio de pareja activo a la vez. El espacio
@@ -332,6 +342,12 @@ function createStyles(colors: ColorTokens) {
       gap: spacing.md,
     },
     headerText: { flex: 1, gap: spacing.xs },
+    coupleIllustration: {
+      alignSelf: 'center',
+      aspectRatio: 1,
+      maxWidth: 260,
+      width: '72%',
+    },
     body: { gap: spacing.md },
     field: { gap: spacing.md },
     divider: {
