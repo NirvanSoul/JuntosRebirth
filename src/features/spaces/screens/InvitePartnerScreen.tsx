@@ -345,8 +345,10 @@ function createStyles(colors: ColorTokens) {
     coupleIllustration: {
       alignSelf: 'center',
       aspectRatio: 1,
-      maxWidth: 260,
-      width: '72%',
+      marginBottom: -spacing.md,
+      marginTop: -spacing.xl,
+      maxWidth: 180,
+      width: '52%',
     },
     body: { gap: spacing.md },
     field: { gap: spacing.md },
