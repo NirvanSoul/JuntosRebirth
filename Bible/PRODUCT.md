@@ -450,7 +450,9 @@ detalle de la cuenta, con su saldo, el saldo inicial, los totales de ingresos
 y gastos, sus movimientos y las acciones de editar y eliminar. Cada tarjeta
 muestra el saldo en la moneda de su propia cuenta, así que el selector de
 moneda de los movimientos no las filtra ni mezcla divisas, y no se muestra
-ningún total agregado de todas las cuentas.
+ningún total agregado de todas las cuentas. La variación frente al mes anterior
+solo aparece si esa cuenta tuvo al menos un movimiento en dicho mes; su saldo
+inicial o la ausencia de actividad no se usan como una base de comparación.
 
 Crear una cuenta se hace desde ahí: con el estado vacío cuando no hay ninguna
 y con `Añadir cuenta` bajo la lista cuando ya existen. El botón flotante de

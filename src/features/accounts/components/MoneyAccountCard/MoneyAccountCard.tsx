@@ -51,10 +51,12 @@ export function MoneyAccountCard({
   const kindLabel = getMoneyAccountKindLabel(account.kind);
   // Una cuenta puede manejar varias divisas, pero no se suman: la variación
   // compara exclusivamente la moneda principal que encabeza la tarjeta.
-  const comparison = calculatePeriodComparison(
-    primary.balanceMinor,
-    primary.previousMonthBalanceMinor,
-  );
+  const comparison = primary.hasPreviousMonthTransaction
+    ? calculatePeriodComparison(
+        primary.balanceMinor,
+        primary.previousMonthBalanceMinor,
+      )
+    : null;
   const currencies = account.balanceByCurrency
     .map((balanceByCurrency) => balanceByCurrency.currency)
     .join(' · ');

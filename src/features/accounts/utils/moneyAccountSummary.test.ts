@@ -57,6 +57,9 @@ describe('summarizeMoneyAccounts', () => {
       incomeMinor: 40000,
     });
     expect(summary?.transactionCount).toBe(2);
+    expect(summary?.balanceByCurrency[0]?.hasPreviousMonthTransaction).toBe(
+      false,
+    );
   });
 
   it('ignora los movimientos sin cuenta y los de otra cuenta', () => {
@@ -163,6 +166,7 @@ describe('summarizeMoneyAccounts', () => {
     expect(summary?.balanceByCurrency[0]).toMatchObject({
       previousMonthBalanceMinor: 110000,
       balanceMinor: 107500,
+      hasPreviousMonthTransaction: true,
     });
   });
 });

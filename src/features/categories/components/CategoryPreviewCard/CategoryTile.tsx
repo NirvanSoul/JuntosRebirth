@@ -86,9 +86,9 @@ export function CategoryTile({
       accessibilityLabel={
         hasIncome && !hasExpenses
           ? `${name}, ingresado ${income}`
-          : hasExpenses || hasIncome
-            ? `${name}, ${hasExpenses ? `${expense} gastado` : ''}${hasExpenses && hasIncome ? ', ' : ''}${hasIncome ? `${income} ingresado` : ''}`
-            : name
+          : hasExpenses && hasIncome
+            ? `${name}, gastado ${expense}, ingresado ${income}`
+            : `${name}, gastado ${expense}`
       }
       accessibilityRole="button"
       disabled={!onPress}

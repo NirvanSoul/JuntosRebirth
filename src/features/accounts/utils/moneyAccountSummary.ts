@@ -11,6 +11,8 @@ export type MoneyAccountCurrencyBalance = {
   balanceMinor: number;
   /** Saldo de cierre de la misma moneda al finalizar el mes anterior. */
   previousMonthBalanceMinor: number;
+  /** Solo habilita la comparación cuando esa cuenta tuvo actividad el mes anterior. */
+  hasPreviousMonthTransaction: boolean;
   incomeMinor: number;
   expenseMinor: number;
   transactionCount: number;
@@ -42,6 +44,9 @@ export function summarizeMoneyAccounts(
   const currentMonthStart = toLocalDateKey(
     new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1, 12),
   );
+  const previousMonthStart = toLocalDateKey(
+    new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, 1, 12),
+  );
   const transactionsThroughCurrentMonth = listTransactionsThroughCurrentMonth(
     transactions,
     referenceDate,
@@ -70,6 +75,12 @@ export function summarizeMoneyAccounts(
                 summary.previousMonthBalanceMinor -= transaction.amountMinor;
               }
             }
+            if (
+              transaction.occurredOn >= previousMonthStart &&
+              transaction.occurredOn < currentMonthStart
+            ) {
+              summary.hasPreviousMonthTransaction = true;
+            }
             summary.transactionCount += 1;
 
             return summary;
@@ -78,6 +89,7 @@ export function summarizeMoneyAccounts(
             currency: balance.currency,
             balanceMinor: balance.openingBalanceMinor,
             previousMonthBalanceMinor: balance.openingBalanceMinor,
+            hasPreviousMonthTransaction: false,
             incomeMinor: 0,
             expenseMinor: 0,
             transactionCount: 0,

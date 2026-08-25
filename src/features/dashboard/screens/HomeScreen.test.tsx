@@ -960,9 +960,8 @@ describe('HomeScreen', () => {
         ).fontFamily,
       ).toBe(fontFamily.medium);
       expect(
-        screen.getByTestId('money-account-card-account-1-comparison'),
-      ).toBeTruthy();
-      expect(screen.getByText('0%')).toBeTruthy();
+        screen.queryByTestId('money-account-card-account-1-comparison'),
+      ).toBeNull();
       expect(
         StyleSheet.flatten(
           screen.getByTestId('home-account-scroller').props.style,
@@ -975,6 +974,30 @@ describe('HomeScreen', () => {
         ),
       ).toMatchObject({ overflow: 'visible', paddingVertical: spacing.md });
       expect(screen.queryByTestId('money-account-row-account-1')).toBeNull();
+    });
+
+    it('muestra la comparación solo después de actividad de esa cuenta el mes anterior', async () => {
+      const previousMonth = new Date();
+      previousMonth.setMonth(previousMonth.getMonth() - 1, 1);
+      const previousMonthTransaction = {
+        ...transactions[0]!,
+        id: 'account-previous-month',
+        moneyAccountId: account.id,
+        occurredOn: `${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, '0')}-01`,
+      };
+      const currentMonthTransaction = {
+        ...transactions[1]!,
+        id: 'account-current-month',
+        moneyAccountId: account.id,
+      };
+      const screen = await renderHome({
+        moneyAccounts: [account],
+        transactions: [previousMonthTransaction, currentMonthTransaction],
+      });
+
+      expect(
+        screen.getByTestId('money-account-card-account-1-comparison'),
+      ).toBeTruthy();
     });
 
     it('lleva a Actividad desde «Ver más»', async () => {
