@@ -470,7 +470,9 @@ categorías, la pantalla indica que debe registrarse y asociarse uno. Las vistas
 previas de categoría de esta pantalla muestran el icono y el nombre y, cuando
 existe presupuesto, el gasto acumulado y su progreso lineal. No muestran la
 cantidad de movimientos; cuando no existe presupuesto conservan una barra lineal
-vacía, sin simular importes ni progreso. Las previews de categoría forman un
+vacía, sin simular importes ni progreso. Si una categoría reúne gastos e
+ingresos, muestra ambos importes para que ninguno quede oculto. Las previews de
+categoría forman un
 único bloque continuo: el borde, la sombra y las esquinas redondeadas pertenecen
 al contenedor exterior, no a cada fila; una línea interior separa las categorías
 consecutivas y un chevron derecho refuerza que cada una es pulsable. Los badges

@@ -146,15 +146,17 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
     onPress,
     testID = 'category-preview-card',
   } = props;
-  const isIncomeOnly = incomeMinor > 0 && expenseMinor === 0;
+  const hasExpenses = expenseMinor > 0;
+  const hasIncome = incomeMinor > 0;
+  const isIncomeOnly = hasIncome && !hasExpenses;
   const hasBudget =
     typeof budgetMinor === 'number' && budgetMinor > 0 && !isIncomeOnly;
-  const spent = formatCurrency(
-    isIncomeOnly ? incomeMinor : expenseMinor,
-    displayCurrency,
-    'es-ES',
-    { omitZeroDecimals: true },
-  );
+  const expense = formatCurrency(expenseMinor, displayCurrency, 'es-ES', {
+    omitZeroDecimals: true,
+  });
+  const income = formatCurrency(incomeMinor, displayCurrency, 'es-ES', {
+    omitZeroDecimals: true,
+  });
   const available = hasBudget
     ? formatCurrency(
         Math.max(budgetMinor - budgetExpenseMinor, 0),
@@ -174,9 +176,9 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
       accessibilityHint={accessibilityHint ?? 'Abre el detalle de la categoría'}
       accessibilityLabel={
         available
-          ? `${name}, ${spent} gastado, ${available} disponible`
-          : isIncomeOnly
-            ? `${name}, ${spent} ingresado`
+          ? `${name}, ${hasExpenses ? `${expense} gastado, ` : ''}${hasIncome ? `${income} ingresado, ` : ''}${available} disponible`
+          : hasExpenses || hasIncome
+            ? `${name}, ${hasExpenses ? `${expense} gastado` : ''}${hasExpenses && hasIncome ? ', ' : ''}${hasIncome ? `${income} ingresado` : ''}`
             : name
       }
       accessibilityRole="button"
@@ -205,27 +207,35 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
           style={styles.budgetSummary}
           testID="category-preview-budget-summary"
         >
-          {hasBudget || isIncomeOnly ? (
+          {hasExpenses || hasIncome ? (
             <Text
               style={{
-                color: isIncomeOnly
-                  ? colors.income
-                  : categoryColors[colorToken],
+                color: hasExpenses ? categoryColors[colorToken] : colors.income,
               }}
               testID="category-preview-spent-amount"
               variant="caption"
               weight="semibold"
             >
-              {spent}
+              {hasExpenses ? expense : income}
+            </Text>
+          ) : null}
+          {hasExpenses && hasIncome ? (
+            <Text
+              style={{ color: colors.income }}
+              testID="category-preview-income-amount"
+              variant="caption"
+              weight="semibold"
+            >
+              {income}
             </Text>
           ) : null}
           <View style={styles.budgetProgress}>
             <CategoryBudgetProgress
               accessibilityText={
                 hasBudget
-                  ? `${Math.round(budgetProgress * 100)}% utilizado, ${spent} gastado`
+                  ? `${Math.round(budgetProgress * 100)}% utilizado, ${expense} gastado`
                   : isIncomeOnly
-                    ? `${spent} ingresado`
+                    ? `${income} ingresado`
                     : 'Sin presupuesto asignado'
               }
               color={categoryColors[colorToken]}

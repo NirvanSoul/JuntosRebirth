@@ -71,12 +71,10 @@ export function CategoryTile({
     createThemedStyles(palette, shadows),
   );
   const categoryColor = categoryColors[colorToken];
-  const isIncomeOnly = incomeMinor > 0 && expenseMinor === 0;
-  const amount = formatCurrency(
-    isIncomeOnly ? incomeMinor : expenseMinor,
-    displayCurrency,
-    'es-ES',
-  );
+  const hasExpenses = expenseMinor > 0;
+  const hasIncome = incomeMinor > 0;
+  const expense = formatCurrency(expenseMinor, displayCurrency, 'es-ES');
+  const income = formatCurrency(incomeMinor, displayCurrency, 'es-ES');
   const hasBudget = typeof budgetMinor === 'number' && budgetMinor > 0;
   const progress = hasBudget
     ? Math.min(budgetExpenseMinor / budgetMinor, 1)
@@ -85,7 +83,13 @@ export function CategoryTile({
   return (
     <Pressable
       accessibilityHint={accessibilityHint}
-      accessibilityLabel={`${name}, ${isIncomeOnly ? 'ingresado' : 'gastado'} ${amount}`}
+      accessibilityLabel={
+        hasIncome && !hasExpenses
+          ? `${name}, ingresado ${income}`
+          : hasExpenses || hasIncome
+            ? `${name}, ${hasExpenses ? `${expense} gastado` : ''}${hasExpenses && hasIncome ? ', ' : ''}${hasIncome ? `${income} ingresado` : ''}`
+            : name
+      }
       accessibilityRole="button"
       disabled={!onPress}
       onPress={onPress}
@@ -151,14 +155,29 @@ export function CategoryTile({
             />
           </View>
         </View>
-        <Text
-          adjustsFontSizeToFit
-          numberOfLines={1}
-          variant="footnote"
-          weight="medium"
-        >
-          {amount}
-        </Text>
+        <View style={styles.amounts}>
+          {hasExpenses ? (
+            <Text
+              adjustsFontSizeToFit
+              numberOfLines={1}
+              variant="footnote"
+              weight="medium"
+            >
+              {expense}
+            </Text>
+          ) : null}
+          {hasIncome ? (
+            <Text
+              adjustsFontSizeToFit
+              numberOfLines={1}
+              style={{ color: colors.income }}
+              variant="footnote"
+              weight="medium"
+            >
+              {income}
+            </Text>
+          ) : null}
+        </View>
       </View>
     </Pressable>
   );
@@ -206,6 +225,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radii.round,
   },
+  amounts: { alignItems: 'center', gap: spacing.xxs },
   progress: {
     position: 'absolute',
   },

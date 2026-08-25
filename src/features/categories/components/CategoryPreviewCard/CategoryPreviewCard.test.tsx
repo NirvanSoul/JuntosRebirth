@@ -57,6 +57,35 @@ describe('CategoryPreviewCard', () => {
     expect(card.props.accessibilityLabel).toBe('Vacía');
   });
 
+  it('muestra gasto e ingreso cuando ambos tipos comparten categoría', async () => {
+    const screen = await render(
+      <ThemeProvider initialAppearance="light">
+        <CategoryPreviewCard
+          budgetExpenseMinor={2500}
+          budgetMinor={10000}
+          colorToken="slate"
+          displayCurrency="EUR"
+          expenseMinor={2500}
+          icon="fork-knife"
+          incomeMinor={5000}
+          name="Compartida"
+          spaceCurrency="EUR"
+        />
+      </ThemeProvider>,
+    );
+
+    const card = screen.getByTestId('category-preview-card');
+
+    expect(
+      within(card).getByTestId('category-preview-spent-amount').props.children,
+    ).toMatch(/25/);
+    expect(
+      within(card).getByTestId('category-preview-income-amount').props.children,
+    ).toMatch(/50/);
+    expect(card.props.accessibilityLabel).toContain('25 € gastado');
+    expect(card.props.accessibilityLabel).toContain('50 € ingresado');
+  });
+
   it('muestra el ingreso en lugar del gasto cuando la categoría solo tiene ingresos (tile)', async () => {
     const screen = await render(
       <ThemeProvider initialAppearance="light">

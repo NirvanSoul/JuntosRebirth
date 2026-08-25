@@ -86,6 +86,7 @@ describe('CategoryDetailModal', () => {
       ...transaction,
       id: 'dinner',
       createdBy: 'uuid-beto',
+      type: 'income' as const,
       title: 'Cena de Beto',
     };
     const screen = await render(
@@ -120,6 +121,8 @@ describe('CategoryDetailModal', () => {
 
     const detail = screen.getByTestId('category-detail-modal');
     await screen.findByLabelText('Autor: Ambos');
+    expect(within(detail).getByTestId('category-expense-metric')).toBeTruthy();
+    expect(within(detail).getByTestId('category-income-metric')).toBeTruthy();
     await fireEvent.press(
       within(detail).getByTestId('category-detail-author-filter'),
     );
