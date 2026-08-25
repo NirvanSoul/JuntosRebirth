@@ -171,17 +171,14 @@ export function InvitePartnerScreen({
         </View>
 
         {!coupleSpace ? (
-          <Image
-            accessible={false}
-            resizeMode="contain"
-            source={require('../../../../assets/Onboarding/Happy Couple.png')}
-            style={styles.coupleIllustration}
-            testID="invite-partner-couple-illustration"
-          />
-        ) : null}
-
-        {!coupleSpace ? (
-          <View style={styles.body}>
+          <View style={styles.creationContent}>
+            <Image
+              accessible={false}
+              resizeMode="contain"
+              source={require('../../../../assets/Onboarding/Happy Couple.png')}
+              style={styles.coupleIllustration}
+              testID="invite-partner-couple-illustration"
+            />
             <Text tone="secondary" variant="body">
               Solo puedes tener un espacio de pareja activo a la vez. El espacio
               se abrirá cuando la otra persona acepte tu invitación, que podrás
@@ -344,12 +341,10 @@ function createStyles(colors: ColorTokens) {
     headerText: { flex: 1, gap: spacing.xs },
     coupleIllustration: {
       alignSelf: 'center',
-      aspectRatio: 1,
-      marginBottom: -spacing.md,
-      marginTop: -spacing.xl,
-      maxWidth: 180,
-      width: '52%',
+      height: 180,
+      width: 180,
     },
+    creationContent: { gap: spacing.md },
     body: { gap: spacing.md },
     field: { gap: spacing.md },
     divider: {
