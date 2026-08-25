@@ -814,6 +814,10 @@ es visible aquí en cuanto se crea, sin esperar a que su mes llegue. Ambas
 secciones reutilizan la misma lista de vistas previas y el mismo detalle al
 tocar un movimiento.
 
+En un espacio juntos, justo encima de `Movimientos`, una fila `Autor` permite
+filtrar el detalle entre ambos, los movimientos propios o los de la pareja. La
+opción de la pareja muestra su nombre cuando el censo del espacio está disponible.
+
 ### Detalle de movimiento
 
 El bloque de metadatos incluye una fila de cuenta, exista o no: cuando el

@@ -4,6 +4,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { CategoryDetailModal } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal';
 import type { Category } from '@/features/categories/types';
+import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
+import type { Space } from '@/features/spaces/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { categoryColors } from '@/theme/categoryColors';
@@ -11,6 +13,36 @@ import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+
+jest.mock('@/features/legal/services/authenticatedUser', () => ({
+  getAuthenticatedUserId: jest.fn(async () => 'uuid-ana'),
+}));
+
+jest.mock(
+  '@/features/profile/repositories/localSpaceMemberProfileRepository',
+  () => ({
+    listSpaceMemberProfiles: jest.fn(async () => [
+      { userId: 'uuid-ana', displayName: 'Ana' },
+      { userId: 'uuid-beto', displayName: 'Beto' },
+    ]),
+  }),
+);
+
+jest.mock('@/features/profile/services/syncOwnAvatar', () => ({
+  syncOwnAvatar: jest.fn(async () => false),
+}));
+
+jest.mock('@/features/profile/services/syncSpaceMemberProfiles', () => ({
+  syncSpaceMemberProfiles: jest.fn(async () => true),
+}));
+
+jest.mock('@/lib/storage/localDatabase', () => ({
+  getLocalDatabase: jest.fn(async () => ({})),
+}));
+
+jest.mock('@/lib/storage/localIdentity', () => ({
+  getOrCreateInstallationId: jest.fn(async () => 'install-ana'),
+}));
 
 const category: Category = {
   id: 'food',
@@ -36,7 +68,69 @@ const transaction: SessionTransaction = {
   updatedAt: '2026-07-30T12:00:00.000Z',
 };
 
+const coupleSpace: Space = {
+  id: 'couple',
+  name: 'Juntos',
+  type: 'couple',
+  currency: 'EUR',
+};
+
 describe('CategoryDetailModal', () => {
+  it('filtra los movimientos de un espacio juntos por autor', async () => {
+    const ownTransaction = {
+      ...transaction,
+      createdBy: 'uuid-ana',
+      title: 'Almuerzo propio',
+    };
+    const partnerTransaction = {
+      ...transaction,
+      id: 'dinner',
+      createdBy: 'uuid-beto',
+      title: 'Cena de Beto',
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <SpaceMembershipProvider space={coupleSpace}>
+            <CategoryDetailModal
+              category={category}
+              displayCurrency="EUR"
+              onAddTransaction={jest.fn()}
+              onClose={jest.fn()}
+              onDelete={jest.fn()}
+              onEdit={jest.fn()}
+              onOpenTransactionDetail={jest.fn()}
+              onSaveBudget={jest.fn()}
+              onSaveNote={jest.fn()}
+              onShare={jest.fn(() => true)}
+              shareTargets={[]}
+              spaceCurrency="EUR"
+              transactions={[ownTransaction, partnerTransaction]}
+              visible
+            />
+          </SpaceMembershipProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const detail = screen.getByTestId('category-detail-modal');
+    await screen.findByLabelText('Autor: Ambos');
+    await fireEvent.press(
+      within(detail).getByTestId('category-detail-author-filter'),
+    );
+    const picker = screen.getByTestId('category-author-filter-modal');
+    await fireEvent.press(within(picker).getByRole('radio', { name: 'Beto' }));
+
+    expect(within(detail).queryByText('Almuerzo propio')).toBeNull();
+    expect(within(detail).getByText('Cena de Beto')).toBeTruthy();
+    expect(within(detail).getByLabelText('Autor: Beto')).toBeTruthy();
+  });
+
   it('expone presupuesto, compartir, edición y eliminación desde el detalle', async () => {
     const onSaveBudget = jest.fn();
     const onSaveNote = jest.fn();

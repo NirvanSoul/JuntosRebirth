@@ -18,6 +18,10 @@ import { CategoryBudgetProgress } from '@/features/categories/components/Categor
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
 import { CategoryDetailActionButton as ActionButton } from '@/features/categories/components/CategoryDetailModal/CategoryDetailActionButton';
 import { CategoryTransactionMetrics } from '@/features/categories/components/CategoryDetailModal/CategoryTransactionMetrics';
+import {
+  CategoryAuthorFilter,
+  type CategoryAuthorFilterValue,
+} from '@/features/categories/components/CategoryDetailModal/CategoryAuthorFilter';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type {
   Category,
@@ -25,8 +29,10 @@ import type {
   CategoryShareTarget,
 } from '@/features/categories/types';
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
+import { useSpaceMembership } from '@/features/profile/state/SpaceMembershipContext';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { resolveTransactionAuthor } from '@/features/transactions/utils/transactionAuthor';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
@@ -82,7 +88,10 @@ export function CategoryDetailModal({
 }: CategoryDetailModalProps) {
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
+  const membership = useSpaceMembership();
   const [panel, setPanel] = useState<DetailPanel>(null);
+  const [authorFilter, setAuthorFilter] =
+    useState<CategoryAuthorFilterValue>('all');
   const [isBudgetModalVisible, setBudgetModalVisible] = useState(false);
   const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
@@ -100,25 +109,38 @@ export function CategoryDetailModal({
       ),
     );
   }, [category, transactions]);
+  const authorFilteredTransactions = useMemo(() => {
+    if (authorFilter === 'all' || !membership.isSharedSpace) {
+      return transactions;
+    }
+
+    return transactions.filter(
+      (transaction) =>
+        resolveTransactionAuthor(transaction.createdBy, membership).isOwn ===
+        (authorFilter === 'own'),
+    );
+  }, [authorFilter, membership, transactions]);
   const categoryTransactions = useMemo(
     () =>
       category
-        ? listTransactionsThroughCurrentMonth(transactions).filter(
+        ? listTransactionsThroughCurrentMonth(
+            authorFilteredTransactions,
+          ).filter(
             (t) =>
               t.categoryId === category.id && t.currency === selectedCurrency,
           )
         : [],
-    [category, selectedCurrency, transactions],
+    [authorFilteredTransactions, category, selectedCurrency],
   );
   const allCategoryTransactions = useMemo(
     () =>
       category
-        ? transactions.filter(
+        ? authorFilteredTransactions.filter(
             (t) =>
               t.categoryId === category.id && t.currency === selectedCurrency,
           )
         : [],
-    [category, selectedCurrency, transactions],
+    [authorFilteredTransactions, category, selectedCurrency],
   );
   const todayKey = getLocalTodayKey();
   const pastCategoryTransactions = useMemo(
@@ -144,9 +166,13 @@ export function CategoryDetailModal({
   const summary = useMemo(
     () =>
       category
-        ? summarizeCategories([category], transactions, selectedCurrency)[0]
+        ? summarizeCategories(
+            [category],
+            authorFilteredTransactions,
+            selectedCurrency,
+          )[0]
         : undefined,
-    [category, selectedCurrency, transactions],
+    [authorFilteredTransactions, category, selectedCurrency],
   );
   const budgetExpenseMinor = useMemo(() => {
     if (!category) return 0;
@@ -167,6 +193,7 @@ export function CategoryDetailModal({
     setBudgetModalVisible(false);
     setNoteModalVisible(false);
     setSpacePickerVisible(false);
+    setAuthorFilter('all');
     setSelectedCurrency(
       detailCurrencies.includes(displayCurrency)
         ? displayCurrency
@@ -396,6 +423,11 @@ export function CategoryDetailModal({
               ) : null}
             </View>
 
+            <CategoryAuthorFilter
+              onChange={setAuthorFilter}
+              value={authorFilter}
+            />
+
             <View style={styles.movementsHeader}>
               <Text accessibilityRole="header" variant="subheading">
                 Movimientos
@@ -407,7 +439,7 @@ export function CategoryDetailModal({
             {pastCategoryTransactions.length > 0 ? (
               <TransactionPreviewList
                 categories={[category]}
-                groupingTransactions={transactions}
+                groupingTransactions={authorFilteredTransactions}
                 onOpenTransactionDetail={onOpenTransactionDetail}
                 testID="category-detail-transaction-list"
                 transactions={pastCategoryTransactions}
@@ -440,7 +472,7 @@ export function CategoryDetailModal({
                 </View>
                 <TransactionPreviewList
                   categories={[category]}
-                  groupingTransactions={transactions}
+                  groupingTransactions={authorFilteredTransactions}
                   onOpenTransactionDetail={onOpenTransactionDetail}
                   testID="category-detail-upcoming-transaction-list"
                   transactions={upcomingCategoryTransactions}
