@@ -25,6 +25,10 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type TabRouteName = keyof MainTabParamList;
 
+type AppTabBarProps = BottomTabBarProps & {
+  disabledRoutes?: readonly TabRouteName[];
+};
+
 type TabPresentation = { icon: Icon; label: string };
 
 const tabPresentation: Record<TabRouteName, TabPresentation> = {
@@ -75,7 +79,8 @@ export function AppTabBar({
   state,
   descriptors,
   navigation,
-}: BottomTabBarProps) {
+  disabledRoutes = [],
+}: AppTabBarProps) {
   const insets = useSafeAreaInsets();
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
@@ -92,7 +97,9 @@ export function AppTabBar({
         const presentation = tabPresentation[route.name as TabRouteName];
         const options = descriptors[route.key]?.options;
         const isFocused = state.index === index;
-        const color = isFocused ? colors.textPrimary : colors.textMuted;
+        const isDisabled = disabledRoutes.includes(route.name as TabRouteName);
+        const color =
+          isFocused && !isDisabled ? colors.textPrimary : colors.textMuted;
 
         const handlePress = () => {
           const event = navigation.emit({
@@ -116,7 +123,8 @@ export function AppTabBar({
               options?.tabBarAccessibilityLabel ?? presentation.label
             }
             accessibilityRole="tab"
-            accessibilityState={{ selected: isFocused }}
+            accessibilityState={{ disabled: isDisabled, selected: isFocused }}
+            disabled={isDisabled}
             key={route.key}
             onLongPress={handleLongPress}
             onPress={handlePress}
@@ -128,6 +136,7 @@ export function AppTabBar({
                 style={[
                   styles.itemInner,
                   isFocused && styles.itemInnerSelected,
+                  isDisabled && styles.itemInnerDisabled,
                   pressed && styles.itemInnerPressed,
                 ]}
                 testID={`app-tab-item-${route.name}`}
@@ -178,6 +187,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     itemInnerPressed: {
       backgroundColor: colors.background,
     },
+    itemInnerDisabled: { opacity: 0.4 },
     itemInnerSelected: {
       backgroundColor: colors.background,
     },

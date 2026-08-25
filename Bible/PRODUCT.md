@@ -878,6 +878,9 @@ Principios:
   espacio de pareja y su invitación se confirman juntos al pulsar enviar; cerrar
   el modal antes de ese éxito conserva Personal como espacio activo y nunca
   muestra una espera falsa.
+- Mientras la invitación confirmada no haya sido aceptada, ese espacio solo
+  permite Inicio con la pantalla de espera: Actividad y Mapa permanecen
+  deshabilitados y no exponen datos ni acciones del espacio pendiente.
 - La invitación guardada y visible dentro de la app es la fuente de verdad. El
   push es un aviso inmediato adicional cuando el dispositivo tiene permisos.
 - Los datos personales permanecen aislados.

@@ -5772,6 +5772,9 @@ verdad.
 - Un correo sin cuenta o un fallo de base de datos no deja espacios huérfanos.
 - No existe una ventana entre crear el espacio y crear la invitación, ni aunque
   la app se cierre durante la operación.
+- El catálogo selecciona el espacio pendiente, pero su navegador se reinicia en
+  Inicio y deshabilita Actividad y Mapa hasta que `activated_at` deje de ser
+  nulo tras la aceptación.
 - Cambiar una invitación de un espacio ya pendiente continúa usando
   `create_space_invitation`; ese espacio sí tiene una invitación confirmada.
 

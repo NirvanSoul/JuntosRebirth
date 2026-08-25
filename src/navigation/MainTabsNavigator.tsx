@@ -1045,8 +1045,16 @@ export function MainTabsNavigator() {
               />
               <Tabs.Navigator
                 initialRouteName="Home"
+                key={isAwaitingPartner ? 'couple-pending' : 'space-ready'}
                 screenOptions={{ headerShown: false, animation: 'fade' }}
-                tabBar={(props) => <AppTabBar {...props} />}
+                tabBar={(props) => (
+                  <AppTabBar
+                    {...props}
+                    disabledRoutes={
+                      isAwaitingPartner ? ['Activity', 'Map'] : undefined
+                    }
+                  />
+                )}
               >
                 <Tabs.Screen
                   listeners={{
