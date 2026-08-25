@@ -341,8 +341,8 @@ function createStyles(colors: ColorTokens) {
     headerText: { flex: 1, gap: spacing.xs },
     coupleIllustration: {
       alignSelf: 'center',
-      height: 180,
-      width: 180,
+      height: 220,
+      width: 220,
     },
     creationContent: { gap: spacing.md },
     body: { gap: spacing.md },
