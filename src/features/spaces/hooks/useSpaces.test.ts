@@ -95,6 +95,33 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     expect(result.current.spaces).toEqual([personalSpace]);
   });
 
+  it('oculta inmediatamente el espacio de pareja y cae a Personal al cerrar sesión', async () => {
+    mockAuthSession(fakeSession);
+    const coupleSpace: Space = {
+      id: 'space-remote',
+      name: 'Juntos',
+      type: 'couple',
+      currency: 'EUR',
+    };
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: coupleSpace.id,
+      spaces: [personalSpace, coupleSpace],
+    });
+    mockRemoteCoupleSpace({ data: coupleSpace, error: null });
+
+    const { result, rerender } = await renderHook(() => useSpaces());
+
+    await waitFor(() =>
+      expect(result.current.activeSpace.id).toBe(coupleSpace.id),
+    );
+
+    mockAuthSession(null);
+    await rerender(undefined);
+
+    expect(result.current.spaces).toEqual([personalSpace]);
+    expect(result.current.activeSpace.id).toBe(personalSpace.id);
+  });
+
   it('fusiona un espacio de pareja remoto nuevo en el catálogo local y lo persiste', async () => {
     mockAuthSession(fakeSession);
     jest.mocked(loadSpaces).mockResolvedValue({

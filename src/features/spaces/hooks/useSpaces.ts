@@ -13,6 +13,7 @@ import {
   type Space,
   type SpacesState,
 } from '@/features/spaces/types';
+import { projectSpacesForSession } from '@/features/spaces/utils/sessionSpaceProjection';
 import {
   defaultCurrencyCode,
   isCurrencyCode,
@@ -228,11 +229,16 @@ export function useSpaces(): SpacesController {
     void refreshCoupleSpace();
   }, [isReady, isAuthReady, refreshCoupleSpace]);
 
+  const sessionSpacesState = useMemo(
+    () => projectSpacesForSession(state, userId),
+    [state, userId],
+  );
   const activeSpace = useMemo(
     () =>
-      state.spaces.find((space) => space.id === state.activeSpaceId) ??
-      personalSpace,
-    [state.activeSpaceId, state.spaces],
+      sessionSpacesState.spaces.find(
+        (space) => space.id === sessionSpacesState.activeSpaceId,
+      ) ?? personalSpace,
+    [sessionSpacesState],
   );
 
   const createSpace = useCallback(
@@ -424,6 +430,6 @@ export function useSpaces(): SpacesController {
     isReady,
     refreshCoupleSpace,
     selectSpace,
-    spaces: state.spaces,
+    spaces: sessionSpacesState.spaces,
   };
 }

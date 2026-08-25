@@ -1541,6 +1541,14 @@ Evaluar:
 - Qué ocurre al borrar la aplicación.
 - Cómo se protege un respaldo temporal de migración.
 
+La política ya resuelta para los espacios compartidos vive en ADR-084: cerrar
+sesión no borra su caché SQLite —podría contener trabajo offline todavía
+pendiente—, pero `useSpaces` deja de exponer de forma síncrona cualquier espacio
+`couple` cuando no existe una sesión. El invitado cae a su espacio Personal y no
+puede seleccionar ni consultar la caché compartida desde la aplicación. Al
+autenticarse de nuevo, el refresco remoto reconcilia el catálogo y RLS vuelve a
+validar la membresía en cada operación de Supabase.
+
 Tokens y credenciales deben usar almacenamiento seguro, no almacenamiento general.
 
 ---

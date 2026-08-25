@@ -5615,6 +5615,60 @@ catálogo local y el texto/confirmación de salida.
 
 ---
 
+# ADR-084 — Los espacios compartidos no son accesibles sin sesión
+
+**Estado:** Aceptada
+
+## Contexto
+
+El cierre de sesión eliminaba correctamente el token de Supabase, pero el
+catálogo de espacios de AsyncStorage y la caché financiera de SQLite permanecían
+en el dispositivo. Como `useSpaces` devolvía el catálogo sin atender a la
+sesión, quien continuaba como invitado podía mantener seleccionado el espacio
+Juntos y ver sus movimientos ya materializados localmente.
+
+## Opciones consideradas
+
+1. Borrar el catálogo y todas las filas SQLite del espacio compartido al cerrar
+   sesión.
+2. Conservar la caché local, pero proyectar el catálogo accesible según la
+   sesión y excluir todos los espacios `couple` cuando no exista una.
+
+## Decisión
+
+Se adopta la opción 2. `useSpaces` conserva internamente el catálogo autenticado
+para no destruir cambios offline, pero durante el propio render devuelve una
+proyección sin espacios de pareja cuando `userId` es nulo. Si el espacio activo
+era compartido, la proyección cae a Personal. El cálculo síncrono evita mostrar
+datos del contexto anterior durante un frame mientras se procesa el cambio de
+sesión.
+
+Las consultas remotas continúan protegidas por RLS y no se realizan sin sesión.
+Al autenticarse de nuevo, el refresco existente vuelve a reconciliar el espacio
+de pareja contra Supabase y RLS valida la membresía en cada operación remota.
+
+## Consecuencias positivas
+
+- Un invitado no puede seleccionar ni navegar a un espacio compartido cacheado.
+- Los movimientos compartidos pendientes no se borran por cerrar sesión.
+- El cambio no requiere una migración destructiva de SQLite ni una dependencia
+  nueva y se aplica igual en iOS y Android.
+
+## Consecuencias negativas
+
+- La caché compartida continúa ocupando espacio local después de cerrar sesión;
+  queda inaccesible desde la interfaz, no eliminada físicamente.
+- La política general de cifrado y separación física de cachés entre varias
+  cuentas sigue perteneciendo a `DATABASE.md` §24 y no se redefine aquí.
+
+## Validación
+
+`useSpaces.test.ts` reproduce la transición con Juntos activo: la prueba falla
+antes de la corrección porque el espacio sigue expuesto y pasa después al
+comprobar que solo Personal permanece accesible.
+
+---
+
 ## 5. Principio final
 
 > Una decisión no documentada se convierte con el tiempo en una suposición.
