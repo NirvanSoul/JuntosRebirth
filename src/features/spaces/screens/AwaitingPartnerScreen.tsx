@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/layout/Screen/Screen';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
@@ -18,7 +18,6 @@ import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
-const heroBadgeSize = 88;
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 
 type AwaitingPartnerScreenProps = {
@@ -106,15 +105,13 @@ export function AwaitingPartnerScreen({
   return (
     <Screen testID="awaiting-partner-screen">
       <View style={styles.panel}>
-        <View style={styles.heroBadge}>
-          <Ionicons
-            accessibilityElementsHidden
-            color={colors.cta}
-            importantForAccessibility="no-hide-descendants"
-            name="mail-unread-outline"
-            size={iconSize.xl}
-          />
-        </View>
+        <Image
+          accessible={false}
+          resizeMode="contain"
+          source={require('../../../../assets/Onboarding/Waiting.png')}
+          style={styles.waitingIllustration}
+          testID="awaiting-partner-illustration"
+        />
 
         <View style={styles.copy}>
           <Text align="center" accessibilityRole="header" variant="heading">
@@ -193,14 +190,11 @@ function createStyles(colors: ColorTokens) {
       gap: spacing.xl,
       paddingBottom: spacing.xxl,
     },
-    heroBadge: {
-      width: heroBadgeSize,
-      height: heroBadgeSize,
-      alignItems: 'center',
+    waitingIllustration: {
       alignSelf: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      backgroundColor: colors.ctaSoft,
+      borderRadius: radii.lg,
+      height: 192,
+      width: 128,
     },
     copy: { gap: spacing.sm },
     statusCard: {
