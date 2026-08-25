@@ -1,5 +1,5 @@
 begin;
-select plan(31);
+select plan(35);
 
 select has_table('public', 'space_invitations', 'space_invitations exists');
 select ok(
@@ -44,6 +44,12 @@ select has_index(
 );
 
 select has_function('public', 'create_couple_space', array['text', 'text'], 'create_couple_space exists');
+select has_function(
+  'public',
+  'create_couple_space_invitation',
+  array['text', 'text', 'text'],
+  'atomic couple space invitation creation exists'
+);
 select has_function('public', 'create_space_invitation', array['uuid', 'text'], 'create_space_invitation exists');
 select has_function('public', 'get_space_invitation_preview', array['text'], 'get_space_invitation_preview exists');
 select has_function('public', 'accept_space_invitation', array['text'], 'accept_space_invitation exists');
@@ -52,6 +58,19 @@ select has_function('public', 'leave_couple_space', array['uuid'], 'leave_couple
 select ok(
   not has_function_privilege('anon', 'public.create_couple_space(text,text)', 'EXECUTE'),
   'anonymous users cannot create a couple space'
+);
+select ok(
+  not has_function_privilege('anon', 'public.create_couple_space_invitation(text,text,text)', 'EXECUTE'),
+  'anonymous users cannot atomically create a couple space invitation'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.create_couple_space_invitation(text,text,text)', 'EXECUTE'),
+  'authenticated users can atomically create their couple space invitation'
+);
+select ok(
+  (select prosrc from pg_proc where oid = 'public.create_couple_space_invitation(text,text,text)'::regprocedure)
+    ~ E'insert into public\\.spaces(.|\\n)*insert into public\\.space_invitations',
+  'the atomic RPC persists the space and invitation in the same database transaction'
 );
 select ok(
   not has_function_privilege('anon', 'public.accept_space_invitation(text)', 'EXECUTE'),

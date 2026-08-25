@@ -33,7 +33,10 @@ export const remoteSpaceIntegrityErrorMessage =
 
 type SpacesController = {
   activeSpace: Space;
-  createCoupleSpace: (name?: string) => Promise<Space>;
+  createCoupleSpaceInvitation: (
+    inviteeEmail: string,
+    name?: string,
+  ) => Promise<Space>;
   createSpace: (name: string) => Promise<Space>;
   leaveCoupleSpace: () => Promise<void>;
   error: string | null;
@@ -315,8 +318,8 @@ export function useSpaces(): SpacesController {
     [state],
   );
 
-  const createCoupleSpace = useCallback(
-    async (rawName?: string): Promise<Space> => {
+  const createCoupleSpaceInvitation = useCallback(
+    async (inviteeEmail: string, rawName?: string): Promise<Space> => {
       if (!session) {
         throw new Error('Inicia sesión para crear un espacio de pareja.');
       }
@@ -332,18 +335,22 @@ export function useSpaces(): SpacesController {
       const gateway = createSupabaseInvitationGateway();
       let spaceId: string;
       try {
-        ({ spaceId } = await gateway.createCoupleSpace(name, spaceCurrency));
+        ({ spaceId } = await gateway.createCoupleSpaceInvitation(
+          name,
+          spaceCurrency,
+          inviteeEmail,
+        ));
       } catch (caught) {
         const message =
           caught instanceof Error
             ? caught.message
-            : 'No pudimos crear el espacio de pareja.';
+            : 'No pudimos crear el espacio y enviar la invitación.';
         setError(message);
-        throw new Error(message);
+        throw caught instanceof Error ? caught : new Error(message);
       }
 
-      // Nace pendiente: `create_couple_space` guarda `activated_at = null` y
-      // el espacio no es utilizable hasta que la otra persona acepte.
+      // El RPC crea el espacio y su invitación en una sola transacción. Solo
+      // después de recibir ambos identificadores se expone la espera en la UI.
       const newSpace: Space = {
         id: spaceId,
         name,
@@ -363,7 +370,7 @@ export function useSpaces(): SpacesController {
         await saveSpaces(nextState);
       } catch {
         const message =
-          'No pudimos guardar el espacio de pareja. Inténtalo de nuevo.';
+          'La invitación se envió, pero no pudimos actualizar tus espacios locales. Cierra y vuelve a abrir Juntos.';
         setError(message);
         throw new Error(message);
       }
@@ -423,7 +430,7 @@ export function useSpaces(): SpacesController {
 
   return {
     activeSpace,
-    createCoupleSpace,
+    createCoupleSpaceInvitation,
     createSpace,
     leaveCoupleSpace,
     error,

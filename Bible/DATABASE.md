@@ -562,6 +562,7 @@ Reglas:
   la fila completa.
 
 Funciones asociadas: `create_couple_space(p_name, p_currency)`,
+`create_couple_space_invitation(p_name, p_currency, p_invitee_email)`,
 `create_space_invitation(p_space_id, p_invitee_email)`,
 `get_space_invitation_preview(p_token)`, `accept_space_invitation(p_token)`,
 `leave_couple_space(p_space_id)`. Ver ADR-083 para el ciclo de vida de salida.
@@ -586,6 +587,14 @@ función reservada a `service_role` reclama un único intento antes de resolver
 los dispositivos del destinatario. El push no concede acceso ni sustituye la
 consulta in-app.
 
+La migración `37_atomic_couple_space_invitation.sql` define la operación que
+usa el alta nueva del cliente. Inserta `spaces`, `space_members` y
+`space_invitations` dentro del mismo RPC y devuelve los identificadores del
+espacio y de la invitación. Un correo inexistente o cualquier fallo revierte la
+transacción completa; llegar al campo de correo o cerrar el modal no escribe
+nada. `create_couple_space()` queda como operación heredada para compatibilidad,
+pero el flujo de producto no la llama de forma aislada.
+
 ### 6.4.1 Un espacio juntos por usuario
 
 `space_members` tiene una columna `space_type` (copiada una sola vez de
@@ -609,8 +618,9 @@ espacio la reactiva: conserva la fila, vuelve `status` a `'active'`, limpia
 `left_at` y actualiza `joined_at`. La unicidad `(space_id, user_id)` evita
 duplicar a esa persona al volver.
 
-Un espacio juntos nace **pendiente**: `create_couple_space()` inserta
-`activated_at = null` y son `accept_space_invitation()` y
+Un espacio juntos nace **pendiente con una invitación ya persistida**: el flujo
+nuevo usa `create_couple_space_invitation()` para insertar ambos elementos de
+forma atómica con `activated_at = null`, y son `accept_space_invitation()` y
 `accept_current_user_space_invitation()` las que lo activan
 (`activated_at = coalesce(activated_at, now())`). Un espacio de una sola
 persona no es un espacio (ADR-078): quien invita es miembro activo para poder

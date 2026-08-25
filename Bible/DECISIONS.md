@@ -5744,6 +5744,47 @@ desplegar la Edge Function y usar builds nativas en staging según
 
 ---
 
+# ADR-086 — Alta atómica del espacio y su primera invitación
+
+**Estado:** Aceptada
+
+## Contexto
+
+El modal creaba el espacio remoto al pasar de la introducción al campo de
+correo. Si la persona cerraba sin enviar, `activated_at = null` hacía que el
+cliente interpretara ese borrador como una invitación confirmada y mostrara
+`AwaitingPartnerScreen` con el texto «Invitación enviada».
+
+## Decisión
+
+El paso introductorio y el campo de correo son estado local del modal. La
+primera escritura ocurre únicamente al pulsar «Enviar invitación» mediante
+`create_couple_space_invitation`: espacio, membresía de quien invita e
+invitación se insertan en una sola transacción PostgreSQL. El cliente incorpora
+el espacio al catálogo y activa la pantalla de espera solo después de validar
+la respuesta completa del RPC. El intento de push continúa siendo posterior y
+no forma parte de esa confirmación, porque la invitación in-app es la fuente de
+verdad.
+
+## Consecuencias
+
+- Cerrar el modal antes de enviar no crea ni consume el cupo de espacio juntos.
+- Un correo sin cuenta o un fallo de base de datos no deja espacios huérfanos.
+- No existe una ventana entre crear el espacio y crear la invitación, ni aunque
+  la app se cierre durante la operación.
+- Cambiar una invitación de un espacio ya pendiente continúa usando
+  `create_space_invitation`; ese espacio sí tiene una invitación confirmada.
+
+## Validación
+
+Las pruebas del modal cubren el cierre sin escritura y el envío atómico. Las
+pruebas de `useSpaces` exigen que el estado de espera se publique después del
+resultado completo; las del gateway verifican un único RPC y que el push se
+intenta después. `space_invitations.test.sql` comprueba existencia, permisos y
+el cuerpo transaccional de la función.
+
+---
+
 ## 5. Principio final
 
 > Una decisión no documentada se convierte con el tiempo en una suposición.

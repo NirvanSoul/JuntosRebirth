@@ -73,10 +73,11 @@ export class CreateInvitationError extends Error {
 }
 
 export type InvitationGateway = {
-  createCoupleSpace(
-    name: string | undefined,
+  createCoupleSpaceInvitation(
+    name: string,
     currency: CurrencyCode,
-  ): Promise<{ spaceId: string }>;
+    inviteeEmail: string,
+  ): Promise<{ spaceId: string; invitationId: string; expiresAt: string }>;
   createInvitation(
     spaceId: string,
     inviteeEmail: string,
@@ -174,19 +175,53 @@ export function createSupabaseInvitationGateway(
   client: SupabaseClient = getConfiguredSupabaseClient(),
 ): InvitationGateway {
   return {
-    async createCoupleSpace(name, currency) {
-      const { data, error } = await client.rpc('create_couple_space', {
-        p_name: name,
-        p_currency: currency,
-      });
+    async createCoupleSpaceInvitation(name, currency, inviteeEmail) {
+      const { data, error } = await client.rpc(
+        'create_couple_space_invitation',
+        {
+          p_name: name,
+          p_currency: currency,
+          p_invitee_email: inviteeEmail,
+        },
+      );
       if (error) {
-        const { text } = splitErrorCode(error.message);
-        throw new Error(text || 'No pudimos crear el espacio de pareja.');
+        const { code, text } = splitErrorCode(error.message);
+        throw new CreateInvitationError(
+          code === 'invitee_not_registered'
+            ? 'invitee_not_registered'
+            : 'unknown',
+          text || 'No pudimos crear el espacio y enviar la invitación.',
+        );
       }
-      if (typeof data !== 'string') {
-        throw new Error('No pudimos crear el espacio de pareja.');
+
+      const rows = Array.isArray(data) ? data : data ? [data] : [];
+      const row = rows[0] as
+        | {
+            space_id: string;
+            invitation_id: string;
+            expires_at: string;
+          }
+        | undefined;
+      if (
+        !row ||
+        typeof row.space_id !== 'string' ||
+        typeof row.invitation_id !== 'string' ||
+        typeof row.expires_at !== 'string'
+      ) {
+        throw new Error('No pudimos crear el espacio y enviar la invitación.');
       }
-      return { spaceId: data };
+
+      await client.functions
+        .invoke('send-space-invitation-push', {
+          body: { invitationId: row.invitation_id },
+        })
+        .catch(() => undefined);
+
+      return {
+        spaceId: row.space_id,
+        invitationId: row.invitation_id,
+        expiresAt: row.expires_at,
+      };
     },
 
     async createInvitation(spaceId, inviteeEmail) {

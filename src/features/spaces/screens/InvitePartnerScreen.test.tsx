@@ -40,7 +40,7 @@ function renderInvitation(createInvitation = jest.fn()) {
     <InvitePartnerScreen
       coupleSpace={coupleSpace}
       onClose={jest.fn()}
-      onCreateCoupleSpace={jest.fn()}
+      onCreateCoupleSpaceInvitation={jest.fn()}
       visible
     />,
   );
@@ -56,6 +56,56 @@ describe('InvitePartnerScreen', () => {
     expect(screen.getByTestId('invite-partner-send-email')).toBeTruthy();
     expect(screen.queryByText(/generar enlace/i)).toBeNull();
     expect(screen.queryByText(/copiar enlace/i)).toBeNull();
+  });
+
+  it('cerrar el paso de correo no crea un espacio ni una espera fantasma', async () => {
+    const onClose = jest.fn();
+    const onCreateCoupleSpaceInvitation = jest.fn();
+    const screen = await renderWithTheme(
+      <InvitePartnerScreen
+        coupleSpace={null}
+        onClose={onClose}
+        onCreateCoupleSpaceInvitation={onCreateCoupleSpaceInvitation}
+        visible
+      />,
+    );
+
+    await fireEvent.press(screen.getByTestId('invite-partner-create-space'));
+    expect(screen.getByLabelText('Correo de tu pareja')).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Cerrar'));
+
+    expect(onCreateCoupleSpaceInvitation).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('crea el espacio y la primera invitación en una sola confirmación', async () => {
+    const onCreateCoupleSpaceInvitation = jest.fn().mockResolvedValue({
+      ...coupleSpace,
+      id: 'couple-atomic',
+    });
+    const screen = await renderWithTheme(
+      <InvitePartnerScreen
+        coupleSpace={null}
+        onClose={jest.fn()}
+        onCreateCoupleSpaceInvitation={onCreateCoupleSpaceInvitation}
+        visible
+      />,
+    );
+
+    await fireEvent.press(screen.getByTestId('invite-partner-create-space'));
+    await fireEvent.changeText(
+      screen.getByTestId('invite-partner-email'),
+      ' pareja@example.com ',
+    );
+    await fireEvent.press(screen.getByTestId('invite-partner-send-email'));
+
+    await waitFor(() =>
+      expect(onCreateCoupleSpaceInvitation).toHaveBeenCalledWith(
+        'pareja@example.com',
+      ),
+    );
+    expect(await screen.findByText('¡Invitación enviada!')).toBeTruthy();
   });
 
   it('confirma la invitación in-app para una cuenta existente', async () => {

@@ -21,39 +21,72 @@ function createFakeClient(
 }
 
 describe('supabaseInvitationGateway', () => {
-  describe('createCoupleSpace', () => {
-    it('devuelve el spaceId cuando el RPC resuelve con éxito', async () => {
-      const rpc = jest.fn().mockResolvedValue({ data: 'space-1', error: null });
+  describe('createCoupleSpaceInvitation', () => {
+    it('confirma espacio e invitación con un único RPC y después intenta el push', async () => {
+      const rpc = jest.fn().mockResolvedValue({
+        data: [
+          {
+            space_id: 'space-atomic',
+            invitation_id: 'invitation-atomic',
+            expires_at: '2026-09-01T00:00:00Z',
+          },
+        ],
+        error: null,
+      });
+      const functionsInvoke = jest.fn().mockResolvedValue({
+        data: { notifiedDevices: 1 },
+        error: null,
+      });
       const gateway = createSupabaseInvitationGateway(
-        createFakeClient({ rpc }),
+        createFakeClient({ functionsInvoke, rpc }),
       );
 
-      await expect(gateway.createCoupleSpace('Juntos', 'VES')).resolves.toEqual(
-        {
-          spaceId: 'space-1',
-        },
-      );
-      expect(rpc).toHaveBeenCalledWith('create_couple_space', {
-        p_name: 'Juntos',
-        p_currency: 'VES',
+      await expect(
+        gateway.createCoupleSpaceInvitation(
+          'Juntos',
+          'EUR',
+          'pareja@example.com',
+        ),
+      ).resolves.toEqual({
+        spaceId: 'space-atomic',
+        invitationId: 'invitation-atomic',
+        expiresAt: '2026-09-01T00:00:00Z',
       });
+      expect(rpc).toHaveBeenCalledWith('create_couple_space_invitation', {
+        p_name: 'Juntos',
+        p_currency: 'EUR',
+        p_invitee_email: 'pareja@example.com',
+      });
+      expect(functionsInvoke).toHaveBeenCalledWith(
+        'send-space-invitation-push',
+        { body: { invitationId: 'invitation-atomic' } },
+      );
     });
 
-    it('separa el código del mensaje en español cuando el RPC falla', async () => {
+    it('no deja avanzar y conserva el código cuando la cuenta no existe', async () => {
       const rpc = jest.fn().mockResolvedValue({
         data: null,
         error: {
           message:
-            'already_in_couple_space: ya perteneces a un espacio juntos activo',
+            'invitee_not_registered: Ese correo aún no tiene una cuenta.',
         },
       });
+      const functionsInvoke = jest.fn();
       const gateway = createSupabaseInvitationGateway(
-        createFakeClient({ rpc }),
+        createFakeClient({ functionsInvoke, rpc }),
       );
 
-      await expect(gateway.createCoupleSpace('Juntos', 'EUR')).rejects.toThrow(
-        'ya perteneces a un espacio juntos activo',
-      );
+      await expect(
+        gateway.createCoupleSpaceInvitation(
+          'Juntos',
+          'EUR',
+          'nueva@example.com',
+        ),
+      ).rejects.toMatchObject({
+        code: 'invitee_not_registered',
+        name: CreateInvitationError.name,
+      });
+      expect(functionsInvoke).not.toHaveBeenCalled();
     });
   });
 

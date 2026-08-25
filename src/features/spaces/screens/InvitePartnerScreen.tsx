@@ -20,13 +20,16 @@ import { useTheme } from '@/theme/useTheme';
 type InvitePartnerScreenProps = {
   coupleSpace: Space | null;
   onClose: () => void;
-  onCreateCoupleSpace: (name?: string) => Promise<Space>;
+  onCreateCoupleSpaceInvitation: (
+    inviteeEmail: string,
+    name?: string,
+  ) => Promise<Space>;
   visible: boolean;
 };
 
 type Phase =
   | { kind: 'idle' }
-  | { kind: 'creating-space' }
+  | { kind: 'entering-email' }
   | { kind: 'sending-invitation' }
   | { kind: 'invitation-created' }
   | { kind: 'invitee-not-registered' }
@@ -41,7 +44,7 @@ type Phase =
 export function InvitePartnerScreen({
   coupleSpace,
   onClose,
-  onCreateCoupleSpace,
+  onCreateCoupleSpaceInvitation,
   visible,
 }: InvitePartnerScreenProps) {
   const { colors } = useTheme();
@@ -58,28 +61,17 @@ export function InvitePartnerScreen({
     }
   }, [visible]);
 
-  const isBusy =
-    phase.kind === 'creating-space' || phase.kind === 'sending-invitation';
+  const isBusy = phase.kind === 'sending-invitation';
 
   const handleClose = () => {
     setPhase({ kind: 'idle' });
     onClose();
   };
 
-  const handleCreateSpace = async () => {
-    setPhase({ kind: 'creating-space' });
-    try {
-      await onCreateCoupleSpace();
-      setPhase({ kind: 'idle' });
-    } catch (caught) {
-      setPhase({
-        kind: 'error',
-        message:
-          caught instanceof Error
-            ? caught.message
-            : 'No pudimos crear el espacio de pareja.',
-      });
-    }
+  const handleContinueToEmail = () => {
+    // Todavía no se crea nada en Supabase. Cerrar desde el siguiente paso no
+    // puede dejar un espacio pendiente sin una invitación confirmada.
+    setPhase({ kind: 'entering-email' });
   };
 
   const handleCreateInAppInvitation = async () => {
@@ -88,13 +80,15 @@ export function InvitePartnerScreen({
       setEmailError('Ingresa un correo válido.');
       return;
     }
-    if (!coupleSpace) return;
-
     setEmailError(null);
     setPhase({ kind: 'sending-invitation' });
-    const gateway = createSupabaseInvitationGateway();
     try {
-      await gateway.createInvitation(coupleSpace.id, trimmedEmail);
+      if (coupleSpace) {
+        const gateway = createSupabaseInvitationGateway();
+        await gateway.createInvitation(coupleSpace.id, trimmedEmail);
+      } else {
+        await onCreateCoupleSpaceInvitation(trimmedEmail);
+      }
       setPhase({ kind: 'invitation-created' });
     } catch (caught) {
       if (
@@ -132,13 +126,15 @@ export function InvitePartnerScreen({
             <Text tone="secondary" variant="label">
               {coupleSpace
                 ? 'Escribe el correo asociado a la cuenta de tu pareja.'
-                : 'Crea un espacio para compartir movimientos con tu pareja.'}
+                : phase.kind !== 'idle'
+                  ? 'Escribe el correo asociado a la cuenta de tu pareja.'
+                  : 'Crea un espacio para compartir movimientos con tu pareja.'}
             </Text>
           </View>
           <ModalCloseButton onPress={handleClose} />
         </View>
 
-        {!coupleSpace ? (
+        {!coupleSpace && phase.kind === 'idle' ? (
           <View style={styles.creationContent}>
             <Image
               accessible={false}
@@ -154,12 +150,8 @@ export function InvitePartnerScreen({
             <ModalPrimaryAction
               accessibilityLabel="Crear espacio de pareja"
               disabled={isBusy}
-              label={
-                phase.kind === 'creating-space'
-                  ? 'Creando…'
-                  : 'Crear espacio de pareja'
-              }
-              onPress={() => void handleCreateSpace()}
+              label="Crear espacio de pareja"
+              onPress={handleContinueToEmail}
               testID="invite-partner-create-space"
               variant="cta"
             />

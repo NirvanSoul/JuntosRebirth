@@ -56,7 +56,7 @@ function createGatewayStub(
 ): InvitationGateway {
   return {
     acceptInvitation: jest.fn(),
-    createCoupleSpace: jest.fn(),
+    createCoupleSpaceInvitation: jest.fn(),
     createInvitation: jest.fn(),
     leaveCoupleSpace: jest.fn(),
     getCurrentUserPendingInvitation: jest.fn(),
@@ -270,7 +270,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     expect(saveSpaces).not.toHaveBeenCalled();
   });
 
-  it('createCoupleSpace exige sesión activa antes de llamar al gateway', async () => {
+  it('createCoupleSpaceInvitation exige sesión activa antes de llamar al gateway', async () => {
     mockAuthSession(null);
     jest.mocked(loadSpaces).mockResolvedValue({
       activeSpaceId: personalSpace.id,
@@ -282,13 +282,41 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     const { result } = await renderHook(() => useSpaces());
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
-    await expect(result.current.createCoupleSpace()).rejects.toThrow(
-      'Inicia sesión',
-    );
-    expect(gateway.createCoupleSpace).not.toHaveBeenCalled();
+    await expect(
+      result.current.createCoupleSpaceInvitation('pareja@example.com'),
+    ).rejects.toThrow('Inicia sesión');
+    expect(gateway.createCoupleSpaceInvitation).not.toHaveBeenCalled();
+    expect(result.current.activeSpace).toEqual(personalSpace);
   });
 
-  it('createCoupleSpace añade el espacio devuelto por el gateway enviando la moneda de preferencias', async () => {
+  it('no expone la espera si la creación atómica falla', async () => {
+    mockAuthSession(fakeSession);
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+    mockRemoteCoupleSpace({ data: null, error: null });
+    const gateway = createGatewayStub({
+      createCoupleSpaceInvitation: jest
+        .fn()
+        .mockRejectedValue(new Error('No se confirmó la invitación.')),
+    });
+    jest.mocked(createSupabaseInvitationGateway).mockReturnValue(gateway);
+
+    const { result } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+    const saveCallCount = jest.mocked(saveSpaces).mock.calls.length;
+
+    await act(async () => {
+      await expect(
+        result.current.createCoupleSpaceInvitation('pareja@example.com'),
+      ).rejects.toThrow('No se confirmó la invitación.');
+    });
+    expect(result.current.activeSpace).toEqual(personalSpace);
+    expect(saveSpaces).toHaveBeenCalledTimes(saveCallCount);
+  });
+
+  it('solo expone la espera después de confirmar juntos el espacio y la invitación', async () => {
     mockAuthSession(fakeSession);
     jest.mocked(loadCurrencyPreferences).mockResolvedValue({
       currencies: ['VES'],
@@ -298,25 +326,31 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
       spaces: [{ ...personalSpace, currency: 'VES' }],
     });
     mockRemoteCoupleSpace({ data: null, error: null });
-    const gateway = createGatewayStub({
-      createCoupleSpace: jest.fn().mockResolvedValue({ spaceId: 'space-new' }),
+    const createCoupleSpaceInvitation = jest.fn().mockResolvedValue({
+      spaceId: 'space-confirmed',
+      invitationId: 'invitation-confirmed',
+      expiresAt: '2026-09-01T00:00:00Z',
     });
+    const gateway = createGatewayStub({ createCoupleSpaceInvitation });
     jest.mocked(createSupabaseInvitationGateway).mockReturnValue(gateway);
 
     const { result } = await renderHook(() => useSpaces());
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
     await act(async () => {
-      await result.current.createCoupleSpace('Nuestro espacio');
+      await result.current.createCoupleSpaceInvitation(
+        'pareja@example.com',
+        'Nuestro espacio',
+      );
     });
 
-    expect(gateway.createCoupleSpace).toHaveBeenCalledWith(
+    expect(createCoupleSpaceInvitation).toHaveBeenCalledWith(
       'Nuestro espacio',
       'VES',
+      'pareja@example.com',
     );
-    // Nace pendiente: no es un espacio usable hasta que la otra persona entre.
     expect(result.current.activeSpace).toEqual({
-      id: 'space-new',
+      id: 'space-confirmed',
       name: 'Nuestro espacio',
       type: 'couple',
       currency: 'VES',

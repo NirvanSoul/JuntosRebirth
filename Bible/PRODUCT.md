@@ -874,6 +874,10 @@ Principios:
   la app no genera enlaces manuales para compartir.
 - Si el correo no tiene cuenta, no se crea la invitación y quien invita debe
   pedir a esa persona que descargue Juntoss y se registre con ese correo.
+- Avanzar hasta el campo de correo no crea todavía ningún espacio. El primer
+  espacio de pareja y su invitación se confirman juntos al pulsar enviar; cerrar
+  el modal antes de ese éxito conserva Personal como espacio activo y nunca
+  muestra una espera falsa.
 - La invitación guardada y visible dentro de la app es la fuente de verdad. El
   push es un aviso inmediato adicional cuando el dispositivo tiene permisos.
 - Los datos personales permanecen aislados.

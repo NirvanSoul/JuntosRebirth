@@ -133,7 +133,7 @@ export function MainTabsNavigator() {
   const { colors } = useTheme();
   const {
     activeSpace,
-    createCoupleSpace,
+    createCoupleSpaceInvitation,
     createSpace,
     leaveCoupleSpace,
     error: spacesError,
@@ -1417,7 +1417,7 @@ export function MainTabsNavigator() {
       <InvitePartnerScreen
         coupleSpace={coupleSpace}
         onClose={() => setInvitePartnerVisible(false)}
-        onCreateCoupleSpace={createCoupleSpace}
+        onCreateCoupleSpaceInvitation={createCoupleSpaceInvitation}
         visible={isInvitePartnerVisible}
       />
       <AuthModal
