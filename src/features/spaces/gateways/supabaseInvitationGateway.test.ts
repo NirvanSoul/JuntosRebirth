@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
   AcceptInvitationError,
+  CreateInvitationError,
   createSupabaseInvitationGateway,
 } from '@/features/spaces/gateways/supabaseInvitationGateway';
 
@@ -57,7 +58,7 @@ describe('supabaseInvitationGateway', () => {
   });
 
   describe('createInvitation', () => {
-    it('desempaqueta la fila devuelta por la función de tabla', async () => {
+    it('crea la invitación dirigida y solicita su push', async () => {
       const rpc = jest.fn().mockResolvedValue({
         data: [
           {
@@ -68,20 +69,50 @@ describe('supabaseInvitationGateway', () => {
         ],
         error: null,
       });
+      const functionsInvoke = jest
+        .fn()
+        .mockResolvedValue({ data: { notifiedDevices: 1 }, error: null });
       const gateway = createSupabaseInvitationGateway(
-        createFakeClient({ rpc }),
+        createFakeClient({ functionsInvoke, rpc }),
       );
 
       await expect(
         gateway.createInvitation('space-1', 'pareja@example.com'),
       ).resolves.toEqual({
         id: 'inv-1',
-        plaintextToken: 'token-abc',
         expiresAt: '2026-08-15T00:00:00Z',
       });
       expect(rpc).toHaveBeenCalledWith('create_space_invitation', {
         p_space_id: 'space-1',
         p_invitee_email: 'pareja@example.com',
+      });
+      expect(functionsInvoke).toHaveBeenCalledWith(
+        'send-space-invitation-push',
+        { body: { invitationId: 'inv-1' } },
+      );
+    });
+
+    it('conserva la invitación si el servicio push no está disponible', async () => {
+      const rpc = jest.fn().mockResolvedValue({
+        data: [
+          {
+            id: 'inv-1',
+            plaintext_token: 'token-abc',
+            expires_at: '2026-08-15T00:00:00Z',
+          },
+        ],
+        error: null,
+      });
+      const functionsInvoke = jest.fn().mockRejectedValue(new Error('offline'));
+      const gateway = createSupabaseInvitationGateway(
+        createFakeClient({ functionsInvoke, rpc }),
+      );
+
+      await expect(
+        gateway.createInvitation('space-1', 'pareja@example.com'),
+      ).resolves.toEqual({
+        id: 'inv-1',
+        expiresAt: '2026-08-15T00:00:00Z',
       });
     });
 
@@ -91,9 +122,29 @@ describe('supabaseInvitationGateway', () => {
         createFakeClient({ rpc }),
       );
 
-      await expect(gateway.createInvitation('space-1')).rejects.toThrow(
-        'No pudimos crear la invitación.',
+      await expect(
+        gateway.createInvitation('space-1', 'pareja@example.com'),
+      ).rejects.toThrow('No pudimos crear la invitación.');
+    });
+
+    it('conserva el código cuando el correo todavía no tiene cuenta', async () => {
+      const rpc = jest.fn().mockResolvedValue({
+        data: null,
+        error: {
+          message:
+            'invitee_not_registered: Ese correo aún no tiene una cuenta.',
+        },
+      });
+      const gateway = createSupabaseInvitationGateway(
+        createFakeClient({ rpc }),
       );
+
+      await expect(
+        gateway.createInvitation('space-1', 'nueva@example.com'),
+      ).rejects.toMatchObject({
+        code: 'invitee_not_registered',
+        name: CreateInvitationError.name,
+      });
     });
   });
 

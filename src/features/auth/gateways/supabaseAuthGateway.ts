@@ -5,6 +5,7 @@ import type {
   SignUpInput,
   VerifyCodeInput,
 } from '@/features/auth/types';
+import { unregisterCurrentDeviceFromInvitationPush } from '@/lib/notifications/invitationPushTokenStore';
 import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 
 /**
@@ -203,6 +204,9 @@ export function createSupabaseAuthGateway(
     },
 
     async signOut() {
+      await unregisterCurrentDeviceFromInvitationPush(client).catch(
+        () => undefined,
+      );
       const { error } = await client.auth.signOut();
       if (error) {
         throw new Error(describeAuthError(error, 'No pudimos cerrar sesión.'));

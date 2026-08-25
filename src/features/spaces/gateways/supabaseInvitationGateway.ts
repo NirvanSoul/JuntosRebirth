@@ -38,6 +38,8 @@ export type AcceptInvitationErrorCode =
   | 'already_in_couple_space'
   | 'unknown';
 
+export type CreateInvitationErrorCode = 'invitee_not_registered' | 'unknown';
+
 const knownAcceptErrorCodes: readonly AcceptInvitationErrorCode[] = [
   'invitation_not_found',
   'invitation_already_used',
@@ -60,6 +62,16 @@ export class AcceptInvitationError extends Error {
   }
 }
 
+export class CreateInvitationError extends Error {
+  code: CreateInvitationErrorCode;
+
+  constructor(code: CreateInvitationErrorCode, message: string) {
+    super(message);
+    this.name = 'CreateInvitationError';
+    this.code = code;
+  }
+}
+
 export type InvitationGateway = {
   createCoupleSpace(
     name: string | undefined,
@@ -67,8 +79,8 @@ export type InvitationGateway = {
   ): Promise<{ spaceId: string }>;
   createInvitation(
     spaceId: string,
-    inviteeEmail?: string,
-  ): Promise<{ id: string; plaintextToken: string; expiresAt: string }>;
+    inviteeEmail: string,
+  ): Promise<{ id: string; expiresAt: string }>;
   getCurrentUserPendingInvitation(): Promise<CurrentUserInvitation | null>;
   getOutgoingInvitation(spaceId: string): Promise<OutgoingInvitation | null>;
   acceptCurrentUserInvitation(
@@ -180,11 +192,16 @@ export function createSupabaseInvitationGateway(
     async createInvitation(spaceId, inviteeEmail) {
       const { data, error } = await client.rpc('create_space_invitation', {
         p_space_id: spaceId,
-        p_invitee_email: inviteeEmail ?? null,
+        p_invitee_email: inviteeEmail,
       });
       if (error) {
-        const { text } = splitErrorCode(error.message);
-        throw new Error(text || 'No pudimos crear la invitación.');
+        const { code, text } = splitErrorCode(error.message);
+        throw new CreateInvitationError(
+          code === 'invitee_not_registered'
+            ? 'invitee_not_registered'
+            : 'unknown',
+          text || 'No pudimos crear la invitación.',
+        );
       }
       const rows = Array.isArray(data) ? data : data ? [data] : [];
       const row = rows[0] as
@@ -192,13 +209,21 @@ export function createSupabaseInvitationGateway(
       if (
         !row ||
         typeof row.id !== 'string' ||
-        typeof row.plaintext_token !== 'string'
+        typeof row.expires_at !== 'string'
       ) {
         throw new Error('No pudimos crear la invitación.');
       }
+
+      // El push complementa la invitación ya persistida. Un dispositivo sin
+      // permiso o un fallo temporal de Expo no debe deshacer ni ocultar esa
+      // invitación dentro de Juntoss.
+      await client.functions
+        .invoke('send-space-invitation-push', {
+          body: { invitationId: row.id },
+        })
+        .catch(() => undefined);
       return {
         id: row.id,
-        plaintextToken: row.plaintext_token,
         expiresAt: row.expires_at,
       };
     },

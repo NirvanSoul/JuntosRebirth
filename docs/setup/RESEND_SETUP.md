@@ -42,8 +42,11 @@ En el Dashboard del proyecto de Supabase:
 ## 3. Invitaciones a espacios
 
 Las invitaciones no se envían con Resend. Si el correo pertenece a una cuenta
-de Juntoss, esa persona verá el aviso al abrir la app; el enlace directo se
-puede compartir por el canal que elija quien invita.
+de Juntoss, esa persona verá el aviso al abrir la app y podrá recibir un push.
+La interfaz no genera enlaces manuales. Si el correo todavía no tiene cuenta,
+no se crea ninguna invitación y se pide que la persona descargue la app y se
+registre primero. La configuración del push vive en
+`docs/setup/PUSH_NOTIFICATIONS_SETUP.md`.
 
 ## 4. Verificación
 

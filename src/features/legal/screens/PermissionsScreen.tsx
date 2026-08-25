@@ -98,15 +98,14 @@ export function PermissionsScreen({
             <SettingsRow
               icon="alarm-outline"
               iconBackgroundColor={categoryColors.pink}
-              label="Recordatorios de movimientos"
+              label="Alertas y recordatorios"
               value={statusLabel}
             />
           </SettingsSection>
           <Text tone="secondary" variant="footnote">
-            Las usamos únicamente para los recordatorios de gastos e ingresos
-            que tú activas en Ajustes → Notificaciones. Juntos no solicita
-            acceso a cámara, fotos, contactos ni ubicación porque no los
-            necesita.
+            Las usamos para avisarte de invitaciones a espacios y para los
+            recordatorios que activas. Nunca mostramos datos financieros en el
+            aviso de una invitación.
           </Text>
 
           {status === 'denied' ? (

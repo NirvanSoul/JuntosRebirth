@@ -5669,6 +5669,81 @@ comprobar que solo Personal permanece accesible.
 
 ---
 
+# ADR-085 — Invitaciones solo por correo con aviso push
+
+**Estado:** Aceptada
+
+## Contexto
+
+El modal mezclaba dos destinos —correo dirigido y enlace manual— con bloques,
+divisor, compartir y copiar. El producto exige ahora un único flujo: escribir
+el correo de una cuenta existente y entregar la invitación dentro de Juntoss.
+Además, abrir la app era hasta ahora la única forma de descubrirla.
+
+## Opciones consideradas
+
+1. Programar una notificación local desde quien invita. No puede crear un aviso
+   en el dispositivo de otra persona y no funciona con la app receptora cerrada.
+2. Enviar directamente a Expo desde el cliente. Expondría tokens o permitiría
+   elegir destinatarios sin una validación de servidor confiable.
+3. Persistir primero la invitación existente y pedir a una Edge Function
+   autenticada que resuelva los dispositivos mediante `service_role` y envíe
+   un push genérico con Expo Push Service.
+
+## Decisión
+
+Se adopta la opción 3:
+
+- `InvitePartnerScreen` elimina generar, compartir y copiar enlaces. Conserva
+  únicamente el correo y una acción de envío. Si el RPC responde
+  `invitee_not_registered`, explica que la persona debe descargar Juntoss y
+  crear su cuenta antes de reintentar.
+- Cambiar el correo revoca cualquier invitación pendiente anterior de ese
+  espacio; nunca quedan dos posibles parejas compitiendo por aceptar primero.
+- `space_invitations` continúa siendo la fuente de verdad. El gateway crea la
+  invitación antes de invocar `send-space-invitation-push`; un fallo de push no
+  revierte una invitación válida ni cambia el éxito mostrado por la interfaz.
+- `user_push_tokens` está cerrado a `anon` y `authenticated`. Dos RPC
+  `SECURITY DEFINER` permiten a la sesión registrar o retirar únicamente su
+  dispositivo, y `claim_space_invitation_push` solo puede ejecutarse con
+  `service_role`.
+- La Edge Function vuelve a validar por RLS que quien llama creó la invitación,
+  la reclama una sola vez y nunca acepta un correo o token de destino desde el
+  cliente.
+- El payload bloqueado solo dice que existe una invitación. Tocar el push abre
+  Inicio, donde `PendingInvitationBanner` consulta el servidor y ofrece la
+  aceptación normal.
+- Tras explicar el uso, la app solicita el permiso una vez por cuenta. Si ya
+  estaba concedido, registra el token silenciosamente al iniciar sesión y al
+  volver a primer plano. Antes de cerrar sesión intenta retirarlo.
+
+## Consecuencias
+
+- Una cuenta existente siempre conserva la invitación in-app, incluso si no
+  concedió notificaciones, no tiene un dispositivo registrado o Expo/APNs/FCM
+  están temporalmente indisponibles.
+- El push remoto requiere development/production build, `projectId` de EAS y
+  credenciales APNs/FCM. Expo Go en Android no lo soporta con la versión actual.
+- Los RPC de enlace anteriores permanecen para que invitaciones históricas no
+  se invaliden, pero esta versión no puede crear ni compartir enlaces.
+- El envío procesa errores inmediatos `DeviceNotRegistered`; queda pendiente un
+  proceso programado para consultar receipts diferidos y retirar tokens que se
+  invaliden después de que Expo acepte el mensaje.
+
+## Validación
+
+`InvitePartnerScreen.test.tsx` demuestra que no existe acción de enlace, que el
+correo se normaliza y que una cuenta inexistente recibe la instrucción nueva.
+Las pruebas del gateway cubren que el push se solicita después del RPC y que su
+indisponibilidad no borra la invitación. `invitationPushNotifications.test.ts`
+cubre permiso, registro y retirada, y
+`invitation_push_notifications.test.sql` verifica privilegios, RLS, funciones
+y la FK de tokens. La prueba real de recepción requiere aplicar la migración,
+desplegar la Edge Function y usar builds nativas en staging según
+`docs/setup/PUSH_NOTIFICATIONS_SETUP.md`.
+
+---
+
 ## 5. Principio final
 
 > Una decisión no documentada se convierte con el tiempo en una suposición.

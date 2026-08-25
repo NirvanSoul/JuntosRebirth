@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 
 import { ensureNotificationHandlerRegistered } from '@/lib/notifications/localNotifications';
+import { InvitationPushRegistration } from '@/lib/notifications/InvitationPushRegistration';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { useTheme } from '@/theme/useTheme';
 import { fontAssets } from '@/theme/fonts';
@@ -35,6 +36,7 @@ export function AppBootstrap() {
     <>
       <AppStatusBar />
       <RootNavigator />
+      <InvitationPushRegistration />
     </>
   );
 }

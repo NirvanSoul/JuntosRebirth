@@ -4,6 +4,11 @@ import {
   AccountLockedError,
   createSupabaseAuthGateway,
 } from '@/features/auth/gateways/supabaseAuthGateway';
+import { unregisterCurrentDeviceFromInvitationPush } from '@/lib/notifications/invitationPushTokenStore';
+
+jest.mock('@/lib/notifications/invitationPushTokenStore', () => ({
+  unregisterCurrentDeviceFromInvitationPush: jest.fn(async () => undefined),
+}));
 
 function createFakeClient(
   overrides: Record<string, jest.Mock> = {},
@@ -169,6 +174,19 @@ describe('supabaseAuthGateway', () => {
     await gateway.resendSignUpCode('a@b.com');
 
     expect(resend).toHaveBeenCalledWith({ type: 'signup', email: 'a@b.com' });
+  });
+
+  it('retira el dispositivo de push antes de cerrar sesión', async () => {
+    const signOut = jest.fn().mockResolvedValue({ error: null });
+    const client = createFakeClient({ signOut });
+    const gateway = createSupabaseAuthGateway(client);
+
+    await gateway.signOut();
+
+    expect(unregisterCurrentDeviceFromInvitationPush).toHaveBeenCalledWith(
+      client,
+    );
+    expect(signOut).toHaveBeenCalledTimes(1);
   });
 
   it('onAuthStateChange delega la suscripción y su cancelación al cliente', () => {

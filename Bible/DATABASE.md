@@ -546,9 +546,9 @@ Reglas:
 - No existe un estado `'expired'` almacenado: se calcula al leer
   (`expires_at < now()`), para no depender de un job programado que este
   proyecto no tiene configurado.
-- Puede coexistir una invitación `pending` dirigida a una cuenta y un enlace
-  manual; cada destino solo conserva una invitación pendiente por espacio.
-  Crear otra para ese mismo destino revoca la anterior.
+- Desde la migración 36 solo existe una invitación `pending` por espacio.
+  Cambiar el correo revoca la anterior antes de insertar la nueva, para que la
+  primera persona ya no pueda aceptar después de invitar a otra.
 - Aceptar una invitación es idempotente (`accept_space_invitation`, mismo
   usuario) y valida que el correo de quien acepta coincida con
   `invitee_email` cuando la invitación se creó para un correo concreto.
@@ -570,13 +570,21 @@ La migración `16_in_app_space_invitations.sql` deja de enviar invitaciones con
 Resend. Una invitación dirigida solo se crea si ese correo ya pertenece a una
 cuenta; `get_current_user_pending_space_invitation()` la muestra únicamente a
 la sesión cuyo correo coincide y `accept_current_user_space_invitation(id)` la
-acepta de forma controlada. El enlace manual se conserva para compartirlo por
-el canal que el usuario elija.
+acepta de forma controlada. El cliente actual exige correo y no ofrece generar,
+copiar ni compartir enlaces. Los RPC de vista previa y aceptación por token se
+mantienen solo para no invalidar enlaces creados por versiones anteriores.
 
 La migración `17_fix_space_invitation_column_reference.sql` corrige una
 referencia ambigua a `id` dentro del RPC de creación: tanto la invitación
 dirigida como el enlace manual vuelven a poder crearse en instalaciones que
 ya aplicaron la versión 16.
+
+La migración `36_invitation_push_notifications.sql` añade
+`push_notification_attempted_at`. La Edge Function autenticada
+`send-space-invitation-push` valida que quien llama creó esa invitación y una
+función reservada a `service_role` reclama un único intento antes de resolver
+los dispositivos del destinatario. El push no concede acceso ni sustituye la
+consulta in-app.
 
 ### 6.4.1 Un espacio juntos por usuario
 
@@ -975,6 +983,32 @@ Reglas:
   a 0. Un bloqueo vencido se limpia en el siguiente intento en vez de
   arrastrar el contador anterior.
 - Un inicio de sesión correcto borra la fila del correo.
+
+### 6.13 `user_push_tokens`
+
+Migración `36_invitation_push_notifications.sql`. Dispositivos autenticados a
+los que se pueden enviar avisos de invitaciones mediante Expo Push Service.
+
+```text
+expo_push_token    text, PK
+user_id            uuid, FK auth.users (on delete cascade)
+platform           text ('ios' | 'android')
+created_at         timestamptz
+updated_at         timestamptz
+```
+
+Reglas:
+
+- RLS está activado sin políticas y `anon`/`authenticated` no tienen permisos
+  directos sobre la tabla. Un usuario solo registra o retira el token de su
+  sesión mediante RPC `SECURITY DEFINER`.
+- Registrar un token ya conocido mueve su asociación a la sesión actual. Esto
+  evita que un dispositivo compartido conserve la cuenta anterior.
+- El cierre de sesión intenta retirar el token antes de borrar el JWT. Borrar
+  la cuenta elimina sus tokens por cascada.
+- Solo `service_role` puede leer tokens y reclamar el envío de una invitación.
+- El payload de invitación es deliberadamente genérico: no contiene nombres de
+  miembros, nombre del espacio ni información financiera.
 
 ---
 

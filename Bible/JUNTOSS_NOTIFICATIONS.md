@@ -4,11 +4,12 @@
 
 Este documento define las plantillas, el tono y las reglas de implementación de las notificaciones de `juntoss`.
 
-La aplicación utiliza tres tipos de notificaciones:
+La aplicación utiliza cuatro tipos de notificaciones:
 
 1. **Recordatorios de gastos solicitados por el usuario.**
 2. **Recordatorios de ingresos solicitados por el usuario.**
 3. **Recordatorios diarios generados por la aplicación para fomentar el registro de movimientos.**
+4. **Avisos push de invitaciones a un espacio de pareja.**
 
 Las notificaciones deben sentirse humanas, claras y útiles. No deben parecer mensajes publicitarios ni recordatorios mecánicos.
 
@@ -291,6 +292,28 @@ Frecuencia:
 
 ---
 
+## 7.1. Invitaciones a espacios de pareja
+
+Las invitaciones son remotas, no programadas localmente. La invitación
+persistida en `space_invitations` sigue siendo la autoridad y debe aparecer en
+Inicio aunque Expo, APNs o FCM no puedan mostrar el push.
+
+**Título:** Nueva invitación en Juntoss
+
+**Texto:** Te invitaron a compartir un espacio. Abre la app para responder.
+
+Reglas:
+
+- No incluir correo, nombre del espacio, nombres de miembros ni datos
+  financieros en la pantalla bloqueada.
+- Enviar solo después de crear una invitación dirigida a una cuenta existente.
+- No tratar la ausencia de token o permiso como un fallo de la invitación.
+- Al tocar el aviso, abrir Inicio y volver a consultar la invitación; nunca
+  aceptar desde una acción rápida.
+- Un dispositivo se registra únicamente después de explicar y obtener el
+  permiso del sistema.
+- Retirar su token antes del cierre de sesión siempre que la red lo permita.
+
 ## 8. Rotación de plantillas
 
 El sistema debe:
@@ -415,6 +438,11 @@ Abrir el formulario o detalle del ingreso correspondiente.
 ### Recordatorio diario
 
 Abrir la creación de movimiento o Inicio, según contexto.
+
+### Invitación a espacio de pareja
+
+Abrir Inicio. El banner in-app consulta el servidor y permite aceptar o dejar
+la invitación para más tarde.
 
 Reglas:
 

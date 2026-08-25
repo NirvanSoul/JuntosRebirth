@@ -1115,7 +1115,7 @@ export function MainTabsNavigator() {
                         showComparisonIndicators={showHomeComparisonIndicators}
                         spaceCurrency={activeSpace.currency}
                         topContent={
-                          activeSpace.type === 'personal' ? (
+                          activeSpace.type !== 'couple' ? (
                             <PendingInvitationBanner
                               onAccepted={refreshCoupleSpaceAndData}
                             />

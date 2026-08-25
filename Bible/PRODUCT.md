@@ -870,6 +870,12 @@ Un usuario registrado puede crear un espacio, invitar a otra persona y comenzar 
 Principios:
 
 - Unirse no fusiona espacios personales.
+- La invitación se dirige exclusivamente al correo de una cuenta existente;
+  la app no genera enlaces manuales para compartir.
+- Si el correo no tiene cuenta, no se crea la invitación y quien invita debe
+  pedir a esa persona que descargue Juntoss y se registre con ese correo.
+- La invitación guardada y visible dentro de la app es la fuente de verdad. El
+  push es un aviso inmediato adicional cuando el dispositivo tiene permisos.
 - Los datos personales permanecen aislados.
 - Los movimientos compartidos conservan autor.
 - Salir revoca solo el acceso de quien lo solicita.
