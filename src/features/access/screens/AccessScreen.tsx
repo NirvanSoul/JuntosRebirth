@@ -45,7 +45,8 @@ const stepTitles: Record<AccessStep['screen'], string> = {
 /** Host de autenticación a pantalla completa, reutilizando los mismos formularios de Ajustes. */
 export function AccessScreen() {
   const styles = useThemedStyles(createStyles);
-  const { markAuthenticated, markGuestComplete } = useOnboardingStatus();
+  const { markAuthenticated, markGuestComplete, status } =
+    useOnboardingStatus();
   const { session } = useBetterAuthSession();
   const pendingVerificationEmail =
     session?.user.emailVerified === false ? session.user.email : null;
@@ -167,14 +168,18 @@ export function AccessScreen() {
                 testID="access-open-login"
                 variant="surface"
               />
-              <ModalPrimaryAction
-                accessibilityLabel="Probar sin cuenta"
-                disabled={isCompletingGuest}
-                label={isCompletingGuest ? 'Preparando…' : 'Probar sin cuenta'}
-                onPress={() => void completeGuest()}
-                testID="access-continue-guest"
-                variant="surface"
-              />
+              {status?.accessMode !== 'authenticated' ? (
+                <ModalPrimaryAction
+                  accessibilityLabel="Probar sin cuenta"
+                  disabled={isCompletingGuest}
+                  label={
+                    isCompletingGuest ? 'Preparando…' : 'Probar sin cuenta'
+                  }
+                  onPress={() => void completeGuest()}
+                  testID="access-continue-guest"
+                  variant="surface"
+                />
+              ) : null}
             </View>
           ) : null}
 
