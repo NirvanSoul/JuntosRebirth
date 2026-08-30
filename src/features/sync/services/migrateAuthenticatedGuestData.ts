@@ -1,4 +1,5 @@
 import type { Space } from '@/features/spaces/types';
+import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import {
   completeLocalGuestMigration,
   failLocalGuestMigration,
@@ -8,14 +9,8 @@ import type {
   GuestMigrationGateway,
   GuestMigrationResult,
 } from '@/features/sync/types';
-import { createSupabaseMerchantRuleGateway } from '@/features/import/gateways/supabaseMerchantRuleGateway';
-import { createSupabaseImportBatchGateway } from '@/features/import/gateways/supabaseImportBatchGateway';
-import { createSupabaseMerchantFeedbackGateway } from '@/features/import/gateways/supabaseMerchantFeedbackGateway';
-import { syncLocalImportBatches } from '@/features/import/services/syncImportBatches';
-import { syncLocalMerchantFeedback } from '@/features/import/services/syncMerchantFeedback';
-import { syncLocalMerchantRules } from '@/features/import/services/syncMerchantRules';
-import { createSupabaseGuestMigrationGateway } from '@/features/sync/gateways/supabaseGuestMigrationGateway';
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
+import { createJuntossGuestMigrationGateway } from '@/features/sync/gateways/juntossGuestMigrationGateway';
+import { apiClient } from '@/services/api/juntossApiClient';
 
 export async function migrateAuthenticatedGuestData(input: {
   userId: string;
@@ -35,10 +30,11 @@ export async function migrateAuthenticatedGuestData(input: {
       result.batchId !== payload.batchId ||
       result.spaceCount !== payload.spaces.length ||
       result.categoryCount !== payload.categories.length ||
+      result.moneyAccountCount !== payload.moneyAccounts.length ||
       result.seriesCount !== payload.recurringSeries.length ||
       result.transactionCount !== payload.transactions.length
     ) {
-      throw new Error('Supabase no confirmó el lote local completo');
+      throw new Error('Juntoss API no confirmó el lote local completo');
     }
     await completeLocalGuestMigration(payload);
     return result;
@@ -52,30 +48,22 @@ export async function syncPendingLocalDataForCurrentSession(input: {
   spaces: readonly Space[];
   confirmOwnership: boolean;
 }): Promise<GuestMigrationResult> {
-  const client = getConfiguredSupabaseClient();
-  const { data, error } = await client.auth.getUser();
-  if (error || !data.user) {
-    throw new Error('Debes iniciar sesión antes de sincronizar');
+  let userId = await getAuthenticatedUserId();
+  if (!userId) {
+    const session = await apiClient.get<{
+      data: { user?: { id: string }; id?: string };
+    }>('/v1/me');
+    userId = session.data.user?.id ?? session.data.id ?? null;
+  }
+  if (!userId) {
+    throw new Error('Debes iniciar sesión antes de migrar tus datos');
   }
 
   const result = await migrateAuthenticatedGuestData({
-    userId: data.user.id,
+    userId,
     spaces: input.spaces,
     confirmOwnership: input.confirmOwnership,
-    gateway: createSupabaseGuestMigrationGateway(client),
-  });
-  await syncLocalMerchantRules({
-    userId: data.user.id,
-    gateway: createSupabaseMerchantRuleGateway(client),
-  });
-  await syncLocalImportBatches({
-    userId: data.user.id,
-    gateway: createSupabaseImportBatchGateway(client),
-  });
-  // Solo puede resolver votos cuyo import_item ya exista en Supabase con
-  // categoría final, así que corre después de sincronizar los batches.
-  await syncLocalMerchantFeedback({
-    gateway: createSupabaseMerchantFeedbackGateway(client),
+    gateway: createJuntossGuestMigrationGateway(),
   });
   return result;
 }

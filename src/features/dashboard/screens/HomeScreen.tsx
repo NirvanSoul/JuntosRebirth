@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
 import { Screen } from '@/components/layout/Screen/Screen';
+import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountCarousel } from '@/features/accounts/components/MoneyAccountCarousel/MoneyAccountCarousel';
 import type { MoneyAccount } from '@/features/accounts/types';
@@ -250,6 +251,14 @@ export function HomeScreen({
                 variant="tile"
               />
             ))}
+            {onCreateCategory ? (
+              <CreatePreviewBadge
+                accessibilityLabel="Crear categoría"
+                label="Crear categoría"
+                onPress={onCreateCategory}
+                testID="home-category-create-badge"
+              />
+            ) : null}
           </ScrollView>
         ) : (
           <EmptyState
@@ -268,6 +277,7 @@ export function HomeScreen({
           <MoneyAccountCarousel
             accounts={moneyAccountSummaries}
             gutter={layout.screenGutter[density]}
+            onCreateMoneyAccount={onCreateMoneyAccount}
             onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
             testID="home-account-scroller"
           />

@@ -42,6 +42,10 @@ describe('sanitizeSignedAmountInput', () => {
     expect(sanitizeSignedAmountInput('-')).toBe('-');
   });
 
+  it('permite vaciar un importe opcional por completo', () => {
+    expect(sanitizeSignedAmountInput('')).toBe('');
+  });
+
   it('ignora un menos que no encabeza el importe', () => {
     expect(sanitizeSignedAmountInput('45-0')).toBe('450');
   });

@@ -417,7 +417,7 @@ export function ActivityScreen({
           onLayout={({ nativeEvent }) =>
             setAccountsOffset(nativeEvent.layout.y)
           }
-          style={{ marginTop: -(spacing.sm * 0.12) }}
+          style={{ marginTop: spacing.sm * 0.2 }}
           testID="activity-accounts-anchor"
         >
           <ActivityAccountsSection

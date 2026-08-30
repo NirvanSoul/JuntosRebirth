@@ -16,9 +16,7 @@ export async function syncLocalImportBatches(input: {
       result.batchCount !== payload.batches.length ||
       result.itemCount !== payload.items.length
     ) {
-      throw new Error(
-        'Supabase no confirmó todas las revisiones de importación',
-      );
+      throw new Error('La API no confirmó todas las revisiones de importación');
     }
     await completeLocalImportBatchSync(payload);
     return result;

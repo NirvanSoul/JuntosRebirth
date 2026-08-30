@@ -1,7 +1,4 @@
-import {
-  getAppEnvironment,
-  getSupabaseEnvironment,
-} from '@/app/config/environment';
+import { getApiEnvironment, getAppEnvironment } from '@/app/config/environment';
 
 describe('getAppEnvironment', () => {
   it('usa development cuando no hay configuración', () => {
@@ -22,23 +19,22 @@ describe('getAppEnvironment', () => {
   });
 });
 
-describe('getSupabaseEnvironment', () => {
-  it('permite ejecutar la app local sin conectar todavía Supabase', () => {
-    expect(getSupabaseEnvironment(undefined, undefined)).toBeNull();
+describe('getApiEnvironment', () => {
+  it('exige una URL pública de API', () => {
+    expect(() => getApiEnvironment(undefined)).toThrow(
+      'Configura EXPO_PUBLIC_API_URL',
+    );
   });
 
-  it('exige URL y publishable key juntas', () => {
-    expect(() =>
-      getSupabaseEnvironment('https://example.supabase.co', undefined),
-    ).toThrow('configuración de Supabase está incompleta');
-  });
-
-  it('normaliza una configuración completa', () => {
-    expect(
-      getSupabaseEnvironment('https://example.supabase.co/', 'publishable'),
-    ).toEqual({
-      url: 'https://example.supabase.co',
-      publishableKey: 'publishable',
+  it('normaliza una URL válida sin barra final', () => {
+    expect(getApiEnvironment('https://api.example.test/')).toEqual({
+      url: 'https://api.example.test',
     });
+  });
+
+  it('rechaza protocolos que no son HTTP', () => {
+    expect(() => getApiEnvironment('juntoss://api')).toThrow(
+      'EXPO_PUBLIC_API_URL debe usar HTTP o HTTPS',
+    );
   });
 });

@@ -15,6 +15,18 @@ jest.mock('@/features/auth/hooks/useAuthSession', () => ({
   }),
 }));
 
+jest.mock('@/features/auth/hooks/useBetterAuthSession', () => ({
+  useBetterAuthSession: () => ({
+    error: null,
+    isReady: true,
+    session: null,
+  }),
+}));
+
+jest.mock('@/lib/auth-client', () => ({
+  authClient: { signIn: { social: jest.fn() } },
+}));
+
 jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
   useOnboardingStatus: () => ({
     isReady: mockOnboardingReady,

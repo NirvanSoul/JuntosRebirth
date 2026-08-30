@@ -51,7 +51,7 @@ export type CategoryPickerSelection = {
 
 type CategoryPickerModalProps = {
   categories: readonly Category[];
-  mode: CategoryPickerMode;
+  mode: 'create' | 'select';
   selectedCategoryId: string | null;
   visible: boolean;
   onClose: () => void;
@@ -62,13 +62,10 @@ type CategoryPickerModalProps = {
   onSelect: (selection: CategoryPickerSelection | null) => void;
 };
 
-type CategoryPickerMode = 'create' | 'select';
-
 const saveButtonMinWidth = 80;
 const categoryRowsPerPage = 3;
 const categoryColumnsPerPage = 3;
 const categoriesPerPage = categoryRowsPerPage * categoryColumnsPerPage;
-
 type CategoryPickerItem = Category | DefaultCategoryDefinition;
 
 function isCreatedCategory(item: CategoryPickerItem): item is Category {
@@ -136,7 +133,7 @@ export function CategoryPickerModal({
   const { colors } = useTheme();
   const themedStyles = useThemedStyles(createStyles);
   const { width } = useWindowDimensions();
-  const [displayMode, setDisplayMode] = useState<CategoryPickerMode>(mode);
+  const [displayMode, setDisplayMode] = useState<'create' | 'select'>(mode);
   const gutter = layout.screenGutter[density];
   const pageWidth = width;
   const pageContentWidth = pageWidth - gutter * 2;
@@ -413,6 +410,7 @@ export function CategoryPickerModal({
                 ? 'Crear categoría'
                 : 'Crear otra categoría'
             }
+            testID="category-picker-create"
             onPress={() => {
               if (displayMode === 'select') {
                 setPageIndex(0);

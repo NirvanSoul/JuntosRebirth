@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
+import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { Text } from '@/components/ui/Text/Text';
 import { getActivityLayoutTransition } from '@/features/activity/components/ActivityCollapsibleSection';
 import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
@@ -177,52 +178,65 @@ export function ActivityCategoryDetail({
         </Pressable>
       </View>
       {categories.length > 0 ? (
-        <Animated.View
-          layout={getActivityLayoutTransition()}
-          style={[
-            displayedGridView ? styles.grid : styles.groupShadow,
-            categoryViewAnimatedStyle,
-          ]}
-          testID="activity-category-preview-group"
-        >
-          <View
-            style={displayedGridView ? styles.gridContent : styles.group}
-            testID="activity-category-preview-list"
+        <>
+          <Animated.View
+            layout={getActivityLayoutTransition()}
+            style={[
+              displayedGridView ? styles.grid : styles.groupShadow,
+              categoryViewAnimatedStyle,
+            ]}
+            testID="activity-category-preview-group"
           >
-            {categories.map(({ id, ...category }, index) =>
-              displayedGridView ? (
-                <CategoryPreviewCard
-                  {...category}
-                  budgetExpenseMinor={budgetExpenseByCategoryId.get(id) ?? 0}
-                  displayCurrency={currency}
-                  key={id}
-                  onPress={() => onOpenCategoryDetail?.(id, currency)}
-                  spaceCurrency={spaceCurrency}
-                  variant="grid"
-                />
-              ) : (
-                <View key={id}>
+            <View
+              style={displayedGridView ? styles.gridContent : styles.group}
+              testID="activity-category-preview-list"
+            >
+              {categories.map(({ id, ...category }, index) =>
+                displayedGridView ? (
                   <CategoryPreviewCard
                     {...category}
                     budgetExpenseMinor={budgetExpenseByCategoryId.get(id) ?? 0}
                     displayCurrency={currency}
+                    key={id}
                     onPress={() => onOpenCategoryDetail?.(id, currency)}
                     spaceCurrency={spaceCurrency}
-                    variant="row"
+                    variant="grid"
                   />
-                  {index < categories.length - 1 ? (
-                    <View
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                      style={styles.separator}
-                      testID="activity-category-separator"
+                ) : (
+                  <View key={id}>
+                    <CategoryPreviewCard
+                      {...category}
+                      budgetExpenseMinor={
+                        budgetExpenseByCategoryId.get(id) ?? 0
+                      }
+                      displayCurrency={currency}
+                      onPress={() => onOpenCategoryDetail?.(id, currency)}
+                      spaceCurrency={spaceCurrency}
+                      variant="row"
                     />
-                  ) : null}
-                </View>
-              ),
-            )}
+                    {index < categories.length - 1 ? (
+                      <View
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        style={styles.separator}
+                        testID="activity-category-separator"
+                      />
+                    ) : null}
+                  </View>
+                ),
+              )}
+            </View>
+          </Animated.View>
+          <View style={styles.createCategoryBadge}>
+            <CreatePreviewBadge
+              accessibilityLabel="Crear categoría"
+              bordered
+              label="Crear categoría"
+              onPress={onCreateCategory}
+              testID="activity-add-category"
+            />
           </View>
-        </Animated.View>
+        </>
       ) : (
         <EmptyState
           accessibilityLabel="Crear primera categoría"
@@ -240,6 +254,7 @@ export function ActivityCategoryDetail({
 
 function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
   return StyleSheet.create({
+    createCategoryBadge: { marginTop: spacing.md },
     grid: { width: '100%' },
     gridContent: {
       flexDirection: 'row',
@@ -252,7 +267,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       backgroundColor: colors.surface,
       borderColor: colors.categoryPreviewBorder,
       borderRadius: previewCardLayout.borderRadius,
-      borderWidth: 2,
+      borderWidth: 1,
     },
     groupShadow: {
       ...shadows.subtle,

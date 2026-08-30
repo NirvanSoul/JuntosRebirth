@@ -13,7 +13,6 @@ import { formatCurrency } from '@/lib/currency/formatCurrency';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
-import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { minTouchTarget } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
@@ -103,7 +102,7 @@ describe('ActivityScreen', () => {
     ).toMatchObject({
       borderColor: colors.categoryPreviewBorder,
       borderRadius: previewCardLayout.borderRadius,
-      borderWidth: 2,
+      borderWidth: 1,
       overflow: 'hidden',
     });
     expect(
@@ -141,10 +140,11 @@ describe('ActivityScreen', () => {
     expect(within(categoryCard).queryByText('disponible')).toBeNull();
     expect(
       StyleSheet.flatten(
-        within(categoryCard).getByTestId('category-preview-spent-amount').props
-          .style,
+        within(categoryCard).getByTestId('category-preview-expense-text', {
+          includeHiddenElements: true,
+        }).props.style,
       ).color,
-    ).toBe(categoryColors.slate);
+    ).toBe(colors.textPrimary);
     expect(
       StyleSheet.flatten(
         within(categoryCard).getByTestId('category-preview-available-amount')
@@ -152,7 +152,7 @@ describe('ActivityScreen', () => {
       ).color,
     ).toBe(colors.textSecondary);
     expect(categoryCard.props.accessibilityLabel).toMatch(
-      /General, 12,50.*gastado, 37,50.*disponible/,
+      /General, 12,50.*gastado, 20.*ingresado, 37,50.*disponible/,
     );
     expect(
       within(categoryCard).getByRole('progressbar').props.accessibilityValue,
@@ -245,6 +245,11 @@ describe('ActivityScreen', () => {
       paddingHorizontal: spacing.xl,
       paddingVertical: spacing.lg,
     });
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('activity-accounts-anchor').props.style,
+      ).marginTop,
+    ).toBe(spacing.sm * 0.2);
     expect(
       StyleSheet.flatten(chart.props.style).backgroundColor,
     ).toBeUndefined();
@@ -587,6 +592,30 @@ describe('ActivityScreen', () => {
     expect(onCreateExpense).toHaveBeenCalledTimes(1);
   });
 
+  it('ofrece crear una categoría debajo de sus previews', async () => {
+    const onCreateCategory = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            onCreateCategory={onCreateCategory}
+            transactions={transactions}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByTestId('activity-add-category'));
+
+    expect(onCreateCategory).toHaveBeenCalledTimes(1);
+  });
+
   it('no ofrece una acción cuando el filtro de movimientos no tiene resultados', async () => {
     const otherCategory: Category = {
       id: 'other',
@@ -662,8 +691,8 @@ describe('ActivityScreen', () => {
       expect.arrayContaining([expect.objectContaining({ width: '0%' })]),
     );
     expect(
-      within(categoryCard).queryByTestId('category-preview-spent-amount'),
-    ).toBeNull();
+      within(categoryCard).getByTestId('category-preview-amount-switcher'),
+    ).toBeTruthy();
     expect(
       within(categoryCard).queryByTestId('category-preview-available-amount'),
     ).toBeNull();
@@ -1490,31 +1519,36 @@ describe('ActivityScreen', () => {
         </SafeAreaProvider>,
       );
 
-    it('muestra la tarjeta y la fila de cada cuenta con su saldo', async () => {
+    it('muestra la lista detallada y permite alternar a las tarjetas de cuenta', async () => {
       const screen = await renderWithAccounts({
         moneyAccounts: [{ ...account, id: 'account-1' }],
       });
 
-      expect(screen.getByTestId('money-account-card-account-1')).toBeTruthy();
+      expect(screen.getByText('Detalles por cuenta')).toBeTruthy();
       expect(screen.getByTestId('money-account-row-account-1')).toBeTruthy();
+      expect(screen.queryByTestId('money-account-card-account-1')).toBeNull();
+
+      await fireEvent.press(
+        screen.getByLabelText('Cambiar a vista de tarjetas'),
+      );
+
+      expect(screen.getByLabelText('Cambiar a vista de lista')).toBeTruthy();
       // Ningún movimiento está asignado todavía: el saldo es el inicial.
       expect(
-        screen.getByTestId('money-account-card-account-1-balance').props
-          .children,
-      ).toBe(formatCurrency(100000, 'EUR', 'es-ES'));
+        screen.getByText(formatCurrency(100000, 'EUR', 'es-ES')),
+      ).toBeTruthy();
     });
 
-    it('abre el detalle al tocar la tarjeta y la fila', async () => {
+    it('abre el detalle al tocar una fila de cuenta', async () => {
       const onOpenMoneyAccountDetail = jest.fn();
       const screen = await renderWithAccounts({
         moneyAccounts: [account],
         onOpenMoneyAccountDetail,
       });
 
-      await fireEvent.press(screen.getByTestId('money-account-card-account-1'));
       await fireEvent.press(screen.getByTestId('money-account-row-account-1'));
 
-      expect(onOpenMoneyAccountDetail).toHaveBeenCalledTimes(2);
+      expect(onOpenMoneyAccountDetail).toHaveBeenCalledTimes(1);
       expect(onOpenMoneyAccountDetail).toHaveBeenCalledWith('account-1');
     });
 
@@ -1525,7 +1559,7 @@ describe('ActivityScreen', () => {
         onCreateMoneyAccount,
       });
 
-      await fireEvent.press(screen.getByLabelText('Añadir cuenta'));
+      await fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
       expect(onCreateMoneyAccount).toHaveBeenCalled();
     });

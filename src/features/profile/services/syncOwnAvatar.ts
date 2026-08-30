@@ -1,15 +1,16 @@
-import { File } from 'expo-file-system';
-
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
-import {
-  buildAvatarPath,
-  uploadOwnAvatar,
-} from '@/features/profile/gateways/supabaseAvatarStorageGateway';
 import {
   getLocalAvatarUpload,
   markAvatarUploadResult,
+  saveDownloadedOwnAvatar,
+  saveOwnRemoteAvatar,
 } from '@/features/profile/repositories/localProfileRepository';
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
+import {
+  readAvatarBytes,
+  storeOwnAvatarBytes,
+} from '@/features/profile/services/avatarImageService';
+import { File } from 'expo-file-system';
+import { getAvatar, uploadAvatar } from '@/services/api/avatar';
 
 /**
  * Sube la foto de perfil propia si hay alguna pendiente.
@@ -41,23 +42,54 @@ export async function syncOwnAvatar(): Promise<boolean> {
       return false;
     }
 
-    const remotePath = await uploadOwnAvatar(userId, await file.bytes());
-
-    const client = getConfiguredSupabaseClient();
-    const { error } = await client
-      .from('profiles')
-      .update({
-        avatar_path: buildAvatarPath(userId),
-        avatar_updated_at: new Date().toISOString(),
-      })
-      .eq('id', userId);
-    if (error) throw new Error('No pudimos publicar tu foto de perfil');
-
-    await markAvatarUploadResult(localPath, 'synced', remotePath);
+    const avatar = await uploadAvatar(await readAvatarBytes(localPath));
+    await saveOwnRemoteAvatar(localPath, avatar);
     return true;
   } catch (error) {
     console.error('[avatar] no se pudo subir la foto de perfil', { error });
     await markAvatarUploadResult(localPath, 'failed', null);
+    return false;
+  }
+}
+
+/**
+ * Trae la foto propia desde el servidor cuando el dispositivo no la tiene.
+ *
+ * Es el caso de estrenar móvil o reinstalar: el censo del espacio incluye la
+ * fila propia, así que de ahí sale el sello vigente. Se descarga por la misma
+ * ruta autenticada que la de cualquier otro miembro; el cliente nunca compone
+ * una dirección de almacenamiento.
+ *
+ * Cede siempre ante una subida pendiente: si en este móvil hay una foto que
+ * todavía no ha salido, bajar la del servidor la borraría antes de publicarla.
+ *
+ * No lanza: quedarse sin foto degrada la interfaz al icono de respaldo.
+ */
+export async function restoreOwnAvatar(remote: {
+  avatarPath: string | null;
+  avatarUpdatedAt: string | null;
+  userId: string;
+}): Promise<boolean> {
+  if (!remote.avatarPath || !remote.avatarUpdatedAt) return false;
+
+  try {
+    const { localPath, syncStatus, remoteUpdatedAt } =
+      await getLocalAvatarUpload();
+    if (syncStatus === 'pending' || syncStatus === 'failed') return false;
+    // Nada que hacer si la copia local ya corresponde a ese sello.
+    if (localPath && remoteUpdatedAt === remote.avatarUpdatedAt) return false;
+
+    const bytes = await getAvatar(remote.userId, remote.avatarUpdatedAt);
+    if (!bytes) return false;
+
+    await saveDownloadedOwnAvatar({
+      localPath: storeOwnAvatarBytes(bytes),
+      avatarPath: remote.avatarPath,
+      avatarUpdatedAt: remote.avatarUpdatedAt,
+    });
+    return true;
+  } catch (error) {
+    console.error('[avatar] no se pudo recuperar la foto de perfil', { error });
     return false;
   }
 }

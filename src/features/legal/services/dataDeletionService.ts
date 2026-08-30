@@ -1,13 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { createSupabaseAccountDeletionGateway } from '@/features/legal/gateways/supabaseAccountDeletionGateway';
+import { createJuntossAccountDeletionGateway } from '@/features/legal/gateways/juntossAccountDeletionGateway';
 import type { DataDeletionResult } from '@/features/legal/model/types';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import {
   getLocalDatabase,
   resetLocalDatabase,
 } from '@/lib/storage/localDatabase';
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
+import { authClient } from '@/lib/auth-client';
 
 const localStorageKeyPrefix = '@juntoss/';
 
@@ -63,10 +63,10 @@ export async function deleteLocalData(): Promise<void> {
  * continuación limpia también los datos locales del dispositivo.
  */
 export async function deleteAccountAndData(): Promise<void> {
-  const client = getConfiguredSupabaseClient();
-  const gateway = createSupabaseAccountDeletionGateway(client);
-  await gateway.deleteAccount();
-  await client.auth.signOut();
+  await createJuntossAccountDeletionGateway().deleteAccount();
+  // La sesión ya no existe en el servidor; esto solo limpia la copia local, y
+  // que falle no debe impedir el borrado de los datos del dispositivo.
+  await authClient.signOut().catch(() => undefined);
   await deleteLocalData();
 }
 

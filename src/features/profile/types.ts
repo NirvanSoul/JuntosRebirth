@@ -1,7 +1,12 @@
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
 export type LocalProfile = {
+  /** Uri del archivo local que pinta la interfaz, con `?v=` para refrescarla. */
   avatarUri: string | null;
+  /** Clave del objeto en el servidor. Nunca se concatena a un dominio. */
+  avatarPath: string | null;
+  /** Sello de la última subida confirmada por la API. */
+  avatarUpdatedAt: string | null;
   displayName: string | null;
 };
 
@@ -9,7 +14,7 @@ export type LocalProfile = {
 export type SpaceMemberProfile = {
   userId: string;
   displayName: string | null;
-  /** Ruta del objeto en Supabase Storage, `{userId}/avatar.jpg`. */
+  /** Clave del objeto en el servidor, `{userId}/avatar.jpg`. */
   avatarPath: string | null;
   /** Sello de la última subida, con el que se decide si hay que redescargar. */
   avatarUpdatedAt: string | null;

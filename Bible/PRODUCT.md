@@ -151,9 +151,10 @@ eje de clasificación de un movimiento, junto a la categoría, y siempre
 saldo.
 
 Una cuenta pertenece a un espacio, como la categoría, y tiene nombre, tipo,
-color, icono, moneda y saldo inicial. Su saldo es el saldo inicial más los
-ingresos menos los gastos que tenga asignados, con la misma regla de horizonte
-mensual que el balance. Una cuenta puede guardar varias monedas —hay bancos que
+color, icono, moneda y saldo inicial. Al crearla, el saldo inicial se registra
+como un movimiento de hoy asociado a la cuenta: positivo como ingreso y
+negativo como gasto. Así su saldo y el balance total comparten la misma fuente
+de verdad. Una cuenta puede guardar varias monedas —hay bancos que
 lo permiten— y cada una lleva su propio saldo; nunca se suman entre sí. Al
 registrar un movimiento solo se ofrecen cuentas que guarden su moneda. El tipo
 solo propone el icono y el color al crearla: los tres calculan el saldo igual y
@@ -233,7 +234,7 @@ Después del onboarding, el usuario entra como invitado o crea su cuenta (ver §
 
 ### Reglas
 
-- Nueve pantallas en total (ver `DECISIONS.md` ADR-012, ampliación).
+- Nueve pantallas en total.
 - No pedir correo ni contraseña antes de probar.
 - No pedir permisos sin explicar por qué.
 - Pedir un primer ingreso y un primer gasto al final, para dejar el espacio local con datos reales.
@@ -256,7 +257,7 @@ El invitado:
 - Puede crear movimientos.
 - Puede crear categorías con límites.
 - Puede navegar por el producto principal.
-- No sincroniza con Supabase.
+- No sincroniza con la API de Juntos.
 - No puede crear espacios compartidos.
 - Puede perder datos si elimina la app o pierde el dispositivo.
 
@@ -276,7 +277,7 @@ Al alcanzar un límite, se bloquea únicamente la acción excedida y se ofrece r
 Cuando el usuario se registra:
 
 1. Se crea la cuenta.
-2. Se verifica el correo con el código de Supabase.
+2. Se verifica el correo con el código OTP de Better Auth.
 3. Se crea o recupera el espacio personal remoto.
 4. Se prepara un lote de migración.
 5. Se suben categorías y movimientos.
@@ -443,9 +444,10 @@ saber qué cuenta genera más de cada uno— y su encabezado recorre meses
 anteriores sin permitir navegar a meses futuros. Reparte solo la moneda
 seleccionada en los movimientos, nunca suma divisas distintas, y deja fuera los
 movimientos sin cuenta. Tocar un badge abre el detalle de esa cuenta. Debajo,
-presenta las cuentas del espacio como tarjetas con la forma de una tarjeta
-física, desplazables en horizontal, y debajo la misma información como lista
-compacta con icono, nombre y saldo. Tocar una tarjeta o una fila abre el
+presenta el encabezado `Detalles por cuenta` con un botón que alterna entre la
+lista compacta con icono, nombre y saldo y las tarjetas de cuenta físicas
+desplazables en horizontal; ambas vistas no se muestran a la vez. Tocar una
+tarjeta o una fila abre el
 detalle de la cuenta, con su saldo, el saldo inicial, los totales de ingresos
 y gastos, sus movimientos y las acciones de editar y eliminar. Cada tarjeta
 muestra el saldo en la moneda de su propia cuenta, así que el selector de
@@ -453,6 +455,8 @@ moneda de los movimientos no las filtra ni mezcla divisas, y no se muestra
 ningún total agregado de todas las cuentas. La variación frente al mes anterior
 solo aparece si esa cuenta tuvo al menos un movimiento en dicho mes; su saldo
 inicial o la ausencia de actividad no se usan como una base de comparación.
+El cambio entre ambas vistas usa la misma transición breve de salida y entrada
+que el selector de vista de Categorías y respeta el movimiento reducido.
 
 Crear una cuenta se hace desde ahí: con el estado vacío cuando no hay ninguna
 y con `Añadir cuenta` bajo la lista cuando ya existen. El botón flotante de
@@ -473,7 +477,12 @@ previas de categoría de esta pantalla muestran el icono y el nombre y, cuando
 existe presupuesto, el gasto acumulado y su progreso lineal. No muestran la
 cantidad de movimientos; cuando no existe presupuesto conservan una barra lineal
 vacía, sin simular importes ni progreso. Si una categoría reúne gastos e
-ingresos, muestra ambos importes para que ninguno quede oculto. Las previews de
+ingresos, alterna sus importes en la misma posición cada ocho segundos mediante
+un fade cruzado con desplazamiento horizontal de 350 ms. El importe se muestra
+siempre en tono oscuro y una flecha
+diagonal a su izquierda identifica el tipo: roja y descendente para gastos,
+verde y ascendente para ingresos. Cuando solo existe un tipo, muestra su importe
+sin animación con esa misma flecha. Las previews de
 categoría forman un
 único bloque continuo: el borde, la sombra y las esquinas redondeadas pertenecen
 al contenedor exterior, no a cada fila; una línea interior separa las categorías
@@ -606,7 +615,7 @@ usan ese indicador ni simulan que la operación se haya completado.
 
 La tarjeta de perfil permite tocar la foto para elegir una imagen de la
 cámara o la galería; se recomprime en el dispositivo antes de guardarse para
-no acumular imágenes pesadas (`Bible/DATABASE.md` §5.4, versión 9). La fila
+no acumular imágenes pesadas. La fila
 «Iniciar sesión o crear cuenta» ya no es pendiente: abre las pantallas de
 autenticación existentes (registro, verificación de código, inicio de sesión,
 recuperación de contraseña y migración de los datos de invitado).

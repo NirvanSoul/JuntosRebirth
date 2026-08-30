@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -15,6 +15,7 @@ import {
   signUpTotalSteps,
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
+import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
 import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
@@ -27,7 +28,9 @@ type AccessStep =
   | { screen: 'verify-signup'; email: string }
   | { screen: 'forgot' }
   | { screen: 'verify-recovery'; email: string }
-  | { screen: 'reset' };
+  // El código verificado viaja hasta aquí: la API lo pide junto con la
+  // contraseña nueva, porque verificarlo no abre sesión.
+  | { screen: 'reset'; code: string; email: string };
 
 const stepTitles: Record<AccessStep['screen'], string> = {
   entry: 'Empieza con Juntos',
@@ -43,8 +46,23 @@ const stepTitles: Record<AccessStep['screen'], string> = {
 export function AccessScreen() {
   const styles = useThemedStyles(createStyles);
   const { markAuthenticated, markGuestComplete } = useOnboardingStatus();
-  const [step, setStep] = useState<AccessStep>({ screen: 'entry' });
+  const { session } = useBetterAuthSession();
+  const pendingVerificationEmail =
+    session?.user.emailVerified === false ? session.user.email : null;
+  const [step, setStep] = useState<AccessStep>(() =>
+    pendingVerificationEmail
+      ? { screen: 'verify-signup', email: pendingVerificationEmail }
+      : { screen: 'entry' },
+  );
   const [isCompletingGuest, setCompletingGuest] = useState(false);
+
+  // Si el alta acaba de crear una sesión sin verificar, RootNavigator vuelve a
+  // montar esta pantalla. Recuperamos el OTP desde la sesión, no desde memoria
+  // efímera del formulario que se acaba de desmontar.
+  useEffect(() => {
+    if (!pendingVerificationEmail) return;
+    setStep({ screen: 'verify-signup', email: pendingVerificationEmail });
+  }, [pendingVerificationEmail]);
 
   const completeAuthenticated = async () => {
     await markAuthenticated();
@@ -171,6 +189,7 @@ export function AccessScreen() {
 
           {step.screen === 'signup' ? (
             <SignUpScreen
+              onGoogleSuccess={() => void completeAuthenticated()}
               onNavigateToLogin={() => setStep({ screen: 'login' })}
               onStepChange={(nextStep) =>
                 setStep({ screen: 'signup', step: nextStep })
@@ -205,13 +224,20 @@ export function AccessScreen() {
             <VerifyCodeScreen
               email={step.email}
               onCancel={goBack}
-              onSuccess={() => setStep({ screen: 'reset' })}
+              onSuccess={({ code }) =>
+                setStep({ screen: 'reset', code, email: step.email })
+              }
               purpose="recovery"
             />
           ) : null}
 
           {step.screen === 'reset' ? (
-            <ResetPasswordScreen onCancel={goBack} onSuccess={goBack} />
+            <ResetPasswordScreen
+              code={step.code}
+              email={step.email}
+              onCancel={goBack}
+              onSuccess={goBack}
+            />
           ) : null}
         </Animated.View>
       </ScrollView>

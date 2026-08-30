@@ -5,9 +5,9 @@ import { Screen } from '@/components/layout/Screen/Screen';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import {
-  createSupabaseInvitationGateway,
+  createJuntossInvitationGateway,
   type OutgoingInvitation,
-} from '@/features/spaces/gateways/supabaseInvitationGateway';
+} from '@/features/spaces/gateways/juntossInvitationGateway';
 import type { Space } from '@/features/spaces/types';
 import { useAppForeground } from '@/hooks/useAppForeground';
 import { layout } from '@/theme/layout';
@@ -57,7 +57,7 @@ export function AwaitingPartnerScreen({
 
   const loadInvitation = useCallback(() => {
     let isMounted = true;
-    void createSupabaseInvitationGateway()
+    void createJuntossInvitationGateway()
       .getOutgoingInvitation(space.id)
       .then((next) => {
         if (isMounted) setInvitation(next);

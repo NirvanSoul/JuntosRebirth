@@ -2,12 +2,13 @@ import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 
+import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
 import {
-  getLocalProfile,
-  saveLocalProfileAvatar,
-} from '@/features/profile/repositories/localProfileRepository';
-import { pickAndStoreAvatar } from '@/features/profile/services/avatarImageService';
+  removeProfileAvatar,
+  updateProfileAvatar,
+} from '@/features/profile/services/updateProfileAvatar';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
+import { ApiError } from '@/services/api/client';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import type { CurrencyPreferences } from '@/state/appPreferences/currencyPreferences';
 import { categoryColors } from '@/theme/categoryColors';
@@ -22,32 +23,36 @@ jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
   }),
 }));
 
+const emptyProfile = {
+  avatarUri: null,
+  avatarPath: null,
+  avatarUpdatedAt: null,
+  displayName: null,
+};
+
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
   getLocalProfile: jest.fn(async () => ({
     avatarUri: null,
-    displayName: null,
-  })),
-  saveLocalProfileAvatar: jest.fn(async (avatarPath: string) => ({
-    avatarUri: `${avatarPath}?v=stub`,
+    avatarPath: null,
+    avatarUpdatedAt: null,
     displayName: null,
   })),
 }));
 
-jest.mock('@/features/profile/services/avatarImageService', () => ({
-  pickAndStoreAvatar: jest.fn(),
+jest.mock('@/features/profile/services/updateProfileAvatar', () => ({
+  updateProfileAvatar: jest.fn(),
+  removeProfileAvatar: jest.fn(),
 }));
 
 const mockGetLocalProfile = jest.mocked(getLocalProfile);
-const mockSaveLocalProfileAvatar = jest.mocked(saveLocalProfileAvatar);
-const mockPickAndStoreAvatar = jest.mocked(pickAndStoreAvatar);
+const mockUpdateProfileAvatar = jest.mocked(updateProfileAvatar);
+const mockRemoveProfileAvatar = jest.mocked(removeProfileAvatar);
 
 describe('SettingsScreen', () => {
   beforeEach(() => {
-    mockGetLocalProfile
-      .mockClear()
-      .mockResolvedValue({ avatarUri: null, displayName: null });
-    mockSaveLocalProfileAvatar.mockClear();
-    mockPickAndStoreAvatar.mockClear();
+    mockGetLocalProfile.mockClear().mockResolvedValue(emptyProfile);
+    mockUpdateProfileAvatar.mockClear();
+    mockRemoveProfileAvatar.mockClear();
     mockRestartOnboarding.mockReset().mockResolvedValue(undefined);
   });
 
@@ -355,8 +360,8 @@ describe('SettingsScreen', () => {
 
   it('carga la foto de perfil guardada al abrir Ajustes', async () => {
     mockGetLocalProfile.mockResolvedValue({
+      ...emptyProfile,
       avatarUri: 'file:///avatar.jpg?v=1',
-      displayName: null,
     });
 
     const { screen } = await renderScreen();
@@ -370,9 +375,10 @@ describe('SettingsScreen', () => {
 
   it('permite elegir una foto de la galería y actualiza el avatar mostrado', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
-    mockPickAndStoreAvatar.mockResolvedValue(
-      'file:///document/avatars/profile-avatar.jpg',
-    );
+    mockUpdateProfileAvatar.mockResolvedValue({
+      ...emptyProfile,
+      avatarUri: 'file:///document/avatars/profile-avatar.jpg?v=stamp',
+    });
     const { screen } = await renderScreen();
 
     await fireEvent.press(screen.getByTestId('settings-avatar-button'));
@@ -387,21 +393,27 @@ describe('SettingsScreen', () => {
       galleryButton?.onPress?.();
     });
 
-    expect(mockPickAndStoreAvatar).toHaveBeenCalledWith('library');
-    expect(mockSaveLocalProfileAvatar).toHaveBeenCalledWith(
-      'file:///document/avatars/profile-avatar.jpg',
+    expect(mockUpdateProfileAvatar).toHaveBeenCalledWith(
+      'library',
+      expect.any(Function),
     );
     await waitFor(() =>
       expect(screen.getByTestId('settings-avatar').props.source).toEqual({
-        uri: 'file:///document/avatars/profile-avatar.jpg?v=stub',
+        uri: 'file:///document/avatars/profile-avatar.jpg?v=stamp',
       }),
     );
     alertSpy.mockRestore();
   });
 
-  it('avisa si no se pudo actualizar la foto de perfil', async () => {
+  it('explica el rechazo del servidor usando el código, no el mensaje', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
-    mockPickAndStoreAvatar.mockRejectedValue(new Error('Permiso denegado'));
+    mockUpdateProfileAvatar.mockRejectedValue(
+      new ApiError({
+        status: 400,
+        code: 'AVATAR_TOO_SMALL',
+        message: 'Revisa los datos e inténtalo de nuevo.',
+      }),
+    );
     const { screen } = await renderScreen();
 
     await fireEvent.press(screen.getByTestId('settings-avatar-button'));
@@ -414,10 +426,38 @@ describe('SettingsScreen', () => {
       cameraButton?.onPress?.();
     });
 
-    expect(alertSpy).toHaveBeenCalledWith(
-      'No se pudo actualizar tu foto',
-      expect.stringContaining('permisos'),
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-avatar-status').props.children).toBe(
+        'Esta imagen tiene una resolución demasiado baja. Elige otra foto.',
+      ),
     );
+    alertSpy.mockRestore();
+  });
+
+  it('ofrece quitar la foto solo cuando hay una puesta', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+    mockGetLocalProfile.mockResolvedValue({
+      ...emptyProfile,
+      avatarUri: 'file:///avatar.jpg?v=1',
+    });
+    mockRemoveProfileAvatar.mockResolvedValue(emptyProfile);
+    const { screen } = await renderScreen();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-avatar').props.source).toEqual({
+        uri: 'file:///avatar.jpg?v=1',
+      }),
+    );
+    await fireEvent.press(screen.getByTestId('settings-avatar-button'));
+    const buttons = alertSpy.mock.calls.at(-1)![2] as {
+      text: string;
+      onPress?: () => void;
+    }[];
+    await act(async () => {
+      buttons.find((button) => button.text === 'Quitar foto')?.onPress?.();
+    });
+
+    expect(mockRemoveProfileAvatar).toHaveBeenCalled();
     alertSpy.mockRestore();
   });
 

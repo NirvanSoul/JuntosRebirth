@@ -19,7 +19,11 @@ import { spacing } from '@/theme/spacing';
 
 const mockUseSpaces = jest.fn();
 let mockSession: {
-  user: { id: string; email: string };
+  user: {
+    id: string;
+    email: string;
+    name?: string;
+  };
   access_token: string;
 } | null = null;
 const mockSyncCoupleSpaceData = jest.fn(
@@ -42,13 +46,14 @@ jest.mock('@/features/spaces/hooks/useSpaces', () => ({
   useSpaces: () => mockUseSpaces(),
 }));
 
-jest.mock('@/features/spaces/gateways/supabaseInvitationGateway', () => {
+jest.mock('@/features/spaces/gateways/juntossInvitationGateway', () => {
   const actual = jest.requireActual(
-    '@/features/spaces/gateways/supabaseInvitationGateway',
+    '@/features/spaces/gateways/juntossInvitationGateway',
   );
   return {
     ...actual,
-    createSupabaseInvitationGateway: () => ({
+    createJuntossInvitationGateway: () => ({
+      getCurrentUserPendingInvitation: jest.fn(async () => null),
       getOutgoingInvitation: jest.fn(async () => null),
     }),
   };
@@ -62,8 +67,12 @@ jest.mock('@/features/auth/hooks/useAuthSession', () => ({
   }),
 }));
 
+jest.mock('@/features/auth/services/sessionInitialization', () => ({
+  initializeAuthenticatedSession: jest.fn(async () => undefined),
+}));
+
 jest.mock('@/features/sync/services/syncCoupleSpaceData', () => ({
-  syncCoupleSpaceDataForCurrentSession: (options?: { spaceId: string }) =>
+  syncSpaceDataForCurrentSession: (options?: { spaceId: string }) =>
     mockSyncCoupleSpaceData(options),
 }));
 
@@ -202,6 +211,7 @@ jest.mock(
 describe('MainTabsNavigator', () => {
   beforeEach(async () => {
     await AsyncStorage.removeItem('@juntoss/activity-sections/v1');
+    mockSession = null;
     mockUseSpaces.mockReturnValue({
       activeSpace: {
         currency: 'EUR',
@@ -361,6 +371,35 @@ describe('MainTabsNavigator', () => {
     expect(
       screen.getByRole('tab', { name: 'Mapa' }).props.accessibilityState,
     ).toMatchObject({ selected: true });
+  });
+
+  it('muestra el nombre de la persona autenticada en su espacio personal', async () => {
+    mockSession = {
+      user: {
+        id: 'user-ana',
+        email: 'ana@example.com',
+        name: '  Ana María  ',
+      },
+      access_token: 'fake-token',
+    };
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getByLabelText('Espacio Ana María')).toBeTruthy();
+    expect(screen.queryByLabelText('Espacio Personal')).toBeNull();
   });
 
   it('alterna entre dos monedas desde Inicio y Actividad sin abrir el selector', async () => {
@@ -626,7 +665,7 @@ describe('MainTabsNavigator', () => {
     );
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
     expect(await screen.findByText('Dale tu estilo')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByTestId('category-form-submit'));
 
     expect(await screen.findByLabelText('Categoría Comida')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('5'));
@@ -663,7 +702,7 @@ describe('MainTabsNavigator', () => {
     );
 
     await fireEvent.press(screen.getByTestId('floating-create-button'));
-    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByTestId('quick-create-category'));
     await fireEvent.press(screen.getByLabelText('Salario'));
     await fireEvent.press(screen.getByLabelText('Guardar categorías'));
 
@@ -799,7 +838,7 @@ describe('MainTabsNavigator', () => {
     );
 
     await fireEvent.press(screen.getByTestId('floating-create-button'));
-    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByTestId('quick-create-category'));
     expect(await screen.findByLabelText('Salario')).toBeTruthy();
     expect(screen.getByLabelText('Salidas')).toBeTruthy();
     expect(
@@ -816,7 +855,7 @@ describe('MainTabsNavigator', () => {
       'Jardinería',
     );
     await fireEvent.press(screen.getByLabelText('Continuar personalización'));
-    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByTestId('category-form-submit'));
     await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Categorías' }));
 
@@ -846,7 +885,7 @@ describe('MainTabsNavigator', () => {
     expect(screen.queryByTestId('category-preview-card')).toBeNull();
 
     await fireEvent.press(screen.getByTestId('floating-create-button'));
-    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByTestId('quick-create-category'));
     expect(screen.getByText('Elige la categoría que va contigo.')).toBeTruthy();
 
     expect(
@@ -904,7 +943,7 @@ describe('MainTabsNavigator', () => {
     expect(screen.getAllByTestId('category-preview-card')).toHaveLength(2);
 
     await fireEvent.press(screen.getByTestId('floating-create-button'));
-    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByTestId('quick-create-category'));
 
     const createdSalary = screen.getByLabelText('Salario, ya creada');
     expect(createdSalary.props.accessibilityState).toMatchObject({
@@ -932,7 +971,7 @@ describe('MainTabsNavigator', () => {
     );
 
     await fireEvent.press(screen.getByTestId('floating-create-button'));
-    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByTestId('quick-create-category'));
     await fireEvent.press(screen.getByLabelText('Salario'));
     await fireEvent.press(screen.getByLabelText('Guardar categorías'));
 
@@ -944,7 +983,7 @@ describe('MainTabsNavigator', () => {
     expect(screen.getByLabelText('Salario')).toBeTruthy();
     expect(screen.queryByLabelText('Supermercado')).toBeNull();
 
-    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByTestId('category-picker-create'));
 
     expect(await screen.findByText('Nueva categoría')).toBeTruthy();
     expect(screen.getByLabelText('Supermercado')).toBeTruthy();

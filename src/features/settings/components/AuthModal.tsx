@@ -16,6 +16,7 @@ import {
   signUpTotalSteps,
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
+import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
 import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
@@ -33,7 +34,9 @@ type AuthModalStep =
   | { screen: 'verify-signup'; email: string }
   | { screen: 'forgot' }
   | { screen: 'verify-recovery'; email: string }
-  | { screen: 'reset' };
+  // El código verificado viaja hasta aquí: la API lo pide junto con la
+  // contraseña nueva, porque verificarlo no abre sesión.
+  | { screen: 'reset'; code: string; email: string };
 
 const stepTitles: Record<AuthModalStep['screen'], string> = {
   entry: 'Tu cuenta',
@@ -93,6 +96,11 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
   };
 
   const handleAuthenticated = async () => {
+    try {
+      await initializeAuthenticatedSession();
+    } catch (error) {
+      console.error('[AuthModal] Error al inicializar sesión:', error);
+    }
     await markAuthenticated();
     onClose();
   };
@@ -175,6 +183,7 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
 
             {step.screen === 'signup' ? (
               <SignUpScreen
+                onGoogleSuccess={() => void handleAuthenticated()}
                 onNavigateToLogin={() => setStep({ screen: 'login' })}
                 onStepChange={(nextStep) =>
                   setStep({ screen: 'signup', step: nextStep })
@@ -209,13 +218,20 @@ export function AuthModal({ onClose, visible }: AuthModalProps) {
               <VerifyCodeScreen
                 email={step.email}
                 onCancel={onClose}
-                onSuccess={() => setStep({ screen: 'reset' })}
+                onSuccess={({ code }) =>
+                  setStep({ screen: 'reset', code, email: step.email })
+                }
                 purpose="recovery"
               />
             ) : null}
 
             {step.screen === 'reset' ? (
-              <ResetPasswordScreen onCancel={onClose} onSuccess={onClose} />
+              <ResetPasswordScreen
+                code={step.code}
+                email={step.email}
+                onCancel={onClose}
+                onSuccess={onClose}
+              />
             ) : null}
           </Animated.View>
         </BottomSheetScrollView>

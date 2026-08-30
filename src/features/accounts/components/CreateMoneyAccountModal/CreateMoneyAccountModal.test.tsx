@@ -4,9 +4,10 @@ import { act, fireEvent } from '@testing-library/react-native';
 import { CreateMoneyAccountModal } from '@/features/accounts/components/CreateMoneyAccountModal/CreateMoneyAccountModal';
 import {
   moneyAccountIconNames,
+  moneyAccountIconSections,
   type MoneyAccount,
 } from '@/features/accounts/types';
-import { categoryIconNames } from '@/features/categories/types';
+import { categoryIconSections } from '@/features/categories/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import { spacing } from '@/theme/spacing';
 
@@ -109,6 +110,22 @@ describe('CreateMoneyAccountModal', () => {
     expect(screen.queryByLabelText('🇺🇸 Dólar estadounidense (USD)')).toBeNull();
   });
 
+  it('permite borrar por completo el saldo inicial opcional', async () => {
+    const screen = await renderModal({
+      account: {
+        ...account,
+        balances: [{ currency: 'EUR', openingBalanceMinor: 0 }],
+      },
+    });
+    await fireEvent.press(screen.getByLabelText('Continuar tipo de cuenta'));
+    const balanceInput = screen.getByLabelText('Saldo inicial');
+
+    expect(balanceInput.props.value).toBe('0');
+    await fireEvent(balanceInput, 'focus');
+
+    expect(screen.getByLabelText('Saldo inicial').props.value).toBe('');
+  });
+
   it('acerca continuar al campo mientras el teclado está visible', async () => {
     const screen = await renderModal();
     const showEvent =
@@ -157,9 +174,16 @@ describe('CreateMoneyAccountModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('incluye cada icono de categoría que no estaba ya entre los de cuenta', () => {
+  it('incluye los iconos de categoría salvo el grupo Finanzas', () => {
+    const categoryIconsWithoutFinance = categoryIconSections
+      .filter(({ title }) => title !== 'Finanzas')
+      .flatMap(({ icons }) => icons);
+
     expect(moneyAccountIconNames).toEqual(
-      expect.arrayContaining(categoryIconNames),
+      expect.arrayContaining(categoryIconsWithoutFinance),
+    );
+    expect(moneyAccountIconSections).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: 'Finanzas' })]),
     );
   });
 

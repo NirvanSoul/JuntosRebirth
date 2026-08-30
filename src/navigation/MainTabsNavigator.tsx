@@ -67,8 +67,9 @@ import { AcceptInvitationScreen } from '@/features/spaces/screens/AcceptInvitati
 import { AwaitingPartnerScreen } from '@/features/spaces/screens/AwaitingPartnerScreen';
 import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScreen';
 import { isAwaitingPartnerSpace } from '@/features/spaces/types';
+import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
-import { syncCoupleSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
+import { syncSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
 import { useActivitySectionsPreference } from '@/state/appPreferences/useActivitySectionsPreference';
 import { useHomeComparisonIndicatorsPreference } from '@/state/appPreferences/useHomeComparisonIndicatorsPreference';
@@ -110,7 +111,6 @@ import {
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { triggerHaptic } from '@/lib/haptics/haptics';
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 import type { CreateActionType } from '@/navigation/createActions';
 import type { MainTabParamList, RootDrawerParamList } from '@/navigation/types';
 import { layout } from '@/theme/layout';
@@ -143,6 +143,14 @@ export function MainTabsNavigator() {
     spaces,
   } = useSpaces();
   const { session } = useAuthSession();
+  const activeSpaceName = useMemo(() => {
+    if (activeSpace.type !== 'personal' || !session) return activeSpace.name;
+
+    const displayName = session.user.name;
+    return typeof displayName === 'string' && displayName.trim()
+      ? displayName.trim()
+      : activeSpace.name;
+  }, [activeSpace.name, activeSpace.type, session]);
   const [isInvitePartnerVisible, setInvitePartnerVisible] = useState(false);
   const [isSpaceAuthModalVisible, setSpaceAuthModalVisible] = useState(false);
   const coupleSpace = spaces.find((space) => space.type === 'couple') ?? null;
@@ -283,14 +291,16 @@ export function MainTabsNavigator() {
     categoryCreationContext !== 'quick' && activeSpaceCategories.length > 0
       ? 'select'
       : 'create';
-
   const moneyAccountsController = useMoneyAccounts({
     activeSpaceId: activeSpace.id,
+    categories: spaceCategories,
     onChangesPublished: () => publishActiveCoupleChanges(),
     onError: () => showSaveError(),
+    onTransactionsCreated: (created) =>
+      setTransactions((current) => [...created, ...current]),
+    transactions,
   });
   const { setMoneyAccounts } = moneyAccountsController;
-
   const { applyTransactionUpdate, quickEditTransaction } =
     useTransactionEditing({
       categories,
@@ -300,7 +310,6 @@ export function MainTabsNavigator() {
       setTransactions,
       spaceTransactions: activeSpaceTransactions,
     });
-
   const detailTransactionMoneyAccount = detailTransaction
     ? (moneyAccountsController.spaceMoneyAccounts.find(
         (account) => account.id === detailTransaction.moneyAccountId,
@@ -319,7 +328,6 @@ export function MainTabsNavigator() {
         moneyAccountSupportsCurrency(account, detailTransaction.currency),
       )
     : [];
-
   const {
     copyCategory: handleShareCategory,
     copyTransaction: handleCopyTransaction,
@@ -338,7 +346,6 @@ export function MainTabsNavigator() {
     spaces,
     transactions,
   });
-
   const reloadLocalFinance = useCallback(async (): Promise<void> => {
     const [storedCategories, storedMoneyAccounts, storedTransactions] =
       await Promise.all([
@@ -354,17 +361,35 @@ export function MainTabsNavigator() {
       transactions: storedTransactions,
     }).catch(() => undefined);
   }, [setMoneyAccounts]);
+  const syncAllUserSpaces = useCallback(async (): Promise<void> => {
+    if (!session) return;
+    for (const space of spaces) {
+      if (isAwaitingPartnerSpace(space)) {
+        continue;
+      }
+      try {
+        await syncSpaceDataForCurrentSession({ spaceId: space.id });
+      } catch (error) {
+        console.error('[sync] Subida de espacio compartido falló:', error);
+      }
+    }
+  }, [session, spaces]);
 
   const refreshSharedCoupleData = useCallback(
     async (spaceId?: string): Promise<void> => {
       if (!session) return;
 
       if (spaceId) {
-        try {
-          await syncCoupleSpaceDataForCurrentSession({ spaceId });
-        } catch (error) {
-          console.error('[sync] Subida de espacio compartido falló:', error);
+        const targetSpace = spaces.find((s) => s.id === spaceId);
+        if (targetSpace && !isAwaitingPartnerSpace(targetSpace)) {
+          try {
+            await syncSpaceDataForCurrentSession({ spaceId });
+          } catch (error) {
+            console.error('[sync] Subida de espacio compartido falló:', error);
+          }
         }
+      } else {
+        await syncAllUserSpaces();
       }
 
       try {
@@ -374,25 +399,18 @@ export function MainTabsNavigator() {
         console.error('[sync] Restauración remota falló:', error);
       }
     },
-    [reloadLocalFinance, session],
+    [reloadLocalFinance, session, syncAllUserSpaces, spaces],
   );
 
   const publishCoupleSpaceChanges = useCallback(
     (spaceId: string) => {
-      if (
-        !session ||
-        !spaces.some(
-          (space) =>
-            space.id === spaceId &&
-            space.type === 'couple' &&
-            !isAwaitingPartnerSpace(space),
-        )
-      ) {
+      if (!session) return;
+      const targetSpace = spaces.find((space) => space.id === spaceId);
+      if (!targetSpace) return;
+      if (isAwaitingPartnerSpace(targetSpace)) {
         return;
       }
-      void syncCoupleSpaceDataForCurrentSession({ spaceId }).catch(
-        () => undefined,
-      );
+      void syncSpaceDataForCurrentSession({ spaceId }).catch(() => undefined);
     },
     [session, spaces],
   );
@@ -405,6 +423,18 @@ export function MainTabsNavigator() {
     await refreshCoupleSpace();
     await refreshSharedCoupleData();
   }, [refreshCoupleSpace, refreshSharedCoupleData]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    void initializeAuthenticatedSession()
+      .then(() => reloadLocalFinance())
+      .catch((error) => {
+        console.error(
+          '[MainTabsNavigator] Error al sincronizar sesión:',
+          error,
+        );
+      });
+  }, [reloadLocalFinance, session?.user]);
 
   useEffect(() => {
     const transactionId = detailTransaction?.id;
@@ -467,120 +497,21 @@ export function MainTabsNavigator() {
       () => undefined,
     );
     void reconcileDailyReminder({ transactions }).catch(() => undefined);
-    if (activeSpace.type === 'couple' && !isAwaitingPartner) {
-      void refreshSharedCoupleData(activeSpace.id);
+    if (session) {
+      void refreshSharedCoupleData();
     }
   });
 
   useEffect(() => {
-    if (
-      !isFinanceReady ||
-      activeSpace.type !== 'couple' ||
-      isAwaitingPartner ||
-      !session
-    )
-      return;
-    void refreshSharedCoupleData(activeSpace.id);
+    if (!isFinanceReady || !session) return;
+
+    void refreshSharedCoupleData();
 
     const refreshTimer = setInterval(() => {
-      void refreshSharedCoupleData(activeSpace.id);
+      void refreshSharedCoupleData();
     }, 15_000);
     return () => clearInterval(refreshTimer);
-  }, [
-    activeSpace.id,
-    activeSpace.type,
-    isAwaitingPartner,
-    isFinanceReady,
-    refreshSharedCoupleData,
-    session,
-  ]);
-
-  useEffect(() => {
-    if (
-      !isFinanceReady ||
-      activeSpace.type !== 'couple' ||
-      isAwaitingPartner ||
-      !session
-    )
-      return;
-
-    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-    const scheduleRemoteRefresh = () => {
-      if (refreshTimer) return;
-      refreshTimer = setTimeout(() => {
-        refreshTimer = null;
-        void refreshSharedCoupleData(activeSpace.id);
-      }, 200);
-    };
-
-    let channel: ReturnType<
-      ReturnType<typeof getConfiguredSupabaseClient>['channel']
-    > | null = null;
-    try {
-      const client = getConfiguredSupabaseClient();
-      const changeFilter = `space_id=eq.${activeSpace.id}`;
-      channel = client
-        .channel(`couple-space-sync:${activeSpace.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'categories',
-            filter: changeFilter,
-          },
-          scheduleRemoteRefresh,
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'money_accounts',
-            filter: changeFilter,
-          },
-          scheduleRemoteRefresh,
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'recurring_transaction_series',
-            filter: changeFilter,
-          },
-          scheduleRemoteRefresh,
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'transactions',
-            filter: changeFilter,
-          },
-          scheduleRemoteRefresh,
-        )
-        .subscribe();
-    } catch {
-      // El sondeo y la restauración al reabrir siguen siendo el respaldo si
-      // Realtime no está disponible temporalmente.
-    }
-
-    return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
-      if (channel) {
-        void getConfiguredSupabaseClient().removeChannel(channel);
-      }
-    };
-  }, [
-    activeSpace.id,
-    activeSpace.type,
-    isAwaitingPartner,
-    isFinanceReady,
-    refreshSharedCoupleData,
-    session,
-  ]);
+  }, [isFinanceReady, refreshSharedCoupleData, session]);
 
   const showSaveError = useCallback(() => {
     Alert.alert(
@@ -780,41 +711,61 @@ export function MainTabsNavigator() {
   };
 
   const handleTransactionSubmit = async (draft: CreateTransactionDraft) => {
-    const categoryBelongsToSpace = spaceCategories.some(
+    const targetCategory = categories.find(
       (category) => category.id === draft.categoryId,
     );
-    if (draft.spaceId !== activeSpace.id || !categoryBelongsToSpace) {
+    if (!targetCategory) {
+      console.error(
+        '[MainTabsNavigator] La categoría seleccionada no existe:',
+        draft.categoryId,
+      );
+      showSaveError();
       return;
     }
-    if (draft.moneyAccountId) {
-      const account = moneyAccountsController.activeSpaceMoneyAccounts.find(
-        (candidate) => candidate.id === draft.moneyAccountId,
+
+    const safeDraft: CreateTransactionDraft = {
+      ...draft,
+      spaceId: activeSpace.id,
+    };
+
+    if (safeDraft.moneyAccountId) {
+      const account = moneyAccountsController.moneyAccounts.find(
+        (candidate) => candidate.id === safeDraft.moneyAccountId,
       );
       if (
         account &&
-        !moneyAccountSupportsCurrency(account, draft.currency) &&
+        !moneyAccountSupportsCurrency(account, safeDraft.currency) &&
         !(await moneyAccountsController.ensureCurrency(
-          draft.moneyAccountId,
-          draft.currency,
+          safeDraft.moneyAccountId,
+          safeDraft.currency,
         ))
       ) {
+        console.error(
+          '[MainTabsNavigator] No se pudo asegurar la moneda para la cuenta:',
+          safeDraft.currency,
+        );
+        showSaveError();
         return;
       }
     }
 
     if (editingTransactionId) {
-      const updated = await applyTransactionUpdate(editingTransactionId, draft);
+      const updated = await applyTransactionUpdate(
+        editingTransactionId,
+        safeDraft,
+      );
       if (updated) {
         setEditingTransactionId(null);
         setTransactionInitialEditor(undefined);
         setTransactionInitialDate(undefined);
         setTransactionModalVisible(false);
+        setSelectedCategoryId(null);
       }
       return;
     }
 
     try {
-      const createdTransactions = await createLocalTransaction(draft);
+      const createdTransactions = await createLocalTransaction(safeDraft);
       let nextTransactions: SessionTransaction[] = [];
       setTransactions((current) => {
         nextTransactions = [...createdTransactions, ...current];
@@ -827,8 +778,9 @@ export function MainTabsNavigator() {
       publishActiveCoupleChanges();
       setTransactionInitialDate(undefined);
       setTransactionModalVisible(false);
+      setSelectedCategoryId(null);
     } catch (error) {
-      console.error('[MainTabsNavigator] createLocalTransaction', error);
+      console.error('[MainTabsNavigator] createLocalTransaction falló:', error);
       showSaveError();
     }
   };
@@ -1033,7 +985,7 @@ export function MainTabsNavigator() {
                 memberAvatarUris={spaceMemberAvatarUris}
                 onCurrencyPress={handleHomeCurrencyPress}
                 onSpacePress={() => navigation.openDrawer()}
-                spaceName={activeSpace.name}
+                spaceName={activeSpaceName}
                 visible={
                   activeMainTab !== 'Activity' || !isActivitySummaryPinned
                 }

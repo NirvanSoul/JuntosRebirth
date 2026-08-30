@@ -10,6 +10,7 @@ import {
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
+import { CategoryAmountSwitcher } from '@/features/categories/components/CategoryPreviewCard/CategoryAmountSwitcher';
 import { CategoryTile } from '@/features/categories/components/CategoryPreviewCard/CategoryTile';
 import type { CategoryIconName } from '@/features/categories/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
@@ -207,28 +208,13 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
           style={styles.budgetSummary}
           testID="category-preview-budget-summary"
         >
-          {hasExpenses || hasIncome ? (
-            <Text
-              style={{
-                color: hasExpenses ? categoryColors[colorToken] : colors.income,
-              }}
-              testID="category-preview-spent-amount"
-              variant="caption"
-              weight="semibold"
-            >
-              {hasExpenses ? expense : income}
-            </Text>
-          ) : null}
-          {hasExpenses && hasIncome ? (
-            <Text
-              style={{ color: colors.income }}
-              testID="category-preview-income-amount"
-              variant="caption"
-              weight="semibold"
-            >
-              {income}
-            </Text>
-          ) : null}
+          <CategoryAmountSwitcher
+            expense={expense}
+            hasExpenses={hasExpenses}
+            hasIncome={hasIncome}
+            income={income}
+            testID="category-preview-amount-switcher"
+          />
           <View style={styles.budgetProgress}>
             <CategoryBudgetProgress
               accessibilityText={

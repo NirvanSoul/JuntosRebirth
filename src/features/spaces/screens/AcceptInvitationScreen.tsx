@@ -14,10 +14,10 @@ import {
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
 import {
   AcceptInvitationError,
-  createSupabaseInvitationGateway,
+  createJuntossInvitationGateway,
   type AcceptInvitationErrorCode,
   type InvitationPreview,
-} from '@/features/spaces/gateways/supabaseInvitationGateway';
+} from '@/features/spaces/gateways/juntossInvitationGateway';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -106,7 +106,7 @@ export function AcceptInvitationScreen({
 
   useEffect(() => {
     let isMounted = true;
-    const gateway = createSupabaseInvitationGateway();
+    const gateway = createJuntossInvitationGateway();
     void gateway
       .getInvitationPreview(token)
       .then((preview) => {
@@ -128,7 +128,7 @@ export function AcceptInvitationScreen({
 
   const handleAccept = useCallback(async () => {
     setAcceptState({ status: 'accepting' });
-    const gateway = createSupabaseInvitationGateway();
+    const gateway = createJuntossInvitationGateway();
     try {
       const result = await gateway.acceptInvitation(token);
       await refreshCoupleSpace();

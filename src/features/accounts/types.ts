@@ -68,10 +68,12 @@ export const moneyAccountIconSections: readonly {
   icons: readonly MoneyAccountIconName[];
 }[] = [
   ...moneyAccountSpecificIconSections,
-  ...categoryIconSections.map(({ title, icons }) => ({
-    title,
-    icons: icons.filter((icon) => !specificIconNames.has(icon)),
-  })),
+  ...categoryIconSections
+    .filter(({ title }) => title !== 'Finanzas')
+    .map(({ title, icons }) => ({
+      title,
+      icons: icons.filter((icon) => !specificIconNames.has(icon)),
+    })),
 ];
 
 export type MoneyAccountIconName =

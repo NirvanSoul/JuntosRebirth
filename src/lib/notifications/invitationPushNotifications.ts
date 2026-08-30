@@ -1,9 +1,8 @@
 import * as Notifications from 'expo-notifications';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
 import { storeInvitationPushToken } from '@/lib/notifications/invitationPushTokenStore';
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
+import { apiClient } from '@/services/api/juntossApiClient';
 
 const invitationChannelId = 'space-invitations';
 
@@ -19,10 +18,9 @@ async function ensureInvitationChannel(): Promise<void> {
   });
 }
 
-/** Registra el dispositivo de la sesión actual sin exponer su token por RLS. */
+/** Registra el dispositivo de la sesión actual; la API lo asocia a quien la abre. */
 export async function registerCurrentDeviceForInvitationPush(
   requestPermission: boolean,
-  client: SupabaseClient = getConfiguredSupabaseClient(),
 ): Promise<InvitationPushRegistrationResult> {
   if (Platform.OS === 'web') return 'unsupported';
 
@@ -36,11 +34,16 @@ export async function registerCurrentDeviceForInvitationPush(
   if (!permission.granted) return 'permission-denied';
 
   const token = (await Notifications.getExpoPushTokenAsync()).data;
-  const { error } = await client.rpc('register_current_user_push_token', {
-    p_expo_push_token: token,
-    p_platform: Platform.OS,
-  });
-  if (error) throw new Error('No pudimos registrar este dispositivo.');
+  try {
+    await apiClient.post('/v1/me/push-tokens', {
+      expoPushToken: token,
+      platform: Platform.OS,
+    });
+  } catch {
+    throw new Error('No pudimos registrar este dispositivo.');
+  }
+  // Se guarda solo si el servidor lo aceptó: si no, no habría nada que
+  // retirar al cerrar sesión.
   await storeInvitationPushToken(token);
   return 'registered';
 }

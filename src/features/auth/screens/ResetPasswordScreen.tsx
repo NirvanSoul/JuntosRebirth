@@ -14,6 +14,9 @@ import { spacing } from '@/theme/spacing';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type ResetPasswordScreenProps = {
+  /** Correo y código verificado en el paso anterior; la API los pide junto a la contraseña. */
+  code: string;
+  email: string;
   onCancel: () => void;
   onSuccess: () => void;
 };
@@ -29,6 +32,8 @@ type ResetPasswordState =
   | { step: 'error'; message: string };
 
 export function ResetPasswordScreen({
+  code,
+  email,
   onCancel,
   onSuccess,
 }: ResetPasswordScreenProps) {
@@ -53,7 +58,7 @@ export function ResetPasswordScreen({
 
     setState({ step: 'submitting' });
     try {
-      await setNewPassword(password);
+      await setNewPassword({ code, email, password });
       onSuccess();
     } catch (caught) {
       setState({

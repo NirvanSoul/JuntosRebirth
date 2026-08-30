@@ -37,7 +37,7 @@ export function MoneyAccountCard({
   bordered = false,
   onPress,
 }: MoneyAccountCardProps) {
-  const { shadows } = useTheme();
+  const { colors, shadows } = useTheme();
   const themedStyles = useThemedStyles((palette) =>
     createThemedStyles(palette, shadows),
   );
@@ -79,7 +79,12 @@ export function MoneyAccountCard({
       onPress={onPress}
       style={({ pressed }) => [
         themedStyles.pressable,
-        bordered ? { borderColor: cardColor, borderWidth: 1 } : null,
+        bordered
+          ? {
+              borderColor: colors.categoryPreviewBorder,
+              borderWidth: StyleSheet.hairlineWidth,
+            }
+          : null,
         pressed && styles.pressed,
       ]}
       testID={`money-account-card-${account.id}`}

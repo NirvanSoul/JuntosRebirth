@@ -4,6 +4,7 @@ import Animated from 'react-native-reanimated';
 
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
+import { GoogleAuthButton } from '@/features/auth/components/GoogleAuthButton';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
 import { signUp } from '@/features/auth/services/signUpService';
 import {
@@ -20,6 +21,7 @@ export const signUpTotalSteps = 4;
 
 type SignUpScreenProps = {
   onNavigateToLogin?: () => void;
+  onGoogleSuccess?: () => void;
   onStepChange: (step: number) => void;
   onSuccess: (result: { email: string }) => void;
   step: number;
@@ -47,6 +49,7 @@ type StepField = (typeof stepFields)[number];
 
 export function SignUpScreen({
   onNavigateToLogin,
+  onGoogleSuccess,
   onStepChange,
   onSuccess,
   step,
@@ -212,6 +215,15 @@ export function SignUpScreen({
         testID="signup-submit"
         variant="cta"
       />
+
+      {isFirstStep && onGoogleSuccess ? (
+        <GoogleAuthButton
+          disabled={isSubmitting}
+          label="Crear cuenta con Google"
+          onSuccess={onGoogleSuccess}
+          testID="signup-google"
+        />
+      ) : null}
 
       {isFirstStep ? (
         onNavigateToLogin ? (

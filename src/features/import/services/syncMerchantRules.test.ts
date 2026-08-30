@@ -49,12 +49,12 @@ describe('syncLocalMerchantRules', () => {
     expect(failLocalMerchantRuleSync).not.toHaveBeenCalled();
   });
 
-  it('marca el lote como fallido si Supabase no confirma todas las reglas', async () => {
+  it('marca el lote como fallido si la API no confirma todas las reglas', async () => {
     jest.mocked(gateway.syncMerchantRules).mockResolvedValue(0);
 
     await expect(
       syncLocalMerchantRules({ userId: 'user-id', gateway }),
-    ).rejects.toThrow('Supabase no confirmó todas las reglas de importación');
+    ).rejects.toThrow('La API no confirmó todas las reglas de importación');
 
     expect(failLocalMerchantRuleSync).toHaveBeenCalledWith(payload);
   });

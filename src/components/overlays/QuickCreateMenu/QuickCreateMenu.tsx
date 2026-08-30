@@ -97,6 +97,7 @@ export function QuickCreateMenu({
             disabled={disabledActionTypes.includes(action.type)}
             key={action.type}
             onPress={() => onSelect(action.type)}
+            testID={`quick-create-${action.type}`}
             style={({ pressed }) => [
               styles.action,
               colorScheme === 'light' && styles.actionLight,

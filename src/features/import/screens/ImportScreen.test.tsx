@@ -1,4 +1,4 @@
-import { fireEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, waitFor } from '@testing-library/react-native';
 
 import * as DocumentPicker from 'expo-document-picker';
 
@@ -144,6 +144,16 @@ function baseProps(
   };
 }
 
+async function renderImportScreen(
+  props: Parameters<typeof ImportScreen>[0] = baseProps(),
+) {
+  const screen = await renderWithTheme(<ImportScreen {...props} />);
+  await act(async () => {
+    fireEvent.press(await screen.findByTestId('import-select-file'));
+  });
+  return screen;
+}
+
 describe('ImportScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -194,6 +204,10 @@ describe('ImportScreen', () => {
   it('analiza el archivo elegido y muestra la revisión lista para importar', async () => {
     const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
 
+    expect(await screen.findByTestId('import-intro')).toBeTruthy();
+    expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('import-select-file'));
+
     expect(await screen.findByTestId('import-confirm')).toBeTruthy();
     expect(createLocalImportBatch).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -223,8 +237,12 @@ describe('ImportScreen', () => {
 
     const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
 
-    expect(await screen.findByTestId('import-center')).toBeTruthy();
+    expect(await screen.findByTestId('import-intro')).toBeTruthy();
     expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
+    fireEvent.press(
+      screen.getByLabelText('Ver revisiones de importación guardadas'),
+    );
+    expect(await screen.findByTestId('import-center')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('import-resume-saved-batch'));
 
@@ -238,7 +256,7 @@ describe('ImportScreen', () => {
       createdAt: '2026-08-01T10:00:00.000Z',
     });
 
-    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    const screen = await renderImportScreen(baseProps());
 
     expect(await screen.findByTestId('import-duplicate-file')).toBeTruthy();
     expect(parseSpreadsheetFile).not.toHaveBeenCalled();
@@ -257,9 +275,7 @@ describe('ImportScreen', () => {
     });
     const onClose = jest.fn();
 
-    const screen = await renderWithTheme(
-      <ImportScreen {...baseProps({ onClose })} />,
-    );
+    const screen = await renderImportScreen(baseProps({ onClose }));
 
     expect(await screen.findByTestId('import-duplicate-file')).toBeTruthy();
     fireEvent.press(screen.getByText('Cancelar'));
@@ -270,9 +286,7 @@ describe('ImportScreen', () => {
 
   it('confirmar la importación crea los movimientos, avisa arriba y encola feedback comunitario', async () => {
     const onImportComplete = jest.fn();
-    const screen = await renderWithTheme(
-      <ImportScreen {...baseProps({ onImportComplete })} />,
-    );
+    const screen = await renderImportScreen(baseProps({ onImportComplete }));
 
     fireEvent.press(await screen.findByTestId('import-confirm'));
 
@@ -312,10 +326,8 @@ describe('ImportScreen', () => {
       { ...readyCandidate, categoryId: 'custom-1', suggestedCategoryId: null },
     ]);
 
-    const screen = await renderWithTheme(
-      <ImportScreen
-        {...baseProps({ categories: [groceriesCategory, customCategory] })}
-      />,
+    const screen = await renderImportScreen(
+      baseProps({ categories: [groceriesCategory, customCategory] }),
     );
 
     fireEvent.press(await screen.findByTestId('import-confirm'));
@@ -327,7 +339,7 @@ describe('ImportScreen', () => {
   it('si no se detecta ningún movimiento, muestra un error con opción de reintentar', async () => {
     (buildImportCandidates as jest.Mock).mockReturnValue([]);
 
-    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    const screen = await renderImportScreen(baseProps());
 
     expect(
       await screen.findByText(
@@ -338,8 +350,8 @@ describe('ImportScreen', () => {
   });
 
   it('si el espacio tiene una sola moneda activa, no pide elegir moneda del documento', async () => {
-    const screen = await renderWithTheme(
-      <ImportScreen {...baseProps({ availableCurrencies: ['EUR'] })} />,
+    const screen = await renderImportScreen(
+      baseProps({ availableCurrencies: ['EUR'] }),
     );
 
     expect(await screen.findByTestId('import-confirm')).toBeTruthy();
@@ -347,8 +359,8 @@ describe('ImportScreen', () => {
   });
 
   it('si el espacio tiene 2+ monedas y el archivo no trae columna de moneda, pide elegirla antes de analizar', async () => {
-    const screen = await renderWithTheme(
-      <ImportScreen {...baseProps({ availableCurrencies: ['EUR', 'USD'] })} />,
+    const screen = await renderImportScreen(
+      baseProps({ availableCurrencies: ['EUR', 'USD'] }),
     );
 
     expect(await screen.findByTestId('import-select-currency')).toBeTruthy();
@@ -374,8 +386,8 @@ describe('ImportScreen', () => {
       ]),
     );
 
-    const screen = await renderWithTheme(
-      <ImportScreen {...baseProps({ availableCurrencies: ['EUR', 'USD'] })} />,
+    const screen = await renderImportScreen(
+      baseProps({ availableCurrencies: ['EUR', 'USD'] }),
     );
 
     expect(await screen.findByTestId('import-confirm')).toBeTruthy();
@@ -401,6 +413,10 @@ describe('ImportScreen', () => {
     (cancelLocalImportBatch as jest.Mock).mockResolvedValue(undefined);
 
     const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    await screen.findByTestId('import-intro');
+    fireEvent.press(
+      screen.getByLabelText('Ver revisiones de importación guardadas'),
+    );
     await screen.findByTestId('import-center');
 
     fireEvent.press(screen.getByTestId('import-delete-saved-batch'));
@@ -409,14 +425,14 @@ describe('ImportScreen', () => {
     await waitFor(() =>
       expect(cancelLocalImportBatch).toHaveBeenCalledWith('saved-batch'),
     );
-    // Sin más revisiones pendientes, vuelve a abrir el picker de archivos.
-    await waitFor(() =>
-      expect(DocumentPicker.getDocumentAsync).toHaveBeenCalled(),
-    );
+    // Sin más revisiones pendientes, vuelve a explicar el flujo antes de abrir
+    // de nuevo el selector nativo.
+    expect(await screen.findByTestId('import-intro')).toBeTruthy();
+    expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
   });
 
   it('reinicia el flujo cuando el modal vuelve a abrirse', async () => {
-    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    const screen = await renderImportScreen(baseProps());
     await waitFor(() =>
       expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(1),
     );
@@ -427,10 +443,11 @@ describe('ImportScreen', () => {
     await waitFor(() =>
       expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(2),
     );
+    fireEvent.press(await screen.findByTestId('import-select-file'));
   });
 
   it('reinicia el flujo al cambiar de espacio', async () => {
-    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    const screen = await renderImportScreen(baseProps());
     await waitFor(() =>
       expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(1),
     );
@@ -446,7 +463,7 @@ describe('ImportScreen', () => {
   });
 
   it('no reinicia el flujo cuando cambian las categorías (snapshot)', async () => {
-    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    const screen = await renderImportScreen(baseProps());
     await waitFor(() =>
       expect(listResumableLocalImportBatches).toHaveBeenCalledTimes(1),
     );
@@ -466,7 +483,7 @@ describe('ImportScreen', () => {
   });
 
   it('re-captura las categorías y la moneda al reabrir el modal', async () => {
-    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    const screen = await renderImportScreen(baseProps());
     await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(1));
 
     await screen.rerender(<ImportScreen {...baseProps({ visible: false })} />);
@@ -486,6 +503,7 @@ describe('ImportScreen', () => {
       />,
     );
 
+    fireEvent.press(await screen.findByTestId('import-select-file'));
     await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(2));
     expect(buildImportCandidates).toHaveBeenNthCalledWith(
       2,
@@ -499,7 +517,7 @@ describe('ImportScreen', () => {
   });
 
   it('usa el catálogo del espacio nuevo al cambiar de espacio', async () => {
-    const screen = await renderWithTheme(<ImportScreen {...baseProps()} />);
+    const screen = await renderImportScreen(baseProps());
     await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(1));
 
     const coupleCategory = {
@@ -518,6 +536,7 @@ describe('ImportScreen', () => {
       />,
     );
 
+    fireEvent.press(await screen.findByTestId('import-select-file'));
     await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(2));
     expect(buildImportCandidates).toHaveBeenNthCalledWith(
       2,
@@ -531,14 +550,12 @@ describe('ImportScreen', () => {
   });
 
   it('al cambiar de espacio, reinicia la moneda documental al fallbackCurrency del nuevo espacio', async () => {
-    const screen = await renderWithTheme(
-      <ImportScreen
-        {...baseProps({
-          activeSpaceId: 'space-eur',
-          availableCurrencies: ['EUR'],
-          fallbackCurrency: 'EUR',
-        })}
-      />,
+    const screen = await renderImportScreen(
+      baseProps({
+        activeSpaceId: 'space-eur',
+        availableCurrencies: ['EUR'],
+        fallbackCurrency: 'EUR',
+      }),
     );
     await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(1));
 
@@ -552,6 +569,7 @@ describe('ImportScreen', () => {
       />,
     );
 
+    fireEvent.press(await screen.findByTestId('import-select-file'));
     await waitFor(() => expect(buildImportCandidates).toHaveBeenCalledTimes(2));
     expect(buildImportCandidates).toHaveBeenNthCalledWith(
       2,

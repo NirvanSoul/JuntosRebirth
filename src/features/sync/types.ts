@@ -90,6 +90,7 @@ export type GuestMigrationResult = {
   batchId: string;
   spaceCount: number;
   categoryCount: number;
+  moneyAccountCount: number;
   seriesCount: number;
   transactionCount: number;
 };

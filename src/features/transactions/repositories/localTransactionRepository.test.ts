@@ -83,7 +83,7 @@ describe('localTransactionRepository', () => {
     expect(created).toEqual({
       ...draft,
       id: '00000000-0000-4000-8000-000000000002',
-      // Sin sesión de Supabase en el entorno de prueba, la autoría cae al id
+      // Sin sesión remota en el entorno de prueba, la autoría cae al id
       // de instalación, que es el comportamiento esperado en modo invitado.
       createdBy: 'installation-id',
       nextOccurrenceOn: undefined,

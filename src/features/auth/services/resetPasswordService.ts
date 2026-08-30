@@ -1,16 +1,20 @@
-import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
+import { createJuntossAuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  const gateway = createSupabaseAuthGateway();
+  const gateway = createJuntossAuthGateway();
   await gateway.requestPasswordReset(email);
 }
 
 /**
- * Solo puede llamarse después de verificar el código de recuperación:
- * `verifyOtp({ type: 'recovery' })` deja establecida una sesión que
- * `updateUser` reutiliza para fijar la nueva contraseña.
+ * Solo puede llamarse después de verificar el código de recuperación.
+ * Verificar no abre sesión a propósito: la API exige correo, código y
+ * contraseña juntos, para que tener el código no equivalga a entrar.
  */
-export async function setNewPassword(password: string): Promise<void> {
-  const gateway = createSupabaseAuthGateway();
-  await gateway.setNewPassword(password);
+export async function setNewPassword(input: {
+  email: string;
+  code: string;
+  password: string;
+}): Promise<void> {
+  const gateway = createJuntossAuthGateway();
+  await gateway.setNewPassword(input);
 }

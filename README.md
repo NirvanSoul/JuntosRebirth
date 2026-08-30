@@ -1,6 +1,6 @@
 # juntoss
 
-> **Versión alpha.** El proyecto está en desarrollo activo y todavía le faltan funcionalidades del roadmap (ver [`Bible/ROADMAP.md`](./Bible/ROADMAP.md)). No es una versión estable ni lista para producción.
+> **Versión alpha.** El proyecto está en desarrollo activo y no es una versión estable ni lista para producción.
 
 Base de la reconstrucción móvil de `juntoss`, creada con React Native, Expo y TypeScript para iOS y Android. Expo Go sigue disponible para las comprobaciones rápidas, y también hay una development build propia para probar los módulos nativos en un iPhone o desde Xcode.
 
@@ -99,14 +99,12 @@ La aplicación dispone de navegación inferior entre Inicio, Actividad y Mapa. E
 
 Solo las variables con prefijo `EXPO_PUBLIC_` llegan al bundle y, por tanto, son públicas. Nunca deben contener secretos. `.env.example` documenta los nombres admitidos; los archivos `.env*` locales no se versionan.
 
-Para conectar un proyecto Supabase añade su Project URL y su publishable key.
-No uses una `service_role` key en la app:
+Para conectar la aplicación con el backend configura su URL pública. No se
+incluyen secretos en la app:
 
 ```sh
-EXPO_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+EXPO_PUBLIC_API_URL=https://juntosapi.aora-estudio-o.workers.dev
 ```
 
-Las migraciones viven en `supabase/migrations/` y las pruebas pgTAP en
-`supabase/tests/`. Con Docker y Supabase CLI disponibles se ejecutan mediante
-`supabase start`, `supabase db reset` y `supabase test db`.
+Los contratos y la infraestructura remota viven en el repositorio de la API:
+https://github.com/NirvanSoul/JuntosRebirthAPI

@@ -10,8 +10,8 @@ import { AuthTextField } from '@/features/auth/screens/components/AuthTextField'
 import { isValidEmail } from '@/features/auth/utils/authValidation';
 import {
   CreateInvitationError,
-  createSupabaseInvitationGateway,
-} from '@/features/spaces/gateways/supabaseInvitationGateway';
+  createJuntossInvitationGateway,
+} from '@/features/spaces/gateways/juntossInvitationGateway';
 import type { Space } from '@/features/spaces/types';
 import { spacing } from '@/theme/spacing';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -69,7 +69,7 @@ export function InvitePartnerScreen({
   };
 
   const handleContinueToEmail = () => {
-    // Todavía no se crea nada en Supabase. Cerrar desde el siguiente paso no
+    // Todavía no se crea nada en la API. Cerrar desde el siguiente paso no
     // puede dejar un espacio pendiente sin una invitación confirmada.
     setPhase({ kind: 'entering-email' });
   };
@@ -84,7 +84,7 @@ export function InvitePartnerScreen({
     setPhase({ kind: 'sending-invitation' });
     try {
       if (coupleSpace) {
-        const gateway = createSupabaseInvitationGateway();
+        const gateway = createJuntossInvitationGateway();
         await gateway.createInvitation(coupleSpace.id, trimmedEmail);
       } else {
         await onCreateCoupleSpaceInvitation(trimmedEmail);
@@ -139,7 +139,7 @@ export function InvitePartnerScreen({
             <Image
               accessible={false}
               resizeMode="contain"
-              source={require('../../../../assets/Onboarding/Happy Couple.png')}
+              source={require('../../../../assets/Onboarding/Happy_Couple.png')}
               style={styles.coupleIllustration}
               testID="invite-partner-couple-illustration"
             />

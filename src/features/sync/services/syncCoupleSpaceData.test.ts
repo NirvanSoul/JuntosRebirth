@@ -1,13 +1,17 @@
 import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
-import { syncCoupleSpaceRemotely } from '@/features/sync/gateways/supabaseCoupleSpaceSyncGateway';
-import { syncCoupleSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
+import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
+import { syncCoupleSpaceRemotely } from '@/features/sync/gateways/juntossCoupleSpaceSyncGateway';
+import { findRemoteIdForLocalEntity } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
+import { syncSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
 
 jest.mock('@/lib/storage/localDatabase');
 jest.mock('@/lib/storage/localIdentity');
-jest.mock('@/features/sync/gateways/supabaseCoupleSpaceSyncGateway');
+jest.mock('@/features/sync/gateways/juntossCoupleSpaceSyncGateway');
+jest.mock('@/features/legal/services/authenticatedUser');
+jest.mock('@/features/sync/repositories/localRemoteEntityLinkRepository');
 
-describe('syncCoupleSpaceDataForCurrentSession', () => {
+describe('syncSpaceDataForCurrentSession', () => {
   const getAllAsync = jest.fn();
   const runAsync = jest.fn();
 
@@ -18,11 +22,21 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
       runAsync,
     } as never);
     jest.mocked(getOrCreateInstallationId).mockResolvedValue('installation-a');
-    jest.mocked(syncCoupleSpaceRemotely).mockResolvedValue();
+    jest.mocked(getAuthenticatedUserId).mockResolvedValue('user-ana');
+    jest.mocked(findRemoteIdForLocalEntity).mockResolvedValue(null);
+    jest.mocked(syncCoupleSpaceRemotely).mockResolvedValue({
+      categoryCount: 0,
+      moneyAccountCount: 0,
+      recurringSeriesCount: 0,
+      transactionCount: 0,
+    });
     runAsync.mockResolvedValue({ changes: 1 });
   });
 
   it('publica el lote del espacio y solo entonces marca sus filas como sincronizadas', async () => {
+    jest
+      .mocked(findRemoteIdForLocalEntity)
+      .mockResolvedValue('remote-couple-a');
     getAllAsync
       .mockResolvedValueOnce([
         {
@@ -36,6 +50,18 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
           isArchived: 0,
           createdAt: '2026-08-13T10:00:00.000Z',
           updated_at: '2026-08-13T10:00:00.000Z',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          category_id: 'category-a',
+          currency: 'EUR',
+          budgetAmountMinor: 30000,
+        },
+        {
+          category_id: 'category-a',
+          currency: 'VES',
+          budgetAmountMinor: 900000,
         },
       ])
       .mockResolvedValueOnce([
@@ -70,6 +96,7 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
           currency: 'EUR',
           title: 'Compra',
           occurredOn: '2026-08-13',
+          note: 'Regalo de Ana',
           recurrence: 'once',
           recurrenceGroupId: null,
           recurrenceSeriesId: null,
@@ -80,17 +107,23 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
         },
       ]);
 
-    await syncCoupleSpaceDataForCurrentSession({ spaceId: 'couple-a' });
+    await syncSpaceDataForCurrentSession({ spaceId: 'couple-a' });
 
     expect(syncCoupleSpaceRemotely).toHaveBeenCalledWith({
       installationId: 'installation-a',
-      spaceId: 'couple-a',
+      spaceId: 'remote-couple-a',
       categories: [
         expect.objectContaining({
           id: 'category-a',
           remoteId: 'category-a',
           isDefault: false,
           isArchived: false,
+          // Los presupuestos por moneda viajan con su categoría: hasta ahora
+          // no salían nunca del dispositivo y se perdían al cambiar de móvil.
+          budgets: [
+            { currency: 'EUR', budgetAmountMinor: 30000 },
+            { currency: 'VES', budgetAmountMinor: 900000 },
+          ],
         }),
       ],
       moneyAccounts: [
@@ -111,6 +144,9 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
           categoryId: 'category-a',
           moneyAccountId: 'money-account-a',
           remoteId: 'transaction-a',
+          // La nota se quedaba en el móvil: el backend la acepta y la
+          // devuelve, pero el cliente no la enviaba.
+          note: 'Regalo de Ana',
           isArchived: false,
         }),
       ],
@@ -128,11 +164,11 @@ describe('syncCoupleSpaceDataForCurrentSession', () => {
     );
   });
 
-  it('no llama a Supabase cuando no hay cambios locales del espacio', async () => {
+  it('no llama a la API cuando no hay cambios locales del espacio', async () => {
     getAllAsync.mockResolvedValue([]);
 
     await expect(
-      syncCoupleSpaceDataForCurrentSession({ spaceId: 'couple-empty' }),
+      syncSpaceDataForCurrentSession({ spaceId: 'couple-empty' }),
     ).resolves.toEqual({
       categoryCount: 0,
       moneyAccountCount: 0,

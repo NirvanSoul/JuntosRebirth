@@ -18,7 +18,7 @@ export function CalendarPreviewScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}
       currentStep={4}
       illustrationAspectRatio={calendarIllustrationAspectRatio}
-      illustrationSource={require('../../../../assets/Onboarding/4 Tu mes.png')}
+      illustrationSource={require('../../../../assets/Onboarding/4_Tu_mes.png')}
       subtitle="Mira en tu Mapa cómo se ha movido tu dinero a lo largo de los días."
       testID="onboarding-calendar"
       title="Tu mes tiene mucho que contarte"

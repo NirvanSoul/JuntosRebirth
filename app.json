@@ -25,6 +25,7 @@
       "package": "com.juntoss.app",
       "predictiveBackGestureEnabled": true
     },
+    "assetBundlePatterns": ["**/*"],
     "plugins": [
       "expo-asset",
       "expo-font",
@@ -40,7 +41,9 @@
           "cameraPermission": "Juntoss necesita acceso a la cámara para tomar tu foto de perfil.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-web-browser",
+      "./plugins/withIosBuildFixes"
     ]
   }
 }

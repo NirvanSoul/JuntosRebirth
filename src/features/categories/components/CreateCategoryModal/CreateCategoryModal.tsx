@@ -263,6 +263,7 @@ export function CreateCategoryModal({
               label={category ? 'Guardar cambios' : 'Crear categoría'}
               onPress={handleSubmit}
               style={styles.primaryButtonLayout}
+              testID="category-form-submit"
             />
           </View>
         )}

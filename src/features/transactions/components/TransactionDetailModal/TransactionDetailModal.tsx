@@ -263,7 +263,7 @@ export function TransactionDetailModal({
                 testID="transaction-detail-title-editor"
               >
                 <Text
-                  align="center"
+                  align="left"
                   testID="transaction-detail-context"
                   tone="secondary"
                   variant="overline"
@@ -272,7 +272,7 @@ export function TransactionDetailModal({
                   Movimiento
                 </Text>
                 <Text
-                  align="center"
+                  align="left"
                   accessibilityRole="header"
                   testID="transaction-detail-title"
                   variant="heading"

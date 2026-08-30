@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
-import { createSupabaseInvitationGateway } from '@/features/spaces/gateways/supabaseInvitationGateway';
+import { createJuntossInvitationGateway } from '@/features/spaces/gateways/juntossInvitationGateway';
+import { listRemoteSpaces } from '@/services/api/spaces';
 import {
   createSpaceId,
   loadSpaces,
@@ -18,7 +19,6 @@ import {
   defaultCurrencyCode,
   isCurrencyCode,
 } from '@/lib/currency/currencyCatalog';
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 import { loadCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 
 const maxSpaceNameLength = 40;
@@ -53,18 +53,9 @@ type SpacesController = {
  * aplicado en el servidor.
  */
 async function fetchRemoteCoupleSpace(): Promise<Space | null> {
-  const client = getConfiguredSupabaseClient();
-  const { data, error } = await client
-    .from('spaces')
-    .select('id, name, type, activated_at, currency')
-    .eq('type', 'couple')
-    .is('archived_at', null)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error('No pudimos comprobar tu espacio de pareja.');
-  }
+  const data = (await listRemoteSpaces()).find(
+    (space) => space.type === 'couple',
+  );
   if (!data) return null;
 
   const rawId = data.id;
@@ -89,10 +80,7 @@ async function fetchRemoteCoupleSpace(): Promise<Space | null> {
     name: rawName,
     type: 'couple',
     currency: rawCurrency,
-    // `activated_at` es null mientras la invitación siga sin aceptar; en cuanto
-    // la otra persona entra, esta misma consulta devuelve la fecha y el espacio
-    // se comporta como cualquier otro.
-    isAwaitingPartner: data.activated_at === null,
+    isAwaitingPartner: data.activatedAt === null,
   };
 }
 
@@ -332,7 +320,7 @@ export function useSpaces(): SpacesController {
           ? firstCurrency
           : defaultCurrencyCode;
 
-      const gateway = createSupabaseInvitationGateway();
+      const gateway = createJuntossInvitationGateway();
       let spaceId: string;
       try {
         ({ spaceId } = await gateway.createCoupleSpaceInvitation(
@@ -392,7 +380,7 @@ export function useSpaces(): SpacesController {
       throw new Error('Inicia sesión para salir del espacio de pareja.');
     }
 
-    const gateway = createSupabaseInvitationGateway();
+    const gateway = createJuntossInvitationGateway();
     try {
       await gateway.leaveCoupleSpace(coupleSpaceEntry.id);
     } catch (caught) {

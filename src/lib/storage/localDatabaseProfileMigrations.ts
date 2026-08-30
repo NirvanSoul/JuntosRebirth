@@ -1,6 +1,6 @@
 import type * as SQLite from 'expo-sqlite';
 
-/** Migraciones locales 17–19 del perfil y de los miembros de un espacio. */
+/** Migraciones locales 17–19 y 26 del perfil y de los miembros de un espacio. */
 export async function applyLocalProfileMigrations(
   transaction: SQLite.SQLiteDatabase,
   currentVersion: number,
@@ -52,6 +52,17 @@ export async function applyLocalProfileMigrations(
   if (currentVersion < 19) {
     await transaction.execAsync(`
       ALTER TABLE space_member_profiles ADD COLUMN default_currency TEXT;
+    `);
+  }
+
+  // La versión 26 separa el sello del servidor del sello local.
+  // `avatar_updated_at` marca cuándo se eligió la foto en este dispositivo y
+  // sirve para refrescar la imagen en pantalla; `avatar_remote_updated_at` es
+  // el `avatarUpdatedAt` que devuelve la API y es el único con el que se puede
+  // decidir si la copia local corresponde a lo que hay en el servidor.
+  if (currentVersion < 26) {
+    await transaction.execAsync(`
+      ALTER TABLE local_profile ADD COLUMN avatar_remote_updated_at TEXT;
     `);
   }
 }

@@ -1,5 +1,5 @@
-import type { AuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
-import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
+import type { AuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
+import { createJuntossAuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
 import {
   confirmGuestDataMerge,
   login,
@@ -13,9 +13,10 @@ import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/
 import { listLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
 import type { SessionTransaction } from '@/features/transactions/types';
 
-jest.mock('@/features/auth/gateways/supabaseAuthGateway');
+jest.mock('@/features/auth/gateways/juntossAuthGateway');
 jest.mock('@/features/categories/repositories/localCategoryRepository');
 jest.mock('@/features/spaces/repositories/localSpaceRepository');
+jest.mock('@/features/sync/services/bootstrapRemoteAccount');
 jest.mock('@/features/sync/services/migrateAuthenticatedGuestData');
 jest.mock('@/features/sync/services/restoreRemoteAccount');
 jest.mock('@/features/transactions/repositories/localTransactionRepository');
@@ -30,8 +31,6 @@ function createGatewayStub(overrides: Partial<AuthGateway> = {}): AuthGateway {
     requestPasswordReset: jest.fn(),
     setNewPassword: jest.fn(),
     signOut: jest.fn(),
-    getSession: jest.fn(),
-    onAuthStateChange: jest.fn(),
     ...overrides,
   };
 }
@@ -39,7 +38,7 @@ function createGatewayStub(overrides: Partial<AuthGateway> = {}): AuthGateway {
 describe('loginService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(createSupabaseAuthGateway).mockReturnValue(createGatewayStub());
+    jest.mocked(createJuntossAuthGateway).mockReturnValue(createGatewayStub());
     jest.mocked(loadSpaces).mockResolvedValue(initialSpacesState);
     jest.mocked(listLocalCategories).mockResolvedValue([]);
     jest.mocked(listLocalTransactions).mockResolvedValue([]);

@@ -1,5 +1,6 @@
 import { ScrollView, StyleSheet } from 'react-native';
 
+import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { MoneyAccountCard } from '@/features/accounts/components/MoneyAccountCard/MoneyAccountCard';
 import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
 import { spacing } from '@/theme/spacing';
@@ -12,6 +13,7 @@ type MoneyAccountCarouselProps = {
    * hasta el borde sin que la primera tarjeta pierda su gutter.
    */
   gutter?: number;
+  onCreateMoneyAccount?: () => void;
   onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   testID?: string;
 };
@@ -20,6 +22,7 @@ export function MoneyAccountCarousel({
   accounts,
   bordered = false,
   gutter = 0,
+  onCreateMoneyAccount,
   onOpenMoneyAccountDetail,
   testID,
 }: MoneyAccountCarouselProps) {
@@ -39,6 +42,14 @@ export function MoneyAccountCarousel({
           onPress={() => onOpenMoneyAccountDetail?.(account.id)}
         />
       ))}
+      {onCreateMoneyAccount ? (
+        <CreatePreviewBadge
+          accessibilityLabel="Crear cuenta"
+          label="Crear cuenta"
+          onPress={onCreateMoneyAccount}
+          testID="money-account-create-card"
+        />
+      ) : null}
     </ScrollView>
   );
 }

@@ -8,15 +8,15 @@ import { Image } from 'react-native';
  * dibuja.
  */
 const onboardingIllustrations = [
-  require('../../../../assets/Onboarding/1 Hola.png'),
-  require('../../../../assets/Onboarding/2 Pais.png'),
-  require('../../../../assets/Onboarding/3 Menos dudas.png'),
-  require('../../../../assets/Onboarding/4 Tu mes.png'),
-  require('../../../../assets/Onboarding/5 Juntos.png'),
-  require('../../../../assets/Onboarding/6 Crea tu categoria.png'),
-  require('../../../../assets/Onboarding/7 Bien.png'),
-  require('../../../../assets/Onboarding/8 Gastos.png'),
-  require('../../../../assets/Onboarding/9 Abrazo.png'),
+  require('../../../../assets/Onboarding/1_Hola.png'),
+  require('../../../../assets/Onboarding/2_Pais.png'),
+  require('../../../../assets/Onboarding/3_Menos_dudas.png'),
+  require('../../../../assets/Onboarding/4_Tu_mes.png'),
+  require('../../../../assets/Onboarding/5_Juntos.png'),
+  require('../../../../assets/Onboarding/6_Crea_tu_categoria.png'),
+  require('../../../../assets/Onboarding/7_Bien.png'),
+  require('../../../../assets/Onboarding/8_Gastos.png'),
+  require('../../../../assets/Onboarding/9_Abrazo.png'),
 ];
 
 /**
@@ -29,11 +29,17 @@ let preloadPromise: Promise<void> | null = null;
 export function preloadOnboardingIllustrations(): Promise<void> {
   if (!preloadPromise) {
     preloadPromise = Asset.loadAsync(onboardingIllustrations)
-      .then((assets) =>
-        Promise.all(
-          assets.map((asset) => Image.prefetch(asset.localUri ?? asset.uri)),
-        ),
-      )
+      .then((assets) => {
+        const httpUrls = assets
+          .map((asset) => asset.localUri ?? asset.uri)
+          .filter(
+            (uri): uri is string =>
+              typeof uri === 'string' && /^https?:\/\//i.test(uri),
+          );
+
+        if (httpUrls.length === 0) return;
+        return Promise.all(httpUrls.map((uri) => Image.prefetch(uri)));
+      })
       // Un fallo de caché nunca puede bloquear el inicio de onboarding: la
       // imagen se seguirá resolviendo de forma normal al renderizarse.
       .then(() => undefined)

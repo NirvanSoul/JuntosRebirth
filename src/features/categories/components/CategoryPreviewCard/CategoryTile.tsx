@@ -9,6 +9,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
+import { CategoryAmountSwitcher } from '@/features/categories/components/CategoryPreviewCard/CategoryAmountSwitcher';
 import type { CategoryIconName } from '@/features/categories/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
@@ -155,28 +156,14 @@ export function CategoryTile({
             />
           </View>
         </View>
-        <View style={styles.amounts}>
-          {hasExpenses ? (
-            <Text
-              adjustsFontSizeToFit
-              numberOfLines={1}
-              variant="footnote"
-              weight="medium"
-            >
-              {expense}
-            </Text>
-          ) : null}
-          {hasIncome ? (
-            <Text
-              adjustsFontSizeToFit
-              numberOfLines={1}
-              style={{ color: colors.income }}
-              variant="footnote"
-              weight="medium"
-            >
-              {income}
-            </Text>
-          ) : null}
+        <View style={styles.amounts} testID="category-tile-amount-area">
+          <CategoryAmountSwitcher
+            expense={expense}
+            hasExpenses={hasExpenses}
+            hasIncome={hasIncome}
+            income={income}
+            testID="category-tile-amount-switcher"
+          />
         </View>
       </View>
     </Pressable>
@@ -225,7 +212,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radii.round,
   },
-  amounts: { alignItems: 'center', gap: spacing.xxs },
+  amounts: { alignItems: 'center' },
   progress: {
     position: 'absolute',
   },

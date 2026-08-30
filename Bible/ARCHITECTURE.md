@@ -17,7 +17,7 @@ Fuera de `src/` permanecen:
 - Configuración.
 - Proyectos nativos.
 - Assets requeridos por compilación.
-- Supabase y migraciones.
+- Integración con Juntoss API.
 - Scripts.
 - Documentación.
 - Automatización.
@@ -61,12 +61,6 @@ juntoss/
 │   ├── theme/
 │   ├── types/
 │   └── utils/
-├── supabase/
-│   ├── migrations/
-│   ├── seed/
-│   ├── functions/
-│   ├── tests/
-│   └── config.toml
 ├── tests/
 │   ├── integration/
 │   └── e2e/
@@ -327,7 +321,7 @@ Adaptadores de librerías externas:
 
 ```text
 src/lib/
-├── supabase/
+├── auth-client.ts
 ├── storage/
 ├── dates/
 ├── currency/
@@ -463,7 +457,7 @@ Entidades, reglas, cálculos y estados válidos.
 
 ### Infraestructura
 
-Supabase, persistencia local, red y servicios externos.
+Juntoss API, persistencia local, red y servicios externos.
 
 Dirección preferida:
 
@@ -474,7 +468,7 @@ UI -> aplicación/dominio -> repositorios -> infraestructura
 Evitar:
 
 ```text
-componente -> cliente Supabase -> tabla
+componente -> cliente HTTP o de autenticación -> API
 ```
 
 ---
@@ -518,22 +512,19 @@ UI
       -> remoto o sincronizado, si autenticado
 ```
 
-La estrategia detallada está en `DATABASE.md`.
+La estrategia detallada está en `API.md`.
 
 El catálogo pequeño de espacios y el identificador activo continúan guardándose
 mediante un repositorio encapsulado sobre AsyncStorage. Las categorías y los
 movimientos usan SQLite mediante `expo-sqlite`, con migraciones versionadas y
 repositorios dentro de cada feature. La interfaz conserva arrays de dominio para
 presentación, pero restaura y confirma cada mutación a través del repositorio; no
-accede directamente a SQLite. La elección y sus límites están registrados en
-ADR-050.
+accede directamente a SQLite.
 
-La primera frontera remota vive en `src/lib/supabase/` y la coordinación de
-migración en `src/features/sync/`. La UI no importa el cliente: una vez exista
-sesión, llama al caso de uso autenticado, que prepara el lote SQLite, lo envía
-mediante un gateway y confirma localmente los conteos. El esquema y el RPC
-transaccional permanecen versionados en `supabase/`; ADR-059 documenta la
-idempotencia y el bloqueo de cuenta equivocada.
+La frontera remota vive en `src/services/api/` y la coordinación de migración
+en `src/features/sync/`. La UI no importa el cliente: una vez exista sesión,
+llama al caso de uso autenticado, que prepara el lote SQLite, lo envía mediante
+un gateway y confirma localmente los conteos.
 
 ---
 
@@ -710,7 +701,6 @@ Cuando dos features comparten algo:
 - Unitarias junto al archivo.
 - Integración en `tests/integration/`.
 - End-to-end en `tests/e2e/`.
-- SQL en `supabase/tests/`.
 
 Prioridades:
 
@@ -731,15 +721,15 @@ Prioridades:
 - Normalizar errores.
 - No mostrar mensajes técnicos crudos.
 - No registrar importes, títulos, tokens o información sensible.
-- La autorización real vive en Supabase.
-- El espacio activo visual no sustituye RLS.
+- La autorización real vive en la API.
+- El espacio activo visual no sustituye la autorización del servidor.
 - Ningún secreto entra en el bundle.
 - Las operaciones destructivas son explícitas.
 - Las contraseñas nunca se persisten: viven solo en el estado en memoria del
   formulario que las captura (registro, inicio de sesión, restablecer),
-  viajan una única vez por HTTPS hacia Supabase Auth (que las hashea del lado
+  viajan una única vez por HTTPS hacia Better Auth (que las procesa del lado
   del servidor) y no se escriben en AsyncStorage, SecureStore, SQLite ni
-  ningún log. Ver ADR-074 en `DECISIONS.md`.
+  ningún log.
 
 ---
 
@@ -782,7 +772,7 @@ src/
 │   └── extras/
 ├── lib/
 │   ├── storage/
-│   └── supabase/
+│   └── auth-client.ts
 ├── navigation/
 ├── state/
 │   ├── session/

@@ -6,6 +6,7 @@ export type RemoteEntityType =
   'space' | 'category' | 'money_account' | 'transaction';
 
 type LinkRow = { local_id: string };
+type RemoteLinkRow = { remote_id: string };
 
 export async function findLocalIdForRemoteEntity(input: {
   executor: LocalSqlExecutor;
@@ -21,6 +22,23 @@ export async function findLocalIdForRemoteEntity(input: {
     input.remoteId,
   );
   return row?.local_id ?? null;
+}
+
+/** Traduce un ID local a su ID remoto para las rutas que lo usan como parámetro. */
+export async function findRemoteIdForLocalEntity(input: {
+  executor: LocalSqlExecutor;
+  userId: string;
+  entityType: RemoteEntityType;
+  localId: string;
+}): Promise<string | null> {
+  const row = await input.executor.getFirstAsync<RemoteLinkRow>(
+    `SELECT remote_id FROM remote_entity_links
+      WHERE user_id = ? AND entity_type = ? AND local_id = ?`,
+    input.userId,
+    input.entityType,
+    input.localId,
+  );
+  return row?.remote_id ?? null;
 }
 
 /** El vínculo es la única autoridad para traducir un ID remoto a uno local. */

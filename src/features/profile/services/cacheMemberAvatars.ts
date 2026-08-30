@@ -1,25 +1,13 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
-import { downloadMemberAvatar } from '@/features/profile/gateways/supabaseAvatarStorageGateway';
+import { buildAvatarCacheFileName } from '@/features/profile/services/avatarImage';
 import {
   listSpaceMemberProfiles,
   saveSpaceMemberAvatarCache,
 } from '@/features/profile/repositories/localSpaceMemberProfileRepository';
+import { getAvatar } from '@/services/api/avatar';
 
 const memberAvatarsDirectoryName = 'avatars/members';
-
-/**
- * Nombre del archivo cacheado, con el sello de la subida incrustado.
- *
- * Incrustarlo evita una columna extra para recordar a qué versión corresponde
- * la copia local: el propio nombre lo dice, así que basta compararlo con el
- * sello que acaba de llegar del servidor para saber si hay que redescargar.
- * También hace que un cambio de foto no reutilice por error el archivo viejo,
- * porque la ruta cambia con él.
- */
-function buildCachedFileName(userId: string, avatarUpdatedAt: string): string {
-  return `${userId}__${avatarUpdatedAt.replace(/\D/g, '')}.jpg`;
-}
 
 function getMemberAvatarsDirectory(): Directory {
   const directory = new Directory(Paths.document, memberAvatarsDirectoryName);
@@ -30,9 +18,14 @@ function getMemberAvatarsDirectory(): Directory {
 /**
  * Descarga y cachea las fotos de las demás personas del espacio.
  *
- * Solo baja lo que ha cambiado: si el nombre del archivo ya guardado contiene
- * el sello que trae el censo, no hay nada que hacer. Sin esa comprobación, cada
- * sincronización redescargaría la misma foto.
+ * Baja siempre por `GET /v1/avatars/:userId`: el cliente no conoce ni construye
+ * la dirección del objeto en el almacenamiento, solo la de la API, que además
+ * comprueba que quien pide comparte espacio con quien aparece.
+ *
+ * Solo baja lo que ha cambiado. La clave de caché es `userId` +
+ * `avatarUpdatedAt`, incrustada en el nombre del archivo: si ya existe, no hay
+ * nada que hacer; si el sello cambió, el nombre cambia y fuerza la descarga.
+ * Sin esa comprobación, cada sincronización redescargaría la misma foto.
  *
  * No lanza nunca. Quedarse sin la foto de la otra persona degrada la interfaz
  * al icono de respaldo, que es un resultado aceptable; abortar la
@@ -56,7 +49,7 @@ export async function cacheMemberAvatars(spaceId: string): Promise<void> {
   for (const profile of profiles) {
     if (!profile.avatarPath || !profile.avatarUpdatedAt) continue;
 
-    const fileName = buildCachedFileName(
+    const fileName = buildAvatarCacheFileName(
       profile.userId,
       profile.avatarUpdatedAt,
     );
@@ -66,7 +59,7 @@ export async function cacheMemberAvatars(spaceId: string): Promise<void> {
     if (destination.exists) continue;
 
     try {
-      const bytes = await downloadMemberAvatar(profile.avatarPath);
+      const bytes = await getAvatar(profile.userId, profile.avatarUpdatedAt);
       // `null` es «todavía no tiene foto», no un fallo: no se escribe nada y no
       // se registra ruido en la consola.
       if (!bytes) continue;

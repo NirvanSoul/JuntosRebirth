@@ -3,7 +3,7 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { createSupabaseInvitationGateway } from '@/features/spaces/gateways/supabaseInvitationGateway';
+import { createJuntossInvitationGateway } from '@/features/spaces/gateways/juntossInvitationGateway';
 import {
   AwaitingPartnerScreen,
   getAnimatedWaitingTitle,
@@ -11,7 +11,7 @@ import {
 import type { Space } from '@/features/spaces/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
-jest.mock('@/features/spaces/gateways/supabaseInvitationGateway');
+jest.mock('@/features/spaces/gateways/juntossInvitationGateway');
 
 const pendingSpace: Space = {
   id: 'space-juntos',
@@ -24,9 +24,9 @@ const pendingSpace: Space = {
 function mockOutgoingInvitation(
   invitation: { inviteeEmail: string | null; expiresAt: string } | null,
 ) {
-  jest.mocked(createSupabaseInvitationGateway).mockReturnValue({
+  jest.mocked(createJuntossInvitationGateway).mockReturnValue({
     getOutgoingInvitation: jest.fn().mockResolvedValue(invitation),
-  } as unknown as ReturnType<typeof createSupabaseInvitationGateway>);
+  } as unknown as ReturnType<typeof createJuntossInvitationGateway>);
 }
 
 async function renderScreen(

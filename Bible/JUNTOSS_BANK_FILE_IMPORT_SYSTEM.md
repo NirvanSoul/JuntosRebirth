@@ -253,7 +253,13 @@ Repositorio:
 
 https://github.com/react-native-documents/document-picker
 
-Restringir inicialmente a PDF, XLS, XLSX y CSV.
+Restringir inicialmente a XLS, XLSX y CSV.
+
+Al abrir la importación, mostrar primero una explicación breve: el usuario
+sube un extracto, revisa movimientos, categorías y duplicados, y solo entonces
+confirma el guardado. El selector nativo se abre exclusivamente tras pulsar la
+acción explícita para elegir archivo; las revisiones guardadas siguen siendo
+accesibles desde esa introducción.
 
 Android puede tener providers que ignoran filtros MIME. Por eso validar después de seleccionar:
 

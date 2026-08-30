@@ -13,6 +13,12 @@ import { SignUpScreen } from '@/features/auth/screens/SignUpScreen';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
 jest.mock('@/features/auth/services/signUpService');
+jest.mock('@/features/auth/components/GoogleAuthButton', () => {
+  const { Text } = jest.requireActual('react-native');
+  return {
+    GoogleAuthButton: ({ label }: { label: string }) => <Text>{label}</Text>,
+  };
+});
 
 function ControlledSignUpScreen({
   onNavigateToLogin,

@@ -35,7 +35,10 @@ export function sanitizeSignedAmountInput(value: string): string {
   const isNegative = value.trimStart().startsWith('-');
   const digits = value.replace(/[^0-9,]/g, '');
 
-  if (!digits) return isNegative ? '-' : '0';
+  // El campo opcional debe poder quedarse vacío. Forzarlo a `0` impedía
+  // borrar el último dígito y hacía que la interfaz pareciera editable solo
+  // hasta llegar a ese valor.
+  if (!digits) return isNegative ? '-' : '';
 
   return isNegative ? `-${digits}` : digits;
 }

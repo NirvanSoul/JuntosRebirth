@@ -43,7 +43,7 @@ export function NameScreen({ navigation }: Props) {
       compactCopyOverlapsIllustration
       compactRaisesActions
       illustrationAspectRatio={helloIllustrationAspectRatio}
-      illustrationSource={require('../../../../assets/Onboarding/1 Hola.png')}
+      illustrationSource={require('../../../../assets/Onboarding/1_Hola.png')}
       isCompact={isFocused}
       subtitle="Nosotros nos llamamos Juntos, y queremos conocerte."
       testID="onboarding-name"

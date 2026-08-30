@@ -1,15 +1,14 @@
 import { cacheMemberAvatars } from '@/features/profile/services/cacheMemberAvatars';
 
-const mockDownloadMemberAvatar = jest.fn();
+const mockGetAvatar = jest.fn();
 const mockListSpaceMemberProfiles = jest.fn();
 const mockSaveSpaceMemberAvatarCache = jest.fn();
 const mockExistingFileNames = new Set<string>();
 const mockDeletedFileNames: string[] = [];
 const mockWrittenFileNames: string[] = [];
 
-jest.mock('@/features/profile/gateways/supabaseAvatarStorageGateway', () => ({
-  downloadMemberAvatar: (...args: unknown[]) =>
-    mockDownloadMemberAvatar(...args),
+jest.mock('@/services/api/avatar', () => ({
+  getAvatar: (...args: unknown[]) => mockGetAvatar(...args),
 }));
 
 jest.mock(
@@ -72,15 +71,17 @@ describe('cacheMemberAvatars', () => {
     mockExistingFileNames.clear();
     mockDeletedFileNames.length = 0;
     mockWrittenFileNames.length = 0;
-    mockDownloadMemberAvatar.mockResolvedValue(new Uint8Array([1, 2, 3]));
+    mockGetAvatar.mockResolvedValue(new Uint8Array([1, 2, 3]));
     mockListSpaceMemberProfiles.mockResolvedValue([beto]);
   });
 
   it('descarga y cachea la foto que todavía no está en disco', async () => {
     await cacheMemberAvatars('space-1');
 
-    expect(mockDownloadMemberAvatar).toHaveBeenCalledWith(
-      'uuid-beto/avatar.jpg',
+    // Se pide por la ruta de la API, no por la clave del almacenamiento.
+    expect(mockGetAvatar).toHaveBeenCalledWith(
+      'uuid-beto',
+      '2026-08-17T10:00:00.000Z',
     );
     expect(mockWrittenFileNames).toEqual(['uuid-beto__20260817100000000.jpg']);
     expect(mockSaveSpaceMemberAvatarCache).toHaveBeenCalled();
@@ -92,7 +93,7 @@ describe('cacheMemberAvatars', () => {
     await cacheMemberAvatars('space-1');
 
     // Sin esta comprobación, cada sincronización redescargaría la misma foto.
-    expect(mockDownloadMemberAvatar).not.toHaveBeenCalled();
+    expect(mockGetAvatar).not.toHaveBeenCalled();
   });
 
   it('redescarga cuando la otra persona cambia de foto', async () => {
@@ -100,7 +101,7 @@ describe('cacheMemberAvatars', () => {
 
     await cacheMemberAvatars('space-1');
 
-    expect(mockDownloadMemberAvatar).toHaveBeenCalled();
+    expect(mockGetAvatar).toHaveBeenCalled();
     expect(mockDeletedFileNames).toContain('uuid-beto__20260101000000000.jpg');
   });
 
@@ -120,12 +121,12 @@ describe('cacheMemberAvatars', () => {
 
     await cacheMemberAvatars('space-1');
 
-    expect(mockDownloadMemberAvatar).not.toHaveBeenCalled();
+    expect(mockGetAvatar).not.toHaveBeenCalled();
     expect(mockWrittenFileNames).toEqual([]);
   });
 
   it('no escribe nada si la descarga vuelve vacía', async () => {
-    mockDownloadMemberAvatar.mockResolvedValue(null);
+    mockGetAvatar.mockResolvedValue(null);
 
     await cacheMemberAvatars('space-1');
 

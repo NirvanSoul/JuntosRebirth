@@ -40,19 +40,16 @@ import {
   SaveConfirmationToast,
   type SaveConfirmationNotice,
 } from '@/components/overlays/SaveConfirmationToast/SaveConfirmationToast';
-import { Avatar } from '@/components/ui/Avatar/Avatar';
 import { Text } from '@/components/ui/Text/Text';
-import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
+import { createJuntossAuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import { DataRightsScreen } from '@/features/legal/screens/DataRightsScreen';
 import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScreen';
 import { PermissionsScreen } from '@/features/legal/screens/PermissionsScreen';
 import { PrivacyChoicesScreen } from '@/features/legal/screens/PrivacyChoicesScreen';
 import { PrivacyLegalScreen } from '@/features/legal/screens/PrivacyLegalScreen';
-import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
-import { updateProfileAvatar } from '@/features/profile/services/updateProfileAvatar';
-import type { AvatarPickSource } from '@/features/profile/types';
 import { AuthModal } from '@/features/settings/components/AuthModal';
+import { ProfileAvatarCard } from '@/features/settings/components/ProfileAvatarCard/ProfileAvatarCard';
 import { CurrencyPreferencesModal } from '@/features/settings/components/CurrencyPreferencesModal/CurrencyPreferencesModal';
 import type { Space } from '@/features/spaces/types';
 import { NotificationRulesModal } from '@/features/transactions/components/NotificationRulesModal/NotificationRulesModal';
@@ -95,7 +92,6 @@ const confirmLeaveCoupleSpaceDelayMs = 5000;
 const confirmLeaveCoupleSpaceDelaySeconds =
   confirmLeaveCoupleSpaceDelayMs / 1000;
 
-const profileIconSize = 56;
 const developerContactEmail = 'aora.estudio.o@gmail.com';
 
 function showPendingNotice() {
@@ -133,7 +129,6 @@ export function SettingsScreen({
   const [isDataRightsVisible, setDataRightsVisible] = useState(false);
   const [saveConfirmationNotice, setSaveConfirmationNotice] =
     useState<SaveConfirmationNotice | null>(null);
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [coupleSpaceExit, setCoupleSpaceExit] = useState<CoupleSpaceExitState>({
     step: 'idle',
   });
@@ -155,16 +150,6 @@ export function SettingsScreen({
     : 'Desactivadas';
 
   useEffect(() => {
-    let isMounted = true;
-    void getLocalProfile().then((profile) => {
-      if (isMounted) setAvatarUri(profile.avatarUri);
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
     if (coupleSpaceExit.step !== 'confirming') {
       coupleSpaceExitProgress.value = 0;
       return;
@@ -183,33 +168,6 @@ export function SettingsScreen({
 
     return () => clearInterval(intervalId);
   }, [coupleSpaceExit.step, coupleSpaceExitProgress]);
-
-  const handlePickAvatar = async (source: AvatarPickSource) => {
-    try {
-      const profile = await updateProfileAvatar(source);
-      if (profile) setAvatarUri(profile.avatarUri);
-    } catch {
-      Alert.alert(
-        'No se pudo actualizar tu foto',
-        'Revisa los permisos de cámara o galería en los ajustes del sistema e inténtalo de nuevo.',
-      );
-    }
-  };
-
-  const handleChangeAvatar = () => {
-    Alert.alert(
-      'Foto de perfil',
-      'Para elegir una imagen, Juntoss necesita acceder a tus fotos o a la cámara. Se usará solo como tu foto de perfil.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Tomar foto', onPress: () => void handlePickAvatar('camera') },
-        {
-          text: 'Elegir de la galería',
-          onPress: () => void handlePickAvatar('library'),
-        },
-      ],
-    );
-  };
 
   const showSaveConfirmation = (message: string) => {
     setSaveConfirmationNotice({ id: nextSaveConfirmationId.current, message });
@@ -245,7 +203,7 @@ export function SettingsScreen({
     if (isSigningOut) return;
     setSigningOut(true);
     try {
-      await createSupabaseAuthGateway().signOut();
+      await createJuntossAuthGateway().signOut();
     } catch {
       Alert.alert(
         'No pudimos cerrar sesión',
@@ -318,42 +276,7 @@ export function SettingsScreen({
           </Text>
         </View>
 
-        <View style={styles.profileCard}>
-          <Pressable
-            accessibilityLabel="Cambiar foto de perfil"
-            accessibilityRole="button"
-            onPress={handleChangeAvatar}
-            style={({ pressed }) => [
-              styles.avatarButton,
-              pressed ? styles.rowPressed : null,
-            ]}
-            testID="settings-avatar-button"
-          >
-            <Avatar
-              size={profileIconSize}
-              testID="settings-avatar"
-              uri={avatarUri}
-            />
-            <View style={styles.avatarEditBadge}>
-              <Ionicons color={colors.onBrand} name="camera" size={14} />
-            </View>
-          </Pressable>
-          <View style={styles.profileText}>
-            <Text variant="bodyStrong" weight="semibold">
-              Tu perfil
-            </Text>
-            <Text tone="secondary" variant="footnote">
-              Toca tu foto para cambiarla
-            </Text>
-          </View>
-          {session ? null : (
-            <View style={styles.guestBadge}>
-              <Text tone="cta" variant="caption" weight="semibold">
-                Invitado
-              </Text>
-            </View>
-          )}
-        </View>
+        <ProfileAvatarCard hasSession={Boolean(session)} />
 
         <SettingsSection
           emphasizeIcon={false}
@@ -634,46 +557,6 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       textShadowColor: colors.textPrimary,
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 0.45,
-    },
-    profileCard: {
-      ...shadows.subtle,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radii.lg,
-      backgroundColor: colors.surface,
-      padding: spacing.lg,
-    },
-    avatarButton: {
-      position: 'relative',
-      width: profileIconSize,
-      height: profileIconSize,
-    },
-    avatarEditBadge: {
-      position: 'absolute',
-      right: -spacing.xxs,
-      bottom: -spacing.xxs,
-      width: 24,
-      height: 24,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      borderWidth: 2,
-      borderColor: colors.surface,
-      backgroundColor: colors.brand,
-    },
-    profileText: {
-      minWidth: 0,
-      flex: 1,
-      gap: spacing.xxs,
-    },
-    guestBadge: {
-      borderRadius: radii.round,
-      backgroundColor: colors.ctaSoft,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
     },
     rowPressed: {
       opacity: 0.68,

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
+import { GoogleAuthButton } from '@/features/auth/components/GoogleAuthButton';
 import {
   confirmGuestDataMerge,
   login,
@@ -180,6 +181,13 @@ export function LoginScreen({
         onPress={() => void handleSubmit()}
         testID="login-submit"
         variant="cta"
+      />
+
+      <GoogleAuthButton
+        disabled={isSubmitting}
+        label="Continuar con Google"
+        onSuccess={onSuccess}
+        testID="login-google"
       />
 
       {onNavigateToSignUp ? (

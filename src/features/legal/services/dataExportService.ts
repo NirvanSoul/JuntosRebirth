@@ -2,12 +2,11 @@ import { Share } from 'react-native';
 
 import { listLocalMoneyAccounts } from '@/features/accounts/repositories/localMoneyAccountRepository';
 import { listLocalCategories } from '@/features/categories/repositories/localCategoryRepository';
-import { createSupabaseDataExportGateway } from '@/features/legal/gateways/supabaseDataExportGateway';
+import { createJuntossDataExportGateway } from '@/features/legal/gateways/juntossDataExportGateway';
 import type { DataExportScope } from '@/features/legal/model/types';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { loadSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import { listLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
 
 async function buildLocalExportPayload(): Promise<Record<string, unknown>> {
   const [spaces, categories, moneyAccounts, transactions] = await Promise.all([
@@ -34,8 +33,7 @@ export type ExportMyDataResult = {
 /**
  * Arma un JSON con los datos del usuario y abre la hoja de compartir nativa
  * para que decida dónde guardarlo. Sin sesión (modo invitado) exporta los
- * datos locales; con sesión, pide también los datos remotos a la Edge
- * Function `export-user-data`.
+ * datos locales; con sesión, pide también los remotos a la API.
  */
 export async function exportMyData(): Promise<ExportMyDataResult> {
   const userId = await getAuthenticatedUserId();
@@ -45,9 +43,7 @@ export async function exportMyData(): Promise<ExportMyDataResult> {
     ? {
         ...localPayload,
         scope: 'account',
-        account: await createSupabaseDataExportGateway(
-          getConfiguredSupabaseClient(),
-        ).exportAccountData(),
+        account: await createJuntossDataExportGateway().exportAccountData(),
       }
     : localPayload;
 

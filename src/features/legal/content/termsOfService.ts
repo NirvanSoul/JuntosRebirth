@@ -104,7 +104,7 @@ export const termsOfService: LegalDocumentContent = {
     {
       heading: '15. Terceros',
       body: [
-        'Usamos Supabase como infraestructura de autenticación y base de datos. El uso de Juntos puede estar sujeto también a los términos de la tienda de aplicaciones (Apple App Store o Google Play) desde la que la instalaste.',
+        'Usamos la API de Juntos como infraestructura de autenticación y sincronización de datos. El uso de Juntos puede estar sujeto también a los términos de la tienda de aplicaciones (Apple App Store o Google Play) desde la que la instalaste.',
       ],
     },
     {

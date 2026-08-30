@@ -22,34 +22,35 @@ export function getAppEnvironment(value: string | undefined): AppEnvironment {
 
 export const appEnvironment = getAppEnvironment(configuredEnvironment);
 
-export type SupabaseEnvironment = {
+export type ApiEnvironment = {
   url: string;
-  publishableKey: string;
 };
 
-export function getSupabaseEnvironment(
-  url: string | undefined,
-  publishableKey: string | undefined,
-): SupabaseEnvironment | null {
-  if (!url && !publishableKey) return null;
-  if (!url || !publishableKey) {
-    throw new Error('La configuración de Supabase está incompleta');
+/**
+ * La URL de la API es pública por diseño: identifica el Worker al que se
+ * conecta la aplicación, pero no concede acceso. Los secretos de Better Auth
+ * y de la base de datos nunca pertenecen al bundle de Expo.
+ */
+export function getApiEnvironment(url: string | undefined): ApiEnvironment {
+  if (!url) {
+    throw new Error(
+      'Configura EXPO_PUBLIC_API_URL para conectar Juntoss con su API.',
+    );
   }
 
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(url);
   } catch {
-    throw new Error('EXPO_PUBLIC_SUPABASE_URL no es una URL válida');
+    throw new Error('EXPO_PUBLIC_API_URL no es una URL válida');
   }
   if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
-    throw new Error('EXPO_PUBLIC_SUPABASE_URL debe usar HTTP o HTTPS');
+    throw new Error('EXPO_PUBLIC_API_URL debe usar HTTP o HTTPS');
   }
 
-  return { url: parsedUrl.toString().replace(/\/$/, ''), publishableKey };
+  return { url: parsedUrl.toString().replace(/\/$/, '') };
 }
 
-export const supabaseEnvironment = getSupabaseEnvironment(
-  process.env.EXPO_PUBLIC_SUPABASE_URL,
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+export const apiEnvironment = getApiEnvironment(
+  process.env.EXPO_PUBLIC_API_URL,
 );

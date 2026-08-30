@@ -1,9 +1,9 @@
 import * as Notifications from 'expo-notifications';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
 import { registerCurrentDeviceForInvitationPush } from '@/lib/notifications/invitationPushNotifications';
 import { storeInvitationPushToken } from '@/lib/notifications/invitationPushTokenStore';
+import { apiClient } from '@/services/api/juntossApiClient';
 
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { HIGH: 4 },
@@ -17,11 +17,11 @@ jest.mock('@/lib/notifications/invitationPushTokenStore', () => ({
   storeInvitationPushToken: jest.fn(async () => undefined),
 }));
 
-const mockedNotifications = jest.mocked(Notifications);
+jest.mock('@/services/api/juntossApiClient', () => ({
+  apiClient: { post: jest.fn() },
+}));
 
-function createFakeClient(rpc = jest.fn()) {
-  return { rpc } as unknown as SupabaseClient;
-}
+const mockedNotifications = jest.mocked(Notifications);
 
 describe('invitationPushNotifications', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -34,15 +34,15 @@ describe('invitationPushNotifications', () => {
       data: 'ExponentPushToken[device_1]',
       type: 'expo',
     });
-    const rpc = jest.fn().mockResolvedValue({ data: null, error: null });
+    jest.mocked(apiClient.post).mockResolvedValue({ data: undefined });
 
-    await expect(
-      registerCurrentDeviceForInvitationPush(false, createFakeClient(rpc)),
-    ).resolves.toBe('registered');
+    await expect(registerCurrentDeviceForInvitationPush(false)).resolves.toBe(
+      'registered',
+    );
 
-    expect(rpc).toHaveBeenCalledWith('register_current_user_push_token', {
-      p_expo_push_token: 'ExponentPushToken[device_1]',
-      p_platform: Platform.OS,
+    expect(apiClient.post).toHaveBeenCalledWith('/v1/me/push-tokens', {
+      expoPushToken: 'ExponentPushToken[device_1]',
+      platform: Platform.OS,
     });
     expect(storeInvitationPushToken).toHaveBeenCalledWith(
       'ExponentPushToken[device_1]',
@@ -54,14 +54,12 @@ describe('invitationPushNotifications', () => {
       canAskAgain: true,
       granted: false,
     } as Notifications.NotificationPermissionsStatus);
-    const rpc = jest.fn();
-
-    await expect(
-      registerCurrentDeviceForInvitationPush(false, createFakeClient(rpc)),
-    ).resolves.toBe('permission-denied');
+    await expect(registerCurrentDeviceForInvitationPush(false)).resolves.toBe(
+      'permission-denied',
+    );
 
     expect(mockedNotifications.requestPermissionsAsync).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(apiClient.post).not.toHaveBeenCalled();
   });
 
   it('solicita y registra el permiso después de la confirmación del usuario', async () => {
@@ -76,11 +74,11 @@ describe('invitationPushNotifications', () => {
       data: 'ExpoPushToken[device_2]',
       type: 'expo',
     });
-    const rpc = jest.fn().mockResolvedValue({ data: null, error: null });
+    jest.mocked(apiClient.post).mockResolvedValue({ data: undefined });
 
-    await expect(
-      registerCurrentDeviceForInvitationPush(true, createFakeClient(rpc)),
-    ).resolves.toBe('registered');
+    await expect(registerCurrentDeviceForInvitationPush(true)).resolves.toBe(
+      'registered',
+    );
     expect(mockedNotifications.requestPermissionsAsync).toHaveBeenCalled();
   });
 });

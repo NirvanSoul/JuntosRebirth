@@ -1,7 +1,6 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
+import { apiClient } from '@/services/api/juntossApiClient';
 
 const storedExpoPushTokenKey = 'juntoss-invitation-expo-push-token';
 
@@ -10,15 +9,14 @@ export async function storeInvitationPushToken(token: string): Promise<void> {
 }
 
 /** Quita la asociación antes de cerrar sesión para no avisar a otra persona. */
-export async function unregisterCurrentDeviceFromInvitationPush(
-  client: SupabaseClient = getConfiguredSupabaseClient(),
-): Promise<void> {
+export async function unregisterCurrentDeviceFromInvitationPush(): Promise<void> {
   const token = await SecureStore.getItemAsync(storedExpoPushTokenKey);
   if (!token) return;
 
-  const { error } = await client.rpc('unregister_current_user_push_token', {
-    p_expo_push_token: token,
-  });
-  if (error) throw new Error('No pudimos retirar este dispositivo.');
+  try {
+    await apiClient.delete('/v1/me/push-tokens', { expoPushToken: token });
+  } catch {
+    throw new Error('No pudimos retirar este dispositivo.');
+  }
   await SecureStore.deleteItemAsync(storedExpoPushTokenKey);
 }

@@ -35,6 +35,7 @@ describe('migrateAuthenticatedGuestData', () => {
         batchId: 'batch-id',
         spaceCount: 1,
         categoryCount: 0,
+        moneyAccountCount: 0,
         seriesCount: 0,
         transactionCount: 0,
       })),
@@ -57,6 +58,7 @@ describe('migrateAuthenticatedGuestData', () => {
         batchId: 'batch-id',
         spaceCount: 0,
         categoryCount: 0,
+        moneyAccountCount: 0,
         seriesCount: 0,
         transactionCount: 0,
       })),
@@ -72,5 +74,50 @@ describe('migrateAuthenticatedGuestData', () => {
     ).rejects.toThrow('no confirmó el lote local completo');
     expect(failLocalGuestMigration).toHaveBeenCalledWith(payload);
     expect(completeLocalGuestMigration).not.toHaveBeenCalled();
+  });
+
+  it('conserva el lote para reintento si la API no confirma las cuentas', async () => {
+    const payloadWithAccount: GuestMigrationPayload = {
+      ...payload,
+      moneyAccounts: [
+        {
+          id: 'account-id',
+          spaceId: 'personal',
+          name: 'Cuenta',
+          kind: 'bank',
+          icon: 'bank',
+          colorToken: 'blue',
+          currency: 'EUR',
+          balances: [],
+          isArchived: false,
+          createdAt: '2026-08-30T00:00:00.000Z',
+          updatedAt: '2026-08-30T00:00:00.000Z',
+          archivedAt: null,
+        },
+      ],
+    };
+    jest
+      .mocked(prepareLocalGuestMigration)
+      .mockResolvedValue(payloadWithAccount);
+    const gateway = {
+      migrateGuestData: jest.fn(async () => ({
+        batchId: 'batch-id',
+        spaceCount: 1,
+        categoryCount: 0,
+        moneyAccountCount: 0,
+        seriesCount: 0,
+        transactionCount: 0,
+      })),
+    };
+
+    await expect(
+      migrateAuthenticatedGuestData({
+        userId: 'user-id',
+        spaces: payload.spaces,
+        confirmOwnership: true,
+        gateway,
+      }),
+    ).rejects.toThrow('no confirmó el lote local completo');
+    expect(failLocalGuestMigration).toHaveBeenCalledWith(payloadWithAccount);
   });
 });

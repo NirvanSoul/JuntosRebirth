@@ -5,9 +5,9 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { Text } from '@/components/ui/Text/Text';
 import {
   AcceptInvitationError,
-  createSupabaseInvitationGateway,
+  createJuntossInvitationGateway,
   type CurrentUserInvitation,
-} from '@/features/spaces/gateways/supabaseInvitationGateway';
+} from '@/features/spaces/gateways/juntossInvitationGateway';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import { useAppForeground } from '@/hooks/useAppForeground';
 import { radii } from '@/theme/radii';
@@ -37,7 +37,7 @@ export function PendingInvitationBanner({
       return;
     }
     let isMounted = true;
-    void createSupabaseInvitationGateway()
+    void createJuntossInvitationGateway()
       .getCurrentUserPendingInvitation()
       .then((next) => {
         if (isMounted) setInvitation(next);
@@ -58,7 +58,7 @@ export function PendingInvitationBanner({
     setBusy(true);
     setError(null);
     try {
-      await createSupabaseInvitationGateway().acceptCurrentUserInvitation(
+      await createJuntossInvitationGateway().acceptCurrentUserInvitation(
         invitation.invitationId,
       );
       await onAccepted();

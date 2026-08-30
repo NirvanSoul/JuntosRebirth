@@ -61,7 +61,7 @@ export function CountryScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}
       currentStep={2}
       illustrationAspectRatio={countryIllustrationAspectRatio}
-      illustrationSource={require('../../../../assets/Onboarding/2 Pais.png')}
+      illustrationSource={require('../../../../assets/Onboarding/2_Pais.png')}
       isCompact={isFocused}
       subtitle="Escribe el nombre de tu país y te mostraremos opciones similares."
       testID="onboarding-country"

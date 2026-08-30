@@ -1,59 +1,19 @@
-import type { Session } from '@supabase/supabase-js';
-import { useEffect, useState } from 'react';
-
-import { supabaseEnvironment } from '@/app/config/environment';
-import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
+import type { BetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
+import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
 
 export type AuthSessionState = {
-  session: Session | null;
+  session: BetterAuthSession | null;
   userId: string | null;
   isReady: boolean;
 };
 
 /**
- * Se suscribe a los cambios de sesión de Supabase Auth y expone el estado
+ * Se suscribe a los cambios de sesión de Better Auth y expone el estado
  * actual. `isReady` queda en `false` hasta que se resuelve la primera lectura
  * de `getSession()`, para no mostrar un parpadeo de "sin sesión" antes de
  * comprobar la sesión guardada en el dispositivo.
  */
 export function useAuthSession(): AuthSessionState {
-  const [session, setSession] = useState<Session | null>(null);
-  const [isReady, setReady] = useState(false);
-
-  useEffect(() => {
-    if (!supabaseEnvironment) {
-      setReady(true);
-      return;
-    }
-
-    let isMounted = true;
-    const gateway = createSupabaseAuthGateway();
-
-    void gateway
-      .getSession()
-      .then((initialSession) => {
-        if (isMounted) setSession(initialSession);
-      })
-      .catch(() => {
-        // Sin sesión recuperable: se trata como invitado, no como error fatal.
-      })
-      .finally(() => {
-        if (isMounted) setReady(true);
-      });
-
-    const subscription = gateway.onAuthStateChange((nextSession) => {
-      if (isMounted) setSession(nextSession);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  return {
-    session,
-    userId: session?.user.id ?? null,
-    isReady,
-  };
+  const { session, isReady } = useBetterAuthSession();
+  return { session, userId: session?.user.id ?? null, isReady };
 }

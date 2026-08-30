@@ -13,6 +13,7 @@ export function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     container: { flex: 1 },
     topBar: {
       zIndex: 2,
+      elevation: 2,
       position: 'absolute',
       top: 0,
       left: 0,
@@ -27,15 +28,26 @@ export function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     scrollContent: {
       paddingTop: spacing.xl + layout.minTouchTarget,
     },
-    hero: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
-    titleBlock: { alignItems: 'center', gap: spacing.xxs },
+    hero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+      marginTop: spacing.lg,
+    },
+    titleBlock: {
+      minWidth: 0,
+      flexShrink: 1,
+      alignItems: 'flex-start',
+      gap: spacing.xxs,
+    },
     heroIcon: {
       width: heroIconSize,
       height: heroIconSize,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radii.round,
-      marginBottom: spacing.xs,
+      flexShrink: 0,
     },
     amountCard: {
       alignItems: 'center',

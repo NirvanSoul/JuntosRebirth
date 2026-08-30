@@ -285,7 +285,7 @@ export function CategoryDetailModal({
                 style={styles.titleBlock}
               >
                 <Text
-                  align="center"
+                  align="left"
                   testID="category-detail-context"
                   tone="secondary"
                   variant="overline"
@@ -294,7 +294,7 @@ export function CategoryDetailModal({
                   Categoría
                 </Text>
                 <Text
-                  align="center"
+                  align="left"
                   accessibilityRole="header"
                   testID="category-detail-title"
                   variant="heading"
@@ -545,15 +545,26 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     scrollContent: {
       paddingTop: spacing.xl + layout.minTouchTarget,
     },
-    hero: { alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg },
-    titleBlock: { alignItems: 'center', gap: spacing.xxs },
+    hero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+      marginTop: spacing.lg,
+    },
+    titleBlock: {
+      minWidth: 0,
+      flexShrink: 1,
+      alignItems: 'flex-start',
+      gap: spacing.xxs,
+    },
     heroIcon: {
       width: heroIconSize,
       height: heroIconSize,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radii.round,
-      marginBottom: spacing.xs,
+      flexShrink: 0,
     },
     currencySelector: {
       alignSelf: 'center',

@@ -179,6 +179,11 @@ export function MoneyAccountDetailsStep({
               maxFontSizeMultiplier={maxFontScale.body}
               editable={!isCurrencyLocked || !existingCurrencies.includes(code)}
               onChangeText={(value) => onChangeBalance(code, value)}
+              onFocus={() => {
+                if ((balanceInputs[code] ?? '') === '0') {
+                  onChangeBalance(code, '');
+                }
+              }}
               placeholder="0"
               placeholderTextColor={colors.textMuted}
               style={[
@@ -186,7 +191,7 @@ export function MoneyAccountDetailsStep({
                 styles.balanceInput,
                 { minHeight: layout.controlHeight[density] },
               ]}
-              value={formatAmountInputForDisplay(balanceInputs[code] ?? '0')}
+              value={formatAmountInputForDisplay(balanceInputs[code] ?? '')}
             />
           </View>
         ))}

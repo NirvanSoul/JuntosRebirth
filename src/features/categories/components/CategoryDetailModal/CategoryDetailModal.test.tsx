@@ -274,7 +274,7 @@ describe('CategoryDetailModal', () => {
       within(budgetModal).getByRole('button', { name: '0' }),
     );
     await fireEvent.press(
-      within(budgetModal).getByRole('button', { name: 'Guardar presupuesto' }),
+      within(budgetModal).getByRole('button', { name: 'Agregar presupuesto' }),
     );
     expect(onSaveBudget).toHaveBeenCalledWith('food', 30_000);
 

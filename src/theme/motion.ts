@@ -6,6 +6,8 @@ export const motion = {
   calendarResetFadeInDuration: 300,
   calendarResetFadeOutDuration: 200,
   calendarViewTransitionDuration: 180,
+  categoryAmountTransitionDuration: 350,
+  categoryAmountSwitchInterval: 8000,
   calendarContentMaxDelay: 120,
   calendarContentStagger: 12,
   categoryViewTransitionDuration: 180,

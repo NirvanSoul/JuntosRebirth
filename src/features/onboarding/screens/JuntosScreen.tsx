@@ -16,7 +16,7 @@ export function JuntosScreen({ navigation }: Props) {
       currentStep={5}
       illustrationAspectRatio={puzzleIllustrationAspectRatio}
       illustrationFullBleed
-      illustrationSource={require('../../../../assets/Onboarding/5 Juntos.png')}
+      illustrationSource={require('../../../../assets/Onboarding/5_Juntos.png')}
       subtitle="Comparte gastos con tu pareja y conserva lo personal en tu propio espacio."
       testID="onboarding-juntos"
       title={'Juntos, pero no\nrevueltos'}

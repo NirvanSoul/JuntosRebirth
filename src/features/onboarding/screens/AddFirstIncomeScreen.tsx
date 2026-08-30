@@ -15,7 +15,7 @@ export function AddFirstIncomeScreen({ navigation }: Props) {
     <AddFirstTransactionStep
       currentStep={7}
       illustrationAspectRatio={incomeIllustrationAspectRatio}
-      illustrationSource={require('../../../../assets/Onboarding/7 Bien.png')}
+      illustrationSource={require('../../../../assets/Onboarding/7_Bien.png')}
       onBack={() => navigation.goBack()}
       onSaved={() => navigation.navigate('AddFirstExpense')}
       spaceId={activeSpace.id}

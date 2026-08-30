@@ -31,7 +31,7 @@ export const privacyPolicy: LegalDocumentContent = {
     {
       heading: '3. Qué datos se recogen',
       body: [
-        'Datos de cuenta (cuando creas una cuenta): nombre, correo electrónico, identificador de usuario y metadatos técnicos de autenticación que gestiona Supabase Auth.',
+        'Datos de cuenta (cuando creas una cuenta): nombre, correo electrónico, identificador de usuario y metadatos técnicos de autenticación gestionados por la API de Juntos.',
         'Datos financieros que introduces tú mismo: importe, tipo (gasto o ingreso), categoría, título o descripción breve, fecha, recurrencia y el espacio (personal o compartido) al que pertenece cada movimiento.',
         'Datos de espacios compartidos: qué miembros pertenecen a un espacio y quién es autor de cada movimiento dentro de él.',
         'Preferencias de la aplicación: moneda, apariencia, reglas de recordatorio y si quieres ver importes en las notificaciones.',
@@ -63,14 +63,14 @@ export const privacyPolicy: LegalDocumentContent = {
     {
       heading: '7. Terceros y encargados',
       body: [
-        'Supabase: aloja la autenticación y la base de datos cuando creas una cuenta, actuando como encargado del tratamiento. Confirmaremos la región exacta del proyecto en esta política antes del lanzamiento definitivo en las tiendas.',
+        'La API de Juntos procesa la autenticación y los datos de cuenta cuando te registras. Antes del lanzamiento definitivo confirmaremos en esta política los encargados de infraestructura y la región aplicable.',
         'No usamos actualmente proveedores de analítica, publicidad ni informes de fallos. Si en el futuro integramos Google AdMob para mostrar anuncios, esta política se actualizará antes de activarlos y seguiremos las políticas de consentimiento de anuncios de Google (https://support.google.com/admob/answer/13554116), incluyendo una plataforma de consentimiento certificada en el Espacio Económico Europeo, Reino Unido y Suiza (https://support.google.com/admob/answer/16918505).',
       ],
     },
     {
       heading: '8. Transferencias internacionales',
       body: [
-        'Si Supabase transfiere datos fuera de tu país, aplicamos las garantías que exige la normativa de protección de datos aplicable, como las cláusulas contractuales tipo aprobadas por la Comisión Europea cuando corresponda (https://commission.europa.eu/law/law-topic/data-protection_en).',
+        'Si nuestra infraestructura transfiere datos fuera de tu país, aplicamos las garantías que exige la normativa de protección de datos aplicable, como las cláusulas contractuales tipo aprobadas por la Comisión Europea cuando corresponda (https://commission.europa.eu/law/law-topic/data-protection_en).',
       ],
     },
     {
@@ -83,7 +83,7 @@ export const privacyPolicy: LegalDocumentContent = {
       heading: '10. Seguridad',
       body: [
         'Las conexiones con nuestro backend usan HTTPS. Las credenciales de sesión se guardan cifradas en el almacenamiento seguro del sistema operativo (Keychain en iOS, Keystore en Android).',
-        'El acceso a los datos en Supabase está protegido por políticas de seguridad a nivel de fila (RLS), de forma que cada persona solo puede leer y modificar los datos de los espacios a los que pertenece.',
+        'La API valida la sesión y la pertenencia al espacio en cada operación remota, de forma que cada persona solo puede leer o modificar los datos de los espacios a los que pertenece.',
         'Ningún sistema es 100% seguro; si detectamos una incidencia que afecte a tus datos, te lo comunicaremos según exija la ley aplicable.',
       ],
     },

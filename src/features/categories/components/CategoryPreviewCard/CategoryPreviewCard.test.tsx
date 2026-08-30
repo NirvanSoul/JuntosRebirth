@@ -23,10 +23,18 @@ describe('CategoryPreviewCard', () => {
     );
 
     const card = screen.getByTestId('category-preview-card');
-    const amount = within(card).getByTestId('category-preview-spent-amount');
+    const amount = within(card).getByTestId('category-preview-income-text');
 
     expect(amount.props.children).toMatch(/50/);
-    expect(StyleSheet.flatten(amount.props.style).color).toBe(colors.income);
+    expect(StyleSheet.flatten(amount.props.style).color).toBe(
+      colors.textPrimary,
+    );
+    expect(
+      StyleSheet.flatten(
+        within(card).getByTestId('category-preview-income-text-arrow').props
+          .style,
+      ).color,
+    ).toBe(colors.income);
     expect(
       within(card).queryByTestId('category-preview-available-amount'),
     ).toBeNull();
@@ -52,12 +60,12 @@ describe('CategoryPreviewCard', () => {
     const card = screen.getByTestId('category-preview-card');
 
     expect(
-      within(card).queryByTestId('category-preview-spent-amount'),
+      within(card).queryByTestId('category-preview-amount-switcher'),
     ).toBeNull();
     expect(card.props.accessibilityLabel).toBe('Vacía');
   });
 
-  it('muestra gasto e ingreso cuando ambos tipos comparten categoría', async () => {
+  it('alterna gasto e ingreso cuando ambos tipos comparten categoría', async () => {
     const screen = await render(
       <ThemeProvider initialAppearance="light">
         <CategoryPreviewCard
@@ -77,11 +85,22 @@ describe('CategoryPreviewCard', () => {
     const card = screen.getByTestId('category-preview-card');
 
     expect(
-      within(card).getByTestId('category-preview-spent-amount').props.children,
+      within(card).getByTestId('category-preview-expense-text', {
+        includeHiddenElements: true,
+      }).props.children,
     ).toMatch(/25/);
     expect(
-      within(card).getByTestId('category-preview-income-amount').props.children,
+      within(card).getByTestId('category-preview-income-text', {
+        includeHiddenElements: true,
+      }).props.children,
     ).toMatch(/50/);
+    expect(
+      StyleSheet.flatten(
+        within(card).getByTestId('category-preview-expense-text-arrow', {
+          includeHiddenElements: true,
+        }).props.style,
+      ).color,
+    ).toBe(colors.expense);
     expect(card.props.accessibilityLabel).toContain('25 € gastado');
     expect(card.props.accessibilityLabel).toContain('50 € ingresado');
   });
@@ -105,8 +124,29 @@ describe('CategoryPreviewCard', () => {
 
     const card = screen.getByTestId('category-preview-card');
 
-    expect(screen.getByText(/50/)).toBeTruthy();
+    expect(screen.getByTestId('category-preview-income-text')).toBeTruthy();
     expect(card.props.accessibilityLabel).toBe('Nómina, ingresado 50 €');
+  });
+
+  it('conserva el área del importe vacía para centrar el icono cuando no hay movimientos (tile)', async () => {
+    const screen = await render(
+      <ThemeProvider initialAppearance="light">
+        <CategoryPreviewCard
+          budgetExpenseMinor={0}
+          colorToken="slate"
+          displayCurrency="EUR"
+          expenseMinor={0}
+          icon="fork-knife"
+          incomeMinor={0}
+          name="Vacía"
+          spaceCurrency="EUR"
+          variant="tile"
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('category-tile-amount-area')).toBeTruthy();
+    expect(screen.queryByTestId('category-tile-amount-switcher')).toBeNull();
   });
 
   it('multidivisa: calcula presupuesto y disponible en spaceCurrency mientras muestra totales en displayCurrency', async () => {
@@ -134,7 +174,7 @@ describe('CategoryPreviewCard', () => {
 
     const card = screen.getByTestId('category-preview-card');
     const spentAmount = within(card).getByTestId(
-      'category-preview-spent-amount',
+      'category-preview-expense-text',
     );
     const availableAmount = within(card).getByTestId(
       'category-preview-available-amount',

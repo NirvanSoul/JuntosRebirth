@@ -1,5 +1,6 @@
-import { fetchSpaceMemberProfiles } from '@/features/profile/gateways/supabaseSpaceMemberProfileGateway';
+import { fetchSpaceMemberProfiles } from '@/features/profile/gateways/juntossSpaceMemberProfileGateway';
 import { cacheMemberAvatars } from '@/features/profile/services/cacheMemberAvatars';
+import { restoreOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { replaceSpaceMemberProfiles } from '@/features/profile/repositories/localSpaceMemberProfileRepository';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 
@@ -7,9 +8,9 @@ import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedU
  * Refresca el censo local de un espacio compartido.
  *
  * Devuelve `false` sin tocar nada cuando no hay sesión: en modo invitado no hay
- * espacios compartidos que censar y `profiles` no es legible. No borra el censo
- * previo en ese caso, para no dejar sin nombre a los movimientos ya bajados si
- * la sesión caduca de forma temporal.
+ * espacios compartidos que censar. No borra el censo previo en ese caso, para
+ * no dejar sin nombre a los movimientos ya bajados si la sesión caduca de forma
+ * temporal.
  */
 export async function syncSpaceMemberProfiles(
   spaceId: string,
@@ -19,6 +20,19 @@ export async function syncSpaceMemberProfiles(
 
   const profiles = await fetchSpaceMemberProfiles(spaceId);
   await replaceSpaceMemberProfiles(spaceId, profiles);
+
+  // La fila propia del censo es la única fuente del sello remoto propio, así
+  // que aquí es donde se detecta que el servidor tiene una foto que este
+  // dispositivo todavía no ha bajado.
+  const own = profiles.find((profile) => profile.userId === userId);
+  if (own) {
+    await restoreOwnAvatar({
+      userId,
+      avatarPath: own.avatarPath,
+      avatarUpdatedAt: own.avatarUpdatedAt,
+    });
+  }
+
   // Después de guardar el censo, no antes: la caché decide qué descargar
   // comparando contra los sellos que acaban de llegar.
   await cacheMemberAvatars(spaceId);

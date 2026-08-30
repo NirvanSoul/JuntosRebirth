@@ -15,7 +15,7 @@ export function WelcomeScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}
       currentStep={3}
       illustrationAspectRatio={walletIllustrationAspectRatio}
-      illustrationSource={require('../../../../assets/Onboarding/3 Menos dudas.png')}
+      illustrationSource={require('../../../../assets/Onboarding/3_Menos_dudas.png')}
       subtitle="Guarda cada gasto e ingreso y mantén una visión clara de tu dinero."
       testID="onboarding-welcome"
       title={'Menos dudas, más control sobre\ntu dinero.'}

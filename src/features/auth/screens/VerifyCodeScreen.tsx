@@ -21,7 +21,8 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type VerifyCodeScreenProps = {
   email: string;
   onCancel: () => void;
-  onSuccess: () => void;
+  /** Recibe el código ya verificado: la recuperación lo necesita después. */
+  onSuccess: (result: { code: string }) => void;
   purpose: VerifyCodePurpose;
 };
 
@@ -87,9 +88,12 @@ export function VerifyCodeScreen({
 
   useEffect(() => {
     if (state.step !== 'success') return;
-    const timer = setTimeout(onSuccess, motion.authSuccessAutoContinueDelay);
+    const timer = setTimeout(
+      () => onSuccess({ code }),
+      motion.authSuccessAutoContinueDelay,
+    );
     return () => clearTimeout(timer);
-  }, [onSuccess, state.step]);
+  }, [code, onSuccess, state.step]);
 
   const handleChangeCode = (value: string) => {
     setCode(value.replace(/\D/g, ''));
@@ -109,7 +113,7 @@ export function VerifyCodeScreen({
       if (purpose === 'signup') {
         setState({ step: 'success' });
       } else {
-        onSuccess();
+        onSuccess({ code });
       }
     } catch (caught) {
       setState({
@@ -164,7 +168,7 @@ export function VerifyCodeScreen({
         <ModalPrimaryAction
           accessibilityLabel="Continuar"
           label="Continuar"
-          onPress={onSuccess}
+          onPress={() => onSuccess({ code })}
           testID="verify-code-success-continue"
           variant="cta"
         />

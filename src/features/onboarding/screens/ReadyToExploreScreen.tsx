@@ -29,7 +29,7 @@ export function ReadyToExploreScreen({ navigation }: Props) {
       currentStep={9}
       illustrationAspectRatio={readyIllustrationAspectRatio}
       illustrationScale={readyIllustrationScale}
-      illustrationSource={require('../../../../assets/Onboarding/9 Abrazo.png')}
+      illustrationSource={require('../../../../assets/Onboarding/9_Abrazo.png')}
       subtitle="Explora Juntos y descubre nuestras herramientas para organizar y entender mejor tu vida financiera."
       testID="onboarding-ready"
       title={'Creces tan rápido…\nYa estás listo.'}

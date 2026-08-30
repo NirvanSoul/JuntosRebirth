@@ -207,7 +207,7 @@ export type MerchantFeedbackQueueEntry = {
 };
 
 export interface MerchantFeedbackSyncGateway {
-  /** Envía un voto. Lanza si Supabase lo rechaza (ítem no elegible, sesión inválida, etc.). */
+  /** Envía un voto. Lanza si la API lo rechaza (ítem no elegible, sesión inválida, etc.). */
   recordMerchantFeedback(entry: {
     importItemId: string;
     canonicalCategoryKey: string;

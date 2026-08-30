@@ -33,10 +33,7 @@ La versión anterior acumuló funcionalidades, duplicación de componentes, resp
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Arquitectura técnica y estructura de carpetas. |
 | [`PROJECT_RULES.md`](./PROJECT_RULES.md) | Reglas obligatorias para modificar el código. |
 | [`WORKFLOW.md`](./WORKFLOW.md) | Jerarquía de trabajo multi-agente y checks obligatorios. |
-| [`DATABASE.md`](./DATABASE.md) | Persistencia local, Supabase, SQL y sincronización. |
-| [`ROADMAP.md`](./ROADMAP.md) | Fases y criterios de finalización. |
-| [`PLAN.md`](./PLAN.md) | Orden de trabajo actual (limpieza → verificación → producto → release). |
-| [`DECISIONS.md`](./DECISIONS.md) | Historial de decisiones técnicas y de producto. |
+| [`API.md`](./API.md) | Servicio remoto, autenticación y sincronización. |
 
 Si una modificación cambia una regla, flujo, arquitectura o decisión relevante, también debe actualizarse el documento correspondiente.
 
@@ -168,7 +165,7 @@ Flujo previsto:
 7. Tras registrarse y verificar su correo, sus datos locales se migran.
 8. Se crea o asigna su espacio personal remoto.
 
-El usuario invitado no escribe datos en Supabase.
+El usuario invitado no escribe datos remotos.
 
 ---
 
@@ -215,9 +212,8 @@ El flujo de trabajo, la jerarquía y los checks viven en [`WORKFLOW.md`](./WORKF
 
 - React Native.
 - TypeScript.
-- Supabase para autenticación y base de datos.
+- Juntoss API para autenticación y datos remotos.
 - Persistencia local para modo invitado.
-- Migraciones SQL versionadas.
 - Sistema central de diseño.
 - Navegación tipada.
 - Estado global limitado a información verdaderamente global.
@@ -239,7 +235,6 @@ Vive en [`WORKFLOW.md`](./WORKFLOW.md) §4.
 3. `PRODUCT.md`
 4. `ARCHITECTURE.md`
 5. `DATABASE.md`, si afecta datos
-6. `ROADMAP.md`
 7. `DECISIONS.md`
 
 ---

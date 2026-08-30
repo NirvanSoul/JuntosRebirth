@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
-import { GradientCard } from '@/components/ui/GradientCard/GradientCard';
+import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
@@ -15,7 +15,7 @@ import {
   formatAmountInputForDisplay,
   parseAmountMinor,
 } from '@/lib/currency/amountInput';
-import { createDiagonalGradient } from '@/theme/gradients';
+import { triggerHaptic } from '@/lib/haptics/haptics';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
@@ -77,6 +77,8 @@ export function CategoryBudgetModal({
   }, [initialBudgetMinor, visible]);
 
   const handleKey = (key: (typeof budgetKeys)[number][number]) => {
+    triggerHaptic('keypadPress');
+
     if (key === 'backspace') {
       setAmountInput((current) =>
         current.length <= 1 ? '0' : current.slice(0, -1),
@@ -99,10 +101,15 @@ export function CategoryBudgetModal({
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text accessibilityRole="header" variant="heading">
+            <Text accessibilityRole="header" variant="heading" weight="medium">
               Presupuesto
             </Text>
-            <Text numberOfLines={1} tone="secondary" variant="footnote">
+            <Text
+              numberOfLines={1}
+              tone="secondary"
+              variant="footnote"
+              weight="medium"
+            >
               {categoryName} ({spaceCurrency})
             </Text>
           </View>
@@ -115,7 +122,12 @@ export function CategoryBudgetModal({
           style={styles.amountArea}
           testID="category-budget-amount"
         >
-          <Text adjustsFontSizeToFit numberOfLines={1} variant="amountHero">
+          <Text
+            adjustsFontSizeToFit
+            numberOfLines={1}
+            variant="amountHero"
+            weight="medium"
+          >
             {displayAmount} {currencySymbol}
           </Text>
         </View>
@@ -164,40 +176,26 @@ export function CategoryBudgetModal({
               ]}
               testID="category-budget-remove-button"
             >
-              <Text testID="category-budget-remove-label" variant="bodyStrong">
+              <Text
+                testID="category-budget-remove-label"
+                variant="bodyStrong"
+                weight="medium"
+              >
                 Quitar Presupuesto
               </Text>
             </Pressable>
           ) : null}
-          <Pressable
-            accessibilityLabel="Guardar presupuesto"
-            accessibilityRole="button"
-            accessibilityState={{ disabled: budgetMinor <= 0 }}
+          <ModalPrimaryAction
+            accessibilityLabel="Agregar presupuesto"
             disabled={budgetMinor <= 0}
+            gradientColor={categoryColor}
+            gradientTestID="category-budget-save-gradient"
+            label="Agregar"
+            mutedWhenDisabled
             onPress={() => onSave(budgetMinor)}
-            style={[
-              styles.saveButton,
-              { minHeight: layout.actionHeight[density] },
-              budgetMinor <= 0 && styles.saveButtonDisabled,
-            ]}
-          >
-            {budgetMinor > 0 ? (
-              <GradientCard
-                colors={createDiagonalGradient(categoryColor)}
-                contentStyle={styles.saveGradientContent}
-                style={styles.saveGradient}
-                testID="category-budget-save-gradient"
-              >
-                <Text tone="onBrand" variant="bodyStrong">
-                  Guardar
-                </Text>
-              </GradientCard>
-            ) : (
-              <Text tone="muted" variant="bodyStrong">
-                Guardar
-              </Text>
-            )}
-          </Pressable>
+            style={styles.saveButton}
+            testID="category-budget-save-button"
+          />
         </View>
       </View>
     </AppModal>
@@ -225,7 +223,7 @@ function createStyles(colors: ColorTokens) {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.keypad,
+      backgroundColor: colors.surface,
       borderRadius: radii.md,
     },
     keyPressed: { opacity: 0.56, transform: [{ scale: 0.97 }] },
@@ -240,20 +238,6 @@ function createStyles(colors: ColorTokens) {
       borderWidth: 1,
       paddingHorizontal: spacing.md,
     },
-    saveButton: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.keypad,
-      borderRadius: radii.md,
-      overflow: 'hidden',
-    },
-    saveButtonDisabled: { opacity: 0.72 },
-    saveGradient: { flex: 1, width: '100%' },
-    saveGradientContent: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
+    saveButton: { flex: 1 },
   });
 }

@@ -2,8 +2,8 @@ import { fireEvent, waitFor } from '@testing-library/react-native';
 
 import {
   CreateInvitationError,
-  createSupabaseInvitationGateway,
-} from '@/features/spaces/gateways/supabaseInvitationGateway';
+  createJuntossInvitationGateway,
+} from '@/features/spaces/gateways/juntossInvitationGateway';
 import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScreen';
 import type { Space } from '@/features/spaces/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
@@ -18,9 +18,9 @@ jest.mock('@/components/overlays/AppModal/AppModal', () => ({
   }) => (visible ? children : null),
 }));
 
-jest.mock('@/features/spaces/gateways/supabaseInvitationGateway', () => ({
-  ...jest.requireActual('@/features/spaces/gateways/supabaseInvitationGateway'),
-  createSupabaseInvitationGateway: jest.fn(),
+jest.mock('@/features/spaces/gateways/juntossInvitationGateway', () => ({
+  ...jest.requireActual('@/features/spaces/gateways/juntossInvitationGateway'),
+  createJuntossInvitationGateway: jest.fn(),
 }));
 
 const coupleSpace: Space = {
@@ -32,9 +32,9 @@ const coupleSpace: Space = {
 };
 
 function renderInvitation(createInvitation = jest.fn()) {
-  jest.mocked(createSupabaseInvitationGateway).mockReturnValue({
+  jest.mocked(createJuntossInvitationGateway).mockReturnValue({
     createInvitation,
-  } as unknown as ReturnType<typeof createSupabaseInvitationGateway>);
+  } as unknown as ReturnType<typeof createJuntossInvitationGateway>);
 
   return renderWithTheme(
     <InvitePartnerScreen

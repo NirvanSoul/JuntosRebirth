@@ -49,7 +49,6 @@ module.exports = defineConfig([
     'android/*',
     'ios/*',
     '.expo/*',
-    'supabase/.temp/*',
     'JuntosRebirth-fase3/*',
   ]),
   expoConfig,
@@ -87,10 +86,4 @@ module.exports = defineConfig([
     files: [file],
     rules: { 'max-lines': ['warn', { max: frozen, skipBlankLines: true }] },
   })),
-  // Las Edge Functions de Supabase usan imports URL de Deno (https://esm.sh/...)
-  // que import/no-unresolved no puede resolver.
-  {
-    files: ['supabase/functions/**/*.ts'],
-    rules: { 'import/no-unresolved': 'off' },
-  },
 ]);

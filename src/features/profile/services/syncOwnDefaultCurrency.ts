@@ -1,6 +1,7 @@
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
+import { apiClient } from '@/services/api/juntossApiClient';
+import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 
 /**
  * Publica la moneda principal de la persona autenticada.
@@ -18,12 +19,13 @@ export async function syncOwnDefaultCurrency(
   if (!userId) return false;
 
   try {
-    const client = getConfiguredSupabaseClient();
-    const { error } = await client
-      .from('profiles')
-      .update({ default_currency: currency })
-      .eq('id', userId);
-    if (error) throw error;
+    // La preferencia se carga al montar la interfaz y puede adelantarse a la
+    // inicialización de sesión. Bootstrap es idempotente y garantiza que el
+    // perfil remoto exista antes del PATCH.
+    await bootstrapRemoteAccount();
+    // El perfil que se actualiza es el de la sesión: la API no acepta un
+    // identificador de usuario en el cuerpo.
+    await apiClient.patch('/v1/me/profile', { defaultCurrency: currency });
     return true;
   } catch (error) {
     console.error('[profiles] no se pudo publicar la moneda principal', {

@@ -18,11 +18,9 @@ Cuando exista una contradicción, se aplica este orden:
 2. `PROJECT_RULES.md`.
 3. `PRODUCT.md`.
 4. `ARCHITECTURE.md`.
-5. `DATABASE.md`.
-6. `ROADMAP.md`.
-7. `DECISIONS.md`.
-8. Instrucciones auxiliares dentro de `instructions/`.
-9. Convenciones inferidas del código existente.
+5. `API.md`.
+6. Instrucciones auxiliares dentro de `instructions/`.
+7. Convenciones inferidas del código existente.
 
 Una instrucción puntual no debe interpretarse como permiso para ignorar reglas no relacionadas.
 
@@ -398,22 +396,12 @@ Las validaciones de interfaz mejoran experiencia, pero no sustituyen seguridad d
 
 ---
 
-## 14. SQL y Supabase
+## 14. Integración remota
 
-Todo cambio SQL debe:
-
-- Realizarse mediante migración.
-- Tener nombre descriptivo.
-- Poder revisarse.
-- Evitar cambios destructivos sin plan.
-- Incluir políticas cuando corresponda.
-- Incluir índices cuando estén justificados.
-- Actualizar tipos generados.
-- Añadir pruebas de permisos.
-- Actualizar `DATABASE.md`.
-- Registrar decisiones relevantes.
-
-No ejecutar manualmente cambios de producción que no estén representados en el repositorio.
+Todo cambio que afecte autenticación, permisos, sincronización o contratos de
+la API debe actualizar `API.md`, mantener la UI independiente del cliente HTTP
+y añadir pruebas proporcionales. La autorización siempre se valida en el
+servidor.
 
 ---
 
@@ -540,7 +528,7 @@ Reglas:
 - No confiar en casts para ocultar errores.
 - Preferir uniones discriminadas para estados.
 - Diferenciar identificadores cuando ayude a evitar mezclas.
-- No duplicar tipos generados de Supabase manualmente.
+- No duplicar contratos remotos manualmente cuando ya exista un tipo compartido.
 - Mantener tipos de navegación actualizados.
 
 Ejemplo:

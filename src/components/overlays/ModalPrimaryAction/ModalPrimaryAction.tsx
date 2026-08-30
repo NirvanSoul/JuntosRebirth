@@ -24,6 +24,7 @@ type ModalPrimaryActionProps = {
   gradientTextTone?: TextTone;
   gradientTestID?: string;
   icon?: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
   label: string;
   mutedWhenDisabled?: boolean;
   onPress: () => void;
@@ -39,6 +40,7 @@ export function ModalPrimaryAction({
   gradientTextTone = 'onBrand',
   gradientTestID,
   icon,
+  iconColor,
   label,
   mutedWhenDisabled = false,
   onPress,
@@ -86,9 +88,11 @@ export function ModalPrimaryAction({
           {icon ? (
             <Ionicons
               color={
-                disabled && mutedWhenDisabled
-                  ? colors.textMuted
-                  : colors.textSecondary
+                iconColor && !disabled
+                  ? iconColor
+                  : disabled && mutedWhenDisabled
+                    ? colors.textMuted
+                    : colors.textSecondary
               }
               name={icon}
               size={iconSize.md}

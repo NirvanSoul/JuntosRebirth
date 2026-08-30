@@ -160,6 +160,9 @@ export function ImportScreen({
 }: ImportScreenProps) {
   const { colors } = useTheme();
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  const [resumableBatches, setResumableBatches] = useState<
+    readonly ResumableLocalImportBatch[]
+  >([]);
   const [remainingImportNotice, setRemainingImportNotice] = useState<
     string | null
   >(null);
@@ -466,10 +469,11 @@ export function ImportScreen({
         await cancelLocalImportBatch(batchId);
         const batches = await listResumableLocalImportBatches(activeSpaceId);
         if (batches.length > 0) {
+          setResumableBatches(batches);
           setPhase({ kind: 'saved-batches', batches });
         } else {
           setPhase({ kind: 'idle' });
-          void handlePickFile();
+          setResumableBatches([]);
         }
       } catch {
         setPhase({
@@ -478,7 +482,7 @@ export function ImportScreen({
         });
       }
     },
-    [activeSpaceId, handlePickFile],
+    [activeSpaceId],
   );
 
   // Snapshot: se repite solo al reabrir el modal o cambiar de espacio, no ante
@@ -489,6 +493,7 @@ export function ImportScreen({
     setPhase({ kind: 'idle' });
     setRemainingImportNotice(null);
     setBatchPendingDeletion(null);
+    setResumableBatches([]);
     setCandidates([]);
     reviewCandidatesRef.current = [];
     activeBatchIdRef.current = null;
@@ -498,14 +503,10 @@ export function ImportScreen({
       .then((batches) => {
         if (cancelled) return;
         if (batches.length > 0) {
-          setPhase({ kind: 'saved-batches', batches });
-          return;
+          setResumableBatches(batches);
         }
-        void handlePickFile();
       })
-      .catch(() => {
-        if (!cancelled) void handlePickFile();
-      });
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -864,12 +865,37 @@ export function ImportScreen({
           ) : null}
         </View>
 
-        {phase.kind === 'idle' ||
-        phase.kind === 'validating' ||
+        {phase.kind === 'validating' ||
         phase.kind === 'parsing' ||
         phase.kind === 'committing' ? (
           <View style={styles.loading} testID="import-loading">
             <ActivityIndicator color={colors.brand} />
+          </View>
+        ) : null}
+
+        {phase.kind === 'idle' ? (
+          <View style={styles.body} testID="import-intro">
+            <Text variant="body">
+              Sube un extracto bancario en Excel o CSV. Revisarás los
+              movimientos, categorías y posibles duplicados antes de guardar.
+            </Text>
+            <ModalPrimaryAction
+              accessibilityLabel="Elegir un archivo bancario"
+              icon="folder-open-outline"
+              label="Elegir archivo"
+              onPress={() => void handlePickFile()}
+              testID="import-select-file"
+            />
+            {resumableBatches.length > 0 ? (
+              <ModalPrimaryAction
+                accessibilityLabel="Ver revisiones de importación guardadas"
+                label="Ver revisiones guardadas"
+                onPress={() =>
+                  setPhase({ kind: 'saved-batches', batches: resumableBatches })
+                }
+                variant="surface"
+              />
+            ) : null}
           </View>
         ) : null}
 

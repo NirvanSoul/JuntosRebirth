@@ -131,10 +131,9 @@ lo existente.
 | Tarea | Lectura obligatoria |
 |---|---|
 | Pequeña | El archivo afectado y sus vecinos directos. Nada de `Bible/` salvo duda concreta. |
-| Mediana | `PROJECT_RULES.md` §§3-7 y el documento de dominio aplicable (`PRODUCT.md`, `ARCHITECTURE.md` o `DATABASE.md`). |
-| Grande | Documentos de dominio completos + índice de `DECISIONS.md`, y solo las decisiones concretas que el índice señale como relevantes. |
+| Mediana | `PROJECT_RULES.md` §§3-7 y el documento de dominio aplicable (`PRODUCT.md`, `ARCHITECTURE.md` o `API.md`). |
+| Grande | Documentos de dominio completos, incluido `API.md` si toca datos o autenticación. |
 
-`DECISIONS.md` no se lee entero nunca. Se consulta por índice.
 
 ---
 
@@ -154,7 +153,7 @@ proporcional a su naturaleza, ya ejecutada y registrada: una prueba
 automática, una configuración verificable, o el resultado anotado de una
 verificación manual, nativa o SQL. Permanece `[ ]` mientras esa evidencia no
 se haya producido — no porque el criterio dependa de un dispositivo, de un
-Supabase real, de pgTAP, de accesibilidad, de rendimiento o de una decisión
+entorno remoto real, de accesibilidad, de rendimiento o de una decisión
 humana, sino porque todavía no se han hecho. Que exista un archivo no cierra
 nada.
 

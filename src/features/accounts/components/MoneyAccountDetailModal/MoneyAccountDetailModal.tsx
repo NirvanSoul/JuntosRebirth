@@ -182,7 +182,7 @@ export function MoneyAccountDetailModal({
             </View>
             <View style={styles.titleBlock}>
               <Text
-                align="center"
+                align="left"
                 testID="money-account-detail-context"
                 tone="secondary"
                 variant="overline"
@@ -191,7 +191,7 @@ export function MoneyAccountDetailModal({
                 {getMoneyAccountKindLabel(account.kind)}
               </Text>
               <Text
-                align="center"
+                align="left"
                 accessibilityRole="header"
                 testID="money-account-detail-title"
                 variant="heading"
@@ -295,7 +295,12 @@ function createStyles(colors: ColorTokens) {
     },
     scroll: { flex: 1 },
     scrollContent: { gap: spacing.lg },
-    hero: { alignItems: 'center', gap: spacing.md },
+    hero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+    },
     heroIcon: {
       width: heroIconSize,
       height: heroIconSize,
@@ -303,7 +308,12 @@ function createStyles(colors: ColorTokens) {
       justifyContent: 'center',
       borderRadius: radii.round,
     },
-    titleBlock: { alignItems: 'center', gap: spacing.xxs },
+    titleBlock: {
+      minWidth: 0,
+      flexShrink: 1,
+      alignItems: 'flex-start',
+      gap: spacing.xxs,
+    },
     summary: {
       gap: spacing.sm,
     },
@@ -350,6 +360,7 @@ function createMetricStyles(colors: ColorTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radii.round,
+      flexShrink: 0,
     },
     diagonalArrow: { transform: [{ rotate: '45deg' }] },
   });

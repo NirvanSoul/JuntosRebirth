@@ -2,6 +2,7 @@ import { fireEvent, render, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { createPreviewBadgeLayout } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { moneyAccountCardLayout } from '@/features/accounts/components/MoneyAccountCard/MoneyAccountCard';
 import { HomeScreen } from '@/features/dashboard/screens/HomeScreen';
 import type { Category } from '@/features/categories/types';
@@ -757,6 +758,36 @@ describe('HomeScreen', () => {
     expect(onOpenCategoryDetail).toHaveBeenCalledWith('salary');
   });
 
+  it('ofrece crear una categoría al final de sus previews', async () => {
+    const onCreateCategory = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen
+            categories={categories.slice(0, 1)}
+            onCreateCategory={onCreateCategory}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const badge = screen.getByTestId('home-category-create-badge');
+    expect(StyleSheet.flatten(badge.props.style)).toMatchObject({
+      ...createPreviewBadgeLayout,
+      backgroundColor: colors.surface,
+    });
+    expect(screen.getByText('Crear categoría')).toBeTruthy();
+
+    await fireEvent.press(badge);
+
+    expect(onCreateCategory).toHaveBeenCalledTimes(1);
+  });
+
   it('aísla los resúmenes de categoría por la moneda activa del encabezado (no mezcla EUR y VES)', async () => {
     const multiCurrencyTransactions: SessionTransaction[] = [
       {
@@ -1022,6 +1053,32 @@ describe('HomeScreen', () => {
       await fireEvent.press(screen.getByTestId('money-account-card-account-1'));
 
       expect(onOpenMoneyAccountDetail).toHaveBeenCalledWith('account-1');
+    });
+
+    it('ofrece crear otra cuenta desde la última tarjeta', async () => {
+      const onCreateMoneyAccount = jest.fn();
+      const screen = await renderHome({
+        moneyAccounts: [account],
+        onCreateMoneyAccount,
+      });
+
+      const createCard = screen.getByTestId('money-account-create-card');
+      expect(createCard).toBeTruthy();
+      expect(StyleSheet.flatten(createCard.props.style)).toMatchObject({
+        ...createPreviewBadgeLayout,
+        backgroundColor: colors.surface,
+      });
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('money-account-create-card-icon-background').props
+            .style,
+        ).backgroundColor,
+      ).toBe(colors.cta);
+      expect(screen.getByText('Crear cuenta')).toBeTruthy();
+
+      await fireEvent.press(createCard);
+
+      expect(onCreateMoneyAccount).toHaveBeenCalledTimes(1);
     });
   });
 });

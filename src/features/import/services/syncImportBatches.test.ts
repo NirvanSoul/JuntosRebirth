@@ -38,7 +38,7 @@ describe('syncLocalImportBatches', () => {
     jest.mocked(prepareLocalImportBatchSync).mockResolvedValue(payload);
   });
 
-  it('confirma localmente solo después de que Supabase confirme todo el lote', async () => {
+  it('confirma localmente solo después de que la API confirme todo el lote', async () => {
     jest.mocked(gateway.syncImportBatches).mockResolvedValue({
       batchCount: 1,
       itemCount: 0,
@@ -60,9 +60,7 @@ describe('syncLocalImportBatches', () => {
 
     await expect(
       syncLocalImportBatches({ userId: 'user-id', gateway }),
-    ).rejects.toThrow(
-      'Supabase no confirmó todas las revisiones de importación',
-    );
+    ).rejects.toThrow('La API no confirmó todas las revisiones de importación');
 
     expect(failLocalImportBatchSync).toHaveBeenCalledWith(payload);
   });

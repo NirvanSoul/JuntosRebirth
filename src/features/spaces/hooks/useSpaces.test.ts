@@ -1,9 +1,8 @@
-import type { Session } from '@supabase/supabase-js';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
-import type { InvitationGateway } from '@/features/spaces/gateways/supabaseInvitationGateway';
-import { createSupabaseInvitationGateway } from '@/features/spaces/gateways/supabaseInvitationGateway';
+import type { InvitationGateway } from '@/features/spaces/gateways/juntossInvitationGateway';
+import { createJuntossInvitationGateway } from '@/features/spaces/gateways/juntossInvitationGateway';
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
 import {
   createSpaceId,
@@ -11,24 +10,32 @@ import {
   saveSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
 import { personalSpace, type Space } from '@/features/spaces/types';
-import { getConfiguredSupabaseClient } from '@/lib/supabase/supabaseClient';
+import { listRemoteSpaces } from '@/services/api/spaces';
 import { loadCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 
 jest.mock('@/features/auth/hooks/useAuthSession');
-jest.mock('@/features/spaces/gateways/supabaseInvitationGateway');
+jest.mock('@/features/spaces/gateways/juntossInvitationGateway');
 jest.mock('@/features/spaces/repositories/localSpaceRepository');
-jest.mock('@/lib/supabase/supabaseClient');
+jest.mock('@/services/api/spaces');
 jest.mock('@/state/appPreferences/currencyPreferencesRepository');
 
 const fakeSession = {
-  user: { id: 'user-1', email: 'a@b.com' },
-} as unknown as Session;
+  user: { id: 'user-1', email: 'a@b.com', name: 'Ada' },
+  session: {},
+} as ReturnType<typeof useAuthSession>['session'];
 
-function sessionFor(userId: string): Session {
-  return { user: { id: userId, email: 'a@b.com' } } as unknown as Session;
+function sessionFor(
+  userId: string,
+): NonNullable<ReturnType<typeof useAuthSession>['session']> {
+  return {
+    user: { id: userId, email: 'a@b.com', name: 'Ada' },
+    session: {},
+  } as NonNullable<ReturnType<typeof useAuthSession>['session']>;
 }
 
-function mockAuthSession(session: Session | null) {
+function mockAuthSession(
+  session: ReturnType<typeof useAuthSession>['session'],
+) {
   jest.mocked(useAuthSession).mockReturnValue({
     isReady: true,
     session,
@@ -37,18 +44,21 @@ function mockAuthSession(session: Session | null) {
 }
 
 function mockRemoteCoupleSpace(result: { data: unknown; error: unknown }) {
-  const maybeSingle = jest.fn().mockResolvedValue(result);
-  const builder = {
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    is: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    maybeSingle,
-  };
-  jest.mocked(getConfiguredSupabaseClient).mockReturnValue({
-    from: jest.fn().mockReturnValue(builder),
-  } as unknown as ReturnType<typeof getConfiguredSupabaseClient>);
-  return builder;
+  const spaces =
+    result.data && typeof result.data === 'object'
+      ? [
+          {
+            ...(result.data as Record<string, unknown>),
+            activatedAt: (result.data as { activated_at?: unknown })
+              .activated_at,
+          },
+        ]
+      : [];
+  const list = jest.mocked(listRemoteSpaces);
+  list.mockResolvedValue(
+    spaces as unknown as Awaited<ReturnType<typeof listRemoteSpaces>>,
+  );
+  return list;
 }
 
 function createGatewayStub(
@@ -73,7 +83,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     jest.mocked(saveSpaces).mockResolvedValue(undefined);
     jest.mocked(createSpaceId).mockReturnValue('space-generated');
     jest
-      .mocked(createSupabaseInvitationGateway)
+      .mocked(createJuntossInvitationGateway)
       .mockReturnValue(createGatewayStub());
     jest.mocked(loadCurrencyPreferences).mockResolvedValue({
       currencies: ['EUR'],
@@ -91,7 +101,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
 
-    expect(getConfiguredSupabaseClient).not.toHaveBeenCalled();
+    expect(listRemoteSpaces).not.toHaveBeenCalled();
     expect(result.current.spaces).toEqual([personalSpace]);
   });
 
@@ -265,7 +275,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     const { result } = await renderHook(() => useSpaces());
 
     await waitFor(() => expect(result.current.isReady).toBe(true));
-    await waitFor(() => expect(getConfiguredSupabaseClient).toHaveBeenCalled());
+    await waitFor(() => expect(listRemoteSpaces).toHaveBeenCalled());
 
     expect(saveSpaces).not.toHaveBeenCalled();
   });
@@ -277,7 +287,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
       spaces: [personalSpace],
     });
     const gateway = createGatewayStub();
-    jest.mocked(createSupabaseInvitationGateway).mockReturnValue(gateway);
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue(gateway);
 
     const { result } = await renderHook(() => useSpaces());
     await waitFor(() => expect(result.current.isReady).toBe(true));
@@ -301,7 +311,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
         .fn()
         .mockRejectedValue(new Error('No se confirmó la invitación.')),
     });
-    jest.mocked(createSupabaseInvitationGateway).mockReturnValue(gateway);
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue(gateway);
 
     const { result } = await renderHook(() => useSpaces());
     await waitFor(() => expect(result.current.isReady).toBe(true));
@@ -332,7 +342,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
       expiresAt: '2026-09-01T00:00:00Z',
     });
     const gateway = createGatewayStub({ createCoupleSpaceInvitation });
-    jest.mocked(createSupabaseInvitationGateway).mockReturnValue(gateway);
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue(gateway);
 
     const { result } = await renderHook(() => useSpaces());
     await waitFor(() => expect(result.current.isReady).toBe(true));
@@ -530,16 +540,15 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     });
 
     // 2. Segunda consulta remota (tras corrección en backend) devuelve datos válidos
-    builder.maybeSingle.mockResolvedValueOnce({
-      data: {
+    builder.mockResolvedValueOnce([
+      {
         id: 'space-valid',
         name: 'Juntos',
         type: 'couple',
         currency: 'VES',
-        activated_at: '2026-08-16T12:00:00.000Z',
+        activatedAt: '2026-08-16T12:00:00.000Z',
       },
-      error: null,
-    });
+    ] as unknown as Awaited<ReturnType<typeof listRemoteSpaces>>);
 
     await act(async () => {
       await result.current.refreshCoupleSpace();
@@ -570,7 +579,7 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     const gateway = createGatewayStub({
       leaveCoupleSpace: jest.fn().mockResolvedValue(undefined),
     });
-    jest.mocked(createSupabaseInvitationGateway).mockReturnValue(gateway);
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue(gateway);
 
     const { result } = await renderHook(() => useSpaces());
     await waitFor(() =>
@@ -595,14 +604,14 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     const builder = mockRemoteCoupleSpace({ data: null, error: null });
 
     const { rerender } = await renderHook(() => useSpaces());
-    await waitFor(() => expect(builder.maybeSingle).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(builder).toHaveBeenCalledTimes(1));
 
     // Mismo usuario con un token nuevo (objeto de sesión distinto): no debe
     // volver a consultar el espacio de pareja.
     mockAuthSession(sessionFor('user-1'));
     await rerender(undefined);
 
-    expect(builder.maybeSingle).toHaveBeenCalledTimes(1);
+    expect(builder).toHaveBeenCalledTimes(1);
   });
 
   it('vuelve a consultar el espacio de pareja cuando cambia el usuario', async () => {
@@ -614,12 +623,12 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     const builder = mockRemoteCoupleSpace({ data: null, error: null });
 
     const { rerender } = await renderHook(() => useSpaces());
-    await waitFor(() => expect(builder.maybeSingle).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(builder).toHaveBeenCalledTimes(1));
 
     mockAuthSession(sessionFor('user-2'));
     await rerender(undefined);
 
-    await waitFor(() => expect(builder.maybeSingle).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(builder).toHaveBeenCalledTimes(2));
   });
 
   it('conserva la referencia de refreshCoupleSpace cuando cambia la sesión pero no el usuario', async () => {

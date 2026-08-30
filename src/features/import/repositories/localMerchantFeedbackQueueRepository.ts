@@ -14,7 +14,7 @@ type QueueRow = {
 /**
  * Encola un voto comunitario para un ítem ya confirmado e importado. No lo
  * envía todavía: `syncLocalMerchantFeedback` solo lo hace una vez el ítem
- * está sincronizado en Supabase con su categoría final (Bible §54).
+ * está sincronizado en la API con su categoría final (Bible §54).
  */
 export async function enqueueMerchantFeedback(input: {
   importItemId: string;

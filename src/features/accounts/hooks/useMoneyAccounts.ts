@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   archiveLocalMoneyAccount,
@@ -10,7 +10,12 @@ import type {
   CreateMoneyAccountInput,
   MoneyAccount,
 } from '@/features/accounts/types';
+import type { Category } from '@/features/categories/types';
+import { createOpeningBalanceTransactions } from '@/features/accounts/utils/openingBalanceTransactions';
+import { createLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
+import type { SessionTransaction } from '@/features/transactions/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
   listMoneyAccountsBySpace,
   validateMoneyAccountName,
@@ -18,9 +23,12 @@ import {
 
 type UseMoneyAccountsInput = {
   activeSpaceId: string;
+  categories: readonly Category[];
   /** Sube los cambios al espacio compartido tras cada mutación local. */
   onChangesPublished: () => void;
   onError: () => void;
+  onTransactionsCreated: (transactions: readonly SessionTransaction[]) => void;
+  transactions: readonly SessionTransaction[];
 };
 
 /**
@@ -32,8 +40,11 @@ type UseMoneyAccountsInput = {
  */
 export function useMoneyAccounts({
   activeSpaceId,
+  categories,
   onChangesPublished,
   onError,
+  onTransactionsCreated,
+  transactions,
 }: UseMoneyAccountsInput) {
   const [moneyAccounts, setMoneyAccounts] = useState<MoneyAccount[]>([]);
   const [isModalVisible, setModalVisible] = useState(false);
@@ -48,6 +59,7 @@ export function useMoneyAccounts({
    */
   const notifyRef = useRef({ onChangesPublished, onError });
   notifyRef.current = { onChangesPublished, onError };
+  const materializingOpeningBalances = useRef(new Set<string>());
 
   const spaceMoneyAccounts = useMemo(
     () => moneyAccounts.filter((account) => account.spaceId === activeSpaceId),
@@ -62,6 +74,79 @@ export function useMoneyAccounts({
     null;
   const detailAccount =
     spaceMoneyAccounts.find((account) => account.id === detailId) ?? null;
+
+  /**
+   * Convierte los saldos iniciales creados antes de esta regla en movimientos.
+   * La cuenta se pone a cero después de guardar las filas, de modo que una
+   * carga posterior no puede volver a materializarlas. Si la app se cerrase
+   * entre ambas operaciones, el título estable permite terminar la conversión
+   * sin crear un duplicado.
+   */
+  useEffect(() => {
+    const pendingAccounts = activeSpaceMoneyAccounts.filter(
+      (account) =>
+        account.balances.some((balance) => balance.openingBalanceMinor !== 0) &&
+        !materializingOpeningBalances.current.has(account.id),
+    );
+    if (pendingAccounts.length === 0) return;
+
+    void Promise.all(
+      pendingAccounts.map(async (account) => {
+        materializingOpeningBalances.current.add(account.id);
+        try {
+          const drafts = createOpeningBalanceTransactions({
+            accountId: account.id,
+            accountName: account.name,
+            balances: account.balances,
+            categories,
+            occurredOn: getLocalTodayKey(),
+            spaceId: account.spaceId,
+          });
+          const missingDrafts = drafts.filter(
+            (draft) =>
+              !transactions.some(
+                (transaction) =>
+                  transaction.moneyAccountId === draft.moneyAccountId &&
+                  transaction.currency === draft.currency &&
+                  transaction.type === draft.type &&
+                  transaction.amountMinor === draft.amountMinor &&
+                  transaction.title === draft.title,
+              ),
+          );
+          const createdTransactions =
+            await createLocalTransactions(missingDrafts);
+          const updated = await updateLocalMoneyAccount({
+            ...account,
+            balances: account.balances.map((balance) => ({
+              ...balance,
+              openingBalanceMinor: 0,
+            })),
+          });
+          setMoneyAccounts((current) =>
+            current.map((candidate) =>
+              candidate.id === updated.id ? updated : candidate,
+            ),
+          );
+          if (createdTransactions.length > 0) {
+            onTransactionsCreated(createdTransactions);
+          }
+          notifyRef.current.onChangesPublished();
+        } catch (error) {
+          console.error(
+            '[accounts] No se pudo materializar el saldo inicial',
+            error,
+          );
+          notifyRef.current.onError();
+          materializingOpeningBalances.current.delete(account.id);
+        }
+      }),
+    );
+  }, [
+    activeSpaceMoneyAccounts,
+    categories,
+    onTransactionsCreated,
+    transactions,
+  ]);
 
   const openCreation = useCallback(() => {
     setEditingId(null);
@@ -149,11 +234,33 @@ export function useMoneyAccounts({
       }
 
       try {
+        // El saldo inicial no se persiste en la cuenta para no contar dos
+        // veces. Se materializa como ingreso o gasto y así también entra en
+        // el balance global, Actividad y sincronización.
+        const openingBalanceTransactions = createOpeningBalanceTransactions({
+          accountId: '',
+          accountName: validation.name,
+          balances: input.balances,
+          categories,
+          occurredOn: getLocalTodayKey(),
+          spaceId: input.spaceId,
+        });
         const created = await createLocalMoneyAccount({
           ...input,
           name: validation.name,
+          balances: input.balances.map((balance) => ({
+            ...balance,
+            openingBalanceMinor: 0,
+          })),
         });
+        const createdTransactions = await createLocalTransactions(
+          openingBalanceTransactions.map((transaction) => ({
+            ...transaction,
+            moneyAccountId: created.id,
+          })),
+        );
         setMoneyAccounts((current) => [...current, created]);
+        onTransactionsCreated(createdTransactions);
         notifyRef.current.onChangesPublished();
         setModalVisible(false);
       } catch (error) {
@@ -161,7 +268,15 @@ export function useMoneyAccounts({
         notifyRef.current.onError();
       }
     },
-    [activeSpaceId, closeModal, editingId, isCurrencyLocked, moneyAccounts],
+    [
+      activeSpaceId,
+      categories,
+      closeModal,
+      editingId,
+      isCurrencyLocked,
+      moneyAccounts,
+      onTransactionsCreated,
+    ],
   );
 
   const archive = useCallback(

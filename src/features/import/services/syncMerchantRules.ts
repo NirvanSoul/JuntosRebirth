@@ -13,7 +13,7 @@ export async function syncLocalMerchantRules(input: {
   try {
     const syncedCount = await input.gateway.syncMerchantRules(payload);
     if (syncedCount !== payload.rules.length) {
-      throw new Error('Supabase no confirmó todas las reglas de importación');
+      throw new Error('La API no confirmó todas las reglas de importación');
     }
     await completeLocalMerchantRuleSync(payload);
     return syncedCount;

@@ -1,12 +1,20 @@
 import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
-import { syncCoupleSpaceRemotely } from '@/features/sync/gateways/supabaseCoupleSpaceSyncGateway';
+import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
+import { syncCoupleSpaceRemotely } from '@/features/sync/gateways/juntossCoupleSpaceSyncGateway';
+import { findRemoteIdForLocalEntity } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
 
 type SyncRow = { id: string; updated_at: string } & Record<string, unknown>;
 
 type MoneyAccountBalanceRow = {
   money_account_id: string;
 } & Record<string, unknown>;
+
+type CategoryBudgetRow = {
+  category_id: string;
+  currency: string;
+  budgetAmountMinor: number;
+};
 
 type CoupleSpaceSyncResult = {
   categoryCount: number;
@@ -15,7 +23,11 @@ type CoupleSpaceSyncResult = {
   transactionCount: number;
 };
 
-const uploadableStatuses = "('local_only', 'pending', 'failed', 'syncing')";
+const uploadableStatuses = (includeLocalOnly: boolean) =>
+  includeLocalOnly
+    ? "('local_only', 'pending', 'failed', 'syncing')"
+    : "('pending', 'failed', 'syncing')";
+const markableStatuses = "('local_only', 'pending', 'failed', 'syncing')";
 const inFlightBySpaceId = new Map<string, Promise<CoupleSpaceSyncResult>>();
 
 function serializeRow(row: SyncRow): Record<string, unknown> {
@@ -46,20 +58,32 @@ async function markRowsSynced(
     await database.runAsync(
       `UPDATE ${table}
           SET sync_status = 'synced'
-        WHERE id = ? AND updated_at = ? AND sync_status IN ${uploadableStatuses}`,
+        WHERE id = ? AND updated_at = ? AND sync_status IN ${markableStatuses}`,
       row.id,
       row.updated_at,
     );
   }
 }
 
-async function syncCoupleSpaceData(input: {
+async function syncSpaceData(input: {
   spaceId: string;
+  includeLocalOnly?: boolean;
 }): Promise<CoupleSpaceSyncResult> {
   const database = await getLocalDatabase();
   const installationId = await getOrCreateInstallationId(database);
+  const userId = await getAuthenticatedUserId();
+  if (!userId) throw new Error('Debes iniciar sesión antes de sincronizar');
+  const remoteSpaceId =
+    (await findRemoteIdForLocalEntity({
+      executor: database,
+      userId,
+      entityType: 'space',
+      localId: input.spaceId,
+    })) ?? input.spaceId;
+  const statuses = uploadableStatuses(input.includeLocalOnly ?? true);
   const [
     categories,
+    categoryBudgets,
     moneyAccounts,
     moneyAccountBalances,
     recurringSeries,
@@ -71,7 +95,22 @@ async function syncCoupleSpaceData(input: {
               template_key AS "templateKey", is_archived AS "isArchived",
               created_at AS "createdAt", updated_at
          FROM categories
-        WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
+        WHERE space_id = ? AND sync_status IN ${statuses}`,
+      input.spaceId,
+    ),
+    // Los presupuestos por moneda viven en su propia tabla desde que un
+    // movimiento puede estar en cualquier divisa. Se leen para todas las
+    // categorías del espacio, no solo para las que viajan en este lote: el
+    // presupuesto puede cambiar sin que cambie la categoría, y hasta ahora no
+    // salía nunca del dispositivo.
+    database.getAllAsync<CategoryBudgetRow>(
+      `SELECT category_budgets.category_id,
+              category_budgets.currency,
+              category_budgets.budget_minor AS "budgetAmountMinor"
+         FROM category_budgets
+         JOIN categories ON categories.id = category_budgets.category_id
+        WHERE categories.space_id = ?
+        ORDER BY category_budgets.currency ASC`,
       input.spaceId,
     ),
     database.getAllAsync<SyncRow>(
@@ -79,7 +118,7 @@ async function syncCoupleSpaceData(input: {
               is_archived AS "isArchived", created_at AS "createdAt",
               updated_at
          FROM money_accounts
-        WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
+        WHERE space_id = ? AND sync_status IN ${statuses}`,
       input.spaceId,
     ),
     database.getAllAsync<MoneyAccountBalanceRow>(
@@ -101,20 +140,20 @@ async function syncCoupleSpaceData(input: {
               next_occurrence_on AS "nextOccurrenceOn",
               is_archived AS "isArchived", created_at AS "createdAt", updated_at
          FROM recurring_transaction_series
-        WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
+        WHERE space_id = ? AND sync_status IN ${statuses}`,
       input.spaceId,
     ),
     database.getAllAsync<SyncRow>(
       `SELECT id, category_id AS "categoryId",
               money_account_id AS "moneyAccountId", type,
               amount_minor AS "amountMinor", currency, title,
-              occurred_on AS "occurredOn", recurrence,
+              occurred_on AS "occurredOn", note, recurrence,
               recurrence_group_id AS "recurrenceGroupId",
               recurrence_series_id AS "recurrenceSeriesId",
               source_transaction_id AS "sourceTransactionId",
               is_archived AS "isArchived", created_at AS "createdAt", updated_at
          FROM transactions
-        WHERE space_id = ? AND sync_status IN ${uploadableStatuses}`,
+        WHERE space_id = ? AND sync_status IN ${statuses}`,
       input.spaceId,
     ),
   ]);
@@ -135,8 +174,16 @@ async function syncCoupleSpaceData(input: {
 
   await syncCoupleSpaceRemotely({
     installationId,
-    spaceId: input.spaceId,
-    categories: categories.map(serializeRow),
+    spaceId: remoteSpaceId,
+    // Cada categoría viaja con sus presupuestos por moneda. `budgetMinor`
+    // sigue yendo para el servidor que solo entiende un importe único, en la
+    // moneda del espacio; `budgets` lleva el modelo multidivisa completo.
+    categories: categories.map((row) => {
+      const budgets = categoryBudgets
+        .filter((budget) => budget.category_id === row.id)
+        .map(({ category_id: _categoryId, ...budget }) => budget);
+      return { ...serializeRow(row), budgets };
+    }),
     // Cada cuenta viaja con sus monedas: el RPC las reescribe enteras, así
     // que una divisa retirada aquí desaparece también en el otro dispositivo.
     moneyAccounts: moneyAccounts.map((row) => ({
@@ -165,17 +212,18 @@ async function syncCoupleSpaceData(input: {
 }
 
 /**
- * Serializa los lotes del mismo espacio. Si una persona crea una categoría y
- * acto seguido un gasto, el segundo lote ve la categoría ya confirmada o la
- * publica junto con el gasto; nunca compiten entre sí en el dispositivo.
+ * Serializa los lotes de cada espacio accesible, incluido el personal. Si una
+ * persona crea una categoría y acto seguido un gasto, el segundo lote ve la
+ * categoría ya confirmada o la publica junto con el gasto; nunca compiten en
+ * el dispositivo.
  */
-export function syncCoupleSpaceDataForCurrentSession(input: {
+export function syncSpaceDataForCurrentSession(input: {
   spaceId: string;
+  /** Los datos de invitado se suben solo tras confirmar su migración. */
+  includeLocalOnly?: boolean;
 }): Promise<CoupleSpaceSyncResult> {
   const previous = inFlightBySpaceId.get(input.spaceId) ?? Promise.resolve();
-  const next = previous
-    .catch(() => undefined)
-    .then(() => syncCoupleSpaceData(input));
+  const next = previous.catch(() => undefined).then(() => syncSpaceData(input));
   inFlightBySpaceId.set(input.spaceId, next);
   void next.finally(() => {
     if (inFlightBySpaceId.get(input.spaceId) === next) {

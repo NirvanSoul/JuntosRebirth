@@ -41,6 +41,45 @@ const transaction: SessionTransaction = {
 };
 
 describe('TransactionDetailModal', () => {
+  it('cierra desde el botón de la barra fija, por encima del scroll', async () => {
+    const onClose = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={onClose}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={transaction}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('transaction-detail-top-bar').props.style,
+      ).elevation,
+    ).toBe(2);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('distribuye los datos del movimiento sin mostrar presupuesto', async () => {
     const onDelete = jest.fn();
     const onEdit = jest.fn();

@@ -1,8 +1,9 @@
-import { createSupabaseAuthGateway } from '@/features/auth/gateways/supabaseAuthGateway';
+import { createJuntossAuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
 import type { LoginInput } from '@/features/auth/types';
 import { listLocalCategories } from '@/features/categories/repositories/localCategoryRepository';
 import { loadSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import { initialSpacesState } from '@/features/spaces/types';
+import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 import { syncPendingLocalDataForCurrentSession } from '@/features/sync/services/migrateAuthenticatedGuestData';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
 import { listLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
@@ -17,7 +18,7 @@ export type LoginOutcome =
  * que la persona usó la app antes de crear cuenta: una transacción, una
  * categoría propia, o un espacio adicional al que trae la app de fábrica
  * (incluido un espacio de pareja local, que `useSpaces` fusiona desde
- * Supabase y por tanto también cuenta aquí como "más que el estado de
+ * Better Auth y por tanto también cuenta aquí como "más que el estado de
  * fábrica").
  */
 async function hasLocalGuestDataWorthMigrating(): Promise<boolean> {
@@ -35,8 +36,9 @@ async function hasLocalGuestDataWorthMigrating(): Promise<boolean> {
 }
 
 export async function login(input: LoginInput): Promise<LoginOutcome> {
-  const gateway = createSupabaseAuthGateway();
+  const gateway = createJuntossAuthGateway();
   await gateway.signInWithPassword(input);
+  await bootstrapRemoteAccount();
 
   const hasGuestData = await hasLocalGuestDataWorthMigrating();
   if (!hasGuestData) {

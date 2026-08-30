@@ -10,7 +10,7 @@ TMP_FILE="$(mktemp)"
 npx --yes license-checker --production --json --excludePrivatePackages > "$TMP_FILE"
 
 node -e '
-const raw = require(process.argv[1]);
+const raw = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
 const entries = Object.entries(raw).map(([key, value]) => {
   const lastAt = key.lastIndexOf("@");
   const name = lastAt > 0 ? key.slice(0, lastAt) : key;
