@@ -12,6 +12,7 @@ jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
   useOnboardingStatus: () => ({
     markAuthenticated: mockMarkAuthenticated,
     markGuestComplete: mockMarkGuestComplete,
+    status: { accessMode: 'guest', completed: true, completedVersion: 1 },
   }),
 }));
 

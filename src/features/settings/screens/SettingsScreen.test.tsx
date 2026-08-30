@@ -16,9 +16,11 @@ import { colors } from '@/theme/colors';
 import type { AppearancePreference } from '@/theme/types';
 
 const mockRestartOnboarding = jest.fn();
+const mockMarkAuthenticated = jest.fn();
 
 jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
   useOnboardingStatus: () => ({
+    markAuthenticated: mockMarkAuthenticated,
     restartOnboarding: mockRestartOnboarding,
   }),
 }));
@@ -54,6 +56,7 @@ describe('SettingsScreen', () => {
     mockUpdateProfileAvatar.mockClear();
     mockRemoveProfileAvatar.mockClear();
     mockRestartOnboarding.mockReset().mockResolvedValue(undefined);
+    mockMarkAuthenticated.mockReset().mockResolvedValue(undefined);
   });
 
   const renderScreen = async (

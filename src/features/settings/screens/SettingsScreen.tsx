@@ -43,6 +43,7 @@ import {
 import { Text } from '@/components/ui/Text/Text';
 import { createJuntossAuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { discardBackedLocalSessionCache } from '@/features/auth/services/discardBackedLocalSessionCache';
 import { DataRightsScreen } from '@/features/legal/screens/DataRightsScreen';
 import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScreen';
 import { PermissionsScreen } from '@/features/legal/screens/PermissionsScreen';
@@ -116,7 +117,7 @@ export function SettingsScreen({
   const { colors, isDark, setAppearance, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const { session } = useAuthSession();
-  const { restartOnboarding } = useOnboardingStatus();
+  const { markAuthenticated, restartOnboarding } = useOnboardingStatus();
   const [isAuthModalVisible, setAuthModalVisible] = useState(false);
   const [isSigningOut, setSigningOut] = useState(false);
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
@@ -204,6 +205,14 @@ export function SettingsScreen({
     setSigningOut(true);
     try {
       await createJuntossAuthGateway().signOut();
+      await Promise.all([
+        // Sustituye cualquier estado de invitado persistido: sin sesión el
+        // RootNavigator vuelve a Acceso, nunca a las pestañas locales.
+        markAuthenticated(),
+        discardBackedLocalSessionCache(),
+      ]).catch((error: unknown) => {
+        console.error('[Settings] No se pudo limpiar la sesión local:', error);
+      });
     } catch {
       Alert.alert(
         'No pudimos cerrar sesión',

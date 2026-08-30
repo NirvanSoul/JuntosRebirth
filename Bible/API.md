@@ -20,6 +20,10 @@ mano. Apple Sign In no está disponible.
 - La restauración remota usa `GET /v1/sync/snapshot`.
 - La sincronización de un espacio usa `POST /v1/spaces/:spaceId/sync` e
   incluye siempre categorías, cuentas, recurrencias y transacciones.
+- Al cerrar sesión, la aplicación vuelve al acceso autenticado y descarta la
+  caché local financiera solo si todas sus filas ya están sincronizadas. Si
+  queda alguna pendiente, se conserva para no perderla, pero nunca se muestra
+  sin una sesión.
 
 Las rutas `/v1/*` requieren sesión de Better Auth. Las respuestas correctas
 envuelven su contenido en `data`; los errores usan `error.code` y
