@@ -33,6 +33,11 @@ El registro por correo ya genera el OTP en el servidor (`sendVerificationOnSignU
 El cliente no debe solicitar un segundo código inmediatamente después de crear
 la cuenta: solo puede usar el reenvío explícito desde la pantalla OTP.
 
+Iniciar sesión con un correo sin verificar es distinto: la API responde
+`403 EMAIL_NOT_VERIFIED` y **no** envía ningún código. El cliente pide uno con
+`emailOtp.sendVerificationOtp` antes de abrir la pantalla OTP, que cuenta su
+cooldown de reenvío dando por hecho que ya salió un código.
+
 `DELETE /v1/me` elimina la cuenta y sus datos. El cliente debe enviar el
 cuerpo `{ confirmation: "DELETE_MY_ACCOUNT" }`; sin esa confirmación el
 servidor rechaza la operación.

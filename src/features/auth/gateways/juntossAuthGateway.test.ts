@@ -146,6 +146,52 @@ describe('juntossAuthGateway', () => {
     });
   });
 
+  it('pide el código al llegar al OTP desde el inicio de sesión', async () => {
+    mockedClient.signIn.email.mockResolvedValueOnce({
+      data: null,
+      error: { error: { code: 'EMAIL_NOT_VERIFIED' } },
+    } as never);
+
+    await expect(
+      createJuntossAuthGateway().signInWithPassword({
+        email: 'ana@example.test',
+        password: 'contrasena-larga',
+      }),
+    ).rejects.toBeInstanceOf(EmailVerificationRequiredError);
+
+    // El acceso rechazado no envía ningún código, y la pantalla de OTP da por
+    // hecho que ya salió uno: sin esto se espera el cooldown por nada.
+    expect(mockedClient.emailOtp.sendVerificationOtp).toHaveBeenCalledWith({
+      email: 'ana@example.test',
+      type: 'email-verification',
+    });
+  });
+
+  it('lleva igualmente al OTP si el envío del código falla', async () => {
+    mockedClient.signIn.email.mockResolvedValueOnce({
+      data: null,
+      error: { error: { code: 'EMAIL_NOT_VERIFIED' } },
+    } as never);
+    mockedClient.emailOtp.sendVerificationOtp.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'TOO_MANY_ATTEMPTS' },
+    } as never);
+    const logged = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    try {
+      await expect(
+        createJuntossAuthGateway().signInWithPassword({
+          email: 'ana@example.test',
+          password: 'contrasena-larga',
+        }),
+      ).rejects.toBeInstanceOf(EmailVerificationRequiredError);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
   it('explica una respuesta sin sesión en lugar de culpar a las credenciales', async () => {
     mockedClient.signIn.email.mockResolvedValueOnce({
       data: null,

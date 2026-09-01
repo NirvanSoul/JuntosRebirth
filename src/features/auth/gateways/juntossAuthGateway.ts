@@ -119,9 +119,14 @@ function describeAuthError(error: ApiError, fallback: string): string {
     case 'INVALID_EMAIL':
       return 'El correo no es válido.';
     case 'VALIDATION_ERROR':
+    case 'INVALID_REQUEST':
       return 'Revisa el nombre, correo y contraseña e inténtalo de nuevo.';
+    // La API traduce el rechazo de origen de Better Auth a su propio
+    // `FORBIDDEN`, así que sin este caso el fallo llegaba a la pantalla como
+    // "el servidor no indicó la causa".
     case 'UNTRUSTED_ORIGIN':
     case 'INVALID_ORIGIN':
+    case 'FORBIDDEN':
       return 'Esta versión de la app no está autorizada para crear cuentas. Actualízala o usa la development build de Juntoss.';
     case 'FAILED_TO_CREATE_USER':
       return 'No pudimos guardar tu cuenta en el servidor. No se ha creado: inténtalo de nuevo en unos minutos.';
@@ -150,6 +155,31 @@ function readLockout(error: ApiError): Date | null {
 
 function fail(error: ApiError, fallback: string): never {
   throw new Error(describeAuthError(error, fallback));
+}
+
+/**
+ * Pide el código de verificación que el inicio de sesión no envía.
+ *
+ * La API responde `EMAIL_NOT_VERIFIED` sin mandar ningún OTP, pero la pantalla
+ * de código arranca su cuenta atrás de reenvío dando por hecho que ya salió
+ * uno. Si el envío falla, la persona llega igualmente a esa pantalla y puede
+ * reenviarlo a mano: dejarla en el login sin explicación sería peor.
+ */
+async function requestEmailVerificationCode(email: string): Promise<void> {
+  try {
+    const { error } = await authClient.emailOtp.sendVerificationOtp({
+      email,
+      type: 'email-verification',
+    });
+    if (error) {
+      console.error(
+        '[auth] El servidor no envió el código de verificación:',
+        normalizeAuthError(error).code ?? 'sin código',
+      );
+    }
+  } catch {
+    console.error('[auth] No pudimos pedir el código de verificación.');
+  }
 }
 
 function isNetworkError(error: unknown): boolean {
@@ -255,6 +285,7 @@ export function createJuntossAuthGateway(): AuthGateway {
           const lockedUntil = readLockout(normalizedError);
           if (lockedUntil) throw new AccountLockedError(lockedUntil);
           if (normalizedError.code === 'EMAIL_NOT_VERIFIED') {
+            await requestEmailVerificationCode(email);
             throw new EmailVerificationRequiredError(email);
           }
           fail(normalizedError, 'No pudimos iniciar sesión.');
