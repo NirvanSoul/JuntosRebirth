@@ -5,8 +5,12 @@
 La aplicación usa exclusivamente Juntoss API:
 
 ```text
-https://juntosapi.aora-estudio-o.workers.dev
+https://api.aoraestudio.com
 ```
+
+Es el dominio propio del Worker, el mismo que declara `EXPO_PUBLIC_API_URL`.
+`juntosapi.aora-estudio-o.workers.dev` sigue respondiendo, pero no es la
+dirección que usa la aplicación.
 
 La autenticación se integra con Better Auth para Expo en `/api/auth` mediante
 `src/lib/auth-client.ts`; no se implementan llamadas HTTP de autenticación a
