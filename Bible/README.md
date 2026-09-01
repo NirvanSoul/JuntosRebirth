@@ -157,15 +157,13 @@ El cliente no es la autoridad final de permisos.
 Flujo previsto:
 
 1. El usuario abre la aplicación.
-2. Completa un onboarding de nueve pantallas (nombre, país y moneda, bienvenida, calendario, uso compartido, tres categorías, primer ingreso, primer gasto y cierre).
-3. Entra como invitado.
-4. Sus datos se almacenan localmente.
-5. Prueba las funciones principales con límites razonables.
-6. Cuando supera un límite o intenta compartir o sincronizar, se le invita a crear una cuenta.
-7. Tras registrarse y verificar su correo, sus datos locales se migran.
-8. Se crea o asigna su espacio personal remoto.
+2. Ve la pantalla de acceso y crea una cuenta o inicia sesión.
+3. Al crear una cuenta, verifica su correo con OTP.
+4. Solo una sesión con correo verificado habilita la aplicación principal.
+5. Se crea o restaura su espacio personal remoto.
+6. Sus datos se guardan localmente como caché de su cuenta y se sincronizan.
 
-El usuario invitado no escribe datos remotos.
+No existe un modo invitado ni una vía para consultar datos sin sesión.
 
 ---
 
@@ -213,7 +211,7 @@ El flujo de trabajo, la jerarquía y los checks viven en [`WORKFLOW.md`](./WORKF
 - React Native.
 - TypeScript.
 - Juntoss API para autenticación y datos remotos.
-- Persistencia local para modo invitado.
+- Persistencia local asociada a una sesión autenticada.
 - Sistema central de diseño.
 - Navegación tipada.
 - Estado global limitado a información verdaderamente global.

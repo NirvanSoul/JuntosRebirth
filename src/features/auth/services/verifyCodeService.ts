@@ -1,4 +1,5 @@
 import { createJuntossAuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
+import { clearPendingEmailVerification } from '@/features/auth/services/pendingEmailVerification';
 import type { VerifyCodeInput, VerifyCodePurpose } from '@/features/auth/types';
 
 /**
@@ -9,6 +10,9 @@ import type { VerifyCodeInput, VerifyCodePurpose } from '@/features/auth/types';
 export async function verifyCode(input: VerifyCodeInput): Promise<void> {
   const gateway = createJuntossAuthGateway();
   await gateway.verifyOtp(input);
+  if (input.purpose === 'signup') {
+    await clearPendingEmailVerification();
+  }
 }
 
 export async function resendCode(

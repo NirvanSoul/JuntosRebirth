@@ -1,7 +1,7 @@
 import { personalSpace, type SpacesState } from '@/features/spaces/types';
 
 /**
- * Conserva la caché autenticada sin exponer espacios compartidos a un invitado.
+ * Conserva la caché autenticada sin exponer espacios compartidos sin sesión.
  * Se calcula durante el render para no dejar un frame con el espacio anterior.
  */
 export function projectSpacesForSession(

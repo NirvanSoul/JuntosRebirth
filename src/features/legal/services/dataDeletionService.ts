@@ -15,8 +15,7 @@ const localStorageKeyPrefix = '@juntoss/';
  * Borra todos los datos locales de la aplicación: movimientos, categorías,
  * series recurrentes, recordatorios, estado de sincronización y todas las
  * preferencias guardadas en AsyncStorage bajo el espacio de nombres de la
- * app. Es la única acción necesaria en modo invitado, y también se ejecuta
- * tras eliminar una cuenta remota.
+ * app. También se ejecuta tras eliminar una cuenta remota.
  */
 export async function deleteLocalData(): Promise<void> {
   try {
@@ -71,10 +70,21 @@ export async function deleteAccountAndData(): Promise<void> {
 }
 
 /**
+ * Elimina el contenido de la cuenta, pero conserva sus credenciales. El
+ * servidor borra primero los datos remotos; después se cierra la sesión y se
+ * descarta la caché para que ninguna tarea pendiente pueda restaurar o subir
+ * filas antiguas durante el mismo arranque.
+ */
+export async function deleteDataButKeepAccount(): Promise<void> {
+  await createJuntossAccountDeletionGateway().deleteData();
+  await authClient.signOut().catch(() => undefined);
+  await deleteLocalData();
+}
+
+/**
  * Decide la ruta correcta según el estado real de la sesión: si hay una
- * cuenta autenticada, elimina la cuenta y los datos remotos; si no (modo
- * invitado, el caso de prácticamente todos los usuarios hoy), borra solo
- * los datos locales.
+ * cuenta autenticada, elimina la cuenta y los datos remotos; sin sesión,
+ * descarta únicamente datos locales heredados.
  */
 export async function deleteMyAccountOrData(): Promise<DataDeletionResult> {
   const userId = await getAuthenticatedUserId();

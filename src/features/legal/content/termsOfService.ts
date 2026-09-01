@@ -30,7 +30,7 @@ export const termsOfService: LegalDocumentContent = {
     {
       heading: '3. Cuenta',
       body: [
-        'Puedes usar Juntos como invitado, con tus datos guardados solo en tu dispositivo, o crear una cuenta para sincronizar y compartir información entre dispositivos y con otra persona.',
+        'Para usar Juntos necesitas crear una cuenta y verificar tu correo. Tus datos se sincronizan con esa cuenta y pueden compartirse con otra persona cuando lo decidas.',
         'Eres responsable de la información que proporcionas al crear tu cuenta y de mantenerla actualizada.',
       ],
     },
@@ -122,7 +122,7 @@ export const termsOfService: LegalDocumentContent = {
     {
       heading: '18. Eliminación',
       body: [
-        'Puedes solicitar la eliminación de tu cuenta y tus datos en cualquier momento desde Ajustes → Ayuda → Política de privacidad → Tus datos → Eliminar cuenta y datos, según se describe en la Política de privacidad.',
+        'Puedes eliminar tus datos conservando tu cuenta, o eliminar cuenta y datos, desde Ajustes → Datos y privacidad → Estado de los datos → Tus datos, según se describe en la Política de privacidad.',
       ],
     },
     {

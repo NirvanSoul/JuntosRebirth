@@ -24,7 +24,6 @@ const beto: SpaceMemberProfile = {
 const context: TransactionAuthorContext = {
   profilesByUserId: { [ana.userId]: ana, [beto.userId]: beto },
   ownUserId: ana.userId,
-  installationId: 'install-abc',
 };
 
 describe('resolveTransactionAuthor', () => {
@@ -42,13 +41,6 @@ describe('resolveTransactionAuthor', () => {
     });
   });
 
-  it('reconoce como propia la fila antigua firmada con el id de instalación', () => {
-    expect(resolveTransactionAuthor('install-abc', context)).toEqual({
-      profile: ana,
-      isOwn: true,
-    });
-  });
-
   it('no atribuye a quien mira un uuid ajeno mientras falta el censo', () => {
     const sinCenso = { ...context, profilesByUserId: {} };
 
@@ -58,24 +50,10 @@ describe('resolveTransactionAuthor', () => {
     });
   });
 
-  it('trata como propia la fila de invitado, sin sesión ni censo', () => {
-    const invitado: TransactionAuthorContext = {
-      profilesByUserId: {},
-      ownUserId: null,
-      installationId: 'install-abc',
-    };
-
-    expect(resolveTransactionAuthor('install-abc', invitado)).toEqual({
-      profile: null,
-      isOwn: true,
-    });
-  });
-
   it('no reconoce nada como propio si aún no se sabe quién usa el móvil', () => {
     const sinIdentidad: TransactionAuthorContext = {
       profilesByUserId: {},
       ownUserId: null,
-      installationId: null,
     };
 
     expect(resolveTransactionAuthor('install-abc', sinIdentidad).isOwn).toBe(

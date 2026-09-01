@@ -93,4 +93,19 @@ describe('VerifyCodeScreen', () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('verify-code-success')).toBeNull();
   });
+
+  it('acepta códigos de la longitud configurada por el proveedor', async () => {
+    const screen = await renderWithTheme(
+      <VerifyCodeScreen
+        email="ana@ejemplo.com"
+        onCancel={jest.fn()}
+        onSuccess={jest.fn()}
+        purpose="signup"
+      />,
+    );
+
+    expect(
+      screen.getByTestId('verify-code-input').props.maxLength,
+    ).toBeUndefined();
+  });
 });

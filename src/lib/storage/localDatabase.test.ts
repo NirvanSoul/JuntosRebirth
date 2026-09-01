@@ -33,6 +33,10 @@ describe('migrateLocalDatabase', () => {
     );
     expect(database.execAsync).toHaveBeenNthCalledWith(
       2,
+      'PRAGMA busy_timeout = 5000',
+    );
+    expect(database.execAsync).toHaveBeenNthCalledWith(
+      3,
       'PRAGMA journal_mode = WAL',
     );
     const schema = (transaction.execAsync as jest.Mock).mock.calls
@@ -611,6 +615,49 @@ describe('getLocalDatabase', () => {
     );
     expect(deleteDatabaseAsync).not.toHaveBeenCalled();
     expect(openDatabaseAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('serializa una escritura que coincide con una transacción exclusiva', async () => {
+    let releaseTransaction: (() => void) | undefined;
+    const transactionFinished = new Promise<void>((resolve) => {
+      releaseTransaction = resolve;
+    });
+    const runAsync = jest.fn(async () => ({ changes: 1, lastInsertRowId: 1 }));
+    const withExclusiveTransactionAsync = jest.fn(async (task) =>
+      task({
+        execAsync: jest.fn(async () => undefined),
+        getFirstAsync: jest.fn(async () => ({ name: 'money_accounts' })),
+        getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
+      }),
+    );
+    const database = {
+      execAsync: jest.fn(async () => undefined),
+      getAllAsync: jest.fn(async () => [{ name: 'display_name' }]),
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+      runAsync,
+      withExclusiveTransactionAsync,
+    } as unknown as SQLiteDatabase;
+    openDatabaseAsync.mockResolvedValueOnce(database);
+
+    const localDatabase = await getLocalDatabase();
+    withExclusiveTransactionAsync.mockImplementationOnce(async (task) => {
+      await task({ runAsync: jest.fn(async () => undefined) });
+      await transactionFinished;
+    });
+
+    const transaction = localDatabase.withExclusiveTransactionAsync(
+      async () => undefined,
+    );
+    const write = localDatabase.runAsync('UPDATE categories SET name = name');
+
+    await Promise.resolve();
+    expect(runAsync).not.toHaveBeenCalled();
+
+    releaseTransaction?.();
+    await Promise.all([transaction, write]);
+    expect(runAsync).toHaveBeenCalledWith('UPDATE categories SET name = name');
   });
 });
 

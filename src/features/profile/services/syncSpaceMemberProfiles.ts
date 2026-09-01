@@ -7,10 +7,9 @@ import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedU
 /**
  * Refresca el censo local de un espacio compartido.
  *
- * Devuelve `false` sin tocar nada cuando no hay sesión: en modo invitado no hay
- * espacios compartidos que censar. No borra el censo previo en ese caso, para
- * no dejar sin nombre a los movimientos ya bajados si la sesión caduca de forma
- * temporal.
+ * Devuelve `false` sin tocar nada cuando la sesión desaparece. No borra el
+ * censo previo en ese caso, para no dejar sin nombre a los movimientos ya
+ * bajados mientras la interfaz vuelve a la pantalla de acceso.
  */
 export async function syncSpaceMemberProfiles(
   spaceId: string,

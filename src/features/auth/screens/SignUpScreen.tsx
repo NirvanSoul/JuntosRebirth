@@ -6,6 +6,7 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { Text } from '@/components/ui/Text/Text';
 import { GoogleAuthButton } from '@/features/auth/components/GoogleAuthButton';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
+import { savePendingEmailVerification } from '@/features/auth/services/pendingEmailVerification';
 import { signUp } from '@/features/auth/services/signUpService';
 import {
   isValidEmail,
@@ -96,7 +97,22 @@ export function SignUpScreen({
         password,
         displayName: displayName.trim(),
       });
-      onSuccess({ email: email.trim() });
+      const verifiedEmail = email.trim();
+      // Better Auth puede renovar la sesión provisional justo al terminar el
+      // alta. Guardar el correo antes de cambiar de vista evita perder el OTP
+      // si el host de acceso se remonta durante esa actualización.
+      try {
+        await savePendingEmailVerification(verifiedEmail);
+      } catch (error) {
+        // No convertir una cuenta ya creada en un falso error. Mientras el
+        // host siga montado, `onSuccess` conserva el paso; si Better Auth
+        // conserva la sesión provisional, AccessScreen también lo recupera.
+        console.error(
+          '[SignUp] No se pudo conservar el correo pendiente de verificar:',
+          error,
+        );
+      }
+      onSuccess({ email: verifiedEmail });
     } catch (caught) {
       setState({
         step: 'error',

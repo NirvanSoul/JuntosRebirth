@@ -1,3 +1,4 @@
+import { discardBackedLocalSessionCache } from '@/features/auth/services/discardBackedLocalSessionCache';
 import { loadSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
@@ -5,6 +6,7 @@ import { syncSpaceDataForCurrentSession } from '@/features/sync/services/syncCou
 import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
 
 jest.mock('@/features/spaces/repositories/localSpaceRepository');
+jest.mock('@/features/auth/services/discardBackedLocalSessionCache');
 jest.mock('@/features/sync/services/bootstrapRemoteAccount');
 jest.mock('@/features/sync/services/restoreRemoteAccount');
 jest.mock('@/features/sync/services/syncCoupleSpaceData');
@@ -27,6 +29,7 @@ describe('initializeAuthenticatedSession', () => {
   it('ejecuta bootstrap, sincroniza los espacios y restaura la cuenta', async () => {
     await initializeAuthenticatedSession();
 
+    expect(discardBackedLocalSessionCache).toHaveBeenCalledTimes(1);
     expect(bootstrapRemoteAccount).toHaveBeenCalled();
     expect(syncSpaceDataForCurrentSession).toHaveBeenCalledWith({
       spaceId: 'personal',
@@ -39,7 +42,7 @@ describe('initializeAuthenticatedSession', () => {
     expect(restoreRemoteAccountForCurrentSession).toHaveBeenCalled();
   });
 
-  it('no inicia una migración de invitado sin su confirmación explícita', async () => {
+  it('solo sincroniza filas pendientes de la sesión actual', async () => {
     await initializeAuthenticatedSession();
 
     expect(bootstrapRemoteAccount).toHaveBeenCalled();

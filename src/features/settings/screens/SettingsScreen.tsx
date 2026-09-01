@@ -8,7 +8,6 @@ import { EnvelopeSimple } from 'phosphor-react-native/src/icons/EnvelopeSimple';
 import { FileText } from 'phosphor-react-native/src/icons/FileText';
 import { Key } from 'phosphor-react-native/src/icons/Key';
 import { MoonStars } from 'phosphor-react-native/src/icons/MoonStars';
-import { PlayCircle } from 'phosphor-react-native/src/icons/PlayCircle';
 import { ShieldCheck } from 'phosphor-react-native/src/icons/ShieldCheck';
 import { SlidersHorizontal } from 'phosphor-react-native/src/icons/SlidersHorizontal';
 import { Trash } from 'phosphor-react-native/src/icons/Trash';
@@ -49,7 +48,6 @@ import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScree
 import { PermissionsScreen } from '@/features/legal/screens/PermissionsScreen';
 import { PrivacyChoicesScreen } from '@/features/legal/screens/PrivacyChoicesScreen';
 import { PrivacyLegalScreen } from '@/features/legal/screens/PrivacyLegalScreen';
-import { AuthModal } from '@/features/settings/components/AuthModal';
 import { ProfileAvatarCard } from '@/features/settings/components/ProfileAvatarCard/ProfileAvatarCard';
 import { CurrencyPreferencesModal } from '@/features/settings/components/CurrencyPreferencesModal/CurrencyPreferencesModal';
 import type { Space } from '@/features/spaces/types';
@@ -57,7 +55,6 @@ import { NotificationRulesModal } from '@/features/transactions/components/Notif
 import type { SaveLocalNotificationRuleInput } from '@/features/transactions/repositories/localTransactionNotificationRuleRepository';
 import type { TransactionNotificationRule } from '@/features/transactions/types';
 import { getCurrencyName } from '@/lib/currency/currencyCatalog';
-import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import type { CurrencyPreferences } from '@/state/appPreferences/currencyPreferences';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize, layout } from '@/theme/layout';
@@ -117,8 +114,6 @@ export function SettingsScreen({
   const { colors, isDark, setAppearance, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const { session } = useAuthSession();
-  const { markAuthenticated, restartOnboarding } = useOnboardingStatus();
-  const [isAuthModalVisible, setAuthModalVisible] = useState(false);
   const [isSigningOut, setSigningOut] = useState(false);
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [isNotificationRulesModalVisible, setNotificationRulesModalVisible] =
@@ -182,22 +177,14 @@ export function SettingsScreen({
   };
 
   const handleAccountRowPress = () => {
-    if (session) {
-      Alert.alert(
-        'Cerrar sesión',
-        '¿Quieres cerrar la sesión de esta cuenta?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Cerrar sesión',
-            style: 'destructive',
-            onPress: () => void handleSignOut(),
-          },
-        ],
-      );
-      return;
-    }
-    setAuthModalVisible(true);
+    Alert.alert('Cerrar sesión', '¿Quieres cerrar la sesión de esta cuenta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Cerrar sesión',
+        style: 'destructive',
+        onPress: () => void handleSignOut(),
+      },
+    ]);
   };
 
   const handleSignOut = async () => {
@@ -205,14 +192,14 @@ export function SettingsScreen({
     setSigningOut(true);
     try {
       await createJuntossAuthGateway().signOut();
-      await Promise.all([
-        // Sustituye cualquier estado de invitado persistido: sin sesión el
-        // RootNavigator vuelve a Acceso, nunca a las pestañas locales.
-        markAuthenticated(),
-        discardBackedLocalSessionCache(),
-      ]).catch((error: unknown) => {
-        console.error('[Settings] No se pudo limpiar la sesión local:', error);
-      });
+      await Promise.all([discardBackedLocalSessionCache()]).catch(
+        (error: unknown) => {
+          console.error(
+            '[Settings] No se pudo limpiar la sesión local:',
+            error,
+          );
+        },
+      );
     } catch {
       Alert.alert(
         'No pudimos cerrar sesión',
@@ -227,15 +214,6 @@ export function SettingsScreen({
     void Clipboard.setStringAsync(developerContactEmail);
     showSaveConfirmation(`Correo copiado: ${developerContactEmail}`);
     void Linking.openURL(`mailto:${developerContactEmail}`);
-  };
-
-  const handleReplayOnboarding = () => {
-    void restartOnboarding().catch(() => {
-      Alert.alert(
-        'No pudimos abrir el onboarding',
-        'Inténtalo de nuevo en unos momentos.',
-      );
-    });
   };
 
   const handleConfirmLeaveCoupleSpace = () => {
@@ -285,7 +263,7 @@ export function SettingsScreen({
           </Text>
         </View>
 
-        <ProfileAvatarCard hasSession={Boolean(session)} />
+        <ProfileAvatarCard />
 
         <SettingsSection
           emphasizeIcon={false}
@@ -293,9 +271,9 @@ export function SettingsScreen({
           title="Cuenta"
         >
           <SettingsRow
-            icon={session ? 'log-out-outline' : 'log-in-outline'}
+            icon="log-out-outline"
             iconBackgroundColor={categoryColors.blue}
-            label={session ? 'Cerrar sesión' : 'Iniciar sesión o crear cuenta'}
+            label="Cerrar sesión"
             onPress={handleAccountRowPress}
             value={session?.user.email ?? undefined}
           />
@@ -451,13 +429,6 @@ export function SettingsScreen({
 
         <SettingsSection icon="help-circle-outline" title="Ayuda">
           <SettingsRow
-            iconComponent={PlayCircle}
-            iconBackgroundColor={categoryColors.green}
-            label="Ver onboarding"
-            onPress={handleReplayOnboarding}
-          />
-          <SettingsDivider />
-          <SettingsRow
             iconComponent={EnvelopeSimple}
             iconBackgroundColor={categoryColors.amber}
             label="Contactar con el desarrollador"
@@ -476,11 +447,6 @@ export function SettingsScreen({
           juntoss 0.1.0
         </Text>
       </ScrollView>
-
-      <AuthModal
-        onClose={() => setAuthModalVisible(false)}
-        visible={isAuthModalVisible}
-      />
 
       <CurrencyPreferencesModal
         onClose={() => setCurrencyModalVisible(false)}

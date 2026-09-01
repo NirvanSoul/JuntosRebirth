@@ -5,10 +5,8 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { Text } from '@/components/ui/Text/Text';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
 import { GoogleAuthButton } from '@/features/auth/components/GoogleAuthButton';
-import {
-  confirmGuestDataMerge,
-  login,
-} from '@/features/auth/services/loginService';
+import { EmailVerificationRequiredError } from '@/features/auth/gateways/juntossAuthGateway';
+import { login } from '@/features/auth/services/loginService';
 import { isValidEmail } from '@/features/auth/utils/authValidation';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
@@ -18,6 +16,7 @@ type LoginScreenProps = {
   onCancel: () => void;
   onNavigateToForgotPassword?: () => void;
   onNavigateToSignUp?: () => void;
+  onEmailVerificationRequired?: (email: string) => void;
   onSuccess: () => void;
 };
 
@@ -29,14 +28,13 @@ type LoginFieldErrors = {
 type LoginState =
   | { step: 'idle' }
   | { step: 'submitting' }
-  | { step: 'confirm-merge' }
-  | { step: 'merging' }
   | { step: 'error'; message: string };
 
 export function LoginScreen({
   onCancel,
   onNavigateToForgotPassword,
   onNavigateToSignUp,
+  onEmailVerificationRequired,
   onSuccess,
 }: LoginScreenProps) {
   const styles = useThemedStyles(createStyles);
@@ -45,7 +43,6 @@ export function LoginScreen({
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const [state, setState] = useState<LoginState>({ step: 'idle' });
   const isSubmitting = state.step === 'submitting';
-  const isMerging = state.step === 'merging';
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -63,13 +60,16 @@ export function LoginScreen({
 
     setState({ step: 'submitting' });
     try {
-      const outcome = await login({ email: trimmedEmail, password });
-      if (outcome.status === 'signed-in') {
-        onSuccess();
+      await login({ email: trimmedEmail, password });
+      onSuccess();
+    } catch (caught) {
+      if (
+        caught instanceof EmailVerificationRequiredError &&
+        onEmailVerificationRequired
+      ) {
+        onEmailVerificationRequired(caught.email);
         return;
       }
-      setState({ step: 'confirm-merge' });
-    } catch (caught) {
       setState({
         step: 'error',
         message:
@@ -79,52 +79,6 @@ export function LoginScreen({
       });
     }
   };
-
-  const handleConfirmMerge = async () => {
-    setState({ step: 'merging' });
-    try {
-      await confirmGuestDataMerge();
-      onSuccess();
-    } catch (caught) {
-      setState({
-        step: 'error',
-        message:
-          caught instanceof Error
-            ? caught.message
-            : 'No pudimos combinar tus datos.',
-      });
-    }
-  };
-
-  if (state.step === 'confirm-merge' || state.step === 'merging') {
-    return (
-      <View style={styles.container}>
-        <Text tone="secondary" variant="label">
-          Este dispositivo tiene movimientos y categorías guardados como
-          invitado. ¿Quieres combinarlos con tu cuenta?
-        </Text>
-        <View style={styles.actionsRow}>
-          <ModalPrimaryAction
-            accessibilityLabel="Ahora no, continuar sin combinar"
-            disabled={isMerging}
-            label="Ahora no"
-            onPress={onSuccess}
-            style={styles.actionButton}
-            variant="surface"
-          />
-          <ModalPrimaryAction
-            accessibilityLabel="Combinar mis datos con la cuenta"
-            disabled={isMerging}
-            label={isMerging ? 'Combinando…' : 'Combinar mis datos'}
-            onPress={() => void handleConfirmMerge()}
-            style={styles.actionButton}
-            testID="login-confirm-merge"
-            variant="cta"
-          />
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>

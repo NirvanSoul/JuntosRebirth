@@ -14,7 +14,6 @@ type SpaceMembershipValue = SpaceMembership & {
 const emptyValue: SpaceMembershipValue = {
   profilesByUserId: {},
   ownUserId: null,
-  installationId: null,
   isSharedSpace: false,
 };
 

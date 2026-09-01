@@ -35,7 +35,7 @@ export const personalSpace: Space = {
 };
 
 /**
- * Un invitado nuevo arranca solo con el espacio Personal. Un espacio
+ * Una cuenta nueva arranca solo con el espacio Personal. Un espacio
  * `type: 'couple'` real solo existe tras crearlo o aceptarlo de verdad vía
  * `useSpaces`/`juntossInvitationGateway` — nunca como valor de fábrica, para
  * no consumir en silencio el cupo de "un espacio juntos por usuario" que

@@ -15,16 +15,6 @@ import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import type { AppearancePreference } from '@/theme/types';
 
-const mockRestartOnboarding = jest.fn();
-const mockMarkAuthenticated = jest.fn();
-
-jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
-  useOnboardingStatus: () => ({
-    markAuthenticated: mockMarkAuthenticated,
-    restartOnboarding: mockRestartOnboarding,
-  }),
-}));
-
 const emptyProfile = {
   avatarUri: null,
   avatarPath: null,
@@ -55,8 +45,6 @@ describe('SettingsScreen', () => {
     mockGetLocalProfile.mockClear().mockResolvedValue(emptyProfile);
     mockUpdateProfileAvatar.mockClear();
     mockRemoveProfileAvatar.mockClear();
-    mockRestartOnboarding.mockReset().mockResolvedValue(undefined);
-    mockMarkAuthenticated.mockReset().mockResolvedValue(undefined);
   });
 
   const renderScreen = async (
@@ -144,8 +132,7 @@ describe('SettingsScreen', () => {
     ).toBe(0.45);
     expect(
       StyleSheet.flatten(
-        screen.getByTestId('row-glyph-Iniciar sesión o crear cuenta').props
-          .style,
+        screen.getByTestId('row-glyph-Cerrar sesión').props.style,
       ).textShadowRadius,
     ).toBe(0.45);
     expect(
@@ -179,14 +166,6 @@ describe('SettingsScreen', () => {
     expect(alertSpy).not.toHaveBeenCalled();
     expect(screen.getByTestId('notification-rules-modal')).toBeTruthy();
     alertSpy.mockRestore();
-  });
-
-  it('permite volver a abrir el onboarding desde Ayuda', async () => {
-    const { screen } = await renderScreen();
-
-    await fireEvent.press(screen.getByText('Ver onboarding'));
-
-    expect(mockRestartOnboarding).toHaveBeenCalledTimes(1);
   });
 
   it('confirma con un mensaje flotante al guardar las reglas de notificación', async () => {
@@ -346,18 +325,18 @@ describe('SettingsScreen', () => {
     expect(screen.getByText('Toca tu foto para cambiarla')).toBeTruthy();
   });
 
-  it('abre el modal de autenticación en vez de mostrar un aviso pendiente', async () => {
+  it('ofrece cerrar la sesión en vez de abrir acceso dentro de la app', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
     const { screen } = await renderScreen();
 
-    expect(
-      screen.queryByTestId('pending-Iniciar sesión o crear cuenta'),
-    ).toBeNull();
-    await fireEvent.press(screen.getByText('Iniciar sesión o crear cuenta'));
+    expect(screen.queryByTestId('pending-Cerrar sesión')).toBeNull();
+    await fireEvent.press(screen.getByText('Cerrar sesión'));
 
-    expect(alertSpy).not.toHaveBeenCalled();
-    expect(screen.getByTestId('auth-modal-open-login')).toBeTruthy();
-    expect(screen.getByTestId('auth-modal-open-signup')).toBeTruthy();
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Cerrar sesión',
+      expect.any(String),
+      expect.any(Array),
+    );
     alertSpy.mockRestore();
   });
 

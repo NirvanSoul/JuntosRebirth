@@ -9,10 +9,14 @@ import * as SecureStore from 'expo-secure-store';
 import { useState } from 'react';
 
 import { signUp } from '@/features/auth/services/signUpService';
+import { savePendingEmailVerification } from '@/features/auth/services/pendingEmailVerification';
 import { SignUpScreen } from '@/features/auth/screens/SignUpScreen';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
 jest.mock('@/features/auth/services/signUpService');
+jest.mock('@/features/auth/services/pendingEmailVerification', () => ({
+  savePendingEmailVerification: jest.fn(async () => undefined),
+}));
 jest.mock('@/features/auth/components/GoogleAuthButton', () => {
   const { Text } = jest.requireActual('react-native');
   return {
@@ -94,6 +98,9 @@ describe('SignUpScreen', () => {
       password: 'secret1234',
       displayName: 'Ana',
     });
+    expect(savePendingEmailVerification).toHaveBeenCalledWith(
+      'ana@ejemplo.com',
+    );
     expect(onSuccess).toHaveBeenCalledWith({ email: 'ana@ejemplo.com' });
   });
 

@@ -35,7 +35,7 @@ export const privacyPolicy: LegalDocumentContent = {
         'Datos financieros que introduces tú mismo: importe, tipo (gasto o ingreso), categoría, título o descripción breve, fecha, recurrencia y el espacio (personal o compartido) al que pertenece cada movimiento.',
         'Datos de espacios compartidos: qué miembros pertenecen a un espacio y quién es autor de cada movimiento dentro de él.',
         'Preferencias de la aplicación: moneda, apariencia, reglas de recordatorio y si quieres ver importes en las notificaciones.',
-        'Identificador local de instalación, usado únicamente para vincular tus datos de invitado a tu cuenta cuando te registras.',
+        'Identificador local de instalación, usado para mantener la sincronización y evitar duplicados de operaciones del dispositivo.',
         'No recogemos ubicación, contactos, cámara ni fotos: la aplicación no solicita esos permisos porque no los necesita.',
       ],
     },
@@ -100,10 +100,10 @@ export const privacyPolicy: LegalDocumentContent = {
       ],
     },
     {
-      heading: '13. Eliminación de cuenta y datos',
+      heading: '13. Eliminación de datos y cuenta',
       body: [
+        'Puedes eliminar tus datos sin eliminar tu cuenta desde Ajustes → Datos y privacidad → Estado de los datos → Tus datos → Eliminar mis datos. Borraremos tus datos financieros y de perfil de la nube y de este dispositivo, conservaremos tus credenciales para que puedas volver a usar la aplicación y cerraremos tus sesiones para evitar que otro dispositivo restaure una copia antigua.',
         'Puedes iniciar la eliminación de tu cuenta y tus datos desde dentro de la aplicación, en Ajustes → Ayuda → Política de privacidad → Tus datos → Eliminar cuenta y datos.',
-        'Si usas Juntos como invitado (sin cuenta), tus datos existen solo en tu dispositivo y esa misma opción los borra localmente sin necesidad de conexión.',
         'Si tienes cuenta, al confirmar la eliminación: cerramos tu sesión, eliminamos o anonimizamos tus movimientos según si pertenecen a un espacio personal o compartido (para no romper los datos legítimos de la otra persona del espacio), y eliminamos tu cuenta de autenticación. Esto cumple con los requisitos de eliminación de cuenta de Apple (https://developer.apple.com/support/offering-account-deletion-in-your-app/) y Google Play (https://support.google.com/googleplay/android-developer/answer/13327111).',
       ],
     },

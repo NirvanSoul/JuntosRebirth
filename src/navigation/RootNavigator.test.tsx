@@ -5,21 +5,17 @@ import { renderWithTheme } from '@/test/renderWithTheme';
 import { darkColors, lightColors } from '@/theme/colors';
 
 let mockAuthReady = true;
-let mockOnboardingReady = true;
-
-jest.mock('@/features/auth/hooks/useAuthSession', () => ({
-  useAuthSession: () => ({
-    session: { access_token: 'token', user: { id: 'user-1' } },
-    userId: 'user-1',
-    isReady: mockAuthReady,
-  }),
-}));
+let mockSession: {
+  user: { id: string; email: string; emailVerified: boolean };
+} | null = {
+  user: { id: 'user-1', email: 'ana@ejemplo.com', emailVerified: true },
+};
 
 jest.mock('@/features/auth/hooks/useBetterAuthSession', () => ({
   useBetterAuthSession: () => ({
     error: null,
-    isReady: true,
-    session: null,
+    isReady: mockAuthReady,
+    session: mockSession,
   }),
 }));
 
@@ -27,17 +23,17 @@ jest.mock('@/lib/auth-client', () => ({
   authClient: { signIn: { social: jest.fn() } },
 }));
 
-jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
-  useOnboardingStatus: () => ({
-    isReady: mockOnboardingReady,
-    status: { accessMode: 'guest', completed: true, version: 1 },
-  }),
-}));
-
 jest.mock('@/navigation/MainTabsNavigator', () => {
   const { Text: RNText } = jest.requireActual('react-native');
   return {
     MainTabsNavigator: () => <RNText>pestañas</RNText>,
+  };
+});
+
+jest.mock('@/features/access/screens/AccessScreen', () => {
+  const { Text: RNText } = jest.requireActual('react-native');
+  return {
+    AccessScreen: () => <RNText>acceso</RNText>,
   };
 });
 
@@ -48,7 +44,9 @@ function backdropBackgroundColor(style: StyleProp<ViewStyle>) {
 describe('RootNavigator', () => {
   beforeEach(() => {
     mockAuthReady = true;
-    mockOnboardingReady = true;
+    mockSession = {
+      user: { id: 'user-1', email: 'ana@ejemplo.com', emailVerified: true },
+    };
   });
 
   it('pinta el fondo del tema detrás de la navegación', async () => {
@@ -89,5 +87,29 @@ describe('RootNavigator', () => {
         screen.getByTestId('root-navigator-backdrop').props.style,
       ),
     ).toBe(lightColors.background);
+  });
+
+  it('mantiene el acceso cuando la sesión todavía no verificó el correo', async () => {
+    mockSession = {
+      user: {
+        id: 'user-1',
+        email: 'ana@ejemplo.com',
+        emailVerified: false,
+      },
+    };
+
+    const screen = await renderWithTheme(<RootNavigator />);
+
+    expect(await screen.findByText('acceso')).toBeTruthy();
+    expect(screen.queryByText('pestañas')).toBeNull();
+  });
+
+  it('después de cerrar sesión no muestra las pestañas de la cuenta anterior', async () => {
+    mockSession = null;
+
+    const screen = await renderWithTheme(<RootNavigator />);
+
+    expect(await screen.findByText('acceso')).toBeTruthy();
+    expect(screen.queryByText('pestañas')).toBeNull();
   });
 });

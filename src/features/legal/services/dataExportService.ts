@@ -32,25 +32,26 @@ export type ExportMyDataResult = {
 
 /**
  * Arma un JSON con los datos del usuario y abre la hoja de compartir nativa
- * para que decida dónde guardarlo. Sin sesión (modo invitado) exporta los
- * datos locales; con sesión, pide también los remotos a la API.
+ * para que decida dónde guardarlo. Requiere una sesión verificada y pide
+ * también los datos remotos a la API.
  */
 export async function exportMyData(): Promise<ExportMyDataResult> {
   const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    throw new Error('Debes iniciar sesión para exportar tus datos.');
+  }
   const localPayload = await buildLocalExportPayload();
 
-  const payload = userId
-    ? {
-        ...localPayload,
-        scope: 'account',
-        account: await createJuntossDataExportGateway().exportAccountData(),
-      }
-    : localPayload;
+  const payload = {
+    ...localPayload,
+    scope: 'account',
+    account: await createJuntossDataExportGateway().exportAccountData(),
+  };
 
   await Share.share({
     message: JSON.stringify(payload, null, 2),
     title: 'Mis datos de Juntos',
   });
 
-  return { scope: userId ? 'account' : 'local' };
+  return { scope: 'account' };
 }

@@ -19,11 +19,6 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const profileIconSize = 56;
 
-type ProfileAvatarCardProps = {
-  /** `false` pinta la etiqueta de invitado: sin cuenta la foto no se publica. */
-  hasSession: boolean;
-};
-
 /**
  * Tarjeta de perfil de Ajustes: la foto y su estado.
  *
@@ -31,7 +26,7 @@ type ProfileAvatarCardProps = {
  * propias —elegir, preparar, subir, error— y mezclarlas con el resto de la
  * pantalla obligaría a leer las dos cosas a la vez para entender cualquiera.
  */
-export function ProfileAvatarCard({ hasSession }: ProfileAvatarCardProps) {
+export function ProfileAvatarCard() {
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const avatar = useProfileAvatar();
@@ -107,13 +102,6 @@ export function ProfileAvatarCard({ hasSession }: ProfileAvatarCardProps) {
             : (avatar.progressLabel ?? 'Toca tu foto para cambiarla')}
         </Text>
       </View>
-      {hasSession ? null : (
-        <View style={styles.guestBadge}>
-          <Text tone="cta" variant="caption" weight="semibold">
-            Invitado
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -164,12 +152,6 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       minWidth: 0,
       flex: 1,
       gap: spacing.xxs,
-    },
-    guestBadge: {
-      borderRadius: radii.round,
-      backgroundColor: colors.ctaSoft,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
     },
     rowPressed: {
       opacity: 0.68,

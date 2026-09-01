@@ -2,6 +2,7 @@ import { apiClient } from '@/services/api/juntossApiClient';
 
 export type AccountDeletionGateway = {
   deleteAccount(): Promise<void>;
+  deleteData(): Promise<void>;
 };
 
 /**
@@ -13,11 +14,22 @@ export function createJuntossAccountDeletionGateway(): AccountDeletionGateway {
   return {
     async deleteAccount(): Promise<void> {
       try {
-        await apiClient.delete('/v1/me');
+        await apiClient.delete('/v1/me', {
+          confirmation: 'DELETE_MY_ACCOUNT',
+        });
       } catch (error) {
         // El mensaje de `ApiError` ya viene en español y sin detalle técnico.
         throw new Error(
           `No pudimos eliminar la cuenta: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    },
+    async deleteData(): Promise<void> {
+      try {
+        await apiClient.delete('/v1/me/data');
+      } catch (error) {
+        throw new Error(
+          `No pudimos eliminar tus datos: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     },

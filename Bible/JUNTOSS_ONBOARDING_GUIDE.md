@@ -2,7 +2,7 @@
 
 ## 1. Objetivo
 
-Esta guía define el sistema de onboarding, la pantalla de acceso, el modo invitado y la primera llegada a Inicio de `juntoss`.
+Esta guía define el sistema de onboarding, la pantalla de acceso autenticado y la primera llegada a Inicio de `juntoss`.
 
 El onboarding debe sentirse:
 
@@ -15,7 +15,8 @@ El onboarding debe sentirse:
 
 Principio central:
 
-> El usuario debe entender primero por qué juntoss le sirve y decidir después si quiere registrarse.
+> La cuenta y la verificación de correo protegen desde el inicio los datos que
+> el usuario verá y guardará en juntoss.
 
 ---
 
@@ -31,7 +32,7 @@ Pantalla 6 → Crear al menos tres categorías
 Pantalla 7 → Añadir el primer ingreso
 Pantalla 8 → Añadir el primer gasto
 Pantalla 9 → Cierre: listo para explorar
-Pantalla de acceso → Crear cuenta, iniciar sesión o probar sin cuenta
+Pantalla de acceso → Crear cuenta o iniciar sesión
 Inicio → Primer movimiento y estado vacío guiado
 ```
 
@@ -346,7 +347,7 @@ Explora Juntos y descubre nuestras herramientas para organizar y entender mejor 
 
 ## Botón principal
 
-**Empezar**, como el resto de pantallas finales del onboarding: completa el flujo y entrega el control a la pantalla de acceso (crear cuenta, iniciar sesión o probar sin cuenta).
+**Empezar**, como el resto de pantallas finales del onboarding: completa el flujo y entrega el control a la pantalla de acceso (crear cuenta o iniciar sesión).
 
 ---
 
@@ -399,7 +400,6 @@ Permitir:
 
 - Crear una cuenta.
 - Iniciar sesión.
-- Probar la aplicación sin cuenta.
 
 ## Jerarquía recomendada
 
@@ -408,8 +408,7 @@ Permitir:
 3. Subtítulo.
 4. Botón principal.
 5. Acción de inicio de sesión.
-6. Acción secundaria de modo invitado.
-7. Microtexto opcional.
+6. Microtexto opcional sobre la verificación de correo.
 
 ## Opciones de título
 
@@ -423,7 +422,7 @@ Permitir:
 
 1. Crea una cuenta para guardar y sincronizar tu información.
 2. Empieza gratis y lleva tus movimientos contigo.
-3. Inicia sesión o prueba primero sin crear una cuenta.
+3. Verifica tu correo para proteger tu cuenta.
 4. Guarda tus datos y accede desde tus dispositivos.
 5. Crea tu espacio personal en pocos segundos.
 
@@ -467,129 +466,32 @@ Iniciar sesión
 
 ---
 
-# 11. Modo invitado
+# 11. Verificación de correo
 
-## Nombre recomendado
+Después de crear la cuenta, la pantalla OTP debe explicar que el código
+confirma el correo y protege el acceso a los datos. La aplicación principal no
+se muestra hasta que la sesión tenga el correo verificado.
 
-**Probar sin cuenta**
-
-Es más claro que “Entrar como invitado” y comunica mejor la intención.
-
-## Alternativas
-
-- Explorar sin cuenta.
-- Comenzar sin registrarme.
-- Probar primero.
-- Usar sin cuenta.
-- Ver la aplicación primero.
-- Empezar como invitado.
-
-## Microtextos centrados en la prueba
-
-1. Prueba la aplicación antes de crear una cuenta.
-2. Empieza ahora y regístrate cuando quieras guardar más.
-3. Explora las funciones principales sin registrarte.
-4. Prueba primero. Crea tu cuenta cuando estés listo.
-5. Empieza en segundos, sin correo ni contraseña.
-6. Descubre juntoss antes de registrarte. sshhh
-
-## Microtextos centrados en continuidad
-
-7. Lo que registres podrá guardarse cuando crees tu cuenta.
-8. Comienza ahora y conserva tus movimientos al registrarte.
-9. Tus primeros movimientos se guardarán en este dispositivo.
-10. Regístrate después para sincronizar y compartir.
-11. Prueba localmente y crea una cuenta cuando quieras continuar.
-12. Tus datos permanecerán en este dispositivo hasta que te registres.
-
-## Microtextos minimalistas
-
-13. Sin cuenta, sin compromiso.
-14. Empieza sin formularios.
-15. Prueba juntoss sin dar ningún dato.
-16. Entra directamente y descubre cómo funciona.
-17. Solo necesitas unos segundos para comenzar.
-
-## Combinaciones recomendadas
-
-### Opción A
-
-**Probar sin cuenta**  
-Prueba la aplicación antes de registrarte.
-
-### Opción B
-
-**Probar sin cuenta**  
-Empieza ahora y regístrate cuando quieras guardar más.
-
-### Opción C
-
-**Probar sin cuenta**  
-Tus primeros movimientos se guardarán en este dispositivo.
-
-### Opción D
-
-**Probar sin cuenta**  
-Regístrate después para sincronizar y compartir.
-
-## Recomendación principal
-
-**Probar sin cuenta**  
-Empieza ahora y regístrate cuando quieras guardar más.
+Si el código vence, es incorrecto o no se puede enviar, se mantiene la persona
+en el flujo de acceso con un mensaje que indique la causa y la acción posible:
+reintentar, solicitar otro código o iniciar sesión.
 
 ---
 
-# 12. Límites del modo invitado
+# 12. Entrada autenticada
 
-Límites previstos:
-
-- Entre 6 y 7 movimientos.
-- Máximo 3 categorías personalizadas.
-- Sin sincronización.
-- Sin espacios compartidos.
-- Sin respaldo remoto.
-
-No explicar todos estos límites en la pantalla inicial.
-
-Mostrarlos únicamente cuando sean relevantes.
-
-## Mensaje al alcanzar el límite
-
-### Título
-
-**Guarda todo lo que has creado**
-
-### Texto
-
-Has llegado al límite de la prueba. Crea una cuenta gratis para seguir registrando movimientos y conservar tu información.
-
-### Acciones
-
-- Crear cuenta.
-- Ahora no.
+No hay límites ni pantallas de prueba locales. Toda función que muestre o
+modifique datos financieros requiere una sesión verificada. Al cerrar sesión,
+la siguiente pantalla es Acceso y no existe una ruta de regreso a la aplicación
+principal mediante navegación o enlaces profundos.
 
 ---
 
-# 13. Momentos apropiados para pedir registro
+# 13. Primera sesión
 
-- Al alcanzar el límite de movimientos.
-- Al alcanzar el límite de categorías.
-- Al intentar crear un espacio compartido.
-- Al intentar sincronizar.
-- Al intentar usar otro dispositivo.
-- Al activar una función que necesita identidad remota.
-
-Evitar:
-
-- “No puedes continuar”.
-- “Función bloqueada”.
-- “Necesitas Premium”.
-
-Preferir:
-
-- “Crea una cuenta para seguir guardando movimientos”.
-- “Regístrate para compartir este espacio”.
-- “Guarda tus datos y continúa desde cualquier dispositivo”.
+El onboarding, si se conserva, solo puede ejecutarse después de verificar el
+correo. Sus datos se guardan como parte de la cuenta actual y no necesitan
+migración posterior.
 
 ---
 
@@ -771,7 +673,6 @@ No deben:
 - No depender únicamente del color.
 - Texto compatible con tamaños dinámicos.
 - Contraste correcto.
-- La opción de invitado no debe quedar visualmente escondida.
 - Ilustraciones decorativas marcadas como tales.
 
 ---
@@ -782,21 +683,17 @@ Guardar:
 
 - Onboarding completado.
 - Nombre local.
-- Elección de modo invitado.
 - Versión del onboarding.
 - Sesión o estado de autenticación.
 
 Flujo:
 
 ```text
-Primera apertura
-  -> Onboarding
+Primera apertura o sesión ausente
+  -> Pantalla de acceso
 
-Onboarding completado + invitado
-  -> Aplicación principal
-
-Onboarding completado + autenticado
-  -> Aplicación principal
+Correo verificado
+  -> Aplicación principal (u onboarding posterior, si se habilita)
 
 Sesión caducada
   -> Pantalla de acceso
@@ -821,11 +718,9 @@ Sin datos financieros ni personales:
 - `onboarding_skipped`
 - `signup_selected`
 - `login_selected`
-- `guest_mode_selected`
 - `first_expense_created`
 - `first_income_created`
-- `guest_limit_reached`
-- `guest_converted_to_account`
+- `email_otp_verified`
 
 No enviar:
 
@@ -868,11 +763,10 @@ Crea una cuenta para guardar y sincronizar tu información.
 
 - Empezar gratis.
 - Ya tengo cuenta.
-- Probar sin cuenta.
 
 Microtexto:
 
-Empieza ahora y regístrate cuando quieras guardar más.
+Verifica tu correo para proteger y sincronizar tus datos.
 
 ---
 
@@ -941,11 +835,10 @@ Cambia de espacio sin mezclar tus finanzas.
 
 - Crear cuenta.
 - Iniciar sesión.
-- Probar sin cuenta.
 
 Microtexto:
 
-Sin correo ni contraseña.
+Tu correo se verifica antes de entrar a la aplicación.
 
 ---
 
@@ -980,7 +873,6 @@ Acciones:
 
 - **Crear cuenta**
 - **Ya tengo cuenta**
-- **Probar sin cuenta**
 
 Microtexto:
 
@@ -993,10 +885,8 @@ Microtexto:
 - [ ] Leer este documento.
 - [ ] Mantener las nueve pantallas actuales en este orden: nombre, país y moneda, bienvenida, calendario, uso compartido, al menos tres categorías, primer ingreso, primer gasto, cierre.
 - [ ] Mantener una sola idea principal por pantalla.
-- [ ] No pedir registro antes de presentar valor.
-- [ ] Mantener visible la opción de probar sin cuenta.
-- [ ] No esconder los límites de forma engañosa.
-- [ ] No explicar todos los límites al inicio.
+- [ ] No habilitar navegación de datos antes de verificar el correo.
+- [ ] Mantener claros los mensajes de error y reenvío de OTP.
 - [ ] Verificar iOS y Android.
 - [ ] Probar accesibilidad.
 - [ ] Probar restauración de estado.

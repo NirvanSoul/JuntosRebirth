@@ -1,20 +1,11 @@
-import { fireEvent } from '@testing-library/react-native';
+import { fireEvent, waitFor } from '@testing-library/react-native';
 
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
-const mockMarkAuthenticated = jest.fn();
-const mockMarkGuestComplete = jest.fn();
 let mockSession: { user: { email: string; emailVerified: boolean } } | null =
   null;
-
-jest.mock('@/state/onboarding/useOnboardingStatus', () => ({
-  useOnboardingStatus: () => ({
-    markAuthenticated: mockMarkAuthenticated,
-    markGuestComplete: mockMarkGuestComplete,
-    status: { accessMode: 'guest', completed: true, completedVersion: 1 },
-  }),
-}));
+let mockPendingVerificationEmail: string | null = null;
 
 jest.mock('@/features/auth/hooks/useBetterAuthSession', () => ({
   useBetterAuthSession: () => ({
@@ -27,12 +18,32 @@ jest.mock('@/features/auth/hooks/useBetterAuthSession', () => ({
 jest.mock('@/features/auth/screens/LoginScreen', () => ({
   LoginScreen: () => null,
 }));
+jest.mock('@/features/auth/services/pendingEmailVerification', () => ({
+  loadPendingEmailVerification: jest.fn(
+    async () => mockPendingVerificationEmail,
+  ),
+}));
 jest.mock('@/features/auth/screens/SignUpScreen', () => ({
-  SignUpScreen: () => null,
+  SignUpScreen: ({
+    onSuccess,
+  }: {
+    onSuccess: (result: { email: string }) => void;
+  }) => {
+    const { Pressable } = jest.requireActual('react-native');
+    return (
+      <Pressable
+        onPress={() => onSuccess({ email: 'ana@ejemplo.com' })}
+        testID="signup-complete"
+      />
+    );
+  },
   signUpTotalSteps: 4,
 }));
 jest.mock('@/features/auth/screens/VerifyCodeScreen', () => ({
-  VerifyCodeScreen: () => null,
+  VerifyCodeScreen: ({ email }: { email: string }) => {
+    const { Text } = jest.requireActual('react-native');
+    return <Text testID="verify-signup-email">{email}</Text>;
+  },
 }));
 jest.mock('@/features/auth/screens/ForgotPasswordScreen', () => ({
   ForgotPasswordScreen: () => null,
@@ -43,17 +54,14 @@ jest.mock('@/features/auth/screens/ResetPasswordScreen', () => ({
 
 describe('AccessScreen', () => {
   beforeEach(() => {
-    mockMarkAuthenticated.mockReset();
-    mockMarkGuestComplete.mockReset();
     mockSession = null;
+    mockPendingVerificationEmail = null;
   });
 
-  it('mantiene visible la entrada como invitado y la persiste al elegirla', async () => {
+  it('no ofrece una entrada sin cuenta', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('access-continue-guest'));
-
-    expect(mockMarkGuestComplete).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('access-continue-guest')).toBeNull();
   });
 
   it('abre el paso de crear cuenta', async () => {
@@ -72,5 +80,27 @@ describe('AccessScreen', () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
     expect(screen.getByText('Verifica tu correo')).toBeTruthy();
+  });
+
+  it('pasa al OTP al terminar el último paso de crear cuenta', async () => {
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    fireEvent.press(screen.getByTestId('access-open-signup'));
+    fireEvent.press(await screen.findByTestId('signup-complete'));
+
+    expect(await screen.findByTestId('verify-signup-email')).toHaveTextContent(
+      'ana@ejemplo.com',
+    );
+  });
+
+  it('retoma el OTP almacenado si el host de acceso se remonta sin sesión provisional', async () => {
+    mockPendingVerificationEmail = 'ana@ejemplo.com';
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('verify-signup-email')).toHaveTextContent(
+        'ana@ejemplo.com',
+      ),
+    );
   });
 });

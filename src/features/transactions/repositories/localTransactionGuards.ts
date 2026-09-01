@@ -10,11 +10,9 @@ import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
 /**
  * Identidad que se graba en `created_by` al crear una fila en este dispositivo.
  *
- * Prefiere el uuid de usuario porque es lo que guarda el servidor y lo que baja
- * en cada restauración: usar el id de instalación dejaba la columna con dos
- * tipos de identificador según el origen de la fila, y la interfaz no podía
- * distinguirlos. En modo invitado no hay uuid todavía, y ahí el id de
- * instalación sigue siendo el único ancla disponible.
+ * Prefiere el uuid de la sesión. El identificador de instalación solo cubre
+ * tareas locales transitorias; la navegación raíz no permite crear ni ver
+ * movimientos sin sesión verificada.
  */
 export async function resolveLocalAuthorId(
   database: SQLiteDatabase,

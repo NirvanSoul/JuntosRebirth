@@ -50,10 +50,6 @@ Organiza ingresos, gastos, balance y categorías sin compartir.
 
 Dos personas organizan parte de sus finanzas juntas sin fusionar automáticamente sus espacios personales.
 
-### Invitado
-
-Prueba la aplicación sin crear cuenta ni enviar datos a la nube.
-
 ### Grupos futuros
 
 Familias, convivientes, amistades o grupos temporales. No son requisito de la primera versión.
@@ -64,7 +60,7 @@ Familias, convivientes, amistades o grupos temporales. No son requisito de la pr
 
 ### Usuario
 
-Puede existir como invitado local o usuario registrado.
+Es una persona con cuenta registrada y correo verificado.
 
 ### Espacio
 
@@ -223,19 +219,20 @@ Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y c
 8. Primer gasto.
 9. Cierre y listo para explorar.
 
-Después del onboarding, el usuario entra como invitado o crea su cuenta (ver §8).
+El acceso a la aplicación requiere una cuenta con correo verificado.
 
 ### Mensajes sugeridos
 
 1. **Control diario:** registra ingresos y gastos en segundos.
 2. **Organización clara:** usa categorías para entender tu dinero.
 3. **Comparte cuando decidas:** mantén un espacio personal y crea otro con tu pareja.
-4. **Tus datos continúan contigo:** prueba localmente y sincroniza al crear una cuenta.
+4. **Tus datos continúan contigo:** se guardan localmente y se sincronizan con tu cuenta.
 
 ### Reglas
 
 - Nueve pantallas en total.
-- No pedir correo ni contraseña antes de probar.
+- El onboarding no es una vía de entrada: se ejecuta solo después de autenticar,
+  cuando esté habilitado para una cuenta.
 - No pedir permisos sin explicar por qué.
 - Pedir un primer ingreso y un primer gasto al final, para dejar el espacio local con datos reales.
 - En los pasos 6, 7 y 8, enseñar la creación con el mismo botón flotante y el
@@ -248,57 +245,26 @@ Después del onboarding, el usuario entra como invitado o crea su cuenta (ver §
 
 ---
 
-## 8. Modo invitado
-
-El invitado:
-
-- Tiene un espacio personal local.
-- Puede crear espacios locales adicionales que permanecen en el dispositivo.
-- Puede crear movimientos.
-- Puede crear categorías con límites.
-- Puede navegar por el producto principal.
-- No sincroniza con la API de Juntos.
-- No puede crear espacios compartidos.
-- Puede perder datos si elimina la app o pierde el dispositivo.
-
-Límites sugeridos, sujetos a validación:
-
-- Entre 5 y 10 movimientos.
-- Hasta 3 categorías personalizadas.
-- Sin sincronización.
-- Sin espacios compartidos.
-
-Al alcanzar un límite, se bloquea únicamente la acción excedida y se ofrece registro.
-
----
-
-## 9. Conversión a cuenta
+## 8. Activación de cuenta
 
 Cuando el usuario se registra:
 
 1. Se crea la cuenta.
 2. Se verifica el correo con el código OTP de Better Auth.
 3. Se crea o recupera el espacio personal remoto.
-4. Se prepara un lote de migración.
-5. Se suben categorías y movimientos.
-6. Se validan resultados.
-7. Se marcan como sincronizados.
-8. Solo después se limpia o archiva la copia temporal.
-
-La migración debe ser idempotente.
+4. Se restaura su copia local/remota asociada a la cuenta.
+5. Se muestra la aplicación.
 
 ---
 
-## 10. Autenticación
+## 9. Autenticación
 
 ### Registro
 
 - Correo.
 - Contraseña, con un segundo campo para confirmarla.
-- Nombre ya capturado o editable.
-- El modal de crear cuenta es un formulario de 4 pasos, con una barra de
-  progreso debajo del título del modal que da sensación de avance y facilita
-  que el usuario continúe.
+- Nombre editable.
+- El registro se presenta a pantalla completa en cuatro pasos, con progreso.
 
 ### Verificación
 
@@ -306,7 +272,7 @@ La interfaz no debe asumir una longitud rígida del código. Debe aceptar la con
 
 ### Inicio de sesión
 
-Si existen datos invitados en el dispositivo, no deben mezclarse con una cuenta equivocada sin confirmación.
+Al iniciar sesión se restauran únicamente los datos de la cuenta autenticada.
 
 ---
 
@@ -616,9 +582,8 @@ usan ese indicador ni simulan que la operación se haya completado.
 La tarjeta de perfil permite tocar la foto para elegir una imagen de la
 cámara o la galería; se recomprime en el dispositivo antes de guardarse para
 no acumular imágenes pesadas. La fila
-«Iniciar sesión o crear cuenta» ya no es pendiente: abre las pantallas de
-autenticación existentes (registro, verificación de código, inicio de sesión,
-recuperación de contraseña y migración de los datos de invitado).
+«Cerrar sesión» devuelve al acceso a pantalla completa y oculta todos los
+datos de la cuenta.
 
 La fila «Recordatorios y alertas» ya no es pendiente: abre un modal con una
 regla por tipo de movimiento del espacio activo (gastos e ingresos por
@@ -965,7 +930,7 @@ Los estados vacíos deben dirigir a una acción útil.
 - Finalización del onboarding.
 - Primer movimiento.
 - Tiempo hasta el primer movimiento.
-- Conversión de invitado a cuenta.
+- Verificación de correo completada.
 - Errores de migración.
 - Primera categoría.
 - Creación o unión a espacio de pareja.

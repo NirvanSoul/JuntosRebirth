@@ -17,7 +17,7 @@ export type LegalDocumentContent = {
   sections: readonly LegalDocumentSection[];
 };
 
-export type DataDeletionScope = 'local' | 'account';
+export type DataDeletionScope = 'local' | 'data' | 'account';
 
 export type DataDeletionResult = {
   scope: DataDeletionScope;

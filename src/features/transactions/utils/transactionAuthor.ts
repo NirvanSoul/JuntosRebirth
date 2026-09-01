@@ -9,19 +9,12 @@ export type TransactionAuthor = {
 
 export type TransactionAuthorContext = {
   profilesByUserId: Readonly<Record<string, SpaceMemberProfile>>;
-  /** Uuid de quien usa el móvil, o `null` en modo invitado. */
+  /** Uuid de quien usa el móvil, si la sesión se pudo restaurar. */
   ownUserId: string | null;
-  /** Id de instalación de este dispositivo, que firma las filas sin sesión. */
-  installationId: string | null;
 };
 
 /**
  * Atribuye un movimiento a una persona del espacio.
- *
- * `createdBy` no siempre es un uuid de usuario: una fila creada en modo
- * invitado, o anterior a que se normalizara la columna, guarda el id de
- * instalación del dispositivo. Por eso la autoría propia se reconoce por dos
- * vías, el uuid y el id de instalación, y ambas se comparan de forma explícita.
  *
  * Lo que no se hace es tratar como propio cualquier id desconocido. Sería
  * cómodo —en un espacio de dos, quien no es la otra persona eres tú— pero
@@ -43,11 +36,9 @@ export function formatAuthorName(author: TransactionAuthor): string {
 
 export function resolveTransactionAuthor(
   createdBy: string,
-  { profilesByUserId, ownUserId, installationId }: TransactionAuthorContext,
+  { profilesByUserId, ownUserId }: TransactionAuthorContext,
 ): TransactionAuthor {
-  const isOwn =
-    (ownUserId !== null && createdBy === ownUserId) ||
-    (installationId !== null && createdBy === installationId);
+  const isOwn = ownUserId !== null && createdBy === ownUserId;
 
   if (isOwn) {
     return {

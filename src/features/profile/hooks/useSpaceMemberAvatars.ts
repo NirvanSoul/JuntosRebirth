@@ -14,10 +14,9 @@ import { useAppForeground } from '@/hooks/useAppForeground';
  * que quien consume el hook decide entre `Avatar` y `AvatarPair` por la
  * longitud y no por el tipo de espacio.
  *
- * La foto propia sale de `local_profile` y no del censo: es la única que existe
- * en modo invitado y la única que está disponible antes de que termine la
- * primera sincronización, así que leerla aparte evita un hueco visible al
- * arrancar.
+ * La foto propia sale de `local_profile` y no del censo: está disponible antes
+ * de que termine la primera sincronización, así que leerla aparte evita un
+ * hueco visible al arrancar.
  */
 export function useSpaceMemberAvatars(
   space: Space,
@@ -49,10 +48,9 @@ export function useSpaceMemberAvatars(
         getAuthenticatedUserId(),
         listSpaceMemberProfiles(spaceId),
       ]);
-      // «La otra persona» es todo el que no sea uno mismo. Cuando aún no se
-      // conoce el propio uuid —modo invitado, o sesión sin resolver— no se
-      // elige a nadie: colocar una foto ajena en el hueco propio sería peor
-      // que mostrar el icono de respaldo.
+      // «La otra persona» es todo el que no sea uno mismo. Mientras la sesión
+      // se resuelve no se elige a nadie: colocar una foto ajena en el hueco
+      // propio sería peor que mostrar el icono de respaldo.
       const partner = ownUserId
         ? profiles.find((profile) => profile.userId !== ownUserId)
         : undefined;

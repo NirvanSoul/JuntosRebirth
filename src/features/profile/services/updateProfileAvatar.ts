@@ -71,8 +71,7 @@ async function uploadWithSingleRetry(
  *
  * Con sesión, la foto no se da por cambiada hasta que `PUT /v1/me/avatar`
  * responde 2xx: mostrarla antes prometería a la persona algo que su pareja
- * todavía no puede ver. Sin sesión —modo invitado— sí se guarda en local con
- * estado pendiente, y `syncOwnAvatar` la publicará en cuanto haya cuenta.
+ * todavía no puede ver. Sin una sesión verificada la operación se rechaza.
  *
  * Devuelve `null` si la persona cancela el selector, que no es un error.
  */

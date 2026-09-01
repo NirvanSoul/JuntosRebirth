@@ -6,9 +6,6 @@ import { linking } from '@/navigation/linking';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
-import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
-import { OnboardingNavigator } from '@/features/onboarding/OnboardingNavigator';
-import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
 import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -17,10 +14,7 @@ import { fontFamily } from '@/theme/fonts';
 export function RootNavigator() {
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(createStyles);
-  const { isReady: isAuthReady, session } = useAuthSession();
-  const { isReady: isBetterAuthReady, session: betterAuthSession } =
-    useBetterAuthSession();
-  const { isReady: isOnboardingReady, status } = useOnboardingStatus();
+  const { isReady: isAuthReady, session } = useBetterAuthSession();
 
   const navigationTheme = useMemo(
     () => ({
@@ -43,23 +37,14 @@ export function RootNavigator() {
     [colors, isDark],
   );
 
-  if (!isAuthReady || !isBetterAuthReady || !isOnboardingReady) {
+  if (!isAuthReady) {
     return <View style={styles.root} testID="root-navigator-backdrop" />;
   }
 
-  // Better Auth crea sesión al registrar una cuenta, antes de que su correo
-  // haya sido confirmado. Esa sesión pendiente no autoriza a entrar a la app.
-  const isEmailVerificationPending = Boolean(
-    betterAuthSession?.user && !betterAuthSession.user.emailVerified,
-  );
-  const content = !status.completed ? (
-    <OnboardingNavigator />
-  ) : status.accessMode === 'authenticated' &&
-    ((!session && !betterAuthSession) || isEmailVerificationPending) ? (
-    <AccessScreen />
-  ) : (
-    <MainTabsNavigator />
-  );
+  // Una sesión provisional de registro no concede acceso. El valor estricto
+  // evita que una respuesta incompleta del proveedor abra datos locales.
+  const hasVerifiedSession = session?.user.emailVerified === true;
+  const content = hasVerifiedSession ? <MainTabsNavigator /> : <AccessScreen />;
 
   // El fondo del root nativo es blanco. Las escenas del drawer y de las pestañas
   // son transparentes y las pestañas se cruzan con `animation: 'fade'`, así que

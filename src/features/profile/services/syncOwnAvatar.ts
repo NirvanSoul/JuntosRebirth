@@ -25,8 +25,7 @@ import { getAvatar, uploadAvatar } from '@/services/api/avatar';
  */
 export async function syncOwnAvatar(): Promise<boolean> {
   const userId = await getAuthenticatedUserId();
-  // En modo invitado no hay a quién asociar la foto: se queda en el dispositivo
-  // y subirá en cuanto la persona se registre.
+  // Si la sesión desaparece durante una tarea de fondo, no se toca la caché.
   if (!userId) return false;
 
   const { localPath, syncStatus } = await getLocalAvatarUpload();

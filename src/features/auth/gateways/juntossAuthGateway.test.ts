@@ -1,6 +1,7 @@
 import {
   AccountLockedError,
   createJuntossAuthGateway,
+  EmailVerificationRequiredError,
 } from '@/features/auth/gateways/juntossAuthGateway';
 import { authClient } from '@/lib/auth-client';
 import { unregisterCurrentDeviceFromInvitationPush } from '@/lib/notifications/invitationPushTokenStore';
@@ -28,6 +29,7 @@ describe('juntossAuthGateway', () => {
       name: 'Ana',
       password: 'contrasena-larga',
     });
+    expect(mockedClient.emailOtp.sendVerificationOtp).not.toHaveBeenCalled();
   });
 
   it('verifica el correo cuando el código es de registro', async () => {
@@ -93,8 +95,10 @@ describe('juntossAuthGateway', () => {
     mockedClient.signIn.email.mockResolvedValueOnce({
       data: null,
       error: {
-        code: 'ACCOUNT_LOCKED',
-        lockedUntil: '2026-08-30T12:00:00.000Z',
+        error: {
+          code: 'ACCOUNT_LOCKED',
+          lockedUntil: '2026-08-30T12:00:00.000Z',
+        },
       },
     } as never);
 
@@ -112,7 +116,7 @@ describe('juntossAuthGateway', () => {
   it('traduce los códigos conocidos a mensajes en español', async () => {
     mockedClient.signIn.email.mockResolvedValueOnce({
       data: null,
-      error: { code: 'INVALID_EMAIL_OR_PASSWORD' },
+      error: { error: { code: 'INVALID_EMAIL_OR_PASSWORD' } },
     } as never);
 
     await expect(
@@ -122,6 +126,70 @@ describe('juntossAuthGateway', () => {
       }),
     ).rejects.toThrow('Correo o contraseña incorrectos.');
   });
+
+  it('distingue una cuenta sin verificar de unas credenciales incorrectas', async () => {
+    mockedClient.signIn.email.mockResolvedValueOnce({
+      data: null,
+      error: { error: { code: 'EMAIL_NOT_VERIFIED' } },
+    } as never);
+
+    const promise = createJuntossAuthGateway().signInWithPassword({
+      email: 'ana@example.test',
+      password: 'contrasena-larga',
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(
+      EmailVerificationRequiredError,
+    );
+    await expect(promise).rejects.toMatchObject({
+      email: 'ana@example.test',
+    });
+  });
+
+  it('explica una respuesta sin sesión en lugar de culpar a las credenciales', async () => {
+    mockedClient.signIn.email.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    } as never);
+
+    await expect(
+      createJuntossAuthGateway().signInWithPassword({
+        email: 'ana@example.test',
+        password: 'contrasena-larga',
+      }),
+    ).rejects.toThrow('No recibimos una confirmación de sesión del servidor.');
+  });
+
+  it.each([
+    [
+      'USER_ALREADY_EXISTS',
+      'Ya existe una cuenta con este correo. Inicia sesión o recupera tu contraseña.',
+    ],
+    [
+      'FAILED_TO_CREATE_USER',
+      'No pudimos guardar tu cuenta en el servidor. No se ha creado: inténtalo de nuevo en unos minutos.',
+    ],
+    [
+      'UNTRUSTED_ORIGIN',
+      'Esta versión de la app no está autorizada para crear cuentas. Actualízala o usa la development build de Juntoss.',
+    ],
+  ])(
+    'explica el fallo de registro %s sin mostrar el detalle técnico',
+    async (code, expectedMessage) => {
+      mockedClient.signUp.email.mockResolvedValueOnce({
+        data: null,
+        error: { code, message: 'Internal failure detail' },
+      } as never);
+
+      await expect(
+        createJuntossAuthGateway().signUp({
+          displayName: 'Ana',
+          email: 'ana@example.test',
+          password: 'contrasena-larga',
+        }),
+      ).rejects.toThrow(expectedMessage);
+    },
+  );
 
   it('no filtra texto de la API cuando el código es desconocido', async () => {
     mockedClient.signIn.email.mockResolvedValueOnce({
@@ -135,6 +203,23 @@ describe('juntossAuthGateway', () => {
         password: 'incorrecta',
       }),
     ).rejects.toThrow('No pudimos iniciar sesión.');
+  });
+
+  it('explica que el servidor no indicó la causa al fallar el registro con un código nuevo', async () => {
+    mockedClient.signUp.email.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'SOMETHING_NEW', message: 'Internal failure detail' },
+    } as never);
+
+    await expect(
+      createJuntossAuthGateway().signUp({
+        displayName: 'Ana',
+        email: 'ana@example.test',
+        password: 'contrasena-larga',
+      }),
+    ).rejects.toThrow(
+      'No pudimos crear tu cuenta porque el servidor no indicó la causa. Comprueba tu conexión e inténtalo de nuevo.',
+    );
   });
 
   it('retira el token push antes de cerrar sesión', async () => {

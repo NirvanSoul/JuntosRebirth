@@ -13,8 +13,8 @@ export type RecordLegalAcceptanceInput = {
 
 /**
  * Registra evidencia de aceptación de términos/política cuando existe una
- * sesión autenticada. Sin sesión (modo invitado) no hay nada que registrar:
- * la evidencia se guarda contra un usuario, no contra un dispositivo.
+ * sesión autenticada. Sin sesión no hay nada que registrar: la evidencia se
+ * guarda contra un usuario, no contra un dispositivo.
  *
  * El identificador del usuario no viaja en el cuerpo: lo deduce la API de la
  * sesión, para que nadie pueda firmar una aceptación en nombre de otro.

@@ -4,7 +4,7 @@
 
 Este documento define la arquitectura técnica de `juntoss`, los límites entre capas y la estructura recomendada del repositorio.
 
-Debe facilitar cambios pequeños, mantener juntas las piezas de una misma funcionalidad, evitar carpetas globales sin criterio, separar interfaz y persistencia, funcionar en iOS y Android y permitir modo invitado local y modo autenticado sincronizado.
+Debe facilitar cambios pequeños, mantener juntas las piezas de una misma funcionalidad, evitar carpetas globales sin criterio, separar interfaz y persistencia, funcionar en iOS y Android y exigir una sesión verificada para acceder a datos.
 
 ---
 
@@ -111,8 +111,7 @@ No contiene lógica específica de movimientos, categorías o espacios.
 ```text
 src/navigation/
 ├── RootNavigator.tsx
-├── AuthNavigator.tsx
-├── GuestNavigator.tsx
+├── AccessScreen.tsx
 ├── MainTabsNavigator.tsx
 ├── types.ts
 ├── linking.ts
@@ -178,7 +177,6 @@ Organiza el proyecto por dominios.
 src/features/
 ├── onboarding/
 ├── auth/
-├── guest/
 ├── transactions/
 ├── categories/
 ├── accounts/
@@ -496,7 +494,8 @@ transactions/repositories/
 └── syncedTransactionRepository.ts
 ```
 
-El modo invitado y la migración local-nube justifican esta abstracción, pero no debe añadirse complejidad innecesaria antes de usarla.
+La caché local se restaura únicamente para una sesión verificada; no existen
+repositorios ni migraciones de invitado.
 
 ---
 
@@ -507,9 +506,8 @@ Flujo conceptual:
 ```text
 UI
   -> caso de uso
-  -> repositorio seleccionado por sesión
-      -> local, si invitado
-      -> remoto o sincronizado, si autenticado
+  -> sesión verificada
+  -> caché local y sincronización remota de la cuenta autenticada
 ```
 
 La estrategia detallada está en `API.md`.
@@ -765,7 +763,6 @@ src/
 │   └── overlays/
 ├── features/
 │   ├── onboarding/
-│   ├── guest/
 │   ├── transactions/
 │   ├── categories/
 │   ├── dashboard/

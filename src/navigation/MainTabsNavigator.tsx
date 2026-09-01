@@ -54,7 +54,6 @@ import {
   MapScreen,
   type MapScreenHandle,
 } from '@/features/map/screens/MapScreen';
-import { AuthModal } from '@/features/settings/components/AuthModal';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
 import { useSpaceMemberAvatars } from '@/features/profile/hooks/useSpaceMemberAvatars';
 import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
@@ -152,7 +151,6 @@ export function MainTabsNavigator() {
       : activeSpace.name;
   }, [activeSpace.name, activeSpace.type, session]);
   const [isInvitePartnerVisible, setInvitePartnerVisible] = useState(false);
-  const [isSpaceAuthModalVisible, setSpaceAuthModalVisible] = useState(false);
   const coupleSpace = spaces.find((space) => space.type === 'couple') ?? null;
   // Un espacio pendiente pausa sus datos compartidos hasta que la pareja acepte.
   const isAwaitingPartner = isAwaitingPartnerSpace(activeSpace);
@@ -544,12 +542,8 @@ export function MainTabsNavigator() {
   ]);
 
   const handleInvitePartner = useCallback(() => {
-    if (!session) {
-      setSpaceAuthModalVisible(true);
-      return;
-    }
     setInvitePartnerVisible(true);
-  }, [session]);
+  }, []);
 
   /** Al cancelar el espacio pendiente, el servidor lo elimina sin miembros. */
   const handleCancelPendingCoupleSpace =
@@ -1374,10 +1368,6 @@ export function MainTabsNavigator() {
         onClose={() => setInvitePartnerVisible(false)}
         onCreateCoupleSpaceInvitation={createCoupleSpaceInvitation}
         visible={isInvitePartnerVisible}
-      />
-      <AuthModal
-        onClose={() => setSpaceAuthModalVisible(false)}
-        visible={isSpaceAuthModalVisible}
       />
     </SpaceMembershipProvider>
   );

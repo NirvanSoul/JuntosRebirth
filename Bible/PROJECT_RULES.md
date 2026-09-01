@@ -389,7 +389,7 @@ Ejemplos de reglas críticas:
 - Separación.
 - Límites de plan.
 - Idempotencia.
-- Migración de invitado.
+- Verificación de correo y autorización de sesión.
 - Cálculo definitivo de operaciones sensibles.
 
 Las validaciones de interfaz mejoran experiencia, pero no sustituyen seguridad de backend.
@@ -405,19 +405,18 @@ servidor.
 
 ---
 
-## 15. Modo invitado
+## 15. Sesión obligatoria
 
 Reglas:
 
-- Los datos se guardan localmente.
-- No se crean filas remotas.
-- La lógica funcional debe parecerse a la autenticada.
-- Los identificadores locales deben permitir migración.
-- La conversión a cuenta debe ser idempotente.
-- No borrar datos locales hasta confirmar sincronización.
-- No mezclar datos de invitado con una cuenta equivocada.
-- Los límites deben centralizarse.
-- La interfaz debe explicar por qué se solicita registro.
+- No existe modo invitado ni acceso anónimo a datos de la aplicación.
+- La navegación principal requiere una sesión cuyo correo esté verificado.
+- La caché local solo puede visualizarse desde esa navegación autenticada.
+- Al cerrar sesión, se revoca inmediatamente el acceso a la interfaz y a los
+  datos visibles; cualquier fila heredada del dispositivo se limpia antes de
+  restaurar la siguiente cuenta.
+- El dispositivo puede conservar un identificador técnico para idempotencia o
+  diagnóstico, pero nunca es identidad, autorización ni propietario de datos.
 
 ---
 
@@ -501,7 +500,7 @@ Preferir:
 
 - `CreateTransactionModal`
 - `ActiveSpaceSelector`
-- `useGuestMigration`
+- `useBetterAuthSession`
 - `transactionRepository`
 - `formatCurrency`
 

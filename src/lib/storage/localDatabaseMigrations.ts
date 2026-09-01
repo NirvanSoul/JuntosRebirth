@@ -21,7 +21,17 @@ export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
 ): Promise<void> {
   await database.execAsync('PRAGMA foreign_keys = ON');
-  await database.execAsync('PRAGMA journal_mode = WAL');
+  await database.execAsync('PRAGMA busy_timeout = 5000');
+
+  // Cambiar el journal mode pide un bloqueo exclusivo. Una base que ya está
+  // en WAL no necesita repetirlo en cada arranque, y así evitamos competir con
+  // una conexión que solo esté terminando de leer la caché local.
+  const journalMode = await database.getFirstAsync<{ journal_mode: string }>(
+    'PRAGMA journal_mode',
+  );
+  if (journalMode?.journal_mode?.toLowerCase() !== 'wal') {
+    await database.execAsync('PRAGMA journal_mode = WAL');
+  }
 
   const versionRow = await database.getFirstAsync<{ user_version: number }>(
     'PRAGMA user_version',

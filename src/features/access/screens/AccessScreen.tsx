@@ -16,7 +16,7 @@ import {
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
-import { useOnboardingStatus } from '@/state/onboarding/useOnboardingStatus';
+import { loadPendingEmailVerification } from '@/features/auth/services/pendingEmailVerification';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -42,20 +42,17 @@ const stepTitles: Record<AccessStep['screen'], string> = {
   reset: 'Nueva contraseña',
 };
 
-/** Host de autenticación a pantalla completa, reutilizando los mismos formularios de Ajustes. */
+/** Host único a pantalla completa para los flujos de autenticación. */
 export function AccessScreen() {
   const styles = useThemedStyles(createStyles);
-  const { markAuthenticated, markGuestComplete, status } =
-    useOnboardingStatus();
   const { session } = useBetterAuthSession();
   const pendingVerificationEmail =
-    session?.user.emailVerified === false ? session.user.email : null;
+    session?.user && !session.user.emailVerified ? session.user.email : null;
   const [step, setStep] = useState<AccessStep>(() =>
     pendingVerificationEmail
       ? { screen: 'verify-signup', email: pendingVerificationEmail }
       : { screen: 'entry' },
   );
-  const [isCompletingGuest, setCompletingGuest] = useState(false);
 
   // Si el alta acaba de crear una sesión sin verificar, RootNavigator vuelve a
   // montar esta pantalla. Recuperamos el OTP desde la sesión, no desde memoria
@@ -65,15 +62,22 @@ export function AccessScreen() {
     setStep({ screen: 'verify-signup', email: pendingVerificationEmail });
   }, [pendingVerificationEmail]);
 
-  const completeAuthenticated = async () => {
-    await markAuthenticated();
-  };
-
-  const completeGuest = async () => {
-    if (isCompletingGuest) return;
-    setCompletingGuest(true);
-    await markGuestComplete();
-  };
+  // La sesión provisional puede desaparecer o refrescarse antes de que la
+  // pantalla se vuelva a montar. En ese caso el correo almacenado es la fuente
+  // de continuidad del OTP; no concede acceso ni contiene credenciales.
+  useEffect(() => {
+    let isMounted = true;
+    void loadPendingEmailVerification()
+      .then((email) => {
+        if (isMounted && email) {
+          setStep({ screen: 'verify-signup', email });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const goBack = () => {
     switch (step.screen) {
@@ -168,33 +172,24 @@ export function AccessScreen() {
                 testID="access-open-login"
                 variant="surface"
               />
-              {status?.accessMode !== 'authenticated' ? (
-                <ModalPrimaryAction
-                  accessibilityLabel="Probar sin cuenta"
-                  disabled={isCompletingGuest}
-                  label={
-                    isCompletingGuest ? 'Preparando…' : 'Probar sin cuenta'
-                  }
-                  onPress={() => void completeGuest()}
-                  testID="access-continue-guest"
-                  variant="surface"
-                />
-              ) : null}
             </View>
           ) : null}
 
           {step.screen === 'login' ? (
             <LoginScreen
               onCancel={goBack}
+              onEmailVerificationRequired={(email) =>
+                setStep({ screen: 'verify-signup', email })
+              }
               onNavigateToForgotPassword={() => setStep({ screen: 'forgot' })}
               onNavigateToSignUp={() => setStep({ screen: 'signup', step: 1 })}
-              onSuccess={() => void completeAuthenticated()}
+              onSuccess={() => undefined}
             />
           ) : null}
 
           {step.screen === 'signup' ? (
             <SignUpScreen
-              onGoogleSuccess={() => void completeAuthenticated()}
+              onGoogleSuccess={() => undefined}
               onNavigateToLogin={() => setStep({ screen: 'login' })}
               onStepChange={(nextStep) =>
                 setStep({ screen: 'signup', step: nextStep })
@@ -210,7 +205,7 @@ export function AccessScreen() {
             <VerifyCodeScreen
               email={step.email}
               onCancel={goBack}
-              onSuccess={() => void completeAuthenticated()}
+              onSuccess={() => undefined}
               purpose="signup"
             />
           ) : null}

@@ -304,6 +304,9 @@ export function AcceptInvitationScreen({
           {authStep.screen === 'login' ? (
             <LoginScreen
               onCancel={onFinished}
+              onEmailVerificationRequired={(email) =>
+                setAuthStep({ screen: 'verify-signup', email })
+              }
               onNavigateToSignUp={() =>
                 setAuthStep({ screen: 'signup', step: 1 })
               }

@@ -159,6 +159,7 @@ export function SettingsRow({
 
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityHint={
         pending ? 'Función pendiente de implementar' : 'Abre esta configuración'
       }

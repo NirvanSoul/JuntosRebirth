@@ -44,10 +44,6 @@ jest.mock('@/lib/storage/localDatabase', () => ({
   getLocalDatabase: jest.fn(async () => ({})),
 }));
 
-jest.mock('@/lib/storage/localIdentity', () => ({
-  getOrCreateInstallationId: jest.fn(async () => 'install-abc'),
-}));
-
 const coupleSpace: Space = {
   id: 'space-couple',
   name: 'Juntos',
@@ -92,14 +88,13 @@ describe('useTransactionAuthor', () => {
     expect(await screen.findByText('sin autor')).toBeTruthy();
   });
 
-  it('reconoce como propia la fila firmada con el id de instalación', async () => {
+  it('no atribuye una fila antigua sin autor autenticado', async () => {
     const screen = await renderWithTheme(
       <SpaceMembershipProvider space={coupleSpace}>
         <AuthorProbe createdBy="install-abc" />
       </SpaceMembershipProvider>,
     );
 
-    // Cae en el perfil propio, no en «Desconocido».
-    expect(await screen.findByText('Ana')).toBeTruthy();
+    expect(await screen.findByText('Desconocido')).toBeTruthy();
   });
 });

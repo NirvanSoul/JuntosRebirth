@@ -23,6 +23,23 @@ export class AccountLockedError extends Error {
   }
 }
 
+/**
+ * Las credenciales son válidas, pero Better Auth no abre una sesión hasta que
+ * la persona confirme su correo. Mantener este caso tipado permite llevarla
+ * directamente al OTP en lugar de presentarlo como un fallo de contraseña.
+ */
+export class EmailVerificationRequiredError extends Error {
+  email: string;
+
+  constructor(email: string) {
+    super(
+      'Tu correo aún no está verificado. Confírmalo con el código que te enviamos.',
+    );
+    this.name = 'EmailVerificationRequiredError';
+    this.email = email;
+  }
+}
+
 export type AuthGateway = {
   signUp(input: SignUpInput): Promise<void>;
   verifyOtp(input: VerifyCodeInput): Promise<void>;
@@ -43,7 +60,34 @@ export type AuthGateway = {
   signOut(): Promise<void>;
 };
 
-type ApiError = { code?: string; message?: string } | null | undefined;
+type ApiError = {
+  code?: string;
+  lockedUntil?: unknown;
+  message?: string;
+};
+
+type RawAuthError = {
+  code?: unknown;
+  error?: unknown;
+  lockedUntil?: unknown;
+  message?: unknown;
+};
+
+/** Better Auth entrega el cuerpo remoto bajo `error`; normalizamos ambos
+ * formatos para que la UI siempre decida por el código estable de la API. */
+function normalizeAuthError(error: unknown): ApiError {
+  if (!error || typeof error !== 'object') return {};
+  const outer = error as RawAuthError;
+  const nested =
+    outer.error && typeof outer.error === 'object'
+      ? (outer.error as RawAuthError)
+      : outer;
+  return {
+    code: typeof nested.code === 'string' ? nested.code : undefined,
+    lockedUntil: nested.lockedUntil ?? outer.lockedUntil,
+    message: typeof nested.message === 'string' ? nested.message : undefined,
+  };
+}
 
 /**
  * Traduce los códigos conocidos de la API a mensajes en español; el resto cae
@@ -52,10 +96,13 @@ type ApiError = { code?: string; message?: string } | null | undefined;
 function describeAuthError(error: ApiError, fallback: string): string {
   switch (error?.code) {
     case 'INVALID_EMAIL_OR_PASSWORD':
+    case 'INVALID_PASSWORD':
+    case 'INVALID_USER':
+    case 'CREDENTIAL_ACCOUNT_NOT_FOUND':
       return 'Correo o contraseña incorrectos.';
     case 'USER_ALREADY_EXISTS':
     case 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL':
-      return 'Ya existe una cuenta con este correo.';
+      return 'Ya existe una cuenta con este correo. Inicia sesión o recupera tu contraseña.';
     case 'EMAIL_NOT_VERIFIED':
       return 'Confirma tu correo antes de continuar.';
     case 'INVALID_OTP':
@@ -64,7 +111,7 @@ function describeAuthError(error: ApiError, fallback: string): string {
       return 'El código venció o no es válido. Solicita uno nuevo.';
     case 'TOO_MANY_ATTEMPTS':
     case 'TOO_MANY_REQUESTS':
-      return 'Demasiados intentos. Espera un momento e inténtalo de nuevo.';
+      return 'Has hecho demasiados intentos. Espera unos minutos antes de volver a probar.';
     case 'PASSWORD_TOO_SHORT':
       return 'La contraseña es demasiado corta. Usa al menos 8 caracteres.';
     case 'PASSWORD_TOO_LONG':
@@ -74,9 +121,17 @@ function describeAuthError(error: ApiError, fallback: string): string {
     case 'VALIDATION_ERROR':
       return 'Revisa el nombre, correo y contraseña e inténtalo de nuevo.';
     case 'UNTRUSTED_ORIGIN':
-      return 'Esta versión de prueba no puede crear cuentas. Usa la development build de Juntoss.';
+    case 'INVALID_ORIGIN':
+      return 'Esta versión de la app no está autorizada para crear cuentas. Actualízala o usa la development build de Juntoss.';
     case 'FAILED_TO_CREATE_USER':
-      return 'No pudimos crear la cuenta ahora. Inténtalo de nuevo en unos minutos.';
+      return 'No pudimos guardar tu cuenta en el servidor. No se ha creado: inténtalo de nuevo en unos minutos.';
+    case 'INTERNAL_SERVER_ERROR':
+    case 'INTERNAL_ERROR':
+      return 'El servidor tuvo un problema temporal al crear la cuenta. No se ha creado: inténtalo de nuevo más tarde.';
+    case 'FAILED_TO_CREATE_SESSION':
+      return 'Tus datos son correctos, pero el servidor no pudo abrir la sesión. Inténtalo de nuevo en unos minutos.';
+    case 'EMAIL_PASSWORD_DISABLED':
+      return 'El acceso con correo y contraseña no está disponible temporalmente. Inténtalo de nuevo más tarde.';
     case 'USER_NOT_FOUND':
       return 'No encontramos una cuenta con ese correo.';
     default:
@@ -85,9 +140,8 @@ function describeAuthError(error: ApiError, fallback: string): string {
 }
 
 /** El bloqueo llega como 429 con la fecha hasta la que dura. */
-function readLockout(error: unknown): Date | null {
-  if (!error || typeof error !== 'object') return null;
-  const candidate = error as { code?: string; lockedUntil?: unknown };
+function readLockout(error: ApiError): Date | null {
+  const candidate = error;
   if (candidate.code !== 'ACCOUNT_LOCKED') return null;
   if (typeof candidate.lockedUntil !== 'string') return null;
   const lockedUntil = new Date(candidate.lockedUntil);
@@ -98,17 +152,23 @@ function fail(error: ApiError, fallback: string): never {
   throw new Error(describeAuthError(error, fallback));
 }
 
+function isNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('network') ||
+    message.includes('failed to fetch') ||
+    message.includes('timed out') ||
+    message.includes('timeout') ||
+    message.includes('load failed')
+  );
+}
+
 async function handleAuthRequest<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
   } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.message.includes('Network') ||
-        error.message.includes('timed out') ||
-        error.message.includes('Network request failed') ||
-        error.message.includes('Failed to fetch'))
-    ) {
+    if (isNetworkError(error)) {
       throw new Error(
         'Tiempo de espera agotado al conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.',
       );
@@ -126,7 +186,15 @@ export function createJuntossAuthGateway(): AuthGateway {
           password,
           name: displayName,
         });
-        if (error) fail(error, 'No pudimos crear tu cuenta.');
+        if (error) {
+          fail(
+            normalizeAuthError(error),
+            'No pudimos crear tu cuenta porque el servidor no indicó la causa. Comprueba tu conexión e inténtalo de nuevo.',
+          );
+        }
+        // El backend tiene `sendVerificationOnSignUp: true`: este único alta
+        // ya emite el OTP. Enviarlo otra vez lo rota, consume el rate limit y
+        // puede dejar a la persona con un código distinto al que recibió.
       });
     },
 
@@ -137,7 +205,8 @@ export function createJuntossAuthGateway(): AuthGateway {
             email,
             otp: token,
           });
-          if (error) fail(error, 'No pudimos verificar el código.');
+          if (error)
+            fail(normalizeAuthError(error), 'No pudimos verificar el código.');
           return;
         }
 
@@ -148,7 +217,8 @@ export function createJuntossAuthGateway(): AuthGateway {
           otp: token,
           type: 'forget-password',
         });
-        if (error) fail(error, 'No pudimos verificar el código.');
+        if (error)
+          fail(normalizeAuthError(error), 'No pudimos verificar el código.');
       });
     },
 
@@ -158,7 +228,8 @@ export function createJuntossAuthGateway(): AuthGateway {
           email,
           type: 'email-verification',
         });
-        if (error) fail(error, 'No pudimos reenviar el código.');
+        if (error)
+          fail(normalizeAuthError(error), 'No pudimos reenviar el código.');
       });
     },
 
@@ -168,7 +239,8 @@ export function createJuntossAuthGateway(): AuthGateway {
           email,
           type: 'forget-password',
         });
-        if (error) fail(error, 'No pudimos reenviar el código.');
+        if (error)
+          fail(normalizeAuthError(error), 'No pudimos reenviar el código.');
       });
     },
 
@@ -179,11 +251,19 @@ export function createJuntossAuthGateway(): AuthGateway {
           password,
         });
         if (error) {
-          const lockedUntil = readLockout(error);
+          const normalizedError = normalizeAuthError(error);
+          const lockedUntil = readLockout(normalizedError);
           if (lockedUntil) throw new AccountLockedError(lockedUntil);
-          fail(error, 'No pudimos iniciar sesión.');
+          if (normalizedError.code === 'EMAIL_NOT_VERIFIED') {
+            throw new EmailVerificationRequiredError(email);
+          }
+          fail(normalizedError, 'No pudimos iniciar sesión.');
         }
-        if (!data?.user?.id) throw new Error('No pudimos iniciar sesión.');
+        if (!data?.user?.id) {
+          throw new Error(
+            'No recibimos una confirmación de sesión del servidor. Comprueba tu conexión e inténtalo de nuevo.',
+          );
+        }
         return { userId: data.user.id };
       });
     },
@@ -194,7 +274,11 @@ export function createJuntossAuthGateway(): AuthGateway {
           email,
           type: 'forget-password',
         });
-        if (error) fail(error, 'No pudimos enviar el código de recuperación.');
+        if (error)
+          fail(
+            normalizeAuthError(error),
+            'No pudimos enviar el código de recuperación.',
+          );
       });
     },
 
@@ -205,7 +289,11 @@ export function createJuntossAuthGateway(): AuthGateway {
           otp: code,
           password,
         });
-        if (error) fail(error, 'No pudimos actualizar tu contraseña.');
+        if (error)
+          fail(
+            normalizeAuthError(error),
+            'No pudimos actualizar tu contraseña.',
+          );
       });
     },
 
@@ -215,7 +303,7 @@ export function createJuntossAuthGateway(): AuthGateway {
       await unregisterCurrentDeviceFromInvitationPush().catch(() => undefined);
       await handleAuthRequest(async () => {
         const { error } = await authClient.signOut();
-        if (error) fail(error, 'No pudimos cerrar sesión.');
+        if (error) fail(normalizeAuthError(error), 'No pudimos cerrar sesión.');
       });
     },
   };

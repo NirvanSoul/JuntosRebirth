@@ -6,26 +6,17 @@ import { syncOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { syncSpaceMemberProfiles } from '@/features/profile/services/syncSpaceMemberProfiles';
 import type { SpaceMemberProfile } from '@/features/profile/types';
 import type { Space } from '@/features/spaces/types';
-import { getLocalDatabase } from '@/lib/storage/localDatabase';
-import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
-
-async function getInstallationId(): Promise<string> {
-  return getOrCreateInstallationId(await getLocalDatabase());
-}
 
 export type SpaceMembership = {
   /** Perfiles indexados por uuid de usuario, para resolver el autor de una fila. */
   profilesByUserId: Readonly<Record<string, SpaceMemberProfile>>;
-  /** Uuid de quien usa el móvil, o `null` en modo invitado. */
+  /** Uuid de quien usa el móvil, si la sesión se pudo restaurar. */
   ownUserId: string | null;
-  /** Id de instalación, con el que van firmadas las filas creadas sin sesión. */
-  installationId: string | null;
 };
 
 const emptyMembership: SpaceMembership = {
   profilesByUserId: {},
   ownUserId: null,
-  installationId: null,
 };
 
 /**
@@ -45,9 +36,8 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
   const isShared = space.type !== 'personal';
 
   const load = useCallback(async (): Promise<SpaceMembership> => {
-    const [ownUserId, installationId, cached] = await Promise.all([
+    const [ownUserId, cached] = await Promise.all([
       getAuthenticatedUserId(),
-      getInstallationId(),
       listSpaceMemberProfiles(spaceId),
     ]);
 
@@ -56,7 +46,6 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
         cached.map((profile) => [profile.userId, profile]),
       ),
       ownUserId,
-      installationId,
     };
   }, [spaceId]);
 

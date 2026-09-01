@@ -219,7 +219,7 @@ async function syncSpaceData(input: {
  */
 export function syncSpaceDataForCurrentSession(input: {
   spaceId: string;
-  /** Los datos de invitado se suben solo tras confirmar su migración. */
+  /** Incluye filas locales aún pendientes de la sesión actual. */
   includeLocalOnly?: boolean;
 }): Promise<CoupleSpaceSyncResult> {
   const previous = inFlightBySpaceId.get(input.spaceId) ?? Promise.resolve();
