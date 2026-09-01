@@ -48,6 +48,17 @@ credenciales. Revoca todas las sesiones; el cliente elimina su caché local y
 vuelve a Acceso. Los datos de otra persona en un espacio compartido no se
 eliminan.
 
+## Espacio de pareja
+
+Crear un espacio compartido son dos peticiones, no una transacción:
+`POST /v1/spaces` y `POST /v1/spaces/:spaceId/invitations`. Si la segunda
+falla, el espacio ya existe y el servidor solo admite un espacio de pareja
+activo por persona, así que el cliente reutiliza el que quedó esperando pareja
+en lugar de crear otro, que sería rechazado con `COUPLE_SPACE_LIMIT`.
+
+Ambas peticiones envían la zona IANA del dispositivo, igual que
+`POST /v1/bootstrap`.
+
 ## Límites de integración
 
 La API es la autoridad de permisos y datos remotos. Una sesión no verificada

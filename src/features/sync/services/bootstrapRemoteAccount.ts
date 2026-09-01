@@ -1,5 +1,6 @@
 import { apiClient } from '@/services/api/juntossApiClient';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
+import { deviceTimeZone } from '@/utils/deviceTimeZone';
 
 const bootstrapInFlightByUserId = new Map<string, Promise<void>>();
 
@@ -24,7 +25,7 @@ export async function bootstrapRemoteAccount(retries = 2): Promise<void> {
 }
 
 async function performBootstrapRemoteAccount(retries: number): Promise<void> {
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const timezone = deviceTimeZone();
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
       // El contrato remoto usa `timezone` (IANA); `timeZone` se rechaza como

@@ -1,5 +1,6 @@
 import { apiClient } from '@/services/api/juntossApiClient';
 import { listRemoteSpaces } from '@/services/api/spaces';
+import { deviceTimeZone } from '@/utils/deviceTimeZone';
 
 export type InvitationPreview =
   | { status: 'not_found' }
@@ -77,21 +78,57 @@ type IncomingInvitation = {
   expiresAt: string;
 };
 
+/** El espacio de pareja que este usuario creó y sigue sin aceptar nadie. */
+async function findOwnCoupleSpaceAwaitingPartner(): Promise<string | null> {
+  const spaces = await listRemoteSpaces();
+  const awaitingPartner = spaces.find(
+    (space) =>
+      space.type === 'couple' &&
+      space.role === 'owner' &&
+      space.activatedAt === null,
+  );
+  return awaitingPartner?.id ?? null;
+}
+
+async function createCoupleSpace(
+  name: string,
+  currency: string,
+): Promise<string> {
+  const space = await apiClient.post<{ data: { space: { id: string } } }>(
+    '/v1/spaces',
+    {
+      name,
+      type: 'couple',
+      currency,
+      // La misma zona que manda `POST /v1/bootstrap`. Con `UTC` fijo, todo
+      // cálculo por día del espacio compartido se desplazaba.
+      timezone: deviceTimeZone(),
+    },
+  );
+  return space.data.space.id;
+}
+
 export function createJuntossInvitationGateway(): InvitationGateway {
   return {
     async createCoupleSpaceInvitation(name, currency, inviteeEmail) {
-      const space = await apiClient.post<{ data: { space: { id: string } } }>(
-        '/v1/spaces',
-        { name, type: 'couple', currency, timezone: 'UTC' },
-      );
+      // Crear el espacio y crear su invitación son dos peticiones, no una
+      // transacción. Si la segunda falla, el espacio ya existe y el servidor
+      // solo admite un espacio de pareja activo por persona: el siguiente
+      // intento moría con `COUPLE_SPACE_LIMIT` sin salida. Reutilizar el que
+      // quedó esperando pareja hace que reintentar funcione. Su nombre y
+      // moneda son los del primer intento; el snapshot remoto es la autoridad
+      // y los devuelve en la siguiente restauración.
+      const spaceId =
+        (await findOwnCoupleSpaceAwaitingPartner()) ??
+        (await createCoupleSpace(name, currency));
       const invitation = await apiClient.post<{
         data: { invitation: { id: string; expiresAt: string } };
-      }>(`/v1/spaces/${space.data.space.id}/invitations`, {
+      }>(`/v1/spaces/${spaceId}/invitations`, {
         email: inviteeEmail,
         role: 'member',
       });
       return {
-        spaceId: space.data.space.id,
+        spaceId,
         invitationId: invitation.data.invitation.id,
         expiresAt: invitation.data.invitation.expiresAt,
       };
