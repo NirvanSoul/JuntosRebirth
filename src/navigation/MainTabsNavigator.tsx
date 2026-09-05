@@ -15,6 +15,11 @@ import { AppTabBar } from '@/components/navigation/AppTabBar/AppTabBar';
 import { CopySuccessToast } from '@/components/overlays/CopySuccessToast/CopySuccessToast';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { ActivityTabContent } from '@/navigation/components/ActivityTabContent';
+import {
+  getHomeCurrencyButtonLabel,
+  resolveHomeCurrencies,
+  useHomeCurrencyPress,
+} from '@/navigation/homeCurrencyControls';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import {
   CategoryPickerModal,
@@ -57,6 +62,7 @@ import {
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
 import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
 import { useSpaceMemberAvatars } from '@/features/profile/hooks/useSpaceMemberAvatars';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
 import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
 import { PendingInvitationBanner } from '@/features/spaces/components/PendingInvitationBanner';
@@ -109,7 +115,6 @@ import { resolveTransactionForDetail } from '@/features/transactions/utils/trans
 import { useAppForeground } from '@/hooks/useAppForeground';
 import {
   defaultCurrencyCode,
-  getCurrencyFlag,
   isCurrencyCode,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
@@ -185,6 +190,7 @@ export function MainTabsNavigator() {
     preferences: currencyPreferences,
     setCurrencyPreferences,
   } = useCurrencyPreferences();
+  const { venezuelaCurrencyMode } = useCurrencyCapabilities();
   const {
     selectedCurrency: selectedHomeCurrency,
     setSelectedCurrency: setSelectedHomeCurrency,
@@ -323,11 +329,14 @@ export function MainTabsNavigator() {
     activeCurrencies,
     activeSpaceDataCurrencies,
   );
-  const hasMultipleHomeCurrencies = spaceCurrencies.length > 1;
+  const homeCurrencies = resolveHomeCurrencies(
+    spaceCurrencies,
+    venezuelaCurrencyMode,
+  );
   const effectiveHomeCurrency =
-    (selectedHomeCurrency && spaceCurrencies.includes(selectedHomeCurrency)
+    (selectedHomeCurrency && homeCurrencies.includes(selectedHomeCurrency)
       ? selectedHomeCurrency
-      : spaceCurrencies[0]) ?? defaultCurrencyCode;
+      : homeCurrencies[0]) ?? defaultCurrencyCode;
   const selectedCategory =
     spaceCategories.find((category) => category.id === selectedCategoryId) ??
     null;
@@ -560,28 +569,13 @@ export function MainTabsNavigator() {
     );
   }, []);
 
-  // Sobre las del espacio, no las propias: si no, en un espacio compartido con
-  // dos monedas el botón no alternaría nada para quien solo tiene una.
-  const handleHomeCurrencyPress = useCallback(() => {
-    if (spaceCurrencies.length === 2) {
-      const nextCurrency = spaceCurrencies.find(
-        (currency) => currency !== effectiveHomeCurrency,
-      );
-      if (nextCurrency) {
-        void setSelectedHomeCurrency(nextCurrency).catch(showSaveError);
-      }
-      return;
-    }
-
-    if (spaceCurrencies.length >= 3) {
-      setHomeCurrencyPickerVisible(true);
-    }
-  }, [
-    spaceCurrencies,
-    effectiveHomeCurrency,
-    setSelectedHomeCurrency,
-    showSaveError,
-  ]);
+  const handleHomeCurrencyPress = useHomeCurrencyPress({
+    currencies: homeCurrencies,
+    currentCurrency: effectiveHomeCurrency,
+    onOpenPicker: () => setHomeCurrencyPickerVisible(true),
+    onSaveError: showSaveError,
+    setSelectedCurrency: setSelectedHomeCurrency,
+  });
 
   const handleInvitePartner = useCallback(() => {
     setInvitePartnerVisible(true);
@@ -1015,8 +1009,11 @@ export function MainTabsNavigator() {
               <ActiveSpaceHeader
                 currencyFlag={
                   (activeMainTab === 'Home' || activeMainTab === 'Activity') &&
-                  hasMultipleHomeCurrencies
-                    ? getCurrencyFlag(effectiveHomeCurrency)
+                  homeCurrencies.length > 1
+                    ? getHomeCurrencyButtonLabel(
+                        effectiveHomeCurrency,
+                        venezuelaCurrencyMode,
+                      )
                     : undefined
                 }
                 memberAvatarUris={spaceMemberAvatarUris}
@@ -1375,14 +1372,14 @@ export function MainTabsNavigator() {
                 onDismiss={handleDismissCopyNotice}
               />
               <HomeCurrencyPickerModal
-                currencies={spaceCurrencies}
+                currencies={homeCurrencies}
                 onClose={() => setHomeCurrencyPickerVisible(false)}
                 onSelect={(currency) => {
                   setHomeCurrencyPickerVisible(false);
                   setSelectedHomeCurrency(currency).catch(showSaveError);
                 }}
                 selectedCurrency={effectiveHomeCurrency}
-                visible={isHomeCurrencyPickerVisible}
+                visible={isHomeCurrencyPickerVisible && !venezuelaCurrencyMode}
               />
             </View>
           )}

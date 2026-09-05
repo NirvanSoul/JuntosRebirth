@@ -18,6 +18,7 @@ import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
 
 const mockUseSpaces = jest.fn();
+let mockCountryCode: string | null = null;
 let mockSession: {
   user: {
     id: string;
@@ -162,6 +163,7 @@ jest.mock(
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
   getLocalProfile: jest.fn(async () => ({
     avatarUri: null,
+    countryCode: mockCountryCode,
     displayName: null,
   })),
   saveLocalProfileAvatar: jest.fn(async () => ({
@@ -211,6 +213,7 @@ jest.mock(
 describe('MainTabsNavigator', () => {
   beforeEach(async () => {
     await AsyncStorage.removeItem('@juntoss/activity-sections/v1');
+    mockCountryCode = null;
     mockSession = null;
     mockUseSpaces.mockReturnValue({
       activeSpace: {
@@ -477,6 +480,44 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByTestId('home-currency-flag-button'));
 
     expect(await screen.findByTestId('home-currency-picker')).toBeTruthy();
+  });
+
+  it('en Venezuela solo alterna USD y VES sin banderas ni selector', async () => {
+    mockCountryCode = 'VE';
+    await AsyncStorage.setItem(
+      '@juntoss/currency-preferences/v1',
+      JSON.stringify({ currencies: ['EUR', 'USD', 'GBP'], version: 1 }),
+    );
+    await AsyncStorage.setItem(
+      '@juntoss/home-currency-selection/v1',
+      JSON.stringify({ currency: 'EUR', version: 1 }),
+    );
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Moneda seleccionada: $')).toBeTruthy(),
+    );
+    await fireEvent.press(screen.getByTestId('home-currency-flag-button'));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Moneda seleccionada: Bs')).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('home-currency-picker')).toBeNull();
+    expect(screen.queryByText('🇪🇺')).toBeNull();
   });
 
   it('desplaza el selector y fija el mismo resumen al recorrer movimientos', async () => {
