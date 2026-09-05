@@ -302,12 +302,10 @@ export function CreateTransactionModal({
   if (
     useDepsChanged([
       activeSpaceId,
-      effectiveAvailableCurrencies,
       initialDate,
       initialDraft,
       initialMoneyAccountId,
       spaceCurrency,
-      venezuelaCurrencyMode,
       visible,
     ]) &&
     visible

@@ -1638,6 +1638,53 @@ describe('CreateTransactionModal', () => {
       expect(previewExchangeRate).not.toHaveBeenCalled();
     });
 
+    it('conserva el importe si las capacidades de Venezuela se cargan con el modal abierto', async () => {
+      const onSubmit = jest.fn();
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="space-usd"
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={onSubmit}
+          selectedCategory={category}
+          spaceCurrency="USD"
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByLabelText('5'));
+      jest.mocked(useCurrencyCapabilities).mockReturnValue({
+        accountingCurrency: 'USD',
+        allowedTransactionInputCurrencies: ['USD', 'VES'],
+        allowsMultipleAccountCurrencies: false,
+        countryCode: 'VE',
+        venezuelaCurrencyMode: true,
+        customExchangeRate: true,
+        multiRateMovementDisplay: true,
+      });
+
+      await act(async () => {
+        screen.rerender(
+          <CreateTransactionModal
+            activeSpaceId="space-usd"
+            initialType="expense"
+            onClose={jest.fn()}
+            onOpenCategoryPicker={jest.fn()}
+            onSubmit={onSubmit}
+            selectedCategory={category}
+            spaceCurrency="USD"
+            visible
+          />,
+        );
+      });
+
+      await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ amountMinor: 500, currency: 'USD' }),
+      );
+    });
+
     it('muestra la conversión bajo el importe cuando la persona vive en Venezuela y escribe en VES', async () => {
       jest.mocked(useCurrencyCapabilities).mockReturnValue({
         accountingCurrency: 'USD',
