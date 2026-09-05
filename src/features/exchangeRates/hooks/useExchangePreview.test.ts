@@ -20,7 +20,7 @@ const preview = {
     },
     EURO: {
       amountMinor: 16_667,
-      currency: 'EUR' as const,
+      currency: 'USD' as const,
       rate: '60.0000000000',
     },
   },

@@ -2,7 +2,7 @@ export type ExchangeRateSource = 'BCV' | 'EURO' | 'CUSTOM';
 
 const exchangeRateSourceLabels: Record<ExchangeRateSource, string> = {
   BCV: 'BCV',
-  EURO: 'Euro',
+  EURO: 'Tasa EUR',
   CUSTOM: 'Personalizada',
 };
 

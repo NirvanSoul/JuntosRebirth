@@ -53,10 +53,14 @@ type RawExchangeRatePreview = {
   ratesUpdatedAt: string;
 };
 
-function mapCurrentRate(raw: RawCurrentExchangeRate): CurrentExchangeRate {
+function mapCurrentRate(
+  raw: RawCurrentExchangeRate,
+  source: VenezuelaExchangeRateSource,
+): CurrentExchangeRate {
+  const expectedBaseCurrency = source === 'BCV' ? 'USD' : 'EUR';
   if (
-    (raw.source !== 'BCV' && raw.source !== 'EURO') ||
-    (raw.baseCurrency !== 'USD' && raw.baseCurrency !== 'EUR') ||
+    raw.source !== source ||
+    raw.baseCurrency !== expectedBaseCurrency ||
     raw.quoteCurrency !== 'VES'
   ) {
     throw new Error('[exchangeRates] La API devolvió una tasa no reconocida');
@@ -74,13 +78,12 @@ function mapCurrentRate(raw: RawCurrentExchangeRate): CurrentExchangeRate {
 function mapConversion(
   raw: { amount: string; currency: string; rate: string },
   source: VenezuelaExchangeRateSource,
+  expectedCurrency: VenezuelaCurrencyCode,
 ): ExchangeRateConversion {
-  if (
-    raw.currency !== 'USD' &&
-    raw.currency !== 'VES' &&
-    raw.currency !== 'EUR'
-  ) {
-    throw new Error(`[exchangeRates] Moneda no reconocida en ${source}`);
+  if (raw.currency !== expectedCurrency) {
+    throw new Error(
+      `[exchangeRates] Moneda inesperada en ${source}: ${raw.currency}`,
+    );
   }
   return {
     amountMinor: decimalStringToAmountMinor(raw.amount, source),
@@ -101,8 +104,8 @@ export async function getCurrentExchangeRates(): Promise<CurrentExchangeRates> {
 
   return {
     rates: {
-      BCV: mapCurrentRate(raw.rates.BCV),
-      EURO: mapCurrentRate(raw.rates.EURO),
+      BCV: mapCurrentRate(raw.rates.BCV, 'BCV'),
+      EURO: mapCurrentRate(raw.rates.EURO, 'EURO'),
     },
     ratesUpdatedAt: raw.ratesUpdatedAt,
     stale: raw.stale,
@@ -125,11 +128,14 @@ export async function previewExchangeRate({
     },
   );
   const raw = response.data;
+  const bcvCurrency = fromCurrency === 'USD' ? 'VES' : 'USD';
 
   return {
     conversions: {
-      BCV: mapConversion(raw.conversions.BCV, 'BCV'),
-      EURO: mapConversion(raw.conversions.EURO, 'EURO'),
+      BCV: mapConversion(raw.conversions.BCV, 'BCV', bcvCurrency),
+      // Ambas referencias devuelven la misma moneda de salida. EURO significa
+      // «dólar a tasa EUR/BCV», no una conversión a euros europeos.
+      EURO: mapConversion(raw.conversions.EURO, 'EURO', bcvCurrency),
     },
     ratesUpdatedAt: raw.ratesUpdatedAt,
   };

@@ -21,7 +21,7 @@ export type CurrentExchangeRates = {
 
 export type ExchangeRateConversion = {
   amountMinor: number;
-  currency: 'USD' | 'VES' | 'EUR';
+  currency: VenezuelaCurrencyCode;
   rate: string;
 };
 

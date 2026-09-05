@@ -1651,7 +1651,7 @@ describe('CreateTransactionModal', () => {
       previewExchangeRate.mockResolvedValue({
         conversions: {
           BCV: { amountMinor: 20_000, currency: 'USD', rate: '50.0000000000' },
-          EURO: { amountMinor: 16_667, currency: 'EUR', rate: '60.0000000000' },
+          EURO: { amountMinor: 16_667, currency: 'USD', rate: '60.0000000000' },
         },
         ratesUpdatedAt: '2026-09-01T04:00:00.000Z',
       });
@@ -1679,7 +1679,7 @@ describe('CreateTransactionModal', () => {
       ).toHaveTextContent('≈ $ 200 · BCV');
       expect(
         screen.getByTestId('transaction-exchange-preview-euro-badge'),
-      ).toHaveTextContent('≈ 166,67 € · Euro');
+      ).toHaveTextContent('≈ $ 166,67 · Tasa EUR');
       expect(previewExchangeRate).toHaveBeenCalledWith(
         expect.objectContaining({ fromCurrency: 'VES' }),
       );
