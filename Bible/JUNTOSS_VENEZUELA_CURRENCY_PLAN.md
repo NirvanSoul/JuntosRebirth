@@ -42,11 +42,11 @@ activas ni tres balances distintos:
 | --------- | ------------------------ | ------------------------------------------------------------------- |
 | `USD`     | Valor principal/contable | USD original o USD normalizado al guardar                           |
 | `VES_BCV` | Equivalente en bolívares | Snapshot BCV del movimiento; tasa actual solo para un saldo actual  |
-| `EUR`     | Equivalente en euros     | Snapshot EURO del movimiento; tasa actual solo para un saldo actual |
+| `EUR`     | Equivalente USD a tasa EUR/BCV | Snapshot EURO del movimiento; tasa actual solo para un saldo actual |
 
-`EUR` significa euros. Nunca se debe etiquetar como "bolívares a tasa euro".
-Si producto quisiese mostrar bolívares calculados con una referencia distinta
-de BCV, necesitaría un cuarto modo con nombre y contrato diferentes.
+`EUR` identifica la referencia oficial EUR/VES del BCV aplicada a un importe
+en USD; no representa una conversión a euros europeos. El modal muestra esa
+referencia como "Tasa EUR" para que nunca se confunda con una moneda de salida.
 
 ## 0.2 Regla de cuentas y balances VE
 
@@ -89,11 +89,11 @@ El preview siempre parte de la moneda introducida:
 ```text
 Entrada USD:  $10,00
                ≈ Bs. 500,00 · BCV
-               ≈ €9,10 · Euro
+               ≈ Bs. 550,00 · Tasa EUR
 
 Entrada VES:  Bs. 5.000,00
                ≈ $100,00 · BCV
-               ≈ €91,00 · Euro
+               ≈ $90,91 · Tasa EUR
 ```
 
 No se muestra un selector de modo dentro del preview. Las dos equivalencias se
