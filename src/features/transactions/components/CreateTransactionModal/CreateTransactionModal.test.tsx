@@ -1670,8 +1670,6 @@ describe('CreateTransactionModal', () => {
       );
 
       await fireEvent.press(screen.getByTestId('transaction-currency-button'));
-      await fireEvent.press(screen.getByLabelText('Bolívares venezolanos'));
-      await fireEvent.press(screen.getByLabelText('Guardar moneda'));
       await fireEvent.press(screen.getByLabelText('5'));
 
       expect(
@@ -1685,7 +1683,7 @@ describe('CreateTransactionModal', () => {
       );
     });
 
-    it('ofrece USD y VES aunque el espacio tenga una sola moneda activa', async () => {
+    it('alterna USD y VES sin banderas ni modal aunque el espacio tenga una sola moneda activa', async () => {
       jest.mocked(useCurrencyCapabilities).mockReturnValue({
         accountingCurrency: 'USD',
         allowedTransactionInputCurrencies: ['USD', 'VES'],
@@ -1708,10 +1706,17 @@ describe('CreateTransactionModal', () => {
         />,
       );
 
+      expect(
+        screen.getByTestId('transaction-currency-symbol').props.children,
+      ).toBe('$');
+      expect(screen.queryByTestId('transaction-currency-flag')).toBeNull();
+
       await fireEvent.press(screen.getByTestId('transaction-currency-button'));
 
-      expect(screen.getByLabelText('Dólares estadounidenses')).toBeTruthy();
-      expect(screen.getByLabelText('Bolívares venezolanos')).toBeTruthy();
+      expect(
+        screen.getByTestId('transaction-currency-symbol').props.children,
+      ).toBe('Bs');
+      expect(screen.queryByTestId('transaction-currency-picker')).toBeNull();
     });
 
     it('inicia en USD aunque el espacio anterior tuviera EUR', async () => {

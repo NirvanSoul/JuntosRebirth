@@ -630,18 +630,39 @@ export function CreateTransactionModal({
             />
             {isCurrencySelectable || shouldUseVenezuelaCurrencySelector ? (
               <Pressable
-                accessibilityHint="Abre las opciones de moneda"
+                accessibilityHint={
+                  shouldUseVenezuelaCurrencySelector
+                    ? 'Alterna entre dólares y bolívares'
+                    : 'Abre las opciones de moneda'
+                }
                 accessibilityLabel={`Moneda: ${currency}`}
                 accessibilityRole="button"
-                onPress={() => setCurrencyPickerVisible(true)}
+                onPress={() => {
+                  if (shouldUseVenezuelaCurrencySelector) {
+                    setCurrency(currency === 'USD' ? 'VES' : 'USD');
+                    return;
+                  }
+                  setCurrencyPickerVisible(true);
+                }}
                 style={({ pressed }) => [
                   styles.currencyButton,
                   pressed && styles.pressed,
                 ]}
                 testID="transaction-currency-button"
               >
-                <Text testID="transaction-currency-flag" variant="subheading">
-                  {currencyFlag}
+                <Text
+                  testID={
+                    shouldUseVenezuelaCurrencySelector
+                      ? 'transaction-currency-symbol'
+                      : 'transaction-currency-flag'
+                  }
+                  variant="subheading"
+                >
+                  {shouldUseVenezuelaCurrencySelector
+                    ? currency === 'VES'
+                      ? 'Bs'
+                      : currencySymbol
+                    : currencyFlag}
                 </Text>
               </Pressable>
             ) : null}
@@ -1006,7 +1027,7 @@ export function CreateTransactionModal({
           setCurrencyPickerVisible(false);
         }}
         venezuelaMode={shouldUseVenezuelaCurrencySelector}
-        visible={isCurrencyPickerVisible}
+        visible={isCurrencyPickerVisible && !shouldUseVenezuelaCurrencySelector}
       />
 
       <TransactionMoneyAccountPickerModal
