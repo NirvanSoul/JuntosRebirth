@@ -4,6 +4,7 @@ import {
   clearLocalProfileAvatar,
   getLocalProfile,
   saveLocalProfileAvatar,
+  saveLocalProfileCountry,
   saveLocalProfileDisplayName,
   saveOwnRemoteAvatar,
 } from '@/features/profile/repositories/localProfileRepository';
@@ -27,7 +28,7 @@ describe('localProfileRepository', () => {
     mockGetLocalDatabase.mockResolvedValue(database);
   });
 
-  it('devuelve un perfil sin avatar ni nombre cuando no hay fila guardada', async () => {
+  it('devuelve un perfil sin avatar, nombre ni país cuando no hay fila guardada', async () => {
     getFirstAsync.mockResolvedValueOnce(null);
 
     await expect(getLocalProfile()).resolves.toEqual({
@@ -35,16 +36,18 @@ describe('localProfileRepository', () => {
       avatarPath: null,
       avatarUpdatedAt: null,
       displayName: null,
+      countryCode: null,
     });
   });
 
-  it('construye una uri con cache-bust y el nombre a partir de la fila guardada', async () => {
+  it('construye una uri con cache-bust, el nombre y el país a partir de la fila guardada', async () => {
     getFirstAsync.mockResolvedValueOnce({
       avatar_path: 'file:///document/avatars/profile-avatar.jpg',
       avatar_updated_at: '2026-08-07T00:00:00.000Z',
       avatar_remote_path: 'uuid-ana/avatar.jpg',
       avatar_remote_updated_at: '2026-08-30T10:14:38.971Z',
       display_name: 'Farruel',
+      country_code: 'VE',
     });
 
     // El sello que manda es el del servidor: es el que cambia cuando la foto
@@ -55,6 +58,7 @@ describe('localProfileRepository', () => {
       avatarPath: 'uuid-ana/avatar.jpg',
       avatarUpdatedAt: '2026-08-30T10:14:38.971Z',
       displayName: 'Farruel',
+      countryCode: 'VE',
     });
   });
 
@@ -80,6 +84,7 @@ describe('localProfileRepository', () => {
       avatarPath: null,
       avatarUpdatedAt: null,
       displayName: null,
+      countryCode: null,
     });
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('avatar_remote_path = NULL'),
@@ -94,6 +99,7 @@ describe('localProfileRepository', () => {
       avatar_remote_path: null,
       avatar_remote_updated_at: null,
       display_name: null,
+      country_code: null,
     });
 
     const profile = await saveLocalProfileAvatar(
@@ -117,6 +123,7 @@ describe('localProfileRepository', () => {
       avatar_remote_path: null,
       avatar_remote_updated_at: null,
       display_name: 'Farruel',
+      country_code: null,
     });
 
     const profile = await saveLocalProfileDisplayName('  Farruel  ');
@@ -130,6 +137,32 @@ describe('localProfileRepository', () => {
       avatarPath: null,
       avatarUpdatedAt: null,
       displayName: 'Farruel',
+      countryCode: null,
+    });
+  });
+
+  it('guarda el país local en mayúsculas y lo devuelve junto al resto del perfil', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      avatar_path: null,
+      avatar_updated_at: null,
+      avatar_remote_path: null,
+      avatar_remote_updated_at: null,
+      display_name: null,
+      country_code: 'VE',
+    });
+
+    const profile = await saveLocalProfileCountry('  ve  ');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO local_profile'),
+      'VE',
+    );
+    expect(profile).toEqual({
+      avatarUri: null,
+      avatarPath: null,
+      avatarUpdatedAt: null,
+      displayName: null,
+      countryCode: 'VE',
     });
   });
 });

@@ -7,6 +7,7 @@ import {
   removeProfileAvatar,
   updateProfileAvatar,
 } from '@/features/profile/services/updateProfileAvatar';
+import { updateProfileDisplayName } from '@/features/profile/services/updateProfileDisplayName';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
 import { ApiError } from '@/services/api/client';
 import { renderWithTheme } from '@/test/renderWithTheme';
@@ -20,6 +21,7 @@ const emptyProfile = {
   avatarPath: null,
   avatarUpdatedAt: null,
   displayName: null,
+  countryCode: null,
 };
 
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
@@ -28,6 +30,7 @@ jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
     avatarPath: null,
     avatarUpdatedAt: null,
     displayName: null,
+    countryCode: null,
   })),
 }));
 
@@ -36,15 +39,21 @@ jest.mock('@/features/profile/services/updateProfileAvatar', () => ({
   removeProfileAvatar: jest.fn(),
 }));
 
+jest.mock('@/features/profile/services/updateProfileDisplayName', () => ({
+  updateProfileDisplayName: jest.fn(),
+}));
+
 const mockGetLocalProfile = jest.mocked(getLocalProfile);
 const mockUpdateProfileAvatar = jest.mocked(updateProfileAvatar);
 const mockRemoveProfileAvatar = jest.mocked(removeProfileAvatar);
+const mockUpdateProfileDisplayName = jest.mocked(updateProfileDisplayName);
 
 describe('SettingsScreen', () => {
   beforeEach(() => {
     mockGetLocalProfile.mockClear().mockResolvedValue(emptyProfile);
     mockUpdateProfileAvatar.mockClear();
     mockRemoveProfileAvatar.mockClear();
+    mockUpdateProfileDisplayName.mockClear();
   });
 
   const renderScreen = async (
@@ -218,6 +227,15 @@ describe('SettingsScreen', () => {
     expect(props.onSaveCurrencyPreferences).toHaveBeenCalledWith({
       currencies: ['EUR', 'USD', 'MXN'],
     });
+  });
+
+  it('abre el selector de País independientemente del selector de Moneda', async () => {
+    const { screen } = await renderScreen();
+
+    await fireEvent.press(screen.getByText('País'));
+
+    expect(screen.getByTestId('country-preferences-modal')).toBeTruthy();
+    expect(screen.queryByTestId('currency-preferences-modal')).toBeNull();
   });
 
   it('filtra el catálogo con el buscador por país, moneda o código', async () => {
@@ -441,6 +459,57 @@ describe('SettingsScreen', () => {
 
     expect(mockRemoveProfileAvatar).toHaveBeenCalled();
     alertSpy.mockRestore();
+  });
+
+  it('muestra el nombre guardado y una invitación a añadirlo cuando no hay ninguno', async () => {
+    const { screen } = await renderScreen();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-display-name').props.children).toBe(
+        'Agregar tu nombre',
+      ),
+    );
+
+    mockGetLocalProfile.mockResolvedValue({
+      ...emptyProfile,
+      displayName: 'Farruel',
+    });
+    const { screen: screenWithName } = await renderScreen();
+
+    await waitFor(() =>
+      expect(
+        screenWithName.getByTestId('settings-display-name').props.children,
+      ).toBe('Farruel'),
+    );
+  });
+
+  it('permite editar el nombre y lo refleja en la fila', async () => {
+    mockUpdateProfileDisplayName.mockResolvedValue({
+      ...emptyProfile,
+      displayName: 'Farruel',
+    });
+    const { screen } = await renderScreen();
+
+    await fireEvent.press(screen.getByTestId('settings-display-name-button'));
+    fireEvent.changeText(
+      screen.getByTestId('profile-display-name-input'),
+      'Farruel',
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-display-name-input').props.value).toBe(
+        'Farruel',
+      ),
+    );
+    await fireEvent.press(
+      screen.getByTestId('profile-display-name-save-button'),
+    );
+
+    expect(mockUpdateProfileDisplayName).toHaveBeenCalledWith('Farruel');
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-display-name').props.children).toBe(
+        'Farruel',
+      ),
+    );
   });
 
   it('no muestra "Salir del espacio de pareja" fuera de un espacio de pareja', async () => {

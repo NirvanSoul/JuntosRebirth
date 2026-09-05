@@ -191,10 +191,25 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
       null,
       // La nota ya no se escribe como NULL fijo: la API la devuelve.
       null,
+      // Legacy no tiene valor contable VE congelado.
+      null,
+      // Los movimientos legacy no tienen snapshot histórico.
+      null,
       0,
       '2026-08-16T12:00:00.000Z',
       '2026-08-16T12:00:00.000Z',
       null,
+    );
+
+    const transactionInsert = (txHandle.runAsync as jest.Mock).mock.calls.find(
+      ([sql]) =>
+        typeof sql === 'string' && sql.includes('INSERT INTO transactions'),
+    )?.[0] as string;
+    expect(transactionInsert).toContain(
+      'note, sync_status,\n           accounting_amount_minor_usd, exchange_snapshot_json,',
+    );
+    expect(transactionInsert).not.toContain(
+      'exchange_snapshot_json, sync_status,',
     );
   });
 });

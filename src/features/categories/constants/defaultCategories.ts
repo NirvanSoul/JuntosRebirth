@@ -63,7 +63,7 @@ export const defaultCategoryPages: readonly (readonly DefaultCategoryDefinition[
         key: 'leisure',
         name: 'Ocio',
         icon: 'game-controller',
-        colorToken: 'emerald',
+        colorToken: 'forest',
       },
       {
         key: 'education',
@@ -75,19 +75,19 @@ export const defaultCategoryPages: readonly (readonly DefaultCategoryDefinition[
         key: 'subscriptions',
         name: 'Suscripciones',
         icon: 'credit-card',
-        colorToken: 'rose',
+        colorToken: 'pink',
       },
       {
         key: 'travel',
         name: 'Viajes',
         icon: 'airplane-tilt',
-        colorToken: 'cyan',
+        colorToken: 'blue',
       },
       {
         key: 'pets',
         name: 'Mascotas',
         icon: 'paw-print',
-        colorToken: 'amber',
+        colorToken: 'orange',
       },
       { key: 'debts', name: 'Deudas', icon: 'receipt', colorToken: 'brown' },
       {

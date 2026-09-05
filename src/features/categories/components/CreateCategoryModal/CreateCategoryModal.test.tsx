@@ -181,14 +181,12 @@ describe('CreateCategoryModal', () => {
     expect(categoryColorTokens).toEqual([
       'violet',
       'plum',
-      'rose',
       'pink',
       'slate',
       'steel',
+      'forest',
       'green',
       'teal',
-      'emerald',
-      'cyan',
       'blue',
       'indigo',
       'yellow',
@@ -196,19 +194,16 @@ describe('CreateCategoryModal', () => {
       'coral',
       'red',
       'brown',
-      'amber',
     ]);
     expect(categoryColorTokens.map((token) => categoryColors[token])).toEqual([
       '#842FFB',
       '#D642FF',
-      '#FF93FD',
       '#FF0084',
       '#AFBEC3',
       '#617D8B',
+      '#15A250',
       '#00CD5C',
       '#14BAA9',
-      '#27E9B5',
-      '#44E9FF',
       '#2E95F0',
       '#295BAB',
       '#FFC200',
@@ -216,9 +211,8 @@ describe('CreateCategoryModal', () => {
       '#FF4000',
       '#FF0004',
       '#BC6128',
-      '#6C300B',
     ]);
-    expect(Object.keys(categoryColors)).toHaveLength(18);
+    expect(Object.keys(categoryColors)).toHaveLength(15);
     categoryColorTokens.forEach((colorToken) => {
       expect(screen.getByLabelText(`Color ${colorToken}`)).toBeTruthy();
     });

@@ -37,7 +37,9 @@ jest.mock('@/features/profile/services/syncSpaceMemberProfiles', () => ({
 }));
 
 jest.mock('@/lib/storage/localDatabase', () => ({
-  getLocalDatabase: jest.fn(async () => ({})),
+  getLocalDatabase: jest.fn(async () => ({
+    getFirstAsync: jest.fn(async () => null),
+  })),
 }));
 
 jest.mock('@/lib/storage/localIdentity', () => ({

@@ -58,7 +58,9 @@ export function useMoneyAccounts({
    * dependencias de los `useCallback`.
    */
   const notifyRef = useRef({ onChangesPublished, onError });
-  notifyRef.current = { onChangesPublished, onError };
+  useEffect(() => {
+    notifyRef.current = { onChangesPublished, onError };
+  });
   const materializingOpeningBalances = useRef(new Set<string>());
 
   const spaceMoneyAccounts = useMemo(

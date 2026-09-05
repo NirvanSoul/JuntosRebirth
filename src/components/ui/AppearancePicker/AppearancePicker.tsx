@@ -17,7 +17,7 @@ import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
-const colorColumns = 6;
+const colorColumns = 5;
 
 export type AppearanceColorOption<TColor extends string> = {
   color: string;

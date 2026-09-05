@@ -7,7 +7,10 @@ import { AppState, type AppStateStatus } from 'react-native';
  */
 export function useAppForeground(onForeground: () => void): void {
   const callbackRef = useRef(onForeground);
-  callbackRef.current = onForeground;
+
+  useEffect(() => {
+    callbackRef.current = onForeground;
+  });
 
   useEffect(() => {
     const appStateRef = { current: AppState.currentState };

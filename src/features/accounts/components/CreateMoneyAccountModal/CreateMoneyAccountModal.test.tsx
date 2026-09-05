@@ -110,6 +110,23 @@ describe('CreateMoneyAccountModal', () => {
     expect(screen.queryByLabelText('🇺🇸 Dólar estadounidense (USD)')).toBeNull();
   });
 
+  it('fuerza USD como único saldo cuando la capacidad del espacio lo exige', async () => {
+    const onSubmit = jest.fn();
+    const screen = await renderModal({ fixedCurrency: 'USD', onSubmit });
+
+    await moveToKind(screen);
+    expect(screen.queryByText('Monedas')).toBeNull();
+    await fireEvent.changeText(screen.getByLabelText('Saldo inicial'), '250');
+    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
+    await fireEvent.press(screen.getByLabelText('Crear cuenta'));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        balances: [{ currency: 'USD', openingBalanceMinor: 25_000 }],
+      }),
+    );
+  });
+
   it('permite borrar por completo el saldo inicial opcional', async () => {
     const screen = await renderModal({
       account: {

@@ -3,6 +3,8 @@ import { Keyboard } from 'react-native';
 
 import { CountryScreen } from '@/features/onboarding/screens/CountryScreen';
 import { NameScreen } from '@/features/onboarding/screens/NameScreen';
+import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
+import { saveCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
@@ -12,6 +14,13 @@ jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
 jest.mock('@/state/appPreferences/currencyPreferencesRepository', () => ({
   saveCurrencyPreferences: jest.fn(),
 }));
+
+jest.mock('@/features/profile/services/updateProfileCountry', () => ({
+  updateProfileCountry: jest.fn(),
+}));
+
+const mockUpdateProfileCountry = updateProfileCountry as jest.Mock;
+const mockSaveCurrencyPreferences = saveCurrencyPreferences as jest.Mock;
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 const navigation = mockNavigation as never;
@@ -90,5 +99,35 @@ describe('pantallas de onboarding', () => {
       expect(screen.getByTestId('onboarding-country-search')).toBeTruthy();
     });
     expect(screen.queryByTestId('onboarding-country-selected')).toBeNull();
+  });
+
+  it('al elegir Venezuela guarda el país y la moneda en bolívares con una sola respuesta', async () => {
+    const screen = await renderWithTheme(
+      <CountryScreen navigation={navigation} route={route} />,
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-country-search'),
+      'venez',
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('onboarding-country-VE')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('onboarding-country-VE'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('onboarding-country-selected')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('onboarding-country-action'));
+
+    await waitFor(() => {
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('Welcome');
+    });
+    expect(mockSaveCurrencyPreferences).toHaveBeenCalledWith({
+      currencies: ['VES'],
+    });
+    expect(mockUpdateProfileCountry).toHaveBeenCalledWith('VE');
   });
 });

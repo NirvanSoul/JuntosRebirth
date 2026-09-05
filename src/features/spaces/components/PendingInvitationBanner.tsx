@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
+import { SpaceCountryMismatchModal } from '@/features/spaces/components/SpaceCountryMismatchModal';
 import {
   AcceptInvitationError,
   createJuntossInvitationGateway,
@@ -17,11 +18,13 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type PendingInvitationBannerProps = {
   onAccepted: () => Promise<void>;
+  onOpenCountrySettings: () => void;
 };
 
 /** Aviso no bloqueante para una invitación dirigida al correo de la sesión. */
 export function PendingInvitationBanner({
   onAccepted,
+  onOpenCountrySettings,
 }: PendingInvitationBannerProps) {
   const { session } = useAuthSession();
   const styles = useThemedStyles(createStyles);
@@ -30,6 +33,7 @@ export function PendingInvitationBanner({
   );
   const [isBusy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCountryMismatchVisible, setCountryMismatchVisible] = useState(false);
 
   const refreshInvitation = useCallback(() => {
     if (!session) {
@@ -48,6 +52,9 @@ export function PendingInvitationBanner({
     };
   }, [session]);
 
+  // `refreshInvitation` también se reutiliza en `useAppForeground` y
+  // devuelve su propio cleanup (isMounted); no es un simple derivado de render.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => refreshInvitation(), [refreshInvitation]);
   useAppForeground(() => {
     refreshInvitation();
@@ -64,6 +71,13 @@ export function PendingInvitationBanner({
       await onAccepted();
       setInvitation(null);
     } catch (caught) {
+      if (
+        caught instanceof AcceptInvitationError &&
+        caught.code === 'space_country_mismatch'
+      ) {
+        setCountryMismatchVisible(true);
+        return;
+      }
       setError(
         caught instanceof AcceptInvitationError
           ? caught.message
@@ -77,43 +91,50 @@ export function PendingInvitationBanner({
   if (!invitation) return null;
 
   return (
-    <View
-      accessible
-      accessibilityRole="alert"
-      style={styles.card}
-      testID="pending-space-invitation"
-    >
-      <Text accessibilityRole="header" variant="label">
-        Invitación a espacio Juntos
-      </Text>
-      <Text tone="secondary" variant="footnote">
-        {invitation.inviterDisplayName} te ha invitado a compartir “
-        {invitation.spaceName}”.
-      </Text>
-      {error ? (
-        <Text tone="expense" variant="footnote">
-          {error}
+    <>
+      <View
+        accessible
+        accessibilityRole="alert"
+        style={styles.card}
+        testID="pending-space-invitation"
+      >
+        <Text accessibilityRole="header" variant="label">
+          Invitación a espacio Juntos
         </Text>
-      ) : null}
-      <View style={styles.actions}>
-        <ModalPrimaryAction
-          accessibilityLabel="Luego"
-          disabled={isBusy}
-          label="Luego"
-          onPress={() => setInvitation(null)}
-          style={styles.laterAction}
-          variant="surface"
-        />
-        <ModalPrimaryAction
-          accessibilityLabel="Aceptar invitación"
-          disabled={isBusy}
-          label={isBusy ? 'Aceptando…' : 'Aceptar'}
-          onPress={() => void handleAccept()}
-          style={styles.acceptAction}
-          variant="cta"
-        />
+        <Text tone="secondary" variant="footnote">
+          {invitation.inviterDisplayName} te ha invitado a compartir “
+          {invitation.spaceName}”.
+        </Text>
+        {error ? (
+          <Text tone="expense" variant="footnote">
+            {error}
+          </Text>
+        ) : null}
+        <View style={styles.actions}>
+          <ModalPrimaryAction
+            accessibilityLabel="Luego"
+            disabled={isBusy}
+            label="Luego"
+            onPress={() => setInvitation(null)}
+            style={styles.laterAction}
+            variant="surface"
+          />
+          <ModalPrimaryAction
+            accessibilityLabel="Aceptar invitación"
+            disabled={isBusy}
+            label={isBusy ? 'Aceptando…' : 'Aceptar'}
+            onPress={() => void handleAccept()}
+            style={styles.acceptAction}
+            variant="cta"
+          />
+        </View>
       </View>
-    </View>
+      <SpaceCountryMismatchModal
+        onClose={() => setCountryMismatchVisible(false)}
+        onOpenCountrySettings={onOpenCountrySettings}
+        visible={isCountryMismatchVisible}
+      />
+    </>
   );
 }
 

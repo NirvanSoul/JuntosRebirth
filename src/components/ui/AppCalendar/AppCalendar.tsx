@@ -3,9 +3,11 @@ import {
   forwardRef,
   memo,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import {
   FlatList,
@@ -26,6 +28,7 @@ import {
   getCalendarFutureMonthRange,
   getCalendarPastMonthRange,
   getMonthDistance,
+  getMonthStartAtOffset,
   minimumCalendarDate,
 } from '@/lib/date/monthDistance';
 import { layout } from '@/theme/layout';
@@ -90,15 +93,6 @@ export function getDominantScrollMonthIndex(
     monthCount - 1,
     Math.max(0, Math.floor(viewportCenter / calendarMonthHeight)),
   );
-}
-
-function getMonthStartAtOffset(anchorDate: string, offset: number): string {
-  const anchorYear = Number(anchorDate.slice(0, 4));
-  const anchorMonthIndex = Number(anchorDate.slice(5, 7)) - 1;
-  const absoluteMonth = anchorYear * 12 + anchorMonthIndex + offset;
-  const year = Math.floor(absoluteMonth / 12);
-  const month = (absoluteMonth % 12) + 1;
-  return `${year}-${String(month).padStart(2, '0')}-01`;
 }
 
 type ScrollCalendarDayProps = Omit<
@@ -354,7 +348,7 @@ export const AppCalendar = memo(
     const { colors } = useTheme();
     const themedStyles = useThemedStyles(createThemedStyles);
     const calendarTheme = useMemo(() => createCalendarTheme(colors), [colors]);
-    const scrollAnchorDate = useRef(currentDate).current;
+    const [scrollAnchorDate] = useState(currentDate);
     const futureScrollRange = getCalendarFutureMonthRange(
       scrollAnchorDate,
       rangeEndDate ?? scrollAnchorDate,
@@ -372,7 +366,9 @@ export const AppCalendar = memo(
     );
     const calendarListRef = useRef<FlatList<string>>(null);
     const onFocusedMonthChangeRef = useRef(onFocusedMonthChange);
-    onFocusedMonthChangeRef.current = onFocusedMonthChange;
+    useEffect(() => {
+      onFocusedMonthChangeRef.current = onFocusedMonthChange;
+    });
     const lastReportedScrollMonthRef = useRef<string | null>(null);
     const dates = useMemo(
       () =>

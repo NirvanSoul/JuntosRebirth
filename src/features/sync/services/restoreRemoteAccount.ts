@@ -273,8 +273,10 @@ export async function restoreRemoteAccount(input: {
            amount_minor, currency,
            title, occurred_on, recurrence, recurrence_group_id,
            recurrence_series_id, source_transaction_id, note, sync_status,
+           accounting_amount_minor_usd, exchange_snapshot_json,
            is_archived, created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?, ?)
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                   'synced', ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET
            category_id = excluded.category_id,
            money_account_id = excluded.money_account_id, type = excluded.type,
@@ -284,6 +286,8 @@ export async function restoreRemoteAccount(input: {
            recurrence_group_id = excluded.recurrence_group_id,
            recurrence_series_id = excluded.recurrence_series_id,
            note = excluded.note,
+           accounting_amount_minor_usd = excluded.accounting_amount_minor_usd,
+           exchange_snapshot_json = excluded.exchange_snapshot_json,
            is_archived = excluded.is_archived, updated_at = excluded.updated_at,
            archived_at = excluded.archived_at
          WHERE transactions.sync_status = 'synced'`,
@@ -306,6 +310,10 @@ export async function restoreRemoteAccount(input: {
         remoteTransaction.recurrenceSeriesRemoteId,
         remoteTransaction.sourceTransactionId,
         remoteTransaction.note,
+        remoteTransaction.accountingAmountMinorUsd ?? null,
+        remoteTransaction.exchangeSnapshot
+          ? JSON.stringify(remoteTransaction.exchangeSnapshot)
+          : null,
         remoteTransaction.isArchived ? 1 : 0,
         remoteTransaction.createdAt,
         remoteTransaction.updatedAt,

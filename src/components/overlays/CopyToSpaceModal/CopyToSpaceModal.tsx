@@ -1,11 +1,12 @@
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { Text } from '@/components/ui/Text/Text';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
@@ -45,6 +46,10 @@ export function CopyToSpaceModal({
   const styles = useThemedStyles(createStyles);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setSaving] = useState(false);
+  if (useDepsChanged([visible]) && visible) {
+    setError(null);
+    setSaving(false);
+  }
   const contentHeight = useMemo(
     () =>
       layout.minTouchTarget +
@@ -55,13 +60,6 @@ export function CopyToSpaceModal({
       Math.max(targets.length - 1, 0) * spacing.sm,
     [targets.length],
   );
-
-  useEffect(() => {
-    if (visible) {
-      setError(null);
-      setSaving(false);
-    }
-  }, [visible]);
 
   return (
     <AppModal

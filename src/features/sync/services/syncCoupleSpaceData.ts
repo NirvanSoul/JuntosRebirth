@@ -133,8 +133,8 @@ async function syncSpaceData(input: {
     ),
     database.getAllAsync<SyncRow>(
       `SELECT id, category_id AS "categoryId",
-              money_account_id AS "moneyAccountId", type,
-              amount_minor AS "amountMinor", currency, title,
+              money_account_id AS "moneyAccountId", created_by AS "createdBy",
+              type, amount_minor AS "amountMinor", currency, title,
               frequency, starts_on AS "startsOn",
               generated_occurrences AS "generatedOccurrences",
               next_occurrence_on AS "nextOccurrenceOn",
@@ -145,12 +145,13 @@ async function syncSpaceData(input: {
     ),
     database.getAllAsync<SyncRow>(
       `SELECT id, category_id AS "categoryId",
-              money_account_id AS "moneyAccountId", type,
-              amount_minor AS "amountMinor", currency, title,
+              money_account_id AS "moneyAccountId", created_by AS "createdBy",
+              type, amount_minor AS "amountMinor", currency, title,
               occurred_on AS "occurredOn", note, recurrence,
               recurrence_group_id AS "recurrenceGroupId",
               recurrence_series_id AS "recurrenceSeriesId",
               source_transaction_id AS "sourceTransactionId",
+              custom_rate_id AS "customRateId",
               is_archived AS "isArchived", created_at AS "createdAt", updated_at
          FROM transactions
         WHERE space_id = ? AND sync_status IN ${statuses}`,
@@ -172,7 +173,7 @@ async function syncSpaceData(input: {
     };
   }
 
-  await syncCoupleSpaceRemotely({
+  const remoteResult = await syncCoupleSpaceRemotely({
     installationId,
     spaceId: remoteSpaceId,
     // Cada categoría viaja con sus presupuestos por moneda. `budgetMinor`
@@ -195,6 +196,20 @@ async function syncSpaceData(input: {
     recurringSeries: recurringSeries.map(serializeRow),
     transactions: transactions.map(serializeRow),
   });
+
+  for (const syncedTransaction of remoteResult.transactions ?? []) {
+    await database.runAsync(
+      `UPDATE transactions
+          SET accounting_amount_minor_usd = ?, exchange_snapshot_json = ?
+        WHERE id = ? AND updated_at = ?`,
+      syncedTransaction.accountingAmountMinorUsd ?? null,
+      syncedTransaction.exchangeSnapshot
+        ? JSON.stringify(syncedTransaction.exchangeSnapshot)
+        : null,
+      syncedTransaction.localId,
+      syncedTransaction.updatedAt,
+    );
+  }
 
   await Promise.all([
     markRowsSynced('categories', categories),

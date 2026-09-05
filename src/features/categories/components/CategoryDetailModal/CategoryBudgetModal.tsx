@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { getCurrencySymbol } from '@/lib/currency/currencyCatalog';
@@ -72,9 +73,9 @@ export function CategoryBudgetModal({
     [density],
   );
 
-  useEffect(() => {
-    if (visible) setAmountInput(amountMinorToInput(initialBudgetMinor ?? 0));
-  }, [initialBudgetMinor, visible]);
+  if (useDepsChanged([visible, initialBudgetMinor]) && visible) {
+    setAmountInput(amountMinorToInput(initialBudgetMinor ?? 0));
+  }
 
   const handleKey = (key: (typeof budgetKeys)[number][number]) => {
     triggerHaptic('keypadPress');

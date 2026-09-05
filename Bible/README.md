@@ -34,6 +34,7 @@ La versión anterior acumuló funcionalidades, duplicación de componentes, resp
 | [`PROJECT_RULES.md`](./PROJECT_RULES.md) | Reglas obligatorias para modificar el código. |
 | [`WORKFLOW.md`](./WORKFLOW.md) | Jerarquía de trabajo multi-agente y checks obligatorios. |
 | [`API.md`](./API.md) | Servicio remoto, autenticación y sincronización. |
+| [`JUNTOSS_VENEZUELA_CURRENCY_PLAN.md`](./JUNTOSS_VENEZUELA_CURRENCY_PLAN.md) | Contrato y entregas activas para el modelo monetario de Venezuela. |
 
 Si una modificación cambia una regla, flujo, arquitectura o decisión relevante, también debe actualizarse el documento correspondiente.
 
@@ -232,8 +233,9 @@ Vive en [`WORKFLOW.md`](./WORKFLOW.md) §4.
 2. `PROJECT_RULES.md`
 3. `PRODUCT.md`
 4. `ARCHITECTURE.md`
-5. `DATABASE.md`, si afecta datos
-7. `DECISIONS.md`
+5. `API.md`, si afecta datos remotos, permisos o sincronización
+6. El documento de dominio aplicable, por ejemplo onboarding, importación o
+   Venezuela.
 
 ---
 

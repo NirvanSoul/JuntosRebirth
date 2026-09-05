@@ -118,7 +118,7 @@ export async function listScheduledLocalNotifications(): Promise<
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
 
   return scheduled.map((notification) => ({
-    data: notification.content.data,
+    data: notification.content.data ?? {},
     id: notification.identifier,
     title: notification.content.title,
   }));

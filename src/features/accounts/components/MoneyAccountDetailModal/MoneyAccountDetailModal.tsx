@@ -1,6 +1,6 @@
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -8,6 +8,7 @@ import {
   useAppModalBottomInset,
 } from '@/components/overlays/AppModal/AppModal';
 import { DestructiveConfirmationPanel } from '@/components/overlays/DestructiveConfirmationPanel/DestructiveConfirmationPanel';
+import { DetailActionCard } from '@/components/overlays/DetailActionCard/DetailActionCard';
 import { DetailActionMenu } from '@/components/overlays/DetailActionMenu/DetailActionMenu';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
@@ -19,10 +20,13 @@ import {
   type MoneyAccountCurrencyBalance,
   summarizeMoneyAccounts,
 } from '@/features/accounts/utils/moneyAccountSummary';
+import { HistoricalTransactionValuation } from '@/features/exchangeRates/components/HistoricalTransactionValuation';
+import { useHistoricalTransactionValuation } from '@/features/exchangeRates/hooks/useHistoricalTransactionValuation';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
@@ -35,6 +39,7 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type MoneyAccountDetailModalProps = {
   account: MoneyAccount | null;
   categories: readonly Category[];
+  onAddTransaction?: (moneyAccountId: string) => void;
   onClose: () => void;
   onDelete: (moneyAccountId: string) => void;
   onEdit: (moneyAccountId: string) => void;
@@ -95,6 +100,7 @@ function AccountTransactionMetric({
 export function MoneyAccountDetailModal({
   account,
   categories,
+  onAddTransaction,
   onClose,
   onDelete,
   onEdit,
@@ -121,25 +127,25 @@ export function MoneyAccountDetailModal({
     [account, transactions],
   );
 
-  useEffect(() => {
-    if (!visible || !account) return;
-
+  if (useDepsChanged([visible, account]) && visible && account) {
     setDeletePanelVisible(false);
     setSelectedCurrency(account.balances[0]?.currency ?? null);
-  }, [account, visible]);
-
-  if (!account || !summary) {
-    return null;
   }
 
-  const accountColor = categoryColors[account.colorToken];
   const selectedBalance =
-    summary.balanceByCurrency.find(
+    summary?.balanceByCurrency.find(
       (balance) => balance.currency === selectedCurrency,
-    ) ?? summary.balanceByCurrency[0];
+    ) ?? summary?.balanceByCurrency[0];
+  const selectedCurrencyTransactions = accountTransactions.filter(
+    (transaction) => transaction.currency === selectedBalance?.currency,
+  );
+  const historicalValuation = useHistoricalTransactionValuation(
+    selectedCurrencyTransactions,
+  );
 
-  if (!selectedBalance) return null;
+  if (!account || !summary || !selectedBalance) return null;
 
+  const accountColor = categoryColors[account.colorToken];
   const hasMultipleCurrencies = summary.balanceByCurrency.length > 1;
 
   return (
@@ -255,6 +261,25 @@ export function MoneyAccountDetailModal({
                 type="expense"
               />
             </View>
+            {historicalValuation.summary &&
+            historicalValuation.selectedSource ? (
+              <HistoricalTransactionValuation
+                availableSources={historicalValuation.availableSources}
+                onChangeSource={historicalValuation.setSelectedSource}
+                selectedSource={historicalValuation.selectedSource}
+                summary={historicalValuation.summary}
+                testID="money-account-historical-valuation"
+              />
+            ) : null}
+          </View>
+
+          <View style={styles.actions} testID="money-account-detail-actions">
+            <DetailActionCard
+              icon="add"
+              label="Añadir movimiento"
+              onPress={() => onAddTransaction?.(account.id)}
+              testIDPrefix="money-account"
+            />
           </View>
 
           <View style={styles.movementsHeader}>
@@ -329,6 +354,7 @@ function createStyles(colors: ColorTokens) {
       flexDirection: 'row',
       gap: spacing.sm,
     },
+    actions: { flexDirection: 'row', gap: spacing.sm },
     movementsHeader: {
       flexDirection: 'row',
       alignItems: 'center',

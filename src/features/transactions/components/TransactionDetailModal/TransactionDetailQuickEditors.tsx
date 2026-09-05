@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import type { MoneyAccount } from '@/features/accounts/types';
 import { TransactionDatePickerModal } from '@/features/transactions/components/CreateTransactionModal/TransactionDatePickerModal';
@@ -11,6 +11,7 @@ import type {
   SessionTransaction,
   TransactionQuickEdit,
 } from '@/features/transactions/types';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 
 /**
  * Campos cuyo selector abre el propio detalle. La categoría también se edita
@@ -53,9 +54,9 @@ export function TransactionDetailQuickEditors({
     readonly string[] | null
   >(null);
 
-  useEffect(() => {
-    if (field === null) setDraftCustomDates(null);
-  }, [field]);
+  if (useDepsChanged([field]) && field === null) {
+    setDraftCustomDates(null);
+  }
 
   const customOccurrenceDates =
     draftCustomDates ?? transaction.customOccurrenceDates ?? [];

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
@@ -8,6 +8,7 @@ import {
   type MarkedDates,
 } from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { getLocalTodayKey, toLocalDateKey } from '@/lib/date/localDate';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
@@ -61,11 +62,10 @@ export function TransactionDateRangePickerModal({
   });
   const [selectingEnd, setSelectingEnd] = useState(false);
 
-  useEffect(() => {
-    if (!visible) return;
+  if (useDepsChanged([visible, initialRange, today]) && visible) {
     setDraftRange(initialRange ?? { startDate: today, endDate: today });
     setSelectingEnd(false);
-  }, [initialRange, today, visible]);
+  }
 
   const markedDates = useMemo(() => {
     const dates: MarkedDates = {};

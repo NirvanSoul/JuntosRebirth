@@ -1,4 +1,5 @@
 import { createJuntossInvitationGateway } from '@/features/spaces/gateways/juntossInvitationGateway';
+import { ApiError } from '@/services/api/client';
 import { apiClient } from '@/services/api/juntossApiClient';
 import { listRemoteSpaces } from '@/services/api/spaces';
 
@@ -98,5 +99,23 @@ describe('createCoupleSpaceInvitation', () => {
       );
 
     expect(result.spaceId).toBe('space-nuevo');
+  });
+});
+
+describe('acceptInvitation', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('traduce el rechazo de país para que la interfaz pueda abrir Ajustes', async () => {
+    jest.mocked(apiClient.post).mockRejectedValue(
+      new ApiError({
+        status: 409,
+        code: 'SPACE_COUNTRY_MISMATCH',
+        message: 'No se puede completar la operación por un conflicto.',
+      }),
+    );
+
+    await expect(
+      createJuntossInvitationGateway().acceptInvitation('token-1'),
+    ).rejects.toMatchObject({ code: 'space_country_mismatch' });
   });
 });

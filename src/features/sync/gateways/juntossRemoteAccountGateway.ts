@@ -2,6 +2,7 @@ import {
   isCurrencyCode,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
+import type { TransactionExchangeSnapshot } from '@/features/transactions/types';
 import { apiClient } from '@/services/api/juntossApiClient';
 
 export type RemoteAccountSpace = {
@@ -83,6 +84,8 @@ export type RemoteAccountTransaction = {
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
+  accountingAmountMinorUsd?: number | null;
+  exchangeSnapshot?: TransactionExchangeSnapshot | null;
 };
 
 export type RemoteAccountSnapshot = {
@@ -105,6 +108,10 @@ function minorAmount(value: unknown): number {
   return parsed;
 }
 
+function optionalMinorAmount(value: unknown): number | null {
+  return value === null || value === undefined ? null : minorAmount(value);
+}
+
 function text(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
@@ -122,6 +129,54 @@ function currency(value: unknown, context: string): CurrencyCode {
     );
   }
   return value;
+}
+
+function exchangeSnapshot(value: unknown): TransactionExchangeSnapshot | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object')
+    throw new Error('[sync] Snapshot de tasa inválido');
+  const snapshot = value as Record<string, unknown>;
+  if (
+    snapshot.countryCode !== 'VE' ||
+    (snapshot.createdWithCurrency !== 'USD' &&
+      snapshot.createdWithCurrency !== 'VES') ||
+    typeof snapshot.rates !== 'object' ||
+    snapshot.rates === null
+  ) {
+    throw new Error('[sync] Snapshot de tasa inválido');
+  }
+  const rates: TransactionExchangeSnapshot['rates'] = {};
+  for (const source of ['BCV', 'EURO', 'CUSTOM'] as const) {
+    const raw = (snapshot.rates as Record<string, unknown>)[source];
+    if (raw === undefined) continue;
+    if (typeof raw !== 'object' || raw === null)
+      throw new Error('[sync] Tasa histórica inválida');
+    const rate = raw as Record<string, unknown>;
+    if (
+      typeof rate.baseCurrency !== 'string' ||
+      typeof rate.quoteCurrency !== 'string' ||
+      typeof rate.rate !== 'string' ||
+      (rate.convertedCurrency !== undefined &&
+        (typeof rate.convertedCurrency !== 'string' ||
+          !isCurrencyCode(rate.convertedCurrency)))
+    )
+      throw new Error('[sync] Tasa histórica inválida');
+    rates[source] = {
+      baseCurrency: rate.baseCurrency,
+      quoteCurrency: rate.quoteCurrency,
+      rate: rate.rate,
+      convertedAmountMinor: minorAmount(rate.convertedAmountMinor),
+      ...(rate.convertedCurrency === undefined
+        ? {}
+        : { convertedCurrency: rate.convertedCurrency }),
+      observedAt: optionalString(rate.observedAt),
+    };
+  }
+  return {
+    countryCode: 'VE',
+    createdWithCurrency: snapshot.createdWithCurrency,
+    rates,
+  };
 }
 
 type RawSnapshot = {
@@ -237,6 +292,10 @@ export async function fetchRemoteAccountSnapshot(): Promise<RemoteAccountSnapsho
       createdAt: text(transaction.createdAt),
       updatedAt: text(transaction.updatedAt),
       archivedAt: optionalString(transaction.archivedAt),
+      accountingAmountMinorUsd: optionalMinorAmount(
+        transaction.accountingAmountMinorUsd,
+      ),
+      exchangeSnapshot: exchangeSnapshot(transaction.exchangeSnapshot),
     })),
   };
 }

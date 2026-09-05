@@ -8,6 +8,7 @@ import { CountrySearchField } from '@/features/onboarding/components/CountrySear
 import { OnboardingScreenLayout } from '@/features/onboarding/components/OnboardingScreenLayout';
 import { SelectedCountryField } from '@/features/onboarding/components/SelectedCountryField';
 import type { OnboardingStackParamList } from '@/features/onboarding/OnboardingNavigator';
+import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
 import {
   getCountryFlag,
   searchCountryCatalog,
@@ -43,7 +44,10 @@ export function CountryScreen({ navigation }: Props) {
     setSaving(true);
     setError(null);
     try {
-      await saveCurrencyPreferences({ currencies: [selected.currencyCode] });
+      await Promise.all([
+        saveCurrencyPreferences({ currencies: [selected.currencyCode] }),
+        updateProfileCountry(selected.iso2),
+      ]);
       navigation.navigate('Welcome');
     } catch (error) {
       console.error('[onboarding] No se pudo guardar el país/moneda', error);

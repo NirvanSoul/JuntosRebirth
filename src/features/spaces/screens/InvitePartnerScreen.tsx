@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
@@ -13,6 +13,7 @@ import {
   createJuntossInvitationGateway,
 } from '@/features/spaces/gateways/juntossInvitationGateway';
 import type { Space } from '@/features/spaces/types';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { spacing } from '@/theme/spacing';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import { useTheme } from '@/theme/useTheme';
@@ -53,13 +54,11 @@ export function InvitePartnerScreen({
   const [emailError, setEmailError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
 
-  useEffect(() => {
-    if (visible) {
-      setEmail('');
-      setEmailError(null);
-      setPhase({ kind: 'idle' });
-    }
-  }, [visible]);
+  if (useDepsChanged([visible]) && visible) {
+    setEmail('');
+    setEmailError(null);
+    setPhase({ kind: 'idle' });
+  }
 
   const isBusy = phase.kind === 'sending-invitation';
 

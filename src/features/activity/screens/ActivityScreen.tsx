@@ -153,16 +153,22 @@ export function ActivityScreen({
   const [isFiltersModalVisible, setFiltersModalVisible] = useState(false);
   const [periodModalType, setPeriodModalType] =
     useState<TransactionPeriodModalType | null>(null);
-  useEffect(() => {
+  const [prevCategoriesExpandedProp, setPrevCategoriesExpandedProp] =
+    useState(categoriesExpanded);
+  if (categoriesExpanded !== prevCategoriesExpandedProp) {
+    setPrevCategoriesExpandedProp(categoriesExpanded);
     if (categoriesExpanded !== undefined) {
       setCategoriesExpanded(categoriesExpanded);
     }
-  }, [categoriesExpanded]);
-  useEffect(() => {
+  }
+  const [prevAccountsExpandedProp, setPrevAccountsExpandedProp] =
+    useState(accountsExpanded);
+  if (accountsExpanded !== prevAccountsExpandedProp) {
+    setPrevAccountsExpandedProp(accountsExpanded);
     if (accountsExpanded !== undefined) {
       setAccountsExpanded(accountsExpanded);
     }
-  }, [accountsExpanded]);
+  }
   const handleCategoriesToggle = () => {
     setCategoriesExpanded((expanded) => {
       const next = !expanded;
@@ -349,7 +355,11 @@ export function ActivityScreen({
       return;
     }
 
+    // Este efecto también sincroniza con el sistema externo de scroll
+    // (rAF + `scrollRef`), por lo que expandir la sección objetivo antes de
+    // desplazarse debe ocurrir aquí, no en el render.
     if (targetSection === 'categories') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCategoriesExpanded(true);
     }
     if (targetSection === 'accounts') {

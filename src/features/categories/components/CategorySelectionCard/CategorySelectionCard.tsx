@@ -121,7 +121,7 @@ function createStyles(colors: ColorTokens) {
     },
     selectedCard: { borderWidth: 0 },
     selectedGradient: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       borderRadius: radii.md,
     },
     checkmark: {

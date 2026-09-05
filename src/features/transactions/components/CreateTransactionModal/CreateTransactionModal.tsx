@@ -1,7 +1,7 @@
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, Pressable, View } from 'react-native';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -20,6 +20,11 @@ import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
+import { TransactionExchangePreview } from '@/features/exchangeRates/components/TransactionExchangePreview';
+import { useExchangePreview } from '@/features/exchangeRates/hooks/useExchangePreview';
+import type { VenezuelaCurrencyCode } from '@/features/exchangeRates/types';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
+import { createStyles } from '@/features/transactions/components/CreateTransactionModal/CreateTransactionModal.styles';
 import type {
   CreateTransactionDraft,
   TransactionEditorTarget,
@@ -33,6 +38,7 @@ import {
   formatAmountInputForDisplay,
   parseAmountMinor,
 } from '@/features/transactions/utils/transactionAmount';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
@@ -48,12 +54,9 @@ import {
   categoryColors,
   getCategoryContentContrast,
 } from '@/theme/categoryColors';
-import { iconSize, type LayoutDensity, layout } from '@/theme/layout';
+import { iconSize } from '@/theme/layout';
 import { motion } from '@/theme/motion';
-import { radii } from '@/theme/radii';
-import { spacing } from '@/theme/spacing';
-import type { ColorTokens, ThemeShadows } from '@/theme/types';
-import { maxFontScale, typography } from '@/theme/typography';
+import { maxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import {
@@ -71,6 +74,8 @@ type CreateTransactionModalProps = {
   initialDate?: string;
   initialDraft?: CreateTransactionDraft;
   initialEditor?: TransactionEditorTarget;
+  /** Cuenta preseleccionada al abrir, por ejemplo desde su propio detalle. */
+  initialMoneyAccountId?: string;
   /** Cuentas activas del espacio; sin ninguna, el selector no aparece. */
   moneyAccounts?: readonly MoneyAccount[];
   /** Abre la creación de una cuenta desde el propio selector. */
@@ -121,24 +126,9 @@ const defaultAvailableCurrencies: readonly CurrencyCode[] = [
 ];
 /** Referencia estable, por el mismo motivo que el array de monedas. */
 const defaultMoneyAccounts: readonly MoneyAccount[] = [];
-/** Altura del bloque del importe antes de repartir el espacio sobrante. */
-const amountAreaMinHeight = { compact: 64, regular: 88 } as const;
 /** Límites visuales que evitan el autoajuste defectuoso de texto en iOS. */
 const amountHeroMaxLength = 9;
 const amountMaxLength = 13;
-/** Separación vertical de las filas del teclado numérico. */
-const keypadRowGap = { compact: spacing.md, regular: spacing.lg } as const;
-/** Lado del avatar de categoría. */
-const categoryIconSize = 44;
-/** Anchura compacta del selector; conserva dos objetivos táctiles holgados. */
-const typeSelectorWidth = { compact: 216, regular: 240 } as const;
-/**
- * Anchura relativa de la columna de operadores.
- *
- * Con márgenes de 16 pt en la pantalla más estrecha admitida (320 pt) la
- * columna sigue midiendo más de 48 pt, el objetivo táctil mínimo.
- */
-const operatorColumnRatio = 0.72;
 
 export function CreateTransactionModal({
   activeSpaceId,
@@ -147,6 +137,7 @@ export function CreateTransactionModal({
   initialDate,
   initialDraft,
   initialEditor,
+  initialMoneyAccountId,
   moneyAccounts = defaultMoneyAccounts,
   onClose,
   onCreateMoneyAccount,
@@ -163,10 +154,15 @@ export function CreateTransactionModal({
   const styles = useThemedStyles((palette) =>
     createStyles(palette, density, shadows),
   );
+  const { allowedTransactionInputCurrencies, venezuelaCurrencyMode } =
+    useCurrencyCapabilities();
   const effectiveAvailableCurrencies = useMemo(() => {
+    if (allowedTransactionInputCurrencies) {
+      return [...allowedTransactionInputCurrencies];
+    }
     const list = availableCurrencies ?? defaultAvailableCurrencies;
     return list.includes(spaceCurrency) ? list : [spaceCurrency, ...list];
-  }, [availableCurrencies, spaceCurrency]);
+  }, [allowedTransactionInputCurrencies, availableCurrencies, spaceCurrency]);
   const [title, setTitle] = useState('');
   const [amountInput, setAmountInput] = useState('0');
   const [hasEnteredAmount, setHasEnteredAmount] = useState(false);
@@ -179,6 +175,7 @@ export function CreateTransactionModal({
     readonly string[]
   >([]);
   const [occurredOn, setOccurredOn] = useState(getLocalTodayKey);
+  const [hasSelectedDate, setHasSelectedDate] = useState(false);
   const [currency, setCurrency] = useState<CurrencyCode>(spaceCurrency);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isRecurrencePickerVisible, setRecurrencePickerVisible] =
@@ -197,6 +194,9 @@ export function CreateTransactionModal({
   const amountCursorOpacity = useSharedValue(1);
   const amountMinor = parseAmountMinor(amountInput);
   const recurrence = recurrenceOptions[recurrenceIndex] ?? defaultRecurrence;
+  const isDateSelected = hasSelectedDate || occurredOn !== getLocalTodayKey();
+  const isRecurrenceSelected =
+    recurrence.value !== 'once' || customOccurrenceDates.length > 0;
   const isCalculationPending = pendingOperations.length > 0;
   const lastPendingOperation =
     pendingOperations[pendingOperations.length - 1] ?? null;
@@ -243,6 +243,9 @@ export function CreateTransactionModal({
     () => moneyAccounts.find((account) => account.id === moneyAccountId),
     [moneyAccountId, moneyAccounts],
   );
+  const isMoneyAccountSelected = Boolean(
+    moneyAccountId || selectedMoneyAccount,
+  );
   /**
    * La moneda solo se elige cuando hay más de una y ninguna cuenta la fija:
    * con cuenta elegida es la suya, y cambiarla dejaría el importe fuera de
@@ -254,6 +257,20 @@ export function CreateTransactionModal({
   const currencySymbol = getCurrencySymbol(currency);
   const currencySymbolPosition = getCurrencySymbolPosition(currency);
   const currencyPluralName = getCurrencyPluralName(currency);
+  /**
+   * Sección 7 del plan de Venezuela: conversión en vivo bajo el importe,
+   * solo para quien tiene la capacidad activa y está escribiendo en USD o
+   * VES — el resto de monedas y de usuarios no llaman a este endpoint.
+   */
+  const isVenezuelaCurrency = currency === 'USD' || currency === 'VES';
+  const shouldUseVenezuelaCurrencySelector =
+    venezuelaCurrencyMode && !selectedMoneyAccount;
+  const shouldPreviewExchange =
+    venezuelaCurrencyMode && isVenezuelaCurrency && !isAmountEmpty;
+  const exchangePreview = useExchangePreview({
+    amountMinor: shouldPreviewExchange ? resolvedAmountMinor : 0,
+    fromCurrency: (currency === 'USD' ? 'USD' : 'VES') as VenezuelaCurrencyCode,
+  });
   const selectedCategoryColor = selectedCategory
     ? categoryColors[selectedCategory.colorToken]
     : null;
@@ -282,11 +299,19 @@ export function CreateTransactionModal({
     [occurredOn],
   );
 
-  useLayoutEffect(() => {
-    if (!visible) {
-      return;
-    }
-
+  if (
+    useDepsChanged([
+      activeSpaceId,
+      effectiveAvailableCurrencies,
+      initialDate,
+      initialDraft,
+      initialMoneyAccountId,
+      spaceCurrency,
+      venezuelaCurrencyMode,
+      visible,
+    ]) &&
+    visible
+  ) {
     setTitle(initialDraft?.title ?? '');
     setAmountInput(
       initialDraft ? amountMinorToInput(initialDraft.amountMinor) : '0',
@@ -307,25 +332,21 @@ export function CreateTransactionModal({
     setOccurredOn(
       initialDraft?.occurredOn ?? initialDate ?? getLocalTodayKey(),
     );
+    setHasSelectedDate(Boolean(initialDraft?.occurredOn || initialDate));
     setCustomOccurrenceDates(
       initialDraft?.recurrence === 'custom'
         ? (initialDraft.customOccurrenceDates ?? [initialDraft.occurredOn])
         : [],
     );
-    setCurrency(initialDraft?.currency ?? spaceCurrency);
-    setMoneyAccountId(initialDraft?.moneyAccountId);
+    setCurrency(
+      initialDraft?.currency ?? (venezuelaCurrencyMode ? 'USD' : spaceCurrency),
+    );
+    setMoneyAccountId(initialDraft?.moneyAccountId ?? initialMoneyAccountId);
     setDatePickerVisible(false);
     setRecurrencePickerVisible(false);
     setCurrencyPickerVisible(false);
     setMoneyAccountPickerVisible(false);
-  }, [
-    activeSpaceId,
-    effectiveAvailableCurrencies,
-    initialDate,
-    initialDraft,
-    spaceCurrency,
-    visible,
-  ]);
+  }
 
   useEffect(() => {
     if (!visible) {
@@ -337,9 +358,12 @@ export function CreateTransactionModal({
     }
 
     openedInitialEditor.current = initialEditor;
+    // Efecto guiado por una ref (`openedInitialEditor`) para abrir el editor
+    // solicitado una sola vez por apertura; no es un derivado puro de render.
     if (initialEditor === 'category') {
       onOpenCategoryPicker();
     } else if (initialEditor === 'date') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDatePickerVisible(true);
     } else if (initialEditor === 'recurrence') {
       setRecurrencePickerVisible(true);
@@ -363,6 +387,9 @@ export function CreateTransactionModal({
 
   useEffect(() => {
     if (!visible || !isAmountEmpty) {
+      // Los `SharedValue` de Reanimated son mutables por diseño; el linter
+      // de React Compiler no distingue esta API de un valor de React.
+      // eslint-disable-next-line react-hooks/immutability
       amountCursorOpacity.value = 1;
       return;
     }
@@ -380,6 +407,7 @@ export function CreateTransactionModal({
   }, [amountCursorOpacity, isAmountEmpty, visible]);
 
   const animateAmountInput = () => {
+    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
     amountScale.value = withSequence(
       withTiming(0.96, {
         duration: motion.inputPulseDuration,
@@ -390,6 +418,7 @@ export function CreateTransactionModal({
         reduceMotion: ReduceMotion.System,
       }),
     );
+    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
     amountTranslateY.value = withSequence(
       withTiming(2, {
         duration: motion.inputPulseDuration,
@@ -599,7 +628,7 @@ export function CreateTransactionModal({
               style={styles.titleInput}
               value={title}
             />
-            {isCurrencySelectable ? (
+            {isCurrencySelectable || shouldUseVenezuelaCurrencySelector ? (
               <Pressable
                 accessibilityHint="Abre las opciones de moneda"
                 accessibilityLabel={`Moneda: ${currency}`}
@@ -702,6 +731,13 @@ export function CreateTransactionModal({
             )}
           </Animated.View>
 
+          {shouldPreviewExchange ? (
+            <TransactionExchangePreview
+              preview={exchangePreview}
+              style={styles.exchangePreviewRow}
+            />
+          ) : null}
+
           <View style={styles.metadataRow} testID="transaction-metadata-row">
             <Pressable
               accessibilityHint="Abre las opciones de fecha"
@@ -712,9 +748,10 @@ export function CreateTransactionModal({
                 styles.metadataButton,
                 pressed && styles.pressed,
               ]}
+              testID="transaction-date-button"
             >
               <Ionicons
-                color={colors.textPrimary}
+                color={isDateSelected ? colors.cta : colors.textPrimary}
                 name="calendar-outline"
                 size={iconSize.md}
                 testID="transaction-date-icon"
@@ -722,7 +759,7 @@ export function CreateTransactionModal({
               <Text
                 numberOfLines={1}
                 style={styles.metadataLabel}
-                tone="secondary"
+                tone={isDateSelected ? 'cta' : 'secondary'}
                 variant="label"
                 weight="semibold"
               >
@@ -742,9 +779,10 @@ export function CreateTransactionModal({
                 styles.metadataButton,
                 pressed && styles.pressed,
               ]}
+              testID="transaction-recurrence-button"
             >
               <Ionicons
-                color={colors.textPrimary}
+                color={isRecurrenceSelected ? colors.cta : colors.textPrimary}
                 name="sync-outline"
                 size={iconSize.md}
                 testID="transaction-recurrence-icon"
@@ -752,7 +790,7 @@ export function CreateTransactionModal({
               <Text
                 numberOfLines={1}
                 style={styles.metadataLabel}
-                tone="secondary"
+                tone={isRecurrenceSelected ? 'cta' : 'secondary'}
                 variant="label"
                 weight="semibold"
               >
@@ -781,7 +819,9 @@ export function CreateTransactionModal({
                   testID="transaction-money-account-button"
                 >
                   <Ionicons
-                    color={colors.textPrimary}
+                    color={
+                      isMoneyAccountSelected ? colors.cta : colors.textPrimary
+                    }
                     name="wallet-outline"
                     size={iconSize.md}
                     testID="transaction-money-account-icon"
@@ -789,7 +829,7 @@ export function CreateTransactionModal({
                   <Text
                     numberOfLines={1}
                     style={styles.metadataLabel}
-                    tone="secondary"
+                    tone={isMoneyAccountSelected ? 'cta' : 'secondary'}
                     variant="label"
                     weight="semibold"
                   >
@@ -933,6 +973,7 @@ export function CreateTransactionModal({
         onClose={() => setDatePickerVisible(false)}
         onSelect={(value) => {
           setOccurredOn(value);
+          setHasSelectedDate(true);
           setDatePickerVisible(false);
         }}
         selectedDate={occurredOn}
@@ -950,6 +991,7 @@ export function CreateTransactionModal({
         onSelectCustomDates={(dates) => {
           setCustomOccurrenceDates(dates);
           setOccurredOn(dates[0] ?? occurredOn);
+          setHasSelectedDate(true);
         }}
         recurrenceIndex={recurrenceIndex}
         visible={isRecurrencePickerVisible}
@@ -963,6 +1005,7 @@ export function CreateTransactionModal({
           setCurrency(code);
           setCurrencyPickerVisible(false);
         }}
+        venezuelaMode={shouldUseVenezuelaCurrencySelector}
         visible={isCurrencyPickerVisible}
       />
 
@@ -989,179 +1032,4 @@ export function CreateTransactionModal({
       />
     </>
   );
-}
-
-function createStyles(
-  colors: ColorTokens,
-  density: LayoutDensity,
-  shadows: ThemeShadows,
-) {
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      justifyContent: 'space-between',
-      gap: layout.stackGap[density],
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.lg,
-    },
-    segmentedControl: {
-      width: typeSelectorWidth[density],
-    },
-    diagonalArrow: {
-      transform: [{ rotate: '45deg' }],
-    },
-    lockedTypeBadge: {
-      height: layout.minTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      borderRadius: radii.lg,
-      paddingHorizontal: spacing.lg,
-    },
-    titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: layout.controlGap[density],
-    },
-    titleInput: {
-      ...shadows.subtle,
-      flex: 1,
-      minHeight: layout.controlHeight[density],
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-      color: colors.textPrimary,
-      fontFamily: typography.body.fontFamily,
-      fontSize: typography.body.fontSize,
-      letterSpacing: typography.body.letterSpacing,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.none,
-      textAlignVertical: 'center',
-    },
-    currencyButton: {
-      ...shadows.subtle,
-      width: layout.controlHeight[density],
-      height: layout.controlHeight[density],
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      backgroundColor: colors.surface,
-    },
-    amountArea: {
-      minHeight: amountAreaMinHeight[density],
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    amount: {
-      flex: 1,
-      textAlign: 'center',
-    },
-    amountRow: {
-      width: '100%',
-      maxWidth: '100%',
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'center',
-    },
-    amountCursor: {
-      width: spacing.xxs,
-      height: spacing.xxxl,
-      borderRadius: radii.round,
-    },
-    metadataRow: {
-      ...shadows.subtle,
-      height: layout.controlHeight[density],
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-      overflow: 'hidden',
-    },
-    metadataButton: {
-      flex: 1,
-      minWidth: 0,
-      height: '100%',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      paddingHorizontal: spacing.sm,
-    },
-    metadataLabel: { flexShrink: 1 },
-    metadataDivider: {
-      width: StyleSheet.hairlineWidth,
-      height: layout.controlHeight[density] - spacing.xl,
-      backgroundColor: colors.border,
-    },
-    keypad: {
-      rowGap: keypadRowGap[density],
-    },
-    keypadRow: {
-      flexDirection: 'row',
-      columnGap: layout.controlGap[density],
-    },
-    key: {
-      ...shadows.subtle,
-      flex: 1,
-      height: layout.keypadKeyHeight[density],
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-    },
-    operatorKey: {
-      flex: operatorColumnRatio,
-    },
-    keyPressed: {
-      backgroundColor: colors.surfaceMuted,
-      transform: [{ scale: 0.97 }],
-    },
-    footer: {
-      flexDirection: 'row',
-      gap: layout.controlGap[density],
-    },
-    categoryButton: {
-      flex: 1.6,
-      minWidth: 0,
-      minHeight: layout.actionHeight[density],
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      borderRadius: radii.md,
-      borderColor: colors.border,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      paddingHorizontal: spacing.md,
-    },
-    categoryButtonCta: {
-      borderColor: colors.cta,
-      backgroundColor: colors.cta,
-    },
-    categoryIcon: {
-      width: categoryIconSize,
-      height: categoryIconSize,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.modalBackground,
-    },
-    selectedCategoryIcon: {
-      backgroundColor: 'transparent',
-    },
-    categoryIconCta: {
-      backgroundColor: 'transparent',
-    },
-    categoryLabel: {
-      flex: 1,
-    },
-    submitButton: {
-      flex: 1,
-    },
-    pressed: { opacity: 0.72 },
-  });
 }

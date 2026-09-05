@@ -103,3 +103,17 @@ export function shouldShowWeekMonthLabel(
   if (index === 0 || crossesMonth) return true;
   return getMonthKey(weeks[index - 1]![6]!) !== getMonthKey(week[0]!);
 }
+
+export function getMonthIntroductionWeekIndex(
+  weeks: readonly (readonly string[])[],
+  date: string,
+): number {
+  const currentWeekIndex = weeks.findIndex((week) => week.includes(date));
+  if (currentWeekIndex < 0) return 0;
+
+  for (let index = currentWeekIndex; index >= 0; index -= 1) {
+    if (shouldShowWeekMonthLabel(weeks, index)) return index;
+  }
+
+  return currentWeekIndex;
+}

@@ -9,14 +9,16 @@ import {
 } from '@/components/overlays/AppModal/AppModal';
 import { CopyToSpaceModal } from '@/components/overlays/CopyToSpaceModal/CopyToSpaceModal';
 import { DestructiveConfirmationPanel } from '@/components/overlays/DestructiveConfirmationPanel/DestructiveConfirmationPanel';
+import { DetailActionCard } from '@/components/overlays/DetailActionCard/DetailActionCard';
 import { DetailActionMenu } from '@/components/overlays/DetailActionMenu/DetailActionMenu';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal';
 import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
+import { HistoricalTransactionValuation } from '@/features/exchangeRates/components/HistoricalTransactionValuation';
+import { useHistoricalTransactionValuation } from '@/features/exchangeRates/hooks/useHistoricalTransactionValuation';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
-import { CategoryDetailActionButton as ActionButton } from '@/features/categories/components/CategoryDetailModal/CategoryDetailActionButton';
 import { CategoryTransactionMetrics } from '@/features/categories/components/CategoryDetailModal/CategoryTransactionMetrics';
 import {
   CategoryAuthorFilter,
@@ -34,6 +36,7 @@ import { TransactionPreviewList } from '@/features/transactions/components/Trans
 import type { SessionTransaction } from '@/features/transactions/types';
 import { resolveTransactionAuthor } from '@/features/transactions/utils/transactionAuthor';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { getLocalTodayKey } from '@/lib/date/localDate';
@@ -174,6 +177,8 @@ export function CategoryDetailModal({
         : undefined,
     [authorFilteredTransactions, category, selectedCurrency],
   );
+  const historicalValuation =
+    useHistoricalTransactionValuation(categoryTransactions);
   const budgetExpenseMinor = useMemo(() => {
     if (!category) return 0;
     return listTransactionsThroughCurrentMonth(transactions)
@@ -186,9 +191,10 @@ export function CategoryDetailModal({
       .reduce((total, t) => total + t.amountMinor, 0);
   }, [category, spaceCurrency, transactions]);
 
-  useEffect(() => {
-    if (!visible) return;
-
+  if (
+    useDepsChanged([visible, category, detailCurrencies, displayCurrency]) &&
+    visible
+  ) {
     setPanel(null);
     setBudgetModalVisible(false);
     setNoteModalVisible(false);
@@ -199,7 +205,8 @@ export function CategoryDetailModal({
         ? displayCurrency
         : (detailCurrencies[0] ?? displayCurrency),
     );
-  }, [category, detailCurrencies, displayCurrency, visible]);
+    historicalValuation.setSelectedSource(null);
+  }
 
   useEffect(() => {
     if (visible) {
@@ -327,6 +334,17 @@ export function CategoryDetailModal({
               />
             ) : null}
 
+            {historicalValuation.summary &&
+            historicalValuation.selectedSource ? (
+              <HistoricalTransactionValuation
+                availableSources={historicalValuation.availableSources}
+                onChangeSource={historicalValuation.setSelectedSource}
+                selectedSource={historicalValuation.selectedSource}
+                summary={historicalValuation.summary}
+                testID="category-historical-valuation"
+              />
+            ) : null}
+
             <CategoryTransactionMetrics
               expense={expense}
               expenseMinor={summary.expenseMinor}
@@ -400,12 +418,13 @@ export function CategoryDetailModal({
             ) : null}
 
             <View style={styles.actions} testID="category-detail-actions">
-              <ActionButton
+              <DetailActionCard
                 icon="add"
                 label="Añadir movimiento"
                 onPress={() => onAddTransaction(category.id)}
+                testIDPrefix="category"
               />
-              <ActionButton
+              <DetailActionCard
                 icon="wallet-outline"
                 label={
                   category.budgetMinor
@@ -413,12 +432,14 @@ export function CategoryDetailModal({
                     : 'Añadir presupuesto'
                 }
                 onPress={() => setBudgetModalVisible(true)}
+                testIDPrefix="category"
               />
               {shareTargets.length > 0 ? (
-                <ActionButton
+                <DetailActionCard
                   icon="copy-outline"
                   label="Copiar en otro espacio"
                   onPress={() => setSpacePickerVisible(true)}
+                  testIDPrefix="category"
                 />
               ) : null}
             </View>
@@ -599,37 +620,6 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     },
     budgetTotal: { flexShrink: 1 },
     actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-    dangerPanel: {
-      gap: spacing.md,
-      backgroundColor: colors.surface,
-      borderColor: colors.expense,
-      borderRadius: radii.md,
-      borderWidth: 1,
-      marginTop: spacing.lg,
-      padding: spacing.lg,
-    },
-    panelActions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      gap: spacing.sm,
-    },
-    secondaryButton: {
-      minHeight: layout.minTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderColor: colors.border,
-      borderRadius: radii.round,
-      borderWidth: 1,
-      paddingHorizontal: spacing.lg,
-    },
-    deleteButton: {
-      minHeight: layout.minTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.expense,
-      borderRadius: radii.round,
-      paddingHorizontal: spacing.xl,
-    },
     movementsHeader: {
       flexDirection: 'row',
       alignItems: 'center',

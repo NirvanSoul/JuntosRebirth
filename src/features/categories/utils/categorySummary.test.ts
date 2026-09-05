@@ -23,7 +23,7 @@ const categories: Category[] = [
     spaceId: 'personal',
     name: 'Salario',
     icon: 'money',
-    colorToken: 'emerald',
+    colorToken: 'forest',
     isDefault: true,
     isArchived: false,
   },

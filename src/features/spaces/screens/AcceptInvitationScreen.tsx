@@ -12,6 +12,7 @@ import {
   signUpTotalSteps,
 } from '@/features/auth/screens/SignUpScreen';
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
+import { SpaceCountryMismatchModal } from '@/features/spaces/components/SpaceCountryMismatchModal';
 import {
   AcceptInvitationError,
   createJuntossInvitationGateway,
@@ -24,6 +25,7 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type AcceptInvitationScreenProps = {
   onFinished: () => void;
+  onOpenCountrySettings: () => void;
   refreshCoupleSpace: () => Promise<void>;
   token: string;
 };
@@ -87,6 +89,7 @@ function describeAcceptError(
  */
 export function AcceptInvitationScreen({
   onFinished,
+  onOpenCountrySettings,
   refreshCoupleSpace,
   token,
 }: AcceptInvitationScreenProps) {
@@ -99,6 +102,7 @@ export function AcceptInvitationScreen({
   const [acceptState, setAcceptState] = useState<AcceptState>({
     status: 'idle',
   });
+  const [isCountryMismatchVisible, setCountryMismatchVisible] = useState(false);
   const [authStep, setAuthStep] = useState<AuthFlowStep>({ screen: 'login' });
   const hasAutoAcceptedRef = useRef(false);
   const initialSessionCheckedRef = useRef(false);
@@ -134,6 +138,14 @@ export function AcceptInvitationScreen({
       await refreshCoupleSpace();
       setAcceptState({ status: 'accepted', spaceName: result.spaceName });
     } catch (caught) {
+      if (
+        caught instanceof AcceptInvitationError &&
+        caught.code === 'space_country_mismatch'
+      ) {
+        setCountryMismatchVisible(true);
+        setAcceptState({ status: 'idle' });
+        return;
+      }
       const message =
         caught instanceof AcceptInvitationError
           ? describeAcceptError(caught.code, caught.message)
@@ -279,6 +291,11 @@ export function AcceptInvitationScreen({
             </View>
           </View>
         </ScrollView>
+        <SpaceCountryMismatchModal
+          onClose={() => setCountryMismatchVisible(false)}
+          onOpenCountrySettings={onOpenCountrySettings}
+          visible={isCountryMismatchVisible}
+        />
       </SafeAreaView>
     );
   }

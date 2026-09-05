@@ -21,6 +21,7 @@ import {
   sanitizeSignedAmountInput,
   signedAmountMinorToInput,
 } from '@/features/accounts/utils/signedAmountInput';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import type { CategoryColorToken } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
@@ -31,6 +32,8 @@ type CreateMoneyAccountModalProps = {
   account?: MoneyAccount | null;
   accounts: readonly MoneyAccount[];
   availableCurrencies: readonly CurrencyCode[];
+  /** Fuerza un único ledger para capacidades locales como Venezuela. */
+  fixedCurrency?: CurrencyCode;
   /** Moneda con la que siempre nace una cuenta nueva. */
   spaceCurrency: CurrencyCode;
   /**
@@ -51,6 +54,7 @@ export function CreateMoneyAccountModal({
   account = null,
   accounts,
   availableCurrencies,
+  fixedCurrency,
   isCurrencyLocked = false,
   spaceId,
   spaceCurrency,
@@ -100,35 +104,36 @@ export function CreateMoneyAccountModal({
     };
   }, []);
 
-  useEffect(() => {
+  if (useDepsChanged([visible, account, fixedCurrency, spaceCurrency])) {
     if (!visible) {
       setKeyboardVisible(false);
-      return;
+    } else {
+      const kindDefinition = moneyAccountKindDefinitions.find(
+        (definition) => definition.kind === (account?.kind ?? defaultKind),
+      );
+
+      setStep('name');
+      setName(account?.name ?? '');
+      setKind(account?.kind ?? defaultKind);
+      const initialCurrencies = account
+        ? account.balances.map((balance) => balance.currency)
+        : [fixedCurrency ?? spaceCurrency];
+      setSelectedCurrencies(initialCurrencies);
+      setBalanceInputs(
+        Object.fromEntries(
+          (account?.balances ?? []).map((balance) => [
+            balance.currency,
+            signedAmountMinorToInput(balance.openingBalanceMinor),
+          ]),
+        ),
+      );
+      setIcon(account?.icon ?? kindDefinition?.icon ?? 'bank');
+      setColorToken(
+        account?.colorToken ?? kindDefinition?.colorToken ?? 'blue',
+      );
+      setHasAttemptedSubmit(false);
     }
-
-    const kindDefinition = moneyAccountKindDefinitions.find(
-      (definition) => definition.kind === (account?.kind ?? defaultKind),
-    );
-
-    setStep('name');
-    setName(account?.name ?? '');
-    setKind(account?.kind ?? defaultKind);
-    const initialCurrencies = account
-      ? account.balances.map((balance) => balance.currency)
-      : [spaceCurrency];
-    setSelectedCurrencies(initialCurrencies);
-    setBalanceInputs(
-      Object.fromEntries(
-        (account?.balances ?? []).map((balance) => [
-          balance.currency,
-          signedAmountMinorToInput(balance.openingBalanceMinor),
-        ]),
-      ),
-    );
-    setIcon(account?.icon ?? kindDefinition?.icon ?? 'bank');
-    setColorToken(account?.colorToken ?? kindDefinition?.colorToken ?? 'blue');
-    setHasAttemptedSubmit(false);
-  }, [account, spaceCurrency, visible]);
+  }
 
   const handleSelectKind = (nextKind: MoneyAccountKind) => {
     setKind(nextKind);
@@ -148,6 +153,8 @@ export function CreateMoneyAccountModal({
   };
 
   const handleToggleCurrency = (code: CurrencyCode) => {
+    if (fixedCurrency) return;
+
     setSelectedCurrencies((current) => {
       const isExistingCurrency = account?.balances.some(
         (balance) => balance.currency === code,
@@ -182,30 +189,39 @@ export function CreateMoneyAccountModal({
     if (!validation.valid) return;
 
     const balances =
-      isCurrencyLocked && account
+      fixedCurrency && !account
         ? [
-            ...account.balances,
-            ...selectedCurrencies
-              .filter(
-                (code) =>
-                  !account.balances.some(
-                    (balance) => balance.currency === code,
-                  ),
-              )
-              .slice(0, account.balances.length === 1 ? 1 : 0)
-              .map((currency) => ({
-                currency,
-                openingBalanceMinor: parseSignedAmountMinor(
-                  balanceInputs[currency] ?? '0',
-                ),
-              })),
+            {
+              currency: fixedCurrency,
+              openingBalanceMinor: parseSignedAmountMinor(
+                balanceInputs[fixedCurrency] ?? '0',
+              ),
+            },
           ]
-        : selectedCurrencies.map((currency) => ({
-            currency,
-            openingBalanceMinor: parseSignedAmountMinor(
-              balanceInputs[currency] ?? '0',
-            ),
-          }));
+        : isCurrencyLocked && account
+          ? [
+              ...account.balances,
+              ...selectedCurrencies
+                .filter(
+                  (code) =>
+                    !account.balances.some(
+                      (balance) => balance.currency === code,
+                    ),
+                )
+                .slice(0, account.balances.length === 1 ? 1 : 0)
+                .map((currency) => ({
+                  currency,
+                  openingBalanceMinor: parseSignedAmountMinor(
+                    balanceInputs[currency] ?? '0',
+                  ),
+                })),
+            ]
+          : selectedCurrencies.map((currency) => ({
+              currency,
+              openingBalanceMinor: parseSignedAmountMinor(
+                balanceInputs[currency] ?? '0',
+              ),
+            }));
 
     onSubmit({
       spaceId,
@@ -280,7 +296,7 @@ export function CreateMoneyAccountModal({
           />
         ) : step === 'details' ? (
           <MoneyAccountDetailsStep
-            allowCurrencySelection={account !== null}
+            allowCurrencySelection={account !== null && !fixedCurrency}
             availableCurrencies={availableCurrencies}
             balanceInputs={balanceInputs}
             existingCurrencies={

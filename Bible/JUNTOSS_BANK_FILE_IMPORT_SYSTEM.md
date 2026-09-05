@@ -2,17 +2,13 @@
 
 > **Estado:** especificación técnica + guía obligatoria para agentes de IA  
 > **Fecha de investigación:** 8 de agosto de 2026  
-> **Stack objetivo:** React Native · TypeScript · Supabase · iOS · Android  
+> **Stack objetivo:** React Native · TypeScript · Juntoss API · iOS · Android
 > **Feature:** importar movimientos desde XLS/XLSX y CSV
 >
-> **Decisión registrada:** `Bible/DECISIONS.md` ADR-073 elimina por completo
-> el soporte de PDF que este documento describe en las secciones 18–29, 77,
-> 86 y otras referencias dispersas. Esas secciones quedan como investigación
-> histórica de por qué se descartó (heurística best-effort, dependencia
-> nativa joven, requisito de development build, errores recurrentes durante
-> el desarrollo) y no deben usarse como guía para reimplementar PDF sin
-> antes leer el ADR. Todo lo demás en este documento (Excel/CSV, pipeline,
-> normalización, deduplicación, categorización) sigue vigente.
+> **Alcance vigente:** la importación operativa cubre Excel/CSV. El material
+> sobre PDF/OCR es investigación histórica y no autoriza implementar soporte
+> PDF. Todo lo demás en este documento (Excel/CSV, pipeline, normalización,
+> deduplicación y categorización) sigue vigente.
 
 ---
 
@@ -58,7 +54,7 @@ Antes de implementar:
 1. Leer `README.md`.
 2. Leer `PROJECT_RULES.md`.
 3. Leer `ARCHITECTURE.md`.
-4. Leer `DATABASE.md`.
+4. Leer `API.md` si la importación toca sincronización remota.
 5. Buscar el modelo actual de `Transaction`.
 6. Buscar el modelo actual de `Category`.
 7. Buscar `activeSpace`.
@@ -286,7 +282,7 @@ pick
 
 No conservar permanentemente el extracto bancario.
 
-No subirlo a Supabase Storage por defecto.
+No subirlo a un almacenamiento remoto por defecto.
 
 Si se procesa en backend:
 
@@ -619,10 +615,9 @@ Por eso no debe existir un único parser PDF universal.
 
 ## 19. PDF digital on-device
 
-> **Decisión registrada:** `Bible/DECISIONS.md` ADR-069 descarta por ahora
-> el soporte de PDF (ninguna opción on-device funciona dentro de Expo Go,
-> el flujo de desarrollo actual del proyecto). La Fase 1 implementada solo
-> cubre Excel/CSV. Leer el ADR antes de retomar esta sección.
+> **Fuera de alcance:** el soporte PDF está descartado por ahora. La
+> implementación operativa cubre solo Excel/CSV; esta sección se conserva
+> exclusivamente como investigación histórica.
 
 Proyecto investigado:
 
@@ -886,13 +881,9 @@ El propio proyecto indica que auth/rate limiting no forman parte de su microserv
 
 ---
 
-# 27. Supabase Edge Functions
+# 27. Infraestructura backend
 
-No usar Edge Functions automáticamente para OCR/PDF pesado.
-
-Documentación actual:
-
-https://supabase.com/docs/guides/functions/limits
+No usar el backend de Juntoss automáticamente para OCR/PDF pesado.
 
 Entre los límites documentados se encuentran memoria y CPU por request.
 
@@ -955,7 +946,7 @@ Si un PDF requiere password:
 - no persistir
 - no analytics
 - no logs
-- no Supabase
+- no proveedor remoto por defecto
 - limpiar después
 - nunca guardar en secure storage como conveniencia
 
@@ -1722,7 +1713,8 @@ Así un movimiento importado hoy con fecha de marzo aparece en marzo inmediatame
 
 No hace falta implementar sockets únicamente para una importación local.
 
-En espacios compartidos, si Supabase Realtime ya forma parte de la arquitectura, las inserciones pueden propagarse al otro miembro mediante el mecanismo existente.
+En espacios compartidos, las inserciones se propagan mediante la sincronización
+normal del espacio.
 
 No construir un segundo realtime subsystem.
 
@@ -2299,7 +2291,8 @@ No iniciar una reestructuración general del proyecto.
 - No duplicar componentes.
 - No reescribir creación de movimientos.
 - No crear nueva category source of truth.
-- No inventar schemas de Supabase sin revisar `DATABASE.md`.
+- No inventar esquemas remotos ni cambios de persistencia sin revisar el
+  contrato y las migraciones aplicables.
 - No instalar librerías sin comparar alternativas.
 - No hacer refactors no solicitados.
 - No implementar OCR antes de terminar el parser estructurado.
@@ -2435,6 +2428,3 @@ https://github.com/mrousavy/react-native-fast-tflite
 https://github.com/krisk/Fuse
 
 https://www.npmjs.com/package/@noble/hashes
-
-## Supabase
-https://supabase.com/docs/guides/functions/limits

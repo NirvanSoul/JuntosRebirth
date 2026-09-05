@@ -1,6 +1,6 @@
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -18,6 +18,7 @@ import type {
   TransactionNotificationRule,
   TransactionType,
 } from '@/features/transactions/types';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -87,9 +88,7 @@ export function NotificationRulesModal({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!visible) return;
-
+  if (useDepsChanged([rules, visible]) && visible) {
     setDrafts({
       expense: draftFromRule(
         rules.find((rule) => rule.transactionType === 'expense'),
@@ -100,7 +99,7 @@ export function NotificationRulesModal({
     });
     setError(null);
     setSaving(false);
-  }, [rules, visible]);
+  }
 
   const updateDraft = (type: TransactionType, changes: Partial<RuleDraft>) => {
     setDrafts((current) => ({

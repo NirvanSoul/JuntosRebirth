@@ -22,6 +22,7 @@ import type {
 } from '@/features/categories/types';
 import { categoryIconSections } from '@/features/categories/types';
 import { validateCategoryName } from '@/features/categories/utils/categoryCatalog';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import {
   categoryColors,
@@ -100,7 +101,7 @@ export function CreateCategoryModal({
     };
   }, []);
 
-  useEffect(() => {
+  if (useDepsChanged([visible, category, initialEditor])) {
     if (visible) {
       setStep(initialEditor ?? 'name');
       setName(category?.name ?? '');
@@ -110,7 +111,7 @@ export function CreateCategoryModal({
     } else {
       setKeyboardVisible(false);
     }
-  }, [category, initialEditor, visible]);
+  }
 
   const handleContinue = () => {
     setHasAttemptedSubmit(true);

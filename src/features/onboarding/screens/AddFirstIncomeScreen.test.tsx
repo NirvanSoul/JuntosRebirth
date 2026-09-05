@@ -21,12 +21,24 @@ jest.mock('@/features/spaces/hooks/useSpaces', () => ({
   }),
 }));
 
+// El modal de movimiento consulta el país para la conversión de Venezuela
+// (sección 7 del plan); sin este mock arrastraría el repositorio de perfil
+// real, respaldado por SQLite, a un test de onboarding que no lo necesita.
+jest.mock('@/features/profile/hooks/useCurrencyCapabilities', () => ({
+  useCurrencyCapabilities: () => ({
+    countryCode: null,
+    venezuelaCurrencyMode: false,
+    customExchangeRate: false,
+    multiRateMovementDisplay: false,
+  }),
+}));
+
 const seededCategory = {
   id: 'category-salary',
   spaceId: 'personal',
   name: 'Salario',
   icon: 'money',
-  colorToken: 'emerald',
+  colorToken: 'forest',
   isDefault: true,
   templateKey: 'salary',
   isArchived: false,

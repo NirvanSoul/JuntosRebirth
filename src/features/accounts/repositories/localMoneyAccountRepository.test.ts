@@ -141,7 +141,7 @@ describe('localMoneyAccountRepository', () => {
         name: 'Cuenta vacía',
         kind: 'cash',
         icon: 'money',
-        colorToken: 'emerald',
+        colorToken: 'forest',
         balances: [],
       }),
     ).rejects.toThrow('La cuenta necesita al menos una moneda');
@@ -170,7 +170,7 @@ describe('localMoneyAccountRepository', () => {
         name: 'Efectivo',
         kind: 'cash',
         icon: 'money',
-        colorToken: 'emerald',
+        colorToken: 'forest',
         balances: [{ currency: 'EUR', openingBalanceMinor: 10.5 }],
       }),
     ).rejects.toThrow('El saldo inicial debe expresarse en unidades menores');
@@ -183,7 +183,7 @@ describe('localMoneyAccountRepository', () => {
       name: 'Efectivo',
       kind: 'cash',
       icon: 'money',
-      colorToken: 'emerald',
+      colorToken: 'forest',
       balances: [{ currency: 'EUR', openingBalanceMinor: 0 }],
       isArchived: false,
     });

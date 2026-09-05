@@ -17,11 +17,16 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { Avatar } from '@/components/ui/Avatar/Avatar';
 import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal';
 import { Text } from '@/components/ui/Text/Text';
+import { TransactionExchangeSnapshotCard } from '@/features/exchangeRates/components/TransactionExchangeSnapshotCard';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import type { MoneyAccount } from '@/features/accounts/types';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { Category } from '@/features/categories/types';
 import { createStyles } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal.styles';
+import {
+  formatTransactionDetailDate,
+  transactionRecurrenceLabels,
+} from '@/features/transactions/components/TransactionDetailModal/transactionDetailPresentation';
 import {
   TransactionDetailQuickEditors,
   type TransactionQuickEditField,
@@ -31,7 +36,6 @@ import type {
   SessionTransaction,
   TransactionEditorTarget,
   TransactionQuickEdit,
-  TransactionRecurrence,
   TransactionReminder,
 } from '@/features/transactions/types';
 import { useTransactionAuthor } from '@/features/transactions/hooks/useTransactionAuthor';
@@ -40,6 +44,7 @@ import {
   getUpcomingTransactionDates,
   parseProjectedTransactionId,
 } from '@/features/transactions/utils/transactionRecurrence';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import {
@@ -87,22 +92,6 @@ type TransactionDetailModalProps = {
 
 const recurrencePageSize = 5;
 
-const recurrenceLabels: Record<TransactionRecurrence, string> = {
-  once: 'Único',
-  weekly: 'Semanal',
-  biweekly: 'Quincenal',
-  monthly: 'Mensual',
-  custom: 'Personalizada',
-};
-
-function formatTransactionDate(occurredOn: string): string {
-  return new Intl.DateTimeFormat('es-ES', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(`${occurredOn}T12:00:00`));
-}
-
 export function TransactionDetailModal({
   assignableMoneyAccounts = [],
   category,
@@ -137,17 +126,15 @@ export function TransactionDetailModal({
   const modalBottomInset = useAppModalBottomInset();
   const author = useTransactionAuthor(transaction?.createdBy ?? '');
 
-  useEffect(() => {
-    if (visible) {
-      setSpacePickerVisible(false);
-      setReminderModalVisible(false);
-      setNoteModalVisible(false);
-      setQuickEditField(null);
-      setDeleteVisible(false);
-      setRecurrenceExpanded(false);
-      setVisibleRecurrenceCount(recurrencePageSize);
-    }
-  }, [transaction, visible]);
+  if (useDepsChanged([transaction, visible]) && visible) {
+    setSpacePickerVisible(false);
+    setReminderModalVisible(false);
+    setNoteModalVisible(false);
+    setQuickEditField(null);
+    setDeleteVisible(false);
+    setRecurrenceExpanded(false);
+    setVisibleRecurrenceCount(recurrencePageSize);
+  }
 
   useEffect(() => {
     if (visible) {
@@ -178,7 +165,7 @@ export function TransactionDetailModal({
       ? nextOccurrenceOn !== undefined
       : upcomingDates.length > visibleRecurrenceCount;
   const nextRecurrenceValue = nextOccurrenceOn
-    ? formatTransactionDate(nextOccurrenceOn)
+    ? formatTransactionDetailDate(nextOccurrenceOn)
     : transaction.recurrence === 'once'
       ? 'No se repetirá'
       : transaction.recurrence === 'custom'
@@ -327,6 +314,13 @@ export function TransactionDetailModal({
               </View>
             </Pressable>
 
+            <TransactionExchangeSnapshotCard
+              amountMinor={transaction.amountMinor}
+              currency={transaction.currency}
+              exchangeSnapshot={transaction.exchangeSnapshot}
+              key={transaction.id}
+            />
+
             {!isProjected ? (
               <View style={styles.actionsRow}>
                 <Pressable
@@ -461,7 +455,7 @@ export function TransactionDetailModal({
               </Pressable>
               <View style={styles.divider} />
               <Pressable
-                accessibilityLabel={`Cambiar fecha: ${formatTransactionDate(transaction.occurredOn)}`}
+                accessibilityLabel={`Cambiar fecha: ${formatTransactionDetailDate(transaction.occurredOn)}`}
                 accessibilityRole="button"
                 onPress={() => setQuickEditField('date')}
                 style={({ pressed }) => [
@@ -480,7 +474,7 @@ export function TransactionDetailModal({
                     Fecha
                   </Text>
                   <Text variant="label">
-                    {formatTransactionDate(transaction.occurredOn)}
+                    {formatTransactionDetailDate(transaction.occurredOn)}
                   </Text>
                 </View>
                 <Ionicons
@@ -511,7 +505,7 @@ export function TransactionDetailModal({
               ) : null}
               <View style={styles.divider} />
               <Pressable
-                accessibilityLabel={`Cambiar recurrencia: ${recurrenceLabels[transaction.recurrence]}`}
+                accessibilityLabel={`Cambiar recurrencia: ${transactionRecurrenceLabels[transaction.recurrence]}`}
                 accessibilityRole="button"
                 onPress={() => setQuickEditField('recurrence')}
                 style={({ pressed }) => [
@@ -531,7 +525,7 @@ export function TransactionDetailModal({
                     Recurrencia
                   </Text>
                   <Text variant="label">
-                    {recurrenceLabels[transaction.recurrence]}
+                    {transactionRecurrenceLabels[transaction.recurrence]}
                   </Text>
                 </View>
                 <Ionicons
@@ -598,7 +592,9 @@ export function TransactionDetailModal({
                       <Text tone="secondary" variant="footnote">
                         {index + 1}.
                       </Text>
-                      <Text variant="label">{formatTransactionDate(date)}</Text>
+                      <Text variant="label">
+                        {formatTransactionDetailDate(date)}
+                      </Text>
                     </View>
                   ))}
                   {hasMoreRecurrences ? (

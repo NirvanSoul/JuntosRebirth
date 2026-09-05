@@ -18,7 +18,9 @@ jest.mock('@gorhom/bottom-sheet', () => {
       { children, onDismiss }: { children?: ReactNode; onDismiss?: () => void },
       ref: React.ForwardedRef<{ present: () => void; dismiss: () => void }>,
     ) => {
-      latestOnDismiss = onDismiss ?? null;
+      React.useEffect(() => {
+        latestOnDismiss = onDismiss ?? null;
+      });
       React.useImperativeHandle(ref, () => ({
         present: mockLatestPresent,
         dismiss: jest.fn(),

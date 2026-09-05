@@ -1,4 +1,7 @@
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import {
+  formatCurrency,
+  formatExchangeRate,
+} from '@/lib/currency/formatCurrency';
 
 describe('formatCurrency', () => {
   it('formatea unidades menores sin usar punto flotante como fuente', () => {
@@ -56,5 +59,33 @@ describe('formatCurrency', () => {
         value: originalFormatToParts,
       });
     }
+  });
+});
+
+const nbsp = ' ';
+
+describe('formatExchangeRate', () => {
+  it('formatea la tasa BCV típica de USD a VES', () => {
+    expect(formatExchangeRate('52.3456', 'USD', 'VES', 'es-ES')).toBe(
+      `1 USD = Bs.${nbsp}52,35`,
+    );
+  });
+
+  it('formatea la tasa en la dirección VES a USD', () => {
+    expect(formatExchangeRate('0.0191', 'VES', 'USD', 'es-ES')).toBe(
+      `1 VES = $${nbsp}0,02`,
+    );
+  });
+
+  it('agrupa los millares en tasas grandes', () => {
+    expect(formatExchangeRate('1234.5', 'USD', 'VES', 'es-ES')).toBe(
+      `1 USD = Bs.${nbsp}1.234,50`,
+    );
+  });
+
+  it('rechaza una tasa que no es un número válido', () => {
+    expect(() => formatExchangeRate('abc', 'USD', 'VES', 'es-ES')).toThrow(
+      'número válido',
+    );
   });
 });

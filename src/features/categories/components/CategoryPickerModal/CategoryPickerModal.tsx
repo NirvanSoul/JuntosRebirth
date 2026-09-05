@@ -31,6 +31,7 @@ import {
   type DefaultCategoryDefinition,
 } from '@/features/categories/constants/defaultCategories';
 import type { Category } from '@/features/categories/types';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { categoryColors } from '@/theme/categoryColors';
@@ -169,14 +170,12 @@ export function CategoryPickerModal({
     [],
   );
 
-  useEffect(() => {
-    if (visible) {
-      setPageIndex(0);
-      setDisplayMode(mode);
-      setSelectedTemplateKeys([]);
-      setDuplicateNoticeVisible(false);
-    }
-  }, [mode, visible]);
+  if (useDepsChanged([visible, mode]) && visible) {
+    setPageIndex(0);
+    setDisplayMode(mode);
+    setSelectedTemplateKeys([]);
+    setDuplicateNoticeVisible(false);
+  }
 
   useEffect(() => {
     if (visible) {
@@ -477,7 +476,7 @@ const styles = StyleSheet.create({
   },
   createdCategoryCard: { opacity: 0.52 },
   selectedGradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: radii.md,
   },
   categoryIcon: {

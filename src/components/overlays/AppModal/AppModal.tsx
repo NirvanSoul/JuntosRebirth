@@ -100,7 +100,9 @@ export function AppModal({
   const dismissRequestedByParentRef = useRef(false);
   const hasPresentedRef = useRef(false);
   const visibleRef = useRef(visible);
-  visibleRef.current = visible;
+  useLayoutEffect(() => {
+    visibleRef.current = visible;
+  });
   const snapPoints = useMemo(
     () =>
       isExpanded
@@ -120,6 +122,9 @@ export function AppModal({
       return;
     }
 
+    // Este efecto también presenta el bottom sheet imperativamente (abajo);
+    // no es un derivado puro de render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setContentVisible(true);
     if (!dismissRequestedByParentRef.current) {
       hasPresentedRef.current = true;
@@ -232,7 +237,7 @@ export function AppModal({
 
 const styles = StyleSheet.create({
   modalLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 100,
     elevation: 20,
   },
@@ -259,7 +264,7 @@ function createThemedStyles(colors: ColorTokens) {
       backgroundColor: colors.border,
     },
     backdropShade: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: colors.overlaySoft,
     },
   });

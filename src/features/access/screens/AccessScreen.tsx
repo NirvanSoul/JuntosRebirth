@@ -57,10 +57,16 @@ export function AccessScreen() {
   // Si el alta acaba de crear una sesión sin verificar, RootNavigator vuelve a
   // montar esta pantalla. Recuperamos el OTP desde la sesión, no desde memoria
   // efímera del formulario que se acaba de desmontar.
-  useEffect(() => {
-    if (!pendingVerificationEmail) return;
+  const [syncedVerificationEmail, setSyncedVerificationEmail] = useState<
+    string | null
+  >(null);
+  if (
+    pendingVerificationEmail &&
+    pendingVerificationEmail !== syncedVerificationEmail
+  ) {
+    setSyncedVerificationEmail(pendingVerificationEmail);
     setStep({ screen: 'verify-signup', email: pendingVerificationEmail });
-  }, [pendingVerificationEmail]);
+  }
 
   // La sesión provisional puede desaparecer o refrescarse antes de que la
   // pantalla se vuelva a montar. En ese caso el correo almacenado es la fuente

@@ -3,7 +3,7 @@ import {
   BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
@@ -11,6 +11,7 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
 import { Text } from '@/components/ui/Text/Text';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import {
   maxActiveCurrencies,
   searchCurrencyCatalog,
@@ -67,12 +68,13 @@ export function CurrencyPreferencesModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [notice, setNotice] = useState<LimitNotice>(null);
 
-  useEffect(() => {
-    if (!visible) return;
-    setSelectedCurrencies(preferences.currencies);
-    setSearchQuery('');
-    setNotice(null);
-  }, [preferences, visible]);
+  if (useDepsChanged([visible, preferences])) {
+    if (visible) {
+      setSelectedCurrencies(preferences.currencies);
+      setSearchQuery('');
+      setNotice(null);
+    }
+  }
 
   const filteredCatalog = useMemo(
     () => searchCurrencyCatalog(searchQuery),

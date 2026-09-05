@@ -39,4 +39,15 @@ describe('listSpaceCurrencies', () => {
 
     expect(currencies).toEqual(['VES', 'EUR', 'USD', 'GBP', 'ARS']);
   });
+
+  it('integra monedas adicionales presentes en los movimientos o cuentas del espacio', () => {
+    const currencies = listSpaceCurrencies(
+      'VES',
+      ['EUR'],
+      ['USD'],
+      ['GBP', 'EUR', 'JPY'],
+    );
+
+    expect(currencies).toEqual(['VES', 'EUR', 'USD', 'GBP', 'JPY']);
+  });
 });

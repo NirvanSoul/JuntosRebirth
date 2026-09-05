@@ -56,15 +56,22 @@ describe('defaultCategories', () => {
     expect(personal).not.toBe(couple);
   });
 
-  it('asigna un color distinto a cada plantilla desde la paleta completa', () => {
+  it('cubre la paleta completa sin repetir color dentro de una misma página', () => {
     const colorTokens = defaultCategoryPages
       .flat()
       .map(({ colorToken }) => colorToken);
 
-    expect(Object.keys(categoryColors)).toHaveLength(18);
-    expect(new Set(Object.values(categoryColors)).size).toBe(18);
-    expect(new Set(colorTokens).size).toBe(18);
+    expect(Object.keys(categoryColors)).toHaveLength(15);
+    expect(new Set(Object.values(categoryColors)).size).toBe(15);
     expect(new Set(colorTokens)).toEqual(new Set(Object.keys(categoryColors)));
+
+    // Hay más plantillas que colores, así que alguno se repite entre páginas,
+    // pero una página nunca muestra dos categorías del mismo color.
+    defaultCategoryPages.forEach((page) => {
+      expect(new Set(page.map(({ colorToken }) => colorToken)).size).toBe(
+        page.length,
+      );
+    });
   });
 
   it('asocia Salario y Familia a los colores sugeridos', () => {

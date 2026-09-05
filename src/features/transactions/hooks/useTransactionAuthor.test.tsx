@@ -41,7 +41,15 @@ jest.mock('@/features/profile/services/syncSpaceMemberProfiles', () => ({
 }));
 
 jest.mock('@/lib/storage/localDatabase', () => ({
-  getLocalDatabase: jest.fn(async () => ({})),
+  getLocalDatabase: jest.fn(async () => ({
+    getFirstAsync: jest.fn(async () => ({
+      avatar_path: 'file:///avatar.jpg',
+      avatar_updated_at: '2026-09-02T10:00:00Z',
+      avatar_remote_path: 'remote/avatar.jpg',
+      avatar_remote_updated_at: '2026-09-02T10:00:00Z',
+      display_name: 'Ana',
+    })),
+  })),
 }));
 
 const coupleSpace: Space = {
@@ -76,6 +84,16 @@ describe('useTransactionAuthor', () => {
     );
 
     expect(await screen.findByText('Beto')).toBeTruthy();
+  });
+
+  it('nombra al propio usuario en un espacio juntos con su nombre de perfil', async () => {
+    const screen = await renderWithTheme(
+      <SpaceMembershipProvider space={coupleSpace}>
+        <AuthorProbe createdBy="uuid-ana" />
+      </SpaceMembershipProvider>,
+    );
+
+    expect(await screen.findByText('Ana')).toBeTruthy();
   });
 
   it('no devuelve autor en un espacio personal, donde el dato sería ruido', async () => {

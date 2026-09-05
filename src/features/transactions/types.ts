@@ -5,6 +5,22 @@ export type TransactionType = 'expense' | 'income';
 export type TransactionRecurrence =
   'once' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
 
+export type ExchangeSnapshotRate = {
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: string;
+  convertedAmountMinor: number;
+  /** Moneda exacta de `convertedAmountMinor`; evita inferir la dirección. */
+  convertedCurrency?: CurrencyCode;
+  observedAt: string | null;
+};
+
+export type TransactionExchangeSnapshot = {
+  countryCode: 'VE';
+  createdWithCurrency: 'USD' | 'VES';
+  rates: Partial<Record<'BCV' | 'EURO' | 'CUSTOM', ExchangeSnapshotRate>>;
+};
+
 /** Selector que debe abrir el formulario al llegar desde el detalle. */
 export type TransactionEditorTarget =
   'category' | 'currency' | 'date' | 'money-account' | 'recurrence';
@@ -64,6 +80,10 @@ export type SessionTransaction = CreateTransactionDraft & {
   /** Id del movimiento original si este es una copia creada en otro espacio. */
   sourceTransactionId?: string;
   note?: string;
+  customRateId?: string;
+  /** Valor USD congelado por el backend para el ledger venezolano. */
+  accountingAmountMinorUsd?: number | null;
+  exchangeSnapshot?: TransactionExchangeSnapshot | null;
 };
 
 /** Configuración de recordatorios locales de un movimiento: un día con una o varias horas. */

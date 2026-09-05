@@ -74,10 +74,27 @@ export async function createInitialSchema(
   `);
 }
 
-/** Versión 2: series recurrentes y reconstrucción de `transactions`. */
+/**
+ * Versión 2: series recurrentes y reconstrucción de `transactions`.
+ *
+ * A diferencia de la versión 1, este peldaño no puede escribirse solo con
+ * `IF NOT EXISTS`: renombra `transactions` y la reconstruye copiando filas. Por
+ * eso comprueba antes si ya dejó su huella. Un dispositivo cuyo `user_version`
+ * quedó por detrás del esquema real —una migración anterior interrumpida, o dos
+ * conexiones abriendo la base a la vez— lo reejecutaría y fallaría con «table
+ * recurring_transaction_series already exists», dejando la app sin poder abrir
+ * sus datos. Es la misma salvaguarda que `ensureMoneyAccountSchema` y
+ * `ensureLocalProfileDisplayNameColumn` aplican a sus propios peldaños.
+ */
 export async function createRecurringSeriesSchema(
   transaction: SQLite.SQLiteDatabase,
 ): Promise<void> {
+  const existingSeries = await transaction.getFirstAsync<{ name: string }>(
+    `SELECT name FROM sqlite_master
+      WHERE type = 'table' AND name = 'recurring_transaction_series'`,
+  );
+  if (existingSeries) return;
+
   await transaction.execAsync(`
     ALTER TABLE transactions RENAME TO transactions_v1;
 

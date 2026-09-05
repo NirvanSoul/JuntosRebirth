@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
@@ -13,6 +13,7 @@ import {
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import type { TransactionRecurrence } from '@/features/transactions/types';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 
@@ -51,11 +52,9 @@ export function TransactionMoneyAccountPickerModal({
   const [draftMoneyAccountId, setDraftMoneyAccountId] =
     useState(moneyAccountId);
 
-  useEffect(() => {
-    if (visible) {
-      setDraftMoneyAccountId(moneyAccountId);
-    }
-  }, [moneyAccountId, visible]);
+  if (useDepsChanged([moneyAccountId, visible]) && visible) {
+    setDraftMoneyAccountId(moneyAccountId);
+  }
 
   return (
     <AppModal
@@ -129,6 +128,8 @@ export function TransactionMoneyAccountPickerModal({
 type TransactionCurrencyPickerModalProps = {
   availableCurrencies: readonly CurrencyCode[];
   currency: CurrencyCode;
+  /** Para Venezuela el flujo de captura solo ofrece USD y VES. */
+  venezuelaMode?: boolean;
   visible: boolean;
   onClose: () => void;
   onSelectCurrency: (currency: CurrencyCode) => void;
@@ -137,17 +138,16 @@ type TransactionCurrencyPickerModalProps = {
 export function TransactionCurrencyPickerModal({
   availableCurrencies,
   currency,
+  venezuelaMode = false,
   visible,
   onClose,
   onSelectCurrency,
 }: TransactionCurrencyPickerModalProps) {
   const [draftCurrency, setDraftCurrency] = useState(currency);
 
-  useEffect(() => {
-    if (visible) {
-      setDraftCurrency(currency);
-    }
-  }, [currency, visible]);
+  if (useDepsChanged([currency, visible]) && visible) {
+    setDraftCurrency(currency);
+  }
 
   return (
     <AppModal
@@ -165,12 +165,27 @@ export function TransactionCurrencyPickerModal({
         </View>
 
         <View accessibilityRole="radiogroup" style={optionPickerStyles.list}>
-          {availableCurrencies.map((code) => (
+          {(venezuelaMode
+            ? (['USD', 'VES'] as const)
+            : availableCurrencies
+          ).map((code) => (
             <SelectableOption
-              accessibilityLabel={`${getCurrencyFlag(code)} ${getCurrencyName(code)} (${code})`}
+              accessibilityLabel={
+                venezuelaMode
+                  ? code === 'USD'
+                    ? 'Dólares estadounidenses'
+                    : 'Bolívares venezolanos'
+                  : `${getCurrencyFlag(code)} ${getCurrencyName(code)} (${code})`
+              }
               indicatorTestID={`transaction-currency-${code}-check`}
               key={code}
-              label={`${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`}
+              label={
+                venezuelaMode
+                  ? code === 'USD'
+                    ? '$  Dólares'
+                    : 'Bs.  Bolívares'
+                  : `${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`
+              }
               onPress={() => setDraftCurrency(code)}
               selected={draftCurrency === code}
             />
@@ -233,12 +248,10 @@ export function TransactionRecurrencePickerModal({
     useState(recurrenceIndex);
   const [isCustomPickerVisible, setCustomPickerVisible] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      setDraftRecurrenceIndex(recurrenceIndex);
-      setCustomPickerVisible(false);
-    }
-  }, [recurrenceIndex, visible]);
+  if (useDepsChanged([recurrenceIndex, visible]) && visible) {
+    setDraftRecurrenceIndex(recurrenceIndex);
+    setCustomPickerVisible(false);
+  }
 
   return (
     <>

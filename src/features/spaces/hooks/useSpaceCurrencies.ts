@@ -19,6 +19,7 @@ import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 export function useSpaceCurrencies(
   space: Space,
   ownCurrencies: readonly CurrencyCode[],
+  extraCurrencies: readonly (CurrencyCode | null | undefined)[] = [],
 ): readonly CurrencyCode[] {
   const [memberCurrencies, setMemberCurrencies] = useState<
     readonly (CurrencyCode | null)[]
@@ -30,6 +31,9 @@ export function useSpaceCurrencies(
     let isMounted = true;
 
     if (!isShared) {
+      // Rama del mismo efecto que hace I/O (censo) en el caso compartido;
+      // limpiar aquí evita arrastrar monedas del espacio anterior.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMemberCurrencies([]);
       return () => {
         isMounted = false;
@@ -59,7 +63,13 @@ export function useSpaceCurrencies(
   }, [isShared, spaceId]);
 
   return useMemo(
-    () => listSpaceCurrencies(space.currency, ownCurrencies, memberCurrencies),
-    [space.currency, ownCurrencies, memberCurrencies],
+    () =>
+      listSpaceCurrencies(
+        space.currency,
+        ownCurrencies,
+        memberCurrencies,
+        extraCurrencies,
+      ),
+    [space.currency, ownCurrencies, memberCurrencies, extraCurrencies],
   );
 }

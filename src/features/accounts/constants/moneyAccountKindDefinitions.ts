@@ -14,7 +14,7 @@ export type MoneyAccountKindDefinition = {
 
 export const moneyAccountKindDefinitions: readonly MoneyAccountKindDefinition[] =
   [
-    { kind: 'cash', label: 'Efectivo', icon: 'money', colorToken: 'emerald' },
+    { kind: 'cash', label: 'Efectivo', icon: 'money', colorToken: 'forest' },
     {
       kind: 'bank',
       label: 'Cuenta bancaria',

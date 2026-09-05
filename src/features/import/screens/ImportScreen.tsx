@@ -83,6 +83,7 @@ import type {
   CreateTransactionDraft,
   SessionTransaction,
 } from '@/features/transactions/types';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import {
   getCurrencyFlag,
   getCurrencyName,
@@ -174,9 +175,9 @@ export function ImportScreen({
   const [documentCurrency, setDocumentCurrency] =
     useState<CurrencyCode>(fallbackCurrency);
 
-  useEffect(() => {
+  if (useDepsChanged([activeSpaceId, fallbackCurrency])) {
     setDocumentCurrency(fallbackCurrency);
-  }, [activeSpaceId, fallbackCurrency]);
+  }
 
   const [candidates, setCandidates] = useState<ImportedTransactionCandidate[]>(
     [],
@@ -490,6 +491,9 @@ export function ImportScreen({
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
+    // Este efecto también lanza `listResumableLocalImportBatches` (I/O) y
+    // limpia refs con cleanup propio; el reinicio de fase va junto a eso.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase({ kind: 'idle' });
     setRemainingImportNotice(null);
     setBatchPendingDeletion(null);

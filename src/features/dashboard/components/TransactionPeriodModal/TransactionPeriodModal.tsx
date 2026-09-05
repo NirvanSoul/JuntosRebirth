@@ -28,6 +28,7 @@ import type {
   TransactionType,
 } from '@/features/transactions/types';
 import { calculatePeriodComparison } from '@/features/transactions/utils/periodComparison';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import {
   getAvailableCurrencies,
   pickEffectiveCurrency,
@@ -166,24 +167,20 @@ export function TransactionPeriodModal({
       : type === 'expense'
         ? 'Añadir gasto'
         : 'Añadir movimiento';
-  useEffect(() => {
-    if (visible) {
-      setPeriod('month');
-      setSelectedDate(new Date());
-      setSelectedCurrency(null);
-      setCurrencyPickerVisible(false);
-    }
-  }, [visible]);
+  if (useDepsChanged([visible]) && visible) {
+    setPeriod('month');
+    setSelectedDate(new Date());
+    setSelectedCurrency(null);
+    setCurrencyPickerVisible(false);
+  }
   useEffect(() => {
     if (visible) {
       triggerHaptic('modalOpen');
     }
   }, [visible]);
-  useEffect(() => {
-    if (selectedCurrency && !availableCurrencies.includes(selectedCurrency)) {
-      setSelectedCurrency(null);
-    }
-  }, [availableCurrencies, selectedCurrency]);
+  if (selectedCurrency && !availableCurrencies.includes(selectedCurrency)) {
+    setSelectedCurrency(null);
+  }
 
   return (
     <>

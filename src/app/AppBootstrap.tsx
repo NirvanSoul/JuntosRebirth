@@ -12,13 +12,7 @@ ensureNotificationHandlerRegistered();
 function AppStatusBar() {
   const { isDark } = useTheme();
 
-  return (
-    <StatusBar
-      backgroundColor="transparent"
-      style={isDark ? 'light' : 'dark'}
-      translucent
-    />
-  );
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
 }
 
 export function AppBootstrap() {

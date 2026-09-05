@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
@@ -6,6 +6,7 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { AppCalendar } from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { spacing } from '@/theme/spacing';
 
 type TransactionDatePickerModalProps = {
@@ -23,9 +24,9 @@ export function TransactionDatePickerModal({
 }: TransactionDatePickerModalProps) {
   const [draftDate, setDraftDate] = useState(selectedDate);
 
-  useEffect(() => {
-    if (visible) setDraftDate(selectedDate);
-  }, [selectedDate, visible]);
+  if (useDepsChanged([selectedDate, visible]) && visible) {
+    setDraftDate(selectedDate);
+  }
 
   return (
     <AppModal

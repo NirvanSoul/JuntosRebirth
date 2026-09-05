@@ -7,6 +7,7 @@ type LocalProfileRow = {
   avatar_remote_path: string | null;
   avatar_remote_updated_at: string | null;
   display_name: string | null;
+  country_code: string | null;
 };
 
 function mapProfile(row: LocalProfileRow | null): LocalProfile {
@@ -19,6 +20,7 @@ function mapProfile(row: LocalProfileRow | null): LocalProfile {
     avatarPath: row?.avatar_remote_path ?? null,
     avatarUpdatedAt: row?.avatar_remote_updated_at ?? null,
     displayName: row?.display_name?.trim() ? row.display_name : null,
+    countryCode: row?.country_code?.trim() ? row.country_code : null,
   };
 }
 
@@ -26,7 +28,7 @@ export async function getLocalProfile(): Promise<LocalProfile> {
   const database = await getLocalDatabase();
   const row = await database.getFirstAsync<LocalProfileRow>(
     `SELECT avatar_path, avatar_updated_at, avatar_remote_path,
-            avatar_remote_updated_at, display_name
+            avatar_remote_updated_at, display_name, country_code
        FROM local_profile WHERE singleton_id = 1`,
   );
   return mapProfile(row ?? null);
@@ -199,6 +201,24 @@ export async function saveLocalProfileDisplayName(
      ON CONFLICT (singleton_id) DO UPDATE SET
        display_name = excluded.display_name`,
     displayName.trim(),
+  );
+  return getLocalProfile();
+}
+
+/**
+ * Guarda el país elegido en el onboarding o en Ajustes. Igual que el nombre,
+ * vuelve a leer la fila completa en vez de construir el resultado a mano.
+ */
+export async function saveLocalProfileCountry(
+  countryCode: string,
+): Promise<LocalProfile> {
+  const database = await getLocalDatabase();
+  await database.runAsync(
+    `INSERT INTO local_profile (singleton_id, country_code)
+     VALUES (1, ?)
+     ON CONFLICT (singleton_id) DO UPDATE SET
+       country_code = excluded.country_code`,
+    countryCode.trim().toUpperCase(),
   );
   return getLocalProfile();
 }

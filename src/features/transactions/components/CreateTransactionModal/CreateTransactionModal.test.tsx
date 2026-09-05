@@ -4,6 +4,7 @@ import { Keyboard, StyleSheet } from 'react-native';
 
 import { CreateTransactionModal as ControlledCreateTransactionModal } from '@/features/transactions/components/CreateTransactionModal/CreateTransactionModal';
 import type { Category } from '@/features/categories/types';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import type { TransactionType } from '@/features/transactions/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import {
@@ -15,6 +16,27 @@ import { minTouchTarget } from '@/theme/layout';
 import { shadows } from '@/theme/shadows';
 
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+
+// El modal solo consulta el país para decidir si muestra la conversión de
+// Venezuela (sección 7 del plan); sin este mock arrastraría el repositorio
+// de perfil real, respaldado por SQLite, a un archivo que no lo necesita.
+jest.mock('@/features/profile/hooks/useCurrencyCapabilities');
+
+jest.mocked(useCurrencyCapabilities).mockReturnValue({
+  countryCode: null,
+  venezuelaCurrencyMode: false,
+  customExchangeRate: false,
+  multiRateMovementDisplay: false,
+});
+
+// Evita llamadas reales al backend de tasas: solo se resuelve explícitamente
+// en los tests de la sección "conversión en vivo para Venezuela".
+jest.mock(
+  '@/features/exchangeRates/gateways/juntossExchangeRateGateway',
+  () => ({
+    previewExchangeRate: jest.fn(),
+  }),
+);
 
 const category: Category = {
   id: 'personal-category-1',
@@ -1457,6 +1479,270 @@ describe('CreateTransactionModal', () => {
       await fireEvent.press(screen.getByLabelText('Crear cuenta'));
 
       expect(onCreateMoneyAccount).toHaveBeenCalled();
+    });
+  });
+
+  describe('resaltado morado en botones de metadatos interactuados', () => {
+    const bankAccount = {
+      id: 'account-1',
+      spaceId: 'personal',
+      name: 'Cuenta nómina',
+      kind: 'bank' as const,
+      icon: 'bank' as const,
+      colorToken: 'blue' as const,
+      balances: [{ currency: 'EUR' as const, openingBalanceMinor: 0 }],
+      isArchived: false,
+    };
+
+    it('muestra los botones en tono neutral por defecto y en morado al seleccionarlos', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          initialType="expense"
+          moneyAccounts={[bankAccount]}
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      // Estado por defecto: neutral
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('transaction-date-icon').props.style,
+        ).color,
+      ).toBe(colors.textPrimary);
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('transaction-recurrence-icon').props.style,
+        ).color,
+      ).toBe(colors.textPrimary);
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('transaction-money-account-icon').props.style,
+        ).color,
+      ).toBe(colors.textPrimary);
+
+      // 1. Seleccionar fecha -> cambia a morado (cta)
+      await fireEvent.press(screen.getByTestId('transaction-date-button'));
+      await fireEvent.press(screen.getByLabelText('Guardar fecha'));
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('transaction-date-icon').props.style,
+        ).color,
+      ).toBe(colors.cta);
+
+      // 2. Seleccionar recurrencia -> cambia a morado (cta)
+      await fireEvent.press(
+        screen.getByTestId('transaction-recurrence-button'),
+      );
+      await fireEvent.press(screen.getByLabelText('Semanal'));
+      await fireEvent.press(screen.getByLabelText('Guardar recurrencia'));
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('transaction-recurrence-icon').props.style,
+        ).color,
+      ).toBe(colors.cta);
+
+      // 3. Seleccionar cuenta -> cambia a morado (cta)
+      await fireEvent.press(
+        screen.getByTestId('transaction-money-account-button'),
+      );
+      await fireEvent.press(screen.getByLabelText('Cuenta nómina · EUR'));
+      await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('transaction-money-account-icon').props.style,
+        ).color,
+      ).toBe(colors.cta);
+    });
+
+    it('precarga en morado los metadatos cuando provienen de initialDraft o initialDate', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="personal"
+          initialDate="2026-08-18"
+          initialDraft={{
+            spaceId: 'personal',
+            type: 'expense',
+            amountMinor: 1250,
+            currency: 'EUR',
+            title: 'Compra',
+            categoryId: category.id,
+            moneyAccountId: 'account-1',
+            occurredOn: '2026-08-18',
+            recurrence: 'monthly',
+          }}
+          initialType="expense"
+          moneyAccounts={[bankAccount]}
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          visible
+        />,
+      );
+
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('transaction-date-icon').props.style,
+        ).color,
+      ).toBe(colors.cta);
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('transaction-recurrence-icon').props.style,
+        ).color,
+      ).toBe(colors.cta);
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('transaction-money-account-icon').props.style,
+        ).color,
+      ).toBe(colors.cta);
+    });
+  });
+
+  describe('conversión en vivo para Venezuela', () => {
+    const { previewExchangeRate } = jest.requireMock(
+      '@/features/exchangeRates/gateways/juntossExchangeRateGateway',
+    ) as { previewExchangeRate: jest.Mock };
+
+    beforeEach(() => {
+      previewExchangeRate.mockReset();
+      jest.mocked(useCurrencyCapabilities).mockReturnValue({
+        countryCode: null,
+        venezuelaCurrencyMode: false,
+        customExchangeRate: false,
+        multiRateMovementDisplay: false,
+      });
+    });
+
+    it('no llama al backend de tasas si la capacidad de Venezuela está desactivada, aunque la moneda sea VES', async () => {
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="space-ves"
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          spaceCurrency="VES"
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByLabelText('5'));
+
+      expect(screen.queryByTestId('transaction-exchange-preview')).toBeNull();
+      expect(previewExchangeRate).not.toHaveBeenCalled();
+    });
+
+    it('muestra la conversión bajo el importe cuando la persona vive en Venezuela y escribe en VES', async () => {
+      jest.mocked(useCurrencyCapabilities).mockReturnValue({
+        accountingCurrency: 'USD',
+        allowedTransactionInputCurrencies: ['USD', 'VES'],
+        allowsMultipleAccountCurrencies: false,
+        countryCode: 'VE',
+        venezuelaCurrencyMode: true,
+        customExchangeRate: true,
+        multiRateMovementDisplay: true,
+      });
+      previewExchangeRate.mockResolvedValue({
+        conversions: {
+          BCV: { amountMinor: 20_000, currency: 'USD', rate: '50.0000000000' },
+          EURO: { amountMinor: 16_667, currency: 'EUR', rate: '60.0000000000' },
+        },
+        ratesUpdatedAt: '2026-09-01T04:00:00.000Z',
+      });
+
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="space-ves"
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          spaceCurrency="VES"
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByTestId('transaction-currency-button'));
+      await fireEvent.press(screen.getByLabelText('Bolívares venezolanos'));
+      await fireEvent.press(screen.getByLabelText('Guardar moneda'));
+      await fireEvent.press(screen.getByLabelText('5'));
+
+      expect(
+        await screen.findByTestId('transaction-exchange-preview-badge'),
+      ).toHaveTextContent('≈ $ 200 · BCV');
+      expect(
+        screen.getByTestId('transaction-exchange-preview-euro-badge'),
+      ).toHaveTextContent('≈ 166,67 € · Euro');
+      expect(previewExchangeRate).toHaveBeenCalledWith(
+        expect.objectContaining({ fromCurrency: 'VES' }),
+      );
+    });
+
+    it('ofrece USD y VES aunque el espacio tenga una sola moneda activa', async () => {
+      jest.mocked(useCurrencyCapabilities).mockReturnValue({
+        accountingCurrency: 'USD',
+        allowedTransactionInputCurrencies: ['USD', 'VES'],
+        allowsMultipleAccountCurrencies: false,
+        countryCode: 'VE',
+        venezuelaCurrencyMode: true,
+        customExchangeRate: true,
+        multiRateMovementDisplay: true,
+      });
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="space-ves"
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          spaceCurrency="VES"
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByTestId('transaction-currency-button'));
+
+      expect(screen.getByLabelText('Dólares estadounidenses')).toBeTruthy();
+      expect(screen.getByLabelText('Bolívares venezolanos')).toBeTruthy();
+    });
+
+    it('inicia en USD aunque el espacio anterior tuviera EUR', async () => {
+      jest.mocked(useCurrencyCapabilities).mockReturnValue({
+        accountingCurrency: 'USD',
+        allowedTransactionInputCurrencies: ['USD', 'VES'],
+        allowsMultipleAccountCurrencies: false,
+        countryCode: 'VE',
+        venezuelaCurrencyMode: true,
+        customExchangeRate: true,
+        multiRateMovementDisplay: true,
+      });
+
+      const screen = await renderWithTheme(
+        <CreateTransactionModal
+          activeSpaceId="space-eur"
+          initialType="expense"
+          onClose={jest.fn()}
+          onOpenCategoryPicker={jest.fn()}
+          onSubmit={jest.fn()}
+          selectedCategory={category}
+          spaceCurrency="EUR"
+          visible
+        />,
+      );
+
+      await fireEvent.press(screen.getByLabelText('5'));
+
+      expect(
+        screen.getByTestId('transaction-amount-currency').props.children,
+      ).toBe('$ ');
     });
   });
 });

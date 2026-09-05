@@ -1,5 +1,5 @@
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
 import { normalizeCustomOccurrenceDates } from '@/features/transactions/utils/transactionRecurrence';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
@@ -44,13 +45,12 @@ export function TransactionCustomRecurrenceModal({
   const amount = Number(amountInput);
   const hasValidAmount = Number.isSafeInteger(amount) && amount > 0;
 
-  useEffect(() => {
-    if (!visible) return;
+  if (useDepsChanged([initialDate, selectedDates, visible]) && visible) {
     setStep('amount');
     setAmountInput(String(selectedDates.length || 1));
     setDraftDates(selectedDates);
     setUnlimited(false);
-  }, [initialDate, selectedDates, visible]);
+  }
 
   const markedDates = useMemo<MarkedDates>(
     () =>

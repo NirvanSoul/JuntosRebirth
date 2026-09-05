@@ -117,8 +117,13 @@ export function DonutBreakdownChart({
   const modeLabel = mode === 'expense' ? 'gastado' : 'ingresado';
   const motionDirection: MotionDirection = mode === 'expense' ? -1 : 1;
   const animationKey = `${mode}-${monthLabel}`;
-
-  let accumulatedLength = 0;
+  const dashOffsets = useMemo(
+    () =>
+      segmentLengths.map((_, index) =>
+        segmentLengths.slice(0, index).reduce((sum, length) => sum + length, 0),
+      ),
+    [segmentLengths],
+  );
 
   return (
     <View style={styles.card} testID={`${idPrefix}-donut-chart`}>
@@ -173,8 +178,7 @@ export function DonutBreakdownChart({
               segmentLength - chartStrokeWidth - segmentVisibleGap,
               minimumDashLength,
             );
-            const dashOffset = -accumulatedLength;
-            accumulatedLength += segmentLength;
+            const dashOffset = -dashOffsets[index]!;
 
             return (
               <AnimatedArcSegment

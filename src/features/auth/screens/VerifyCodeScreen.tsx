@@ -79,6 +79,9 @@ export function VerifyCodeScreen({
   const canResend = !isResending && cooldownSeconds <= 0;
 
   useEffect(() => {
+    // El reinicio del contador va junto al `setInterval` que lo hace avanzar;
+    // es parte de arrancar el temporizador, no un derivado puro de props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCooldownSeconds(resendCooldownSeconds);
     const intervalId = setInterval(() => {
       setCooldownSeconds((current) => Math.max(0, current - 1));

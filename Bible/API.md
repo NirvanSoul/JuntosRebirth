@@ -24,9 +24,18 @@ mano. Apple Sign In no está disponible.
 - La restauración remota usa `GET /v1/sync/snapshot`.
 - La sincronización de un espacio usa `POST /v1/spaces/:spaceId/sync` e
   incluye siempre categorías, cuentas, recurrencias y transacciones.
-- Al cerrar sesión, la aplicación vuelve al acceso autenticado y oculta la
-  caché local financiera. Una caché heredada sin propietario se descarta antes
-  de restaurar una cuenta.
+- Al cerrar sesión, la aplicación vuelve al acceso autenticado, oculta la
+  caché local financiera y la descarta.
+- Al iniciar sesión, la caché local **se conserva salvo prueba de que pertenece
+  a otra cuenta**. `local_sync_account` guarda el propietario declarado; en los
+  dispositivos anteriores a ese marcador, un enlace de `remote_entity_links` con
+  otro `user_id` sirve de prueba. Sin ninguna de las dos, la caché se adopta:
+  puede ser trabajo sin conexión que todavía no llegó a subirse, y descartarlo
+  lo perdería para siempre.
+- Por eso la sincronización de inicio de sesión sí incluye las filas
+  `local_only`: son las creadas sin conexión y su única vía de subida.
+  `GET /v1/sync/snapshot` solo sobrescribe filas locales en `synced`, así que lo
+  pendiente de subir sobrevive a la restauración.
 
 Las rutas `/v1/*` requieren sesión de Better Auth con correo verificado. Las respuestas correctas
 envuelven su contenido en `data`; los errores usan `error.code` y
@@ -62,6 +71,27 @@ en lugar de crear otro, que sería rechazado con `COUPLE_SPACE_LIMIT`.
 
 Ambas peticiones envían la zona IANA del dispositivo, igual que
 `POST /v1/bootstrap`.
+
+## Tasas de Venezuela
+
+Las tasas públicas de Venezuela viven bajo `/v1/exchange`:
+
+- `GET /v1/exchange/rates` devuelve las tasas `BCV` (USD/VES) y `EURO`
+  (EUR/VES), su fecha de observación, su fecha de captura y `stale` si el
+  servidor tuvo que usar el último snapshot conocido.
+- `POST /v1/exchange/preview` recibe `{ countryCode: 'VE', amount, currency }`.
+  `amount` es un string decimal en unidades mayores y `currency` es `USD` o
+  `VES`; devuelve conversiones BCV y Euro. La frontera entre ese contrato y
+  los enteros en unidades menores se concentra en
+  `features/exchangeRates/gateways/juntossExchangeRateGateway.ts`.
+
+Las tasas personalizadas requieren sesión y usan
+`/v1/exchange/custom-rates`. El lote `POST /v1/spaces/:spaceId/sync` acepta
+`customRateId` en un movimiento, pero nunca tasas ni snapshots enviados por el
+cliente. Para movimientos de usuarios de Venezuela en USD o VES, el servidor
+congela las tasas aplicables y responde `exchangeSnapshot` por movimiento.
+`GET /v1/sync/snapshot` también devuelve ese snapshot. El cliente persiste y
+lee esos valores históricos; no los recalcula con la tasa vigente.
 
 ## Límites de integración
 

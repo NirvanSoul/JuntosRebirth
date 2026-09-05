@@ -86,6 +86,7 @@ function renderModal(
     <MoneyAccountDetailModal
       account={account}
       categories={categories}
+      onAddTransaction={jest.fn()}
       onClose={jest.fn()}
       onDelete={jest.fn()}
       onEdit={jest.fn()}
@@ -98,6 +99,58 @@ function renderModal(
 }
 
 describe('MoneyAccountDetailModal', () => {
+  it('muestra los movimientos convertidos como un valor histórico separado del balance', async () => {
+    const venezuelaAccount: MoneyAccount = {
+      ...account,
+      balances: [{ currency: 'USD', openingBalanceMinor: 0 }],
+    };
+    const venezuelaTransaction: SessionTransaction = {
+      ...transactions[0]!,
+      currency: 'USD',
+      occurredOn: '2026-08-14',
+      exchangeSnapshot: {
+        countryCode: 'VE',
+        createdWithCurrency: 'USD',
+        rates: {
+          BCV: {
+            baseCurrency: 'USD',
+            quoteCurrency: 'VES',
+            rate: '50',
+            convertedAmountMinor: 125_000,
+            observedAt: '2026-09-04T04:00:00.000Z',
+          },
+          EURO: {
+            baseCurrency: 'USD',
+            quoteCurrency: 'EUR',
+            rate: '0.91',
+            convertedAmountMinor: 2_275,
+            observedAt: '2026-09-04T04:00:00.000Z',
+          },
+        },
+      },
+    };
+    const screen = await renderModal({
+      account: venezuelaAccount,
+      transactions: [venezuelaTransaction],
+    });
+
+    expect(
+      screen.getByTestId('money-account-historical-valuation'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Movimientos valorados históricamente'),
+    ).toBeTruthy();
+    expect(screen.getByText(/Bs\. 1\.250/)).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByTestId(
+        'money-account-historical-valuation-source-selector-control-EURO',
+      ),
+    );
+
+    expect(screen.getByText(/22,75/)).toBeTruthy();
+  });
+
   beforeAll(() => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-08-15T12:00:00'));
@@ -153,6 +206,17 @@ describe('MoneyAccountDetailModal', () => {
     expect(
       screen.getByTestId('phosphor-react-native-bank-fill').props.color,
     ).toBe(colors.onBrand);
+  });
+
+  it('permite añadir un movimiento a la cuenta desde su detalle', async () => {
+    const onAddTransaction = jest.fn();
+    const screen = await renderModal({ onAddTransaction });
+
+    expect(screen.getByText('Añadir movimiento')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('money-account-action-icon-add'));
+
+    expect(onAddTransaction).toHaveBeenCalledWith('account-1');
   });
 
   it('avisa de que los movimientos se conservan antes de eliminarla', async () => {

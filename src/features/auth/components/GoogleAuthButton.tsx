@@ -32,10 +32,10 @@ export function GoogleAuthButton({
 }: GoogleAuthButtonProps) {
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setStarting] = useState(false);
+  const [isAwaitingSession, setAwaitingSession] = useState(false);
   const { isReady, session } = useBetterAuthSession();
-  const isAwaitingSession = useRef(false);
   const hasCompleted = useRef(false);
-  const isDisabled = disabled || isStarting || isAwaitingSession.current;
+  const isDisabled = disabled || isStarting || isAwaitingSession;
 
   useEffect(() => {
     void WebBrowser.warmUpAsync();
@@ -74,7 +74,7 @@ export function GoogleAuthButton({
 
       // expoClient guarda la cookie de la devolución OAuth y notifica
       // useSession. Consultarla de inmediato puede adelantarse a esa señal.
-      isAwaitingSession.current = true;
+      setAwaitingSession(true);
     } catch {
       setError('No pudimos continuar con Google. Inténtalo de nuevo.');
     } finally {
@@ -83,7 +83,7 @@ export function GoogleAuthButton({
   };
 
   useEffect(() => {
-    if (!isAwaitingSession.current || !isReady || hasCompleted.current) return;
+    if (!isAwaitingSession || !isReady || hasCompleted.current) return;
     if (!session?.user) return;
 
     hasCompleted.current = true;
@@ -92,10 +92,10 @@ export function GoogleAuthButton({
       .then(onSuccess)
       .catch(() => {
         hasCompleted.current = false;
-        isAwaitingSession.current = false;
+        setAwaitingSession(false);
         setError('Iniciaste sesión, pero no pudimos preparar tus espacios.');
       });
-  }, [isReady, onSuccess, session]);
+  }, [isAwaitingSession, isReady, onSuccess, session]);
 
   return (
     <View style={styles.container}>

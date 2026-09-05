@@ -4,10 +4,15 @@ import {
   createInitialSchema,
   createRecurringSeriesSchema,
 } from '@/lib/storage/localDatabaseBaseSchema';
+import { applyRetiredCategoryColorMigration } from '@/lib/storage/localDatabaseCategoryColorMigration';
 import { withLegacyMoneyAccountRebuildTransaction } from '@/lib/storage/localDatabaseLegacyMoneyAccountMigration';
 import { applyMoneyAccountMigrations } from '@/lib/storage/localDatabaseMoneyAccountSchema';
 import { applyLocalProfileMigrations } from '@/lib/storage/localDatabaseProfileMigrations';
-import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabaseSchemaRepair';
+import {
+  ensureLocalProfileCountryCodeColumn,
+  ensureLocalProfileDisplayNameColumn,
+  ensureTransactionExchangeRateColumns,
+} from '@/lib/storage/localDatabaseSchemaRepair';
 
 /**
  * Versión del esquema local. Cada incremento añade abajo un bloque
@@ -15,7 +20,7 @@ import { ensureLocalProfileDisplayNameColumn } from '@/lib/storage/localDatabase
  * versión, de modo que la escalera es acumulativa y ningún bloque se
  * reejecuta.
  */
-export const localDatabaseVersion = 26;
+export const localDatabaseVersion = 30;
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -46,12 +51,29 @@ export async function migrateLocalDatabase(
       await applyMoneyAccountMigrations(transaction, currentVersion);
     });
     await ensureLocalProfileDisplayNameColumn(database);
+    await ensureLocalProfileCountryCodeColumn(database);
+    await ensureTransactionExchangeRateColumns(database);
     return;
   }
 
   const needsLegacyMoneyAccountRebuild =
     currentVersion >= 20 && currentVersion < 22;
   const runMigrations = async (transaction: SQLite.SQLiteDatabase) => {
+    // La versión se releé ya bajo el candado exclusivo. La lectura de arriba
+    // ocurre fuera de él, así que entre una y otra pudo migrar y confirmar
+    // otra conexión: seguir con el número obsoleto repetiría peldaños aplicados
+    // y rompería los que no son idempotentes. `user_version` solo toma el valor
+    // con el que se abrió la base o `localDatabaseVersion` —ninguna migración
+    // escribe un valor intermedio—, así que basta con abandonar cuando ya
+    // alcanzó el destino.
+    const lockedVersionRow = await transaction.getFirstAsync<{
+      user_version: number;
+    }>('PRAGMA user_version');
+    if (
+      (lockedVersionRow?.user_version ?? currentVersion) >= localDatabaseVersion
+    )
+      return;
+
     if (currentVersion < 1) {
       await createInitialSchema(transaction);
     }
@@ -380,9 +402,24 @@ export async function migrateLocalDatabase(
       `);
     }
 
+    if (currentVersion < 29) {
+      await transaction.execAsync(`
+        ALTER TABLE transactions ADD COLUMN custom_rate_id TEXT;
+        ALTER TABLE transactions ADD COLUMN exchange_snapshot_json TEXT;
+      `);
+    }
+
+    if (currentVersion < 30) {
+      await transaction.execAsync(`
+        ALTER TABLE transactions ADD COLUMN accounting_amount_minor_usd INTEGER;
+      `);
+    }
+
     await applyLocalProfileMigrations(transaction, currentVersion);
 
     await applyMoneyAccountMigrations(transaction, currentVersion);
+
+    await applyRetiredCategoryColorMigration(transaction, currentVersion);
 
     await transaction.execAsync(
       `PRAGMA user_version = ${localDatabaseVersion}`,

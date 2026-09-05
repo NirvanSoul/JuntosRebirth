@@ -1,6 +1,7 @@
 import { currencyCatalog } from '@/lib/currency/currencyCatalog';
 import {
   countryCatalog,
+  getCountryByIso2,
   getCountryFlag,
   searchCountryCatalog,
 } from '@/lib/geography/countryCatalog';
@@ -45,6 +46,17 @@ describe('getCountryFlag', () => {
 
   it('da una bandera distinta por país aunque compartan moneda', () => {
     expect(getCountryFlag('ES')).not.toBe(getCountryFlag('DE'));
+  });
+});
+
+describe('getCountryByIso2', () => {
+  it('encuentra un país por su código ISO2, en mayúsculas o minúsculas', () => {
+    expect(getCountryByIso2('VE')?.name).toBe('Venezuela');
+    expect(getCountryByIso2('ve')?.name).toBe('Venezuela');
+  });
+
+  it('devuelve undefined si el código no existe en el catálogo', () => {
+    expect(getCountryByIso2('ZZ')).toBeUndefined();
   });
 });
 

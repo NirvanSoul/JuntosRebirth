@@ -7,6 +7,7 @@ import { DeviceMobile } from 'phosphor-react-native/src/icons/DeviceMobile';
 import { EnvelopeSimple } from 'phosphor-react-native/src/icons/EnvelopeSimple';
 import { FileText } from 'phosphor-react-native/src/icons/FileText';
 import { Key } from 'phosphor-react-native/src/icons/Key';
+import { MapPin } from 'phosphor-react-native/src/icons/MapPin';
 import { MoonStars } from 'phosphor-react-native/src/icons/MoonStars';
 import { ShieldCheck } from 'phosphor-react-native/src/icons/ShieldCheck';
 import { SlidersHorizontal } from 'phosphor-react-native/src/icons/SlidersHorizontal';
@@ -48,13 +49,18 @@ import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScree
 import { PermissionsScreen } from '@/features/legal/screens/PermissionsScreen';
 import { PrivacyChoicesScreen } from '@/features/legal/screens/PrivacyChoicesScreen';
 import { PrivacyLegalScreen } from '@/features/legal/screens/PrivacyLegalScreen';
-import { ProfileAvatarCard } from '@/features/settings/components/ProfileAvatarCard/ProfileAvatarCard';
+import { CountryPreferencesModal } from '@/features/settings/components/CountryPreferencesModal/CountryPreferencesModal';
+import { CountryChangeBlockedModal } from '@/features/settings/components/CountryPreferencesModal/CountryChangeBlockedModal';
+import { CountryChangeSharedSpaceWarningModal } from '@/features/settings/components/CountryPreferencesModal/CountryChangeSharedSpaceWarningModal';
+import { ProfileHeader } from '@/features/settings/components/ProfileHeader/ProfileHeader';
 import { CurrencyPreferencesModal } from '@/features/settings/components/CurrencyPreferencesModal/CurrencyPreferencesModal';
+import { useProfileCountry } from '@/features/profile/hooks/useProfileCountry';
 import type { Space } from '@/features/spaces/types';
 import { NotificationRulesModal } from '@/features/transactions/components/NotificationRulesModal/NotificationRulesModal';
 import type { SaveLocalNotificationRuleInput } from '@/features/transactions/repositories/localTransactionNotificationRuleRepository';
 import type { TransactionNotificationRule } from '@/features/transactions/types';
 import { getCurrencyName } from '@/lib/currency/currencyCatalog';
+import { getCountryByIso2 } from '@/lib/geography/countryCatalog';
 import type { CurrencyPreferences } from '@/state/appPreferences/currencyPreferences';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize, layout } from '@/theme/layout';
@@ -67,6 +73,7 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type SettingsScreenProps = {
   activeSpaceId: string;
   activeSpaceType: Space['type'];
+  hasSharedSpace?: boolean;
   currencyPreferences: CurrencyPreferences;
   notificationRules: readonly TransactionNotificationRule[];
   onBack: () => void;
@@ -102,6 +109,7 @@ function showPendingNotice() {
 export function SettingsScreen({
   activeSpaceId,
   activeSpaceType,
+  hasSharedSpace = false,
   currencyPreferences,
   notificationRules,
   onBack,
@@ -114,8 +122,20 @@ export function SettingsScreen({
   const { colors, isDark, setAppearance, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const { session } = useAuthSession();
+  const {
+    countryCode,
+    error: countryError,
+    isSaving: isSavingCountry,
+    saveCountry,
+  } = useProfileCountry();
   const [isSigningOut, setSigningOut] = useState(false);
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
+  const [isCountryModalVisible, setCountryModalVisible] = useState(false);
+  const [isCountryChangeBlockedVisible, setCountryChangeBlockedVisible] =
+    useState(false);
+  const [pendingCountryChange, setPendingCountryChange] = useState<
+    string | null
+  >(null);
   const [isNotificationRulesModalVisible, setNotificationRulesModalVisible] =
     useState(false);
   const [isPrivacyModalVisible, setPrivacyModalVisible] = useState(false);
@@ -139,6 +159,9 @@ export function SettingsScreen({
     currencyPreferences.currencies.length > 1
       ? currencyPreferences.currencies.join(' · ')
       : getCurrencyName(currencyPreferences.currencies[0]!);
+  const countryValueLabel = countryCode
+    ? (getCountryByIso2(countryCode)?.name ?? countryCode)
+    : 'Sin elegir';
   const notificationRulesValueLabel = notificationRules.some(
     (rule) => rule.isEnabled,
   )
@@ -151,6 +174,9 @@ export function SettingsScreen({
       return;
     }
 
+    // Este efecto arranca el `setInterval` y la animación de progreso; el
+    // reinicio del contador va junto a eso, no es un derivado puro.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCoupleSpaceExitSecondsRemaining(confirmLeaveCoupleSpaceDelaySeconds);
     coupleSpaceExitProgress.value = 0;
     coupleSpaceExitProgress.value = withTiming(1, {
@@ -174,6 +200,16 @@ export function SettingsScreen({
     setSaveConfirmationNotice((current) =>
       current?.id === noticeId ? null : current,
     );
+  };
+
+  const saveSelectedCountry = async (next: string) => {
+    const result = await saveCountry(next);
+    if (result.success) {
+      setCountryModalVisible(false);
+    } else if (result.errorCode === 'country_change_blocked_by_shared_space') {
+      setCountryModalVisible(false);
+      setCountryChangeBlockedVisible(true);
+    }
   };
 
   const handleAccountRowPress = () => {
@@ -263,7 +299,7 @@ export function SettingsScreen({
           </Text>
         </View>
 
-        <ProfileAvatarCard />
+        <ProfileHeader />
 
         <SettingsSection
           emphasizeIcon={false}
@@ -290,6 +326,14 @@ export function SettingsScreen({
             label="Moneda"
             onPress={() => setCurrencyModalVisible(true)}
             value={currencyValueLabel}
+          />
+          <SettingsDivider />
+          <SettingsRow
+            iconComponent={MapPin}
+            iconBackgroundColor={categoryColors.blue}
+            label="País"
+            onPress={() => setCountryModalVisible(true)}
+            value={countryValueLabel}
           />
           <SettingsDivider />
           <SettingsToggleRow
@@ -430,7 +474,7 @@ export function SettingsScreen({
         <SettingsSection icon="help-circle-outline" title="Ayuda">
           <SettingsRow
             iconComponent={EnvelopeSimple}
-            iconBackgroundColor={categoryColors.amber}
+            iconBackgroundColor={categoryColors.brown}
             label="Contactar con el desarrollador"
             onPress={handleContactDeveloper}
           />
@@ -456,6 +500,46 @@ export function SettingsScreen({
         }}
         preferences={currencyPreferences}
         visible={isCurrencyModalVisible}
+      />
+
+      <CountryPreferencesModal
+        countryCode={countryCode}
+        error={countryError}
+        isSaving={isSavingCountry}
+        onClose={() => setCountryModalVisible(false)}
+        onSave={async (next) => {
+          if (hasSharedSpace && next !== countryCode) {
+            setCountryModalVisible(false);
+            setPendingCountryChange(next);
+            return;
+          }
+          await saveSelectedCountry(next);
+        }}
+        visible={isCountryModalVisible}
+      />
+
+      <CountryChangeSharedSpaceWarningModal
+        countryName={
+          pendingCountryChange
+            ? (getCountryByIso2(pendingCountryChange)?.name ??
+              pendingCountryChange)
+            : ''
+        }
+        onCancel={() => {
+          setPendingCountryChange(null);
+          setCountryModalVisible(true);
+        }}
+        onConfirm={() => {
+          const next = pendingCountryChange;
+          setPendingCountryChange(null);
+          if (next) void saveSelectedCountry(next);
+        }}
+        visible={pendingCountryChange !== null}
+      />
+
+      <CountryChangeBlockedModal
+        onClose={() => setCountryChangeBlockedVisible(false)}
+        visible={isCountryChangeBlockedVisible}
       />
 
       <NotificationRulesModal

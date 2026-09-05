@@ -9,17 +9,19 @@ import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
-export type CategoryDetailActionButtonProps = {
+export type DetailActionCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
+  testIDPrefix: string;
 };
 
-export function CategoryDetailActionButton({
+export function DetailActionCard({
   icon,
   label,
   onPress,
-}: CategoryDetailActionButtonProps) {
+  testIDPrefix,
+}: DetailActionCardProps) {
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
 
@@ -34,7 +36,7 @@ export function CategoryDetailActionButton({
         color={colors.textMuted}
         name={icon}
         size={iconSize.md}
-        testID={`category-action-icon-${icon}`}
+        testID={`${testIDPrefix}-action-icon-${icon}`}
       />
       <Text align="center" variant="footnote" weight="semibold">
         {label}

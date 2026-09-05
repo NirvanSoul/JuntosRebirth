@@ -10,6 +10,7 @@ export const localDatabaseName = 'juntoss.db';
 export { localDatabaseVersion, migrateLocalDatabase };
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let resetPromise: Promise<void> | null = null;
 let localWriteQueue: Promise<void> = Promise.resolve();
 const serializedDatabases = new WeakSet<SQLite.SQLiteDatabase>();
 
@@ -110,6 +111,14 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
 }
 
 export function getLocalDatabase(): Promise<SQLite.SQLiteDatabase> {
+  // Una limpieza en curso va a cerrar la conexión y borrar el archivo. Abrir
+  // ahora entregaría una base a punto de desaparecer, y peor: una segunda
+  // conexión leería `user_version` antes de que la primera confirmase su
+  // migración y repetiría peldaños ya aplicados. Esperamos y reintentamos.
+  if (resetPromise) {
+    return resetPromise.then(() => getLocalDatabase());
+  }
+
   if (!databasePromise) {
     databasePromise = openAndMigrate().catch((error: unknown) => {
       // Si abrir o migrar falla (p. ej. un fallo transitorio en el primer
@@ -125,32 +134,57 @@ export function getLocalDatabase(): Promise<SQLite.SQLiteDatabase> {
   return databasePromise;
 }
 
-/**
- * Descarta la conexión en caché y borra el archivo `.db` del dispositivo.
- * Última vía de escape cuando abrir o migrar la base falla de forma
- * persistente (p. ej. corrupción): la próxima llamada a `getLocalDatabase`
- * parte de un archivo nuevo en vez de reintentar contra el mismo roto.
- */
-export async function resetLocalDatabase(): Promise<void> {
-  const currentDatabase = databasePromise;
-  databasePromise = null;
+async function discardLocalDatabase(
+  pendingDatabase: Promise<SQLite.SQLiteDatabase> | null,
+): Promise<void> {
   let database: SQLite.SQLiteDatabase | null = null;
   try {
-    database = await currentDatabase;
+    database = await pendingDatabase;
   } catch {
     // Si la apertura ya falló, no hay conexión utilizable que cerrar.
   }
 
   try {
     await database?.closeAsync();
-  } catch {
-    // Una conexión ya cerrada no impide intentar borrar el archivo.
+  } catch (error) {
+    // Una conexión ya cerrada no impide intentar borrar el archivo, pero el
+    // motivo se registra: un cierre que falla es la antesala de un borrado
+    // que tampoco puede completarse.
+    console.error('[localDatabase] No se pudo cerrar la conexión', error);
   }
   try {
     await SQLite.deleteDatabaseAsync(localDatabaseName);
-  } catch {
+  } catch (error) {
     // No hay archivo que borrar (ya no existía) o el borrado falló por una
     // razón que de todos modos no podemos resolver aquí: lo importante es
-    // que la próxima apertura no reutilice una promesa/conexión rota.
+    // que la próxima apertura no reutilice una promesa/conexión rota. Aun
+    // así se registra, porque un archivo que sobrevive al borrado deja la
+    // base con datos de la sesión anterior.
+    console.error('[localDatabase] No se pudo borrar la base local', error);
   }
+}
+
+/**
+ * Descarta la conexión en caché y borra el archivo `.db` del dispositivo.
+ * Última vía de escape cuando abrir o migrar la base falla de forma
+ * persistente (p. ej. corrupción): la próxima llamada a `getLocalDatabase`
+ * parte de un archivo nuevo en vez de reintentar contra el mismo roto.
+ */
+export function resetLocalDatabase(): Promise<void> {
+  // Dos limpiezas simultáneas cerrarían la misma conexión dos veces; la
+  // segunda se suma a la primera en vez de abrir su propia carrera.
+  if (resetPromise) return resetPromise;
+
+  const pendingDatabase = databasePromise;
+  // `databasePromise` se conserva hasta terminar: mientras tanto
+  // `getLocalDatabase` espera a `resetPromise`, así que nadie recibe la
+  // conexión que estamos cerrando ni abre una nueva sobre el archivo a medio
+  // borrar.
+  const reset = discardLocalDatabase(pendingDatabase).finally(() => {
+    databasePromise = null;
+    resetPromise = null;
+  });
+  resetPromise = reset;
+
+  return reset;
 }

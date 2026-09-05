@@ -22,7 +22,8 @@ import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 export function listSpaceCurrencies(
   spaceCurrency: CurrencyCode,
   ownCurrencies: readonly CurrencyCode[],
-  memberCurrencies: readonly (CurrencyCode | null)[] = [],
+  memberCurrencies: readonly (CurrencyCode | null | undefined)[] = [],
+  extraCurrencies: readonly (CurrencyCode | null | undefined)[] = [],
 ): readonly CurrencyCode[] {
   const ordered: CurrencyCode[] = [];
   const seen = new Set<CurrencyCode>();
@@ -31,6 +32,7 @@ export function listSpaceCurrencies(
     spaceCurrency,
     ...ownCurrencies,
     ...memberCurrencies,
+    ...extraCurrencies,
   ]) {
     if (!currency || seen.has(currency)) continue;
     seen.add(currency);

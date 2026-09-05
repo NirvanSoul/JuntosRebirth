@@ -6,10 +6,7 @@ import {
 } from '@/features/categories/types';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
-import {
-  categoryColors,
-  type CategoryColorToken,
-} from '@/theme/categoryColors';
+import { normalizeCategoryColorToken } from '@/theme/categoryColors';
 
 type CategoryRow = {
   id: string;
@@ -30,10 +27,11 @@ export type CreateLocalCategoryInput = Omit<Category, 'id' | 'isArchived'> & {
 };
 
 const iconNames = new Set<string>(categoryIconNames);
-const colorTokens = new Set<string>(Object.keys(categoryColors));
 
 function mapCategory(row: CategoryRow): Category {
-  if (!iconNames.has(row.icon) || !colorTokens.has(row.color_token)) {
+  const colorToken = normalizeCategoryColorToken(row.color_token);
+
+  if (!iconNames.has(row.icon) || !colorToken) {
     throw new Error('La categoría local contiene valores no reconocidos');
   }
 
@@ -42,7 +40,7 @@ function mapCategory(row: CategoryRow): Category {
     spaceId: row.space_id,
     name: row.name,
     icon: row.icon as CategoryIconName,
-    colorToken: row.color_token as CategoryColorToken,
+    colorToken,
     ...(row.budget_minor === null ? {} : { budgetMinor: row.budget_minor }),
     isDefault: row.is_default === 1,
     ...(row.template_key === null ? {} : { templateKey: row.template_key }),

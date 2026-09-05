@@ -62,6 +62,9 @@ export function useSpaceMemberAvatars(
     };
   }, [isCouple, spaceId]);
 
+  // `loadAvatars` también se reutiliza en `useAppForeground` y devuelve su
+  // propio cleanup (isMounted); no es un simple derivado de render.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => loadAvatars(), [loadAvatars]);
   useAppForeground(loadAvatars);
 

@@ -1,4 +1,5 @@
 import { apiClient } from '@/services/api/juntossApiClient';
+import type { TransactionExchangeSnapshot } from '@/features/transactions/types';
 
 export type CoupleSpaceSyncPayload = {
   installationId: string;
@@ -14,6 +15,13 @@ export type CoupleSpaceSyncResult = {
   moneyAccountCount: number;
   recurringSeriesCount: number;
   transactionCount: number;
+  transactions?: readonly {
+    localId: string;
+    remoteId: string;
+    updatedAt: string;
+    accountingAmountMinorUsd?: number | null;
+    exchangeSnapshot: TransactionExchangeSnapshot | null;
+  }[];
 };
 
 /**

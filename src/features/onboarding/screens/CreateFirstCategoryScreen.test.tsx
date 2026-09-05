@@ -223,7 +223,7 @@ describe('CreateFirstCategoryScreen', () => {
         spaceId: 'personal',
         name: 'Salario',
         icon: 'money',
-        colorToken: 'emerald',
+        colorToken: 'forest',
         isDefault: true,
         templateKey: 'salary',
         isArchived: false,

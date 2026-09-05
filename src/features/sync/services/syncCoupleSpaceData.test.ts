@@ -179,4 +179,61 @@ describe('syncSpaceDataForCurrentSession', () => {
     expect(syncCoupleSpaceRemotely).not.toHaveBeenCalled();
     expect(runAsync).not.toHaveBeenCalled();
   });
+
+  it('guarda el snapshot que el backend devuelve para el movimiento sincronizado', async () => {
+    jest.mocked(syncCoupleSpaceRemotely).mockResolvedValue({
+      categoryCount: 0,
+      moneyAccountCount: 0,
+      recurringSeriesCount: 0,
+      transactionCount: 1,
+      transactions: [
+        {
+          localId: 'transaction-a',
+          remoteId: 'remote-a',
+          updatedAt: '2026-08-13T10:01:00.000Z',
+          accountingAmountMinorUsd: 2,
+          exchangeSnapshot: {
+            countryCode: 'VE',
+            createdWithCurrency: 'VES',
+            rates: {},
+          },
+        },
+      ],
+    });
+    getAllAsync
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'transaction-a',
+          categoryId: 'category-a',
+          type: 'expense',
+          amountMinor: 100,
+          currency: 'VES',
+          title: 'Café',
+          occurredOn: '2026-08-13',
+          recurrence: 'once',
+          isArchived: 0,
+          createdAt: '2026-08-13T10:01:00.000Z',
+          updated_at: '2026-08-13T10:01:00.000Z',
+        },
+      ]);
+
+    await syncSpaceDataForCurrentSession({ spaceId: 'couple-a' });
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('exchange_snapshot_json'),
+      2,
+      JSON.stringify({
+        countryCode: 'VE',
+        createdWithCurrency: 'VES',
+        rates: {},
+      }),
+      'transaction-a',
+      '2026-08-13T10:01:00.000Z',
+    );
+  });
 });

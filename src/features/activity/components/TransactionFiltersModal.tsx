@@ -1,10 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import {
-  type ComponentProps,
-  type PropsWithChildren,
-  useEffect,
-  useState,
-} from 'react';
+import { type ComponentProps, type PropsWithChildren, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -40,6 +35,7 @@ import {
 } from '@/features/dashboard/utils/transactionPeriod';
 import { TransactionPeriodSelector } from '@/features/transactions/components/TransactionPeriodSelector/TransactionPeriodSelector';
 import type { TransactionRecurrence } from '@/features/transactions/types';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import {
   getCurrencyFlag,
@@ -184,7 +180,7 @@ export function TransactionFiltersModal({
     selectableOptionHeight * filterGridRows + spacing.sm;
   const hasMultipleCurrencies = currencies.length >= 2;
 
-  useEffect(() => {
+  if (useDepsChanged([visible, filters])) {
     if (visible) {
       setDraft(filters);
       setDateAnchor(
@@ -196,7 +192,7 @@ export function TransactionFiltersModal({
     } else {
       setDateRangePickerVisible(false);
     }
-  }, [filters, visible]);
+  }
 
   const hasDraftFilters =
     draft.type !== 'all' ||

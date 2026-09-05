@@ -6,6 +6,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import {
   FlatList,
@@ -23,9 +24,9 @@ import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import {
   getCalendarWeek,
+  getMonthIntroductionWeekIndex,
   getWeeksInCalendarRange,
   parseCalendarDate,
-  shouldShowWeekMonthLabel,
 } from '@/features/map/model/calendarPeriods';
 import {
   maximumCalendarDate,
@@ -119,19 +120,7 @@ function getWeekMonthAnchorDate(week: readonly string[]): string {
   return crossesMonth ? week[6]! : week[3]!;
 }
 
-function getMonthIntroductionWeekIndex(
-  weeks: readonly (readonly string[])[],
-  date: string,
-): number {
-  const currentWeekIndex = weeks.findIndex((week) => week.includes(date));
-  if (currentWeekIndex < 0) return 0;
-
-  for (let index = currentWeekIndex; index >= 0; index -= 1) {
-    if (shouldShowWeekMonthLabel(weeks, index)) return index;
-  }
-
-  return currentWeekIndex;
-}
+const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
 
 export const WeeklyMovementCalendar = memo(
   forwardRef<WeeklyMovementCalendarHandle, WeeklyMovementCalendarProps>(
@@ -150,7 +139,7 @@ export const WeeklyMovementCalendar = memo(
       ref,
     ) {
       const themedStyles = useThemedStyles(createThemedStyles);
-      const initialDate = useRef(currentDate).current;
+      const [initialDate] = useState(currentDate);
       const calendarToday = today ?? initialDate;
       const listRef = useRef<FlatList<readonly string[]>>(null);
       const pendingScrollIndex = useRef<number | null>(null);
@@ -207,9 +196,10 @@ export const WeeklyMovementCalendar = memo(
         (_: unknown, index: number) => weekLayouts[index]!,
         [weekLayouts],
       );
-      const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
       const onFocusedMonthChangeRef = useRef(onFocusedMonthChange);
-      onFocusedMonthChangeRef.current = onFocusedMonthChange;
+      useEffect(() => {
+        onFocusedMonthChangeRef.current = onFocusedMonthChange;
+      });
       const handleViewableItemsChanged = useCallback(
         ({
           viewableItems,
@@ -393,7 +383,7 @@ export const WeeklyMovementCalendar = memo(
             style={themedStyles.list}
             testID={testID}
             updateCellsBatchingPeriod={16}
-            viewabilityConfig={viewabilityConfig.current}
+            viewabilityConfig={viewabilityConfig}
             windowSize={9}
           />
         </View>

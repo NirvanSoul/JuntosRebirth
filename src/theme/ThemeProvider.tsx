@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { useColorScheme } from 'react-native';
+import { type ColorSchemeName, useColorScheme } from 'react-native';
 
 import {
   loadAppPreferences,
@@ -37,7 +37,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function resolveEffectiveScheme(
   appearance: AppearancePreference,
-  systemScheme: ColorScheme | null | undefined,
+  systemScheme: ColorSchemeName,
 ): ColorScheme {
   if (appearance === 'system') {
     return systemScheme === 'dark' ? 'dark' : 'light';

@@ -139,6 +139,7 @@ export async function listLocalTransactions(): Promise<SessionTransaction[]> {
             transactions.recurrence_group_id,
             transactions.recurrence_series_id, transactions.updated_at,
             transactions.source_transaction_id, transactions.note,
+            transactions.custom_rate_id, transactions.accounting_amount_minor_usd, transactions.exchange_snapshot_json,
             recurring_transaction_series.next_occurrence_on,
             recurring_transaction_series.starts_on AS recurrence_starts_on
        FROM transactions

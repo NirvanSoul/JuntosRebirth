@@ -178,7 +178,7 @@ describe('summarizeMoneyAccountTotals', () => {
     name: 'Efectivo',
     kind: 'cash',
     icon: 'money',
-    colorToken: 'emerald',
+    colorToken: 'forest',
   };
 
   it('reparte ingresos y gastos por cuenta sin mezclar divisas', () => {
@@ -212,7 +212,7 @@ describe('summarizeMoneyAccountTotals', () => {
       {
         id: 'account-2',
         name: 'Efectivo',
-        colorToken: 'emerald',
+        colorToken: 'forest',
         incomeMinor: 0,
         expenseMinor: 1500,
       },

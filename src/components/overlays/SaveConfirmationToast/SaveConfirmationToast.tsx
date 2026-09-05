@@ -55,6 +55,10 @@ export function SaveConfirmationToast({
 
   useEffect(() => {
     if (!notice) {
+      // El componente ya devuelve null sin `notice`, así que esto no afecta
+      // el render actual: solo evita arrastrar `isVisible` obsoleto al
+      // próximo aviso.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(false);
       return;
     }
@@ -119,7 +123,7 @@ export function SaveConfirmationToast({
 function createStyles(colors: ColorTokens) {
   return StyleSheet.create({
     overlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       zIndex: 200,
     },
     card: {

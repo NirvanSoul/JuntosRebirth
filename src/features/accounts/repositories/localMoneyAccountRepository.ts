@@ -17,10 +17,7 @@ import {
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import type { LocalSqlExecutor } from '@/lib/storage/localSqlExecutor';
 import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
-import {
-  categoryColors,
-  type CategoryColorToken,
-} from '@/theme/categoryColors';
+import { normalizeCategoryColorToken } from '@/theme/categoryColors';
 
 type MoneyAccountRow = {
   id: string;
@@ -44,7 +41,6 @@ export type CreateLocalMoneyAccountInput = CreateMoneyAccountInput & {
 
 const iconNames = new Set<string>(moneyAccountIconNames);
 const kinds = new Set<string>(moneyAccountKinds);
-const colorTokens = new Set<string>(Object.keys(categoryColors));
 
 /**
  * `getAllAsync<MoneyAccountRow>` es un cast, no una comprobación: la fila
@@ -67,11 +63,12 @@ function mapMoneyAccount(
         openingBalanceMinor: balance.opening_balance_minor,
       };
     });
+  const colorToken = normalizeCategoryColorToken(row.color_token);
 
   if (
     !kinds.has(row.kind) ||
     !iconNames.has(row.icon) ||
-    !colorTokens.has(row.color_token) ||
+    !colorToken ||
     accountBalances.length === 0
   ) {
     throw new Error('La cuenta local contiene valores no reconocidos');
@@ -83,7 +80,7 @@ function mapMoneyAccount(
     name: row.name,
     kind: row.kind as MoneyAccountKind,
     icon: row.icon as MoneyAccountIconName,
-    colorToken: row.color_token as CategoryColorToken,
+    colorToken,
     balances: accountBalances,
     isArchived: row.is_archived === 1,
   };

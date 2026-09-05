@@ -1,4 +1,5 @@
 import { apiClient } from '@/services/api/juntossApiClient';
+import { ApiError } from '@/services/api/client';
 import { listRemoteSpaces } from '@/services/api/spaces';
 import { deviceTimeZone } from '@/utils/deviceTimeZone';
 
@@ -31,6 +32,7 @@ export type AcceptInvitationErrorCode =
   | 'already_in_couple_space'
   | 'invalid_space'
   | 'space_full'
+  | 'space_country_mismatch'
   | 'unknown';
 export class AcceptInvitationError extends Error {
   constructor(
@@ -77,6 +79,26 @@ type IncomingInvitation = {
   inviterDisplayName: string | null;
   expiresAt: string;
 };
+
+function toAcceptInvitationError(caught: unknown): never {
+  if (!(caught instanceof ApiError)) throw caught;
+
+  const codeByApiCode: Partial<Record<string, AcceptInvitationErrorCode>> = {
+    ALREADY_IN_COUPLE_SPACE: 'already_in_couple_space',
+    INVITATION_ALREADY_USED: 'invitation_already_used',
+    INVITATION_EXPIRED: 'invitation_expired',
+    INVITATION_NOT_FOUND: 'invitation_not_found',
+    INVITATION_REVOKED: 'invitation_revoked',
+    INVITATION_WRONG_EMAIL: 'invitation_wrong_email',
+    INVALID_SPACE: 'invalid_space',
+    SPACE_COUNTRY_MISMATCH: 'space_country_mismatch',
+    SPACE_FULL: 'space_full',
+  };
+  throw new AcceptInvitationError(
+    codeByApiCode[caught.code] ?? 'unknown',
+    caught.message,
+  );
+}
 
 /** El espacio de pareja que este usuario creó y sigue sin aceptar nadie. */
 async function findOwnCoupleSpaceAwaitingPartner(): Promise<string | null> {
@@ -169,10 +191,15 @@ export function createJuntossInvitationGateway(): InvitationGateway {
         : null;
     },
     async acceptCurrentUserInvitation(invitationId) {
-      const response = await apiClient.post<{ data: { spaceId: string } }>(
-        `/v1/invitations/${invitationId}/accept`,
-        {},
-      );
+      let response: { data: { spaceId: string } };
+      try {
+        response = await apiClient.post<{ data: { spaceId: string } }>(
+          `/v1/invitations/${invitationId}/accept`,
+          {},
+        );
+      } catch (caught) {
+        toAcceptInvitationError(caught);
+      }
       const space = (await listRemoteSpaces()).find(
         (item) => item.id === response.data.spaceId,
       );
@@ -188,10 +215,15 @@ export function createJuntossInvitationGateway(): InvitationGateway {
       return response.data.invitation;
     },
     async acceptInvitation(token) {
-      const response = await apiClient.post<{ data: { spaceId: string } }>(
-        '/v1/invitations/accept',
-        { token },
-      );
+      let response: { data: { spaceId: string } };
+      try {
+        response = await apiClient.post<{ data: { spaceId: string } }>(
+          '/v1/invitations/accept',
+          { token },
+        );
+      } catch (caught) {
+        toAcceptInvitationError(caught);
+      }
       const space = (await listRemoteSpaces()).find(
         (item) => item.id === response.data.spaceId,
       );

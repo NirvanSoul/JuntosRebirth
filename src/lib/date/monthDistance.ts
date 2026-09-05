@@ -38,3 +38,15 @@ export function isMonthWithinRange(
 ): boolean {
   return Math.abs(getMonthDistance(centerMonth, month)) <= range;
 }
+
+export function getMonthStartAtOffset(
+  anchorDate: string,
+  offset: number,
+): string {
+  const anchorYear = Number(anchorDate.slice(0, 4));
+  const anchorMonthIndex = Number(anchorDate.slice(5, 7)) - 1;
+  const absoluteMonth = anchorYear * 12 + anchorMonthIndex + offset;
+  const year = Math.floor(absoluteMonth / 12);
+  const month = (absoluteMonth % 12) + 1;
+  return `${year}-${String(month).padStart(2, '0')}-01`;
+}

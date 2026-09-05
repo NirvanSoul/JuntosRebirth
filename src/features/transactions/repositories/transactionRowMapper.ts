@@ -23,6 +23,9 @@ export type TransactionRow = {
   recurrence_starts_on: string | null;
   source_transaction_id: string | null;
   note: string | null;
+  custom_rate_id: string | null;
+  accounting_amount_minor_usd: number | null;
+  exchange_snapshot_json: string | null;
   updated_at: string;
 };
 
@@ -57,6 +60,19 @@ export function mapTransaction(row: TransactionRow): SessionTransaction {
     throw new Error('El movimiento local contiene valores no reconocidos');
   }
 
+  let exchangeSnapshot: SessionTransaction['exchangeSnapshot'];
+  if (row.exchange_snapshot_json) {
+    try {
+      exchangeSnapshot = JSON.parse(
+        row.exchange_snapshot_json,
+      ) as SessionTransaction['exchangeSnapshot'];
+    } catch {
+      throw new Error(
+        'El movimiento local contiene un snapshot de tasa inválido',
+      );
+    }
+  }
+
   return {
     id: row.id,
     spaceId: row.space_id,
@@ -77,6 +93,12 @@ export function mapTransaction(row: TransactionRow): SessionTransaction {
     recurrenceStartsOn: row.recurrence_starts_on ?? undefined,
     sourceTransactionId: row.source_transaction_id ?? undefined,
     ...(row.note === null || row.note === undefined ? {} : { note: row.note }),
+    ...(row.custom_rate_id ? { customRateId: row.custom_rate_id } : {}),
+    ...(row.accounting_amount_minor_usd === null ||
+    row.accounting_amount_minor_usd === undefined
+      ? {}
+      : { accountingAmountMinorUsd: row.accounting_amount_minor_usd }),
+    ...(exchangeSnapshot === undefined ? {} : { exchangeSnapshot }),
     updatedAt: row.updated_at,
   };
 }

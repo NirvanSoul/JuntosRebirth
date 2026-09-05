@@ -8,6 +8,8 @@ export type LocalProfile = {
   /** Sello de la última subida confirmada por la API. */
   avatarUpdatedAt: string | null;
   displayName: string | null;
+  /** Código ISO 3166-1 alfa-2 del país desde donde usa la app, o `null`. */
+  countryCode: string | null;
 };
 
 /** Perfil de una persona con membresía activa en un espacio compartido. */

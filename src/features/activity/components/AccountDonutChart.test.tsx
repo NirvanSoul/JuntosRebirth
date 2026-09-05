@@ -22,7 +22,7 @@ const testAccounts: MoneyAccount[] = [
     name: 'Efectivo',
     kind: 'cash',
     icon: 'money',
-    colorToken: 'emerald',
+    colorToken: 'forest',
     balances: [{ currency: 'USD', openingBalanceMinor: 0 }],
     isArchived: false,
   },

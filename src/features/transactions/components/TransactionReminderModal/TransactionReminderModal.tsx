@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
@@ -8,6 +8,7 @@ import { AppCalendar } from '@/components/ui/AppCalendar/AppCalendar';
 import { Text } from '@/components/ui/Text/Text';
 import { ReminderTimesEditor } from '@/features/transactions/components/ReminderTimesEditor/ReminderTimesEditor';
 import type { TransactionReminder } from '@/features/transactions/types';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
@@ -63,9 +64,10 @@ export function TransactionReminderModal({
   const [isSaving, setSaving] = useState(false);
   const [isRemoving, setRemoving] = useState(false);
 
-  useEffect(() => {
-    if (!visible) return;
-
+  if (
+    useDepsChanged([reminder, today, transactionOccurredOn, visible]) &&
+    visible
+  ) {
     setStep('date');
     setDraftDate(
       reminder?.remindOn ??
@@ -75,7 +77,7 @@ export function TransactionReminderModal({
     setError(null);
     setSaving(false);
     setRemoving(false);
-  }, [reminder, today, transactionOccurredOn, visible]);
+  }
 
   const handleSelectDate = (date: string) => {
     if (date < today) return;

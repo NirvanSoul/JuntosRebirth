@@ -18,6 +18,7 @@ describe('migrateLocalDatabase', () => {
   it('crea un esquema versionado con integridad por espacio', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
     };
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -64,6 +65,7 @@ describe('migrateLocalDatabase', () => {
   it('añade el control de cuenta y lotes al actualizar desde la versión 4', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
     };
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -84,6 +86,7 @@ describe('migrateLocalDatabase', () => {
   it('añade la tabla de recordatorios de movimiento al actualizar desde la versión 5', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
     };
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -107,6 +110,7 @@ describe('migrateLocalDatabase', () => {
   it('añade las tablas de reglas de notificación al actualizar desde la versión 6', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
     };
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -133,6 +137,7 @@ describe('migrateLocalDatabase', () => {
   it('actualiza solo los colores anteriores de las plantillas repetidas', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
     };
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -158,6 +163,7 @@ describe('migrateLocalDatabase', () => {
   it('añade la columna de nota a categorías y movimientos al actualizar desde la versión 7', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
     };
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -182,6 +188,7 @@ describe('migrateLocalDatabase', () => {
   it('añade la tabla de perfil local al actualizar desde la versión 8', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
     };
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -202,6 +209,7 @@ describe('migrateLocalDatabase', () => {
   it('añade reglas personales de importación al actualizar desde la versión 10', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
     };
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -222,6 +230,7 @@ describe('migrateLocalDatabase', () => {
   it('añade batches e ítems de importación al actualizar desde la versión 11', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
     };
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -241,7 +250,10 @@ describe('migrateLocalDatabase', () => {
   });
 
   it('añade enlaces remotos explícitos al actualizar desde la versión 12', async () => {
-    const transaction = { execAsync: jest.fn(async () => undefined) };
+    const transaction = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
+    };
     const database = {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 12 })),
@@ -258,7 +270,10 @@ describe('migrateLocalDatabase', () => {
   });
 
   it('añade las cuentas y su columna opcional al actualizar desde la versión 19', async () => {
-    const transaction = { execAsync: jest.fn(async () => undefined) };
+    const transaction = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => null),
+    };
     const database = {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 19 })),
@@ -471,6 +486,65 @@ describe('migrateLocalDatabase', () => {
     expect(migration).not.toContain('DROP TABLE money_accounts_v20');
   });
 
+  it('abandona si otra conexión migró entre la lectura de versión y el candado', async () => {
+    // La lectura de `user_version` de fuera del candado puede quedar obsoleta:
+    // otra conexión abre la misma base, migra y confirma. Sin releerla bajo el
+    // candado, esta repetiría peldaños ya aplicados.
+    const transaction = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+    };
+    const database = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ user_version: 0 })),
+      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    expect(transaction.getFirstAsync).toHaveBeenCalledWith(
+      'PRAGMA user_version',
+    );
+    expect(transaction.execAsync).not.toHaveBeenCalled();
+  });
+
+  it('no reconstruye los movimientos si la tabla de series ya existe', async () => {
+    // Un dispositivo cuyo `user_version` quedó por detrás del esquema real
+    // debe autorepararse, no fallar con «table ... already exists».
+    const transaction = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async (statement: string) =>
+        statement === 'PRAGMA user_version'
+          ? { user_version: 0 }
+          : { name: 'recurring_transaction_series' },
+      ),
+    };
+    const database = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ user_version: 0 })),
+      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    const migration = (transaction.execAsync as jest.Mock).mock.calls
+      .map(([statement]) => statement)
+      .join('\n');
+    expect(migration).not.toContain(
+      'CREATE TABLE recurring_transaction_series',
+    );
+    expect(migration).not.toContain(
+      'ALTER TABLE transactions RENAME TO transactions_v1',
+    );
+    // El resto de la escalera sí corre y la base queda en la versión actual.
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS categories');
+    expect(transaction.execAsync).toHaveBeenLastCalledWith(
+      `PRAGMA user_version = ${localDatabaseVersion}`,
+    );
+  });
+
   it('rechaza una base creada por una versión futura de la app', async () => {
     const database = {
       execAsync: jest.fn(async () => undefined),
@@ -530,6 +604,85 @@ describe('migrateLocalDatabase', () => {
 
     expect(execAsync).not.toHaveBeenCalledWith(
       'ALTER TABLE local_profile ADD COLUMN display_name TEXT',
+    );
+  });
+
+  it('repara local_profile.country_code si el dispositivo quedó en la versión actual sin esa columna', async () => {
+    const execAsync = jest.fn(async () => undefined);
+    const database = {
+      execAsync,
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+      getAllAsync: jest.fn(async () => [
+        { name: 'singleton_id' },
+        { name: 'avatar_path' },
+        { name: 'avatar_updated_at' },
+        { name: 'display_name' },
+      ]),
+      withExclusiveTransactionAsync: jest.fn(),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    expect(execAsync).toHaveBeenCalledWith(
+      'ALTER TABLE local_profile ADD COLUMN country_code TEXT',
+    );
+  });
+
+  it('no repite el ALTER si local_profile.country_code ya existe en la versión actual', async () => {
+    const execAsync = jest.fn(async () => undefined);
+    const database = {
+      execAsync,
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+      getAllAsync: jest.fn(async () => [
+        { name: 'singleton_id' },
+        { name: 'avatar_path' },
+        { name: 'avatar_updated_at' },
+        { name: 'display_name' },
+        { name: 'country_code' },
+      ]),
+      withExclusiveTransactionAsync: jest.fn(),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    expect(execAsync).not.toHaveBeenCalledWith(
+      'ALTER TABLE local_profile ADD COLUMN country_code TEXT',
+    );
+  });
+
+  it('repara las columnas de tasas de movimientos si la base ya indica la versión actual', async () => {
+    const execAsync = jest.fn(async () => undefined);
+    const database = {
+      execAsync,
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+      getAllAsync: jest.fn(async (statement: string) =>
+        statement === 'PRAGMA table_info(transactions)'
+          ? [{ name: 'id' }, { name: 'sync_status' }]
+          : [
+              { name: 'singleton_id' },
+              { name: 'display_name' },
+              { name: 'country_code' },
+            ],
+      ),
+      withExclusiveTransactionAsync: jest.fn(),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    expect(database.getAllAsync).toHaveBeenCalledWith(
+      'PRAGMA table_info(transactions)',
+    );
+    expect(execAsync).toHaveBeenCalledWith(
+      'ALTER TABLE transactions ADD COLUMN custom_rate_id TEXT',
+    );
+    expect(execAsync).toHaveBeenCalledWith(
+      'ALTER TABLE transactions ADD COLUMN exchange_snapshot_json TEXT',
     );
   });
 
@@ -703,9 +856,58 @@ describe('resetLocalDatabase', () => {
     expect(openDatabaseAsync).toHaveBeenCalledTimes(2);
   });
 
-  it('no propaga el error si el archivo ya no existe', async () => {
+  it('registra el fallo de borrado sin propagarlo', async () => {
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
     deleteDatabaseAsync.mockRejectedValueOnce(new Error('no such file'));
 
     await expect(resetLocalDatabase()).resolves.toBeUndefined();
+    // Un archivo que sobrevive al borrado deja datos de la sesión anterior:
+    // el motivo no puede quedarse en un `catch` mudo.
+    expect(consoleError).toHaveBeenCalledWith(
+      '[localDatabase] No se pudo borrar la base local',
+      expect.any(Error),
+    );
+    consoleError.mockRestore();
+  });
+
+  it('no abre una conexión nueva mientras la limpieza está en curso', async () => {
+    // Los dos efectos que montan `MainTabsNavigator` hacen justo esto: uno
+    // borra la caché local y el otro la abre para leer los movimientos. Sin
+    // coordinación, el segundo migraba sobre el archivo a medio borrar.
+    const order: string[] = [];
+    const workingDatabase = {
+      closeAsync: jest.fn(async () => undefined),
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+      getAllAsync: jest.fn(async () => [{ name: 'display_name' }]),
+      withExclusiveTransactionAsync: jest.fn(async (task) =>
+        task({
+          execAsync: jest.fn(async () => undefined),
+          getFirstAsync: jest.fn(async () => ({ name: 'money_accounts' })),
+          getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
+        }),
+      ),
+    } as unknown as SQLiteDatabase;
+    openDatabaseAsync.mockImplementation(async () => {
+      order.push('open');
+      return workingDatabase;
+    });
+    deleteDatabaseAsync.mockImplementation(async () => {
+      order.push('delete');
+    });
+
+    await getLocalDatabase();
+    expect(order).toEqual(['open']);
+
+    const reset = resetLocalDatabase();
+    const reopened = getLocalDatabase();
+    await Promise.all([reset, reopened]);
+
+    expect(order).toEqual(['open', 'delete', 'open']);
+    expect(openDatabaseAsync).toHaveBeenCalledTimes(2);
   });
 });

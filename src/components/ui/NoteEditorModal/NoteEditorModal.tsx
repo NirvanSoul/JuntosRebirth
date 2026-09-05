@@ -6,6 +6,7 @@ import { Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text, type TextTone } from '@/components/ui/Text/Text';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -45,6 +46,13 @@ export function NoteEditorModal({
   const styles = useThemedStyles(createStyles);
   const [note, setNote] = useState(value ?? '');
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  if (useDepsChanged([visible, value])) {
+    if (visible) {
+      setNote(value ?? '');
+    } else {
+      setKeyboardVisible(false);
+    }
+  }
 
   useEffect(() => {
     const showEvent =
@@ -63,14 +71,6 @@ export function NoteEditorModal({
       hideSubscription.remove();
     };
   }, []);
-
-  useEffect(() => {
-    if (visible) {
-      setNote(value ?? '');
-    } else {
-      setKeyboardVisible(false);
-    }
-  }, [value, visible]);
 
   const handleSave = () => {
     const trimmed = note.trim();

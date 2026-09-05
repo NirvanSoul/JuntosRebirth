@@ -92,3 +92,33 @@ export function formatCurrency(
 
   return applyCurrencySymbol(currency, groupedAmount);
 }
+
+/**
+ * Formatea una tasa de cambio para mostrarla, ej. «1 USD = Bs. 52,35».
+ *
+ * `rate` llega como string, nunca como `float`: es el mismo tipo con el que
+ * el backend define sus tasas (ver
+ * `Bible/JUNTOSS_VENEZUELA_CURRENCY_PLAN.md`), para no perder precisión al pasar por un
+ * `number` de JS antes de esta función.
+ */
+export function formatExchangeRate(
+  rate: string,
+  baseCurrency: CurrencyCode,
+  quoteCurrency: CurrencyCode,
+  locale: string,
+): string {
+  const rateValue = Number(rate);
+  if (!Number.isFinite(rateValue)) {
+    throw new Error('La tasa debe ser un número válido');
+  }
+
+  const formatter = new Intl.NumberFormat(locale, {
+    useGrouping: true,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  const groupedRate = enforceGrouping(formatter.format(rateValue), 2, locale);
+
+  return `1 ${baseCurrency} = ${applyCurrencySymbol(quoteCurrency, groupedRate)}`;
+}

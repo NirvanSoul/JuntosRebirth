@@ -96,6 +96,9 @@ export function DataRightsScreen({ onClose, visible }: DataRightsScreenProps) {
       return;
     }
 
+    // Este efecto arranca el `setInterval` y la animación de progreso; el
+    // reinicio del contador va junto a eso, no es un derivado puro.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSecondsRemaining(confirmDeletionDelaySeconds);
     confirmProgress.value = 0;
     confirmProgress.value = withTiming(1, {

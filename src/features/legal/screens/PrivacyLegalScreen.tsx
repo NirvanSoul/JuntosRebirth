@@ -80,7 +80,7 @@ export function PrivacyLegalScreen({
             <SettingsDivider />
             <SettingsRow
               icon="receipt-outline"
-              iconBackgroundColor={categoryColors.amber}
+              iconBackgroundColor={categoryColors.brown}
               label="Términos de servicio"
               onPress={() => setOpenDocumentId('terms-of-service')}
             />

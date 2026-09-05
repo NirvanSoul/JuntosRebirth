@@ -103,6 +103,14 @@ export function getCountryFlag(iso2: string): string {
     .join('');
 }
 
+/** Busca un país por su código ISO2, sin distinguir mayúsculas. */
+export function getCountryByIso2(
+  iso2: string,
+): CountryCatalogEntry | undefined {
+  const normalized = iso2.toUpperCase();
+  return countryCatalog.find((entry) => entry.iso2 === normalized);
+}
+
 /** Busca países por nombre, sin distinguir mayúsculas ni acentos. */
 export function searchCountryCatalog(
   query: string,

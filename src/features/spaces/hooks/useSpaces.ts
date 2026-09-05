@@ -150,7 +150,9 @@ export function useSpaces(): SpacesController {
   const { isReady: isAuthReady, session } = useAuthSession();
   const userId = session?.user.id ?? null;
   const stateRef = useRef(state);
-  stateRef.current = state;
+  useEffect(() => {
+    stateRef.current = state;
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -217,6 +219,10 @@ export function useSpaces(): SpacesController {
 
   useEffect(() => {
     if (!isReady || !isAuthReady) return;
+    // `refreshCoupleSpace` solo actualiza estado tras un `await` de red; el
+    // análisis estático no distingue esa frontera asíncrona del cuerpo
+    // síncrono del efecto.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshCoupleSpace();
   }, [isReady, isAuthReady, refreshCoupleSpace]);
 

@@ -599,7 +599,7 @@ function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
       paddingVertical: spacing.sm,
     },
     calendarLayer: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: colors.surface,
     },
     returnButton: {

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
+import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
 import { listSpaceMemberProfiles } from '@/features/profile/repositories/localSpaceMemberProfileRepository';
 import { syncOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { syncSpaceMemberProfiles } from '@/features/profile/services/syncSpaceMemberProfiles';
 import type { SpaceMemberProfile } from '@/features/profile/types';
 import type { Space } from '@/features/spaces/types';
+import { useAppForeground } from '@/hooks/useAppForeground';
 
 export type SpaceMembership = {
   /** Perfiles indexados por uuid de usuario, para resolver el autor de una fila. */
@@ -36,32 +38,42 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
   const isShared = space.type !== 'personal';
 
   const load = useCallback(async (): Promise<SpaceMembership> => {
-    const [ownUserId, cached] = await Promise.all([
+    const [ownUserId, cached, localProfile] = await Promise.all([
       getAuthenticatedUserId(),
       listSpaceMemberProfiles(spaceId),
+      getLocalProfile(),
     ]);
 
+    const profilesByUserId: Record<string, SpaceMemberProfile> =
+      Object.fromEntries(cached.map((profile) => [profile.userId, profile]));
+
+    if (ownUserId) {
+      const existing = profilesByUserId[ownUserId];
+      profilesByUserId[ownUserId] = {
+        userId: ownUserId,
+        displayName: localProfile.displayName ?? existing?.displayName ?? null,
+        avatarPath: existing?.avatarPath ?? localProfile.avatarPath ?? null,
+        avatarUpdatedAt:
+          existing?.avatarUpdatedAt ?? localProfile.avatarUpdatedAt ?? null,
+        avatarUri: localProfile.avatarUri ?? existing?.avatarUri ?? null,
+        defaultCurrency: existing?.defaultCurrency ?? null,
+      };
+    }
+
     return {
-      profilesByUserId: Object.fromEntries(
-        cached.map((profile) => [profile.userId, profile]),
-      ),
+      profilesByUserId,
       ownUserId,
     };
   }, [spaceId]);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     let isMounted = true;
 
     void (async () => {
       try {
         if (isMounted) setMembership(await load());
-        // Reintento de la subida pendiente. Va fuera del `if (isShared)` a
-        // propósito: en un espacio personal también hay que subir la foto, y
-        // este es el único punto que corre siempre. No lanza ni bloquea.
         void syncOwnAvatar();
 
-        // Un espacio personal no tiene a nadie más: la identidad propia que
-        // acaba de cargarse ya basta para atribuir sus movimientos.
         if (!isShared) return;
 
         await syncSpaceMemberProfiles(spaceId);
@@ -78,6 +90,9 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
       isMounted = false;
     };
   }, [isShared, load, spaceId]);
+
+  useEffect(() => refresh(), [refresh]);
+  useAppForeground(refresh);
 
   return membership;
 }

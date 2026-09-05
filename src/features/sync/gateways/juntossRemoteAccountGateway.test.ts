@@ -59,6 +59,7 @@ describe('juntossRemoteAccountGateway', () => {
             spaceId: 'space-1',
             categoryId: 'cat-1',
             amountMinor: '100',
+            accountingAmountMinorUsd: '2',
             currency: 'EUR',
             title: 'Café',
             occurredOn: '2026-08-20',
@@ -80,6 +81,60 @@ describe('juntossRemoteAccountGateway', () => {
       recurrenceGroupId: 'group-9',
       sourceTransactionId: 'local-3',
     });
+  });
+
+  it('normaliza el snapshot histórico sin recalcular sus importes', async () => {
+    mockedGet.mockResolvedValue(
+      snapshot({
+        transactions: [
+          {
+            id: 'tx-1',
+            spaceId: 'space-1',
+            categoryId: 'cat-1',
+            amountMinor: '100',
+            accountingAmountMinorUsd: '2',
+            currency: 'VES',
+            title: 'Café',
+            occurredOn: '2026-08-20',
+            type: 'expense',
+            recurrence: 'once',
+            exchangeSnapshot: {
+              countryCode: 'VE',
+              createdWithCurrency: 'VES',
+              rates: {
+                BCV: {
+                  baseCurrency: 'USD',
+                  quoteCurrency: 'VES',
+                  rate: '50.0000000000',
+                  convertedAmountMinor: '200',
+                  observedAt: '2026-08-20T04:00:00.000Z',
+                },
+              },
+            },
+          },
+        ],
+      }) as never,
+    );
+
+    expect(
+      (await fetchRemoteAccountSnapshot()).transactions[0]?.exchangeSnapshot,
+    ).toEqual({
+      countryCode: 'VE',
+      createdWithCurrency: 'VES',
+      rates: {
+        BCV: {
+          baseCurrency: 'USD',
+          quoteCurrency: 'VES',
+          rate: '50.0000000000',
+          convertedAmountMinor: 200,
+          observedAt: '2026-08-20T04:00:00.000Z',
+        },
+      },
+    });
+    expect(
+      (await fetchRemoteAccountSnapshot()).transactions[0]
+        ?.accountingAmountMinorUsd,
+    ).toBe(2);
   });
 
   it('trae los presupuestos por moneda de cada categoría', async () => {

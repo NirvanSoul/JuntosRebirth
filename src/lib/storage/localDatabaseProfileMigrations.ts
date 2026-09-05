@@ -1,6 +1,6 @@
 import type * as SQLite from 'expo-sqlite';
 
-/** Migraciones locales 17–19 y 26 del perfil y de los miembros de un espacio. */
+/** Migraciones locales 17–19, 26 y 28 del perfil y de los miembros de un espacio. */
 export async function applyLocalProfileMigrations(
   transaction: SQLite.SQLiteDatabase,
   currentVersion: number,
@@ -63,6 +63,15 @@ export async function applyLocalProfileMigrations(
   if (currentVersion < 26) {
     await transaction.execAsync(`
       ALTER TABLE local_profile ADD COLUMN avatar_remote_updated_at TEXT;
+    `);
+  }
+
+  // La versión 28 guarda el país desde donde la persona usa la app, separado
+  // de la moneda: la moneda es una preferencia financiera (AsyncStorage), el
+  // país es un dato de identidad, igual que el nombre.
+  if (currentVersion < 28) {
+    await transaction.execAsync(`
+      ALTER TABLE local_profile ADD COLUMN country_code TEXT;
     `);
   }
 }
