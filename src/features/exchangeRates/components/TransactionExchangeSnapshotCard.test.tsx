@@ -24,10 +24,10 @@ describe('TransactionExchangeSnapshotCard', () => {
               },
               EURO: {
                 baseCurrency: 'USD',
-                quoteCurrency: 'EUR',
-                rate: '0.91',
-                convertedAmountMinor: 910,
-                convertedCurrency: 'EUR',
+                quoteCurrency: 'VES',
+                rate: '60',
+                convertedAmountMinor: 60_000,
+                convertedCurrency: 'VES',
                 observedAt: '2026-09-05T04:00:00.000Z',
               },
             },
@@ -57,6 +57,7 @@ describe('TransactionExchangeSnapshotCard', () => {
     );
     expect(
       screen.getByTestId('transaction-detail-rate-badge').props.children,
-    ).toBe('9,10 €');
+    ).toBe('Bs. 600');
+    expect(screen.getByText(/Tasa EUR.*5 sept/i)).toBeTruthy();
   });
 });

@@ -14,10 +14,10 @@ const snapshot = {
     },
     EURO: {
       baseCurrency: 'USD',
-      quoteCurrency: 'EUR',
-      rate: '0.91',
-      convertedAmountMinor: 910,
-      convertedCurrency: 'EUR' as const,
+      quoteCurrency: 'VES',
+      rate: '60',
+      convertedAmountMinor: 60_000,
+      convertedCurrency: 'VES' as const,
       observedAt: '2026-09-05T04:00:00.000Z',
     },
   },
@@ -35,7 +35,7 @@ describe('getVenezuelaDisplayValue', () => {
     ).toMatchObject({ amountMinor: 1_000, currency: 'USD', source: null });
   });
 
-  it('lee las equivalencias BCV y Euro desde el snapshot congelado', () => {
+  it('lee las equivalencias BCV y Tasa EUR en bolívares desde el snapshot congelado', () => {
     expect(
       getVenezuelaDisplayValue({
         amountMinor: 1_000,
@@ -51,7 +51,11 @@ describe('getVenezuelaDisplayValue', () => {
         exchangeSnapshot: snapshot,
         mode: 'EUR',
       }),
-    ).toMatchObject({ amountMinor: 910, currency: 'EUR', source: 'EURO' });
+    ).toMatchObject({
+      amountMinor: 60_000,
+      currency: 'VES',
+      source: 'EURO',
+    });
   });
 
   it('usa exclusivamente el valor contable congelado para leer VES en USD', () => {

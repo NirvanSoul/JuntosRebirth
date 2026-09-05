@@ -49,7 +49,9 @@ export function getVenezuelaDisplayValue({
 
   const source = mode === 'EUR' ? 'EURO' : 'BCV';
   const rate = exchangeSnapshot.rates[source];
-  const expectedCurrency = mode === 'VES_BCV' ? 'VES' : 'EUR';
+  // En Venezuela, «EUR» es la referencia EUR/VES del BCV, no una moneda de
+  // salida. Ambos modos de tasa muestran el equivalente histórico en VES.
+  const expectedCurrency = 'VES';
 
   if (!rate || rate.convertedCurrency !== expectedCurrency) return null;
 
