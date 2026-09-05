@@ -19,17 +19,29 @@ export type VenezuelaDisplayValue = {
  */
 export function getVenezuelaDisplayValue({
   amountMinor,
+  accountingAmountMinorUsd,
   currency,
   exchangeSnapshot,
   mode,
 }: {
   amountMinor: number;
+  accountingAmountMinorUsd?: number | null;
   currency: CurrencyCode;
   exchangeSnapshot: TransactionExchangeSnapshot;
   mode: VenezuelaDisplayMode;
 }): VenezuelaDisplayValue | null {
-  if (mode === 'USD' && currency === 'USD') {
-    return { amountMinor, currency: 'USD', rate: null, source: null };
+  if (mode === 'USD') {
+    const usdAmountMinor =
+      currency === 'USD' ? amountMinor : accountingAmountMinorUsd;
+
+    return typeof usdAmountMinor === 'number'
+      ? {
+          amountMinor: usdAmountMinor,
+          currency: 'USD',
+          rate: null,
+          source: null,
+        }
+      : null;
   }
   if (mode === 'VES_BCV' && currency === 'VES') {
     return { amountMinor, currency: 'VES', rate: null, source: null };
@@ -37,8 +49,7 @@ export function getVenezuelaDisplayValue({
 
   const source = mode === 'EUR' ? 'EURO' : 'BCV';
   const rate = exchangeSnapshot.rates[source];
-  const expectedCurrency =
-    mode === 'USD' ? 'USD' : mode === 'VES_BCV' ? 'VES' : 'EUR';
+  const expectedCurrency = mode === 'VES_BCV' ? 'VES' : 'EUR';
 
   if (!rate || rate.convertedCurrency !== expectedCurrency) return null;
 

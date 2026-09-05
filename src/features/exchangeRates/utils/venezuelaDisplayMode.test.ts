@@ -54,6 +54,29 @@ describe('getVenezuelaDisplayValue', () => {
     ).toMatchObject({ amountMinor: 910, currency: 'EUR', source: 'EURO' });
   });
 
+  it('usa exclusivamente el valor contable congelado para leer VES en USD', () => {
+    expect(
+      getVenezuelaDisplayValue({
+        accountingAmountMinorUsd: 1_000,
+        amountMinor: 50_000,
+        currency: 'VES',
+        exchangeSnapshot: snapshot,
+        mode: 'USD',
+      }),
+    ).toMatchObject({ amountMinor: 1_000, currency: 'USD', source: null });
+  });
+
+  it('declara cobertura incompleta si un movimiento VES no tiene valor contable', () => {
+    expect(
+      getVenezuelaDisplayValue({
+        amountMinor: 50_000,
+        currency: 'VES',
+        exchangeSnapshot: snapshot,
+        mode: 'USD',
+      }),
+    ).toBeNull();
+  });
+
   it('no adivina la moneda de snapshots antiguos sin convertedCurrency', () => {
     expect(
       getVenezuelaDisplayValue({

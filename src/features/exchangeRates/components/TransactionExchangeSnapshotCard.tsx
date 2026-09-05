@@ -24,12 +24,14 @@ import type { ColorTokens } from '@/theme/types';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type TransactionExchangeSnapshotCardProps = {
+  accountingAmountMinorUsd?: number | null;
   amountMinor: number;
   currency: CurrencyCode;
   exchangeSnapshot: TransactionExchangeSnapshot | null | undefined;
 };
 
 export function TransactionExchangeSnapshotCard({
+  accountingAmountMinorUsd,
   amountMinor,
   currency,
   exchangeSnapshot,
@@ -38,6 +40,7 @@ export function TransactionExchangeSnapshotCard({
   const [mode, setMode] = useState<VenezuelaDisplayMode>('USD');
   if (!exchangeSnapshot) return null;
   const displayValue = getVenezuelaDisplayValue({
+    accountingAmountMinorUsd,
     amountMinor,
     currency,
     exchangeSnapshot,

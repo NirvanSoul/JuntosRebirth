@@ -315,6 +315,7 @@ export function TransactionDetailModal({
             </Pressable>
 
             <TransactionExchangeSnapshotCard
+              accountingAmountMinorUsd={transaction.accountingAmountMinorUsd}
               amountMinor={transaction.amountMinor}
               currency={transaction.currency}
               exchangeSnapshot={transaction.exchangeSnapshot}
