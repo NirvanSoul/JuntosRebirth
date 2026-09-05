@@ -1,6 +1,16 @@
 import { useProfileCountry } from '@/features/profile/hooks/useProfileCountry';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
+/**
+ * Referencia estable para consumidores que sincronizan estado local a partir
+ * de las capacidades. Declararla dentro del hook haría que cada render de un
+ * perfil venezolano pareciese un cambio de capacidad.
+ */
+const venezuelaTransactionInputCurrencies: readonly CurrencyCode[] = [
+  'USD',
+  'VES',
+];
+
 export type CurrencyCapabilities = {
   accountingCurrency?: CurrencyCode;
   allowedTransactionInputCurrencies?: readonly CurrencyCode[];
@@ -27,7 +37,9 @@ export function useCurrencyCapabilities(): CurrencyCapabilities {
 
   return {
     accountingCurrency: isVenezuela ? 'USD' : undefined,
-    allowedTransactionInputCurrencies: isVenezuela ? ['USD', 'VES'] : undefined,
+    allowedTransactionInputCurrencies: isVenezuela
+      ? venezuelaTransactionInputCurrencies
+      : undefined,
     allowsMultipleAccountCurrencies: !isVenezuela,
     countryCode,
     venezuelaCurrencyMode: isVenezuela,

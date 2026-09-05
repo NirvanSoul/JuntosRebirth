@@ -20,7 +20,9 @@ describe('useCurrencyCapabilities', () => {
   it('activa todas las capacidades cuando el país es Venezuela', async () => {
     mockCountryCode('VE');
 
-    const { result } = await renderHook(() => useCurrencyCapabilities());
+    const { result, rerender } = await renderHook(() =>
+      useCurrencyCapabilities(),
+    );
 
     expect(result.current).toEqual({
       accountingCurrency: 'USD',
@@ -31,6 +33,13 @@ describe('useCurrencyCapabilities', () => {
       customExchangeRate: true,
       multiRateMovementDisplay: true,
     });
+
+    const currenciesBeforeRerender =
+      result.current.allowedTransactionInputCurrencies;
+    await rerender({});
+    expect(result.current.allowedTransactionInputCurrencies).toBe(
+      currenciesBeforeRerender,
+    );
   });
 
   it('desactiva todas las capacidades para otro país', async () => {
