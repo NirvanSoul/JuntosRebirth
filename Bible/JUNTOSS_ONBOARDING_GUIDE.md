@@ -501,7 +501,9 @@ mediante navegación o enlaces profundos.
 El onboarding se completa antes de Acceso y su marca se guarda por instalación,
 no por cuenta. Por eso un cierre de sesión no lo reinicia. Al crear o restaurar
 una sesión verificada, los datos locales creados durante el flujo se asocian a
-esa cuenta mediante la inicialización normal de sesión.
+esa cuenta mediante la inicialización normal de sesión. El país elegido se
+publica antes de restaurar el snapshot remoto, para abrir el espacio personal
+del contexto monetario correcto.
 
 ---
 
@@ -522,6 +524,10 @@ esa cuenta mediante la inicialización normal de sesión.
 4. Empezamos por lo esencial.
 
 ## Recomendación
+
+El nombre guardado aquí rellena inicialmente el campo de nombre al crear una
+cuenta. La persona puede cambiarlo; el valor con el que se registra es el que
+se conserva como perfil local.
 
 **Primero que nada… ¿Cómo te llamas?**
 Nosotros nos llamamos Juntos, y queremos conocerte.

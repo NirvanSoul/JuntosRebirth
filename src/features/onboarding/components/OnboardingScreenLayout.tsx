@@ -118,6 +118,7 @@ export function OnboardingScreenLayout({
   const { width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReduceMotionPreference();
   const onboardingFlow = useOnboardingFlow();
+  const [skipError, setSkipError] = useState<string | null>(null);
   const [isSkipping, setSkipping] = useState(false);
   const subtitleDelay =
     estimateRevealDuration() + motion.onboardingTextRevealBlockPause;
@@ -129,10 +130,12 @@ export function OnboardingScreenLayout({
     if (!onboardingFlow || isSkipping) return;
 
     setSkipping(true);
+    setSkipError(null);
     try {
       await onboardingFlow.completeOnboarding();
     } catch (error) {
       console.error('[onboarding] No se pudo omitir el onboarding', error);
+      setSkipError('No pudimos omitir el onboarding. Inténtalo de nuevo.');
       setSkipping(false);
     }
   };
@@ -201,6 +204,11 @@ export function OnboardingScreenLayout({
             </Pressable>
           ) : null}
         </View>
+        {skipError ? (
+          <Text tone="expense" variant="footnote">
+            {skipError}
+          </Text>
+        ) : null}
         <Animated.View
           layout={layoutTransition}
           style={isCompact ? styles.headerCompact : styles.header}

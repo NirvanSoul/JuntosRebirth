@@ -11,11 +11,19 @@ import { useState } from 'react';
 import { signUp } from '@/features/auth/services/signUpService';
 import { savePendingEmailVerification } from '@/features/auth/services/pendingEmailVerification';
 import { SignUpScreen } from '@/features/auth/screens/SignUpScreen';
+import {
+  getLocalProfile,
+  saveLocalProfileDisplayName,
+} from '@/features/profile/repositories/localProfileRepository';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
 jest.mock('@/features/auth/services/signUpService');
 jest.mock('@/features/auth/services/pendingEmailVerification', () => ({
   savePendingEmailVerification: jest.fn(async () => undefined),
+}));
+jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
+  getLocalProfile: jest.fn(),
+  saveLocalProfileDisplayName: jest.fn(),
 }));
 jest.mock('@/features/auth/components/GoogleAuthButton', () => {
   const { Text } = jest.requireActual('react-native');
@@ -58,6 +66,36 @@ async function renderWizard(onNavigateToLogin?: () => void) {
 describe('SignUpScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(getLocalProfile).mockResolvedValue({
+      avatarPath: null,
+      avatarUpdatedAt: null,
+      avatarUri: null,
+      countryCode: null,
+      displayName: null,
+    });
+    jest.mocked(saveLocalProfileDisplayName).mockResolvedValue({
+      avatarPath: null,
+      avatarUpdatedAt: null,
+      avatarUri: null,
+      countryCode: null,
+      displayName: 'Ana',
+    });
+  });
+
+  it('precarga el nombre recogido durante el onboarding', async () => {
+    jest.mocked(getLocalProfile).mockResolvedValue({
+      avatarPath: null,
+      avatarUpdatedAt: null,
+      avatarUri: null,
+      countryCode: 'ES',
+      displayName: 'Ana',
+    });
+
+    await renderWizard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('signup-display-name').props.value).toBe('Ana');
+    });
   });
 
   it('pide un dato por paso, en 4 pasos, antes de crear la cuenta', async () => {

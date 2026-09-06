@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import { GoogleAuthButton } from '@/features/auth/components/GoogleAuthButton';
+import {
+  getLocalProfile,
+  saveLocalProfileDisplayName,
+} from '@/features/profile/repositories/localProfileRepository';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
 import { savePendingEmailVerification } from '@/features/auth/services/pendingEmailVerification';
 import { signUp } from '@/features/auth/services/signUpService';
@@ -58,6 +62,7 @@ export function SignUpScreen({
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [displayName, setDisplayName] = useState('');
+  const hasEditedDisplayName = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -67,6 +72,29 @@ export function SignUpScreen({
   const currentField: StepField = stepFields[step - 1] ?? stepFields[0];
   const isLastStep = step === signUpTotalSteps;
   const isFirstStep = step === 1;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void getLocalProfile()
+      .then((profile) => {
+        if (
+          !isMounted ||
+          hasEditedDisplayName.current ||
+          !profile.displayName
+        ) {
+          return;
+        }
+        setDisplayName(profile.displayName);
+      })
+      .catch((error: unknown) => {
+        console.error('[SignUp] No se pudo recuperar el nombre inicial', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const validateCurrentField = (): string | undefined => {
     switch (currentField) {
@@ -97,6 +125,13 @@ export function SignUpScreen({
         password,
         displayName: displayName.trim(),
       });
+      try {
+        await saveLocalProfileDisplayName(displayName.trim());
+      } catch (error) {
+        // La cuenta ya existe aunque la copia local falle; el nombre remoto se
+        // recuperará en una sesión posterior.
+        console.error('[SignUp] No se pudo guardar el nombre local:', error);
+      }
       const verifiedEmail = email.trim();
       // Better Auth puede renovar la sesión provisional justo al terminar el
       // alta. Guardar el correo antes de cambiar de vista evita perder el OTP
@@ -153,7 +188,10 @@ export function SignUpScreen({
             editable={!isSubmitting}
             error={fieldErrors.displayName}
             label="Nombre"
-            onChangeText={setDisplayName}
+            onChangeText={(value) => {
+              hasEditedDisplayName.current = true;
+              setDisplayName(value);
+            }}
             onSubmitEditing={handleContinue}
             placeholder="Tu nombre"
             testID="signup-display-name"
