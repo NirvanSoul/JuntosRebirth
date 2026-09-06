@@ -5,14 +5,29 @@ import type { OnboardingStackParamList } from '@/features/onboarding/OnboardingN
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'ReadyToExplore'>;
 
+type ReadyToExploreScreenProps = Props & {
+  onComplete: () => Promise<void>;
+};
+
 const readyIllustrationAspectRatio = 1254 / 1254;
 const readyIllustrationScale = 1.12;
 
-export function ReadyToExploreScreen({ navigation }: Props) {
+export function ReadyToExploreScreen({
+  navigation,
+  onComplete,
+}: ReadyToExploreScreenProps) {
+  const handleComplete = async () => {
+    try {
+      await onComplete();
+    } catch (error) {
+      console.error('[onboarding] No se pudo completar el onboarding', error);
+    }
+  };
+
   return (
     <OnboardingScreenLayout
       actionLabel="Empezar"
-      onAction={() => navigation.popToTop()}
+      onAction={() => void handleComplete()}
       onBack={() => navigation.goBack()}
       currentStep={9}
       illustrationAspectRatio={readyIllustrationAspectRatio}

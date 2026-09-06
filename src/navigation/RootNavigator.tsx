@@ -6,6 +6,8 @@ import { linking } from '@/navigation/linking';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
+import { OnboardingNavigator } from '@/features/onboarding/OnboardingNavigator';
+import { useOnboardingCompletion } from '@/features/onboarding/hooks/useOnboardingCompletion';
 import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -15,6 +17,11 @@ export function RootNavigator() {
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(createStyles);
   const { isReady: isAuthReady, session } = useBetterAuthSession();
+  const {
+    complete: completeOnboarding,
+    hasCompleted: hasCompletedOnboarding,
+    isReady: isOnboardingReady,
+  } = useOnboardingCompletion();
 
   const navigationTheme = useMemo(
     () => ({
@@ -37,14 +44,20 @@ export function RootNavigator() {
     [colors, isDark],
   );
 
-  if (!isAuthReady) {
+  if (!isAuthReady || !isOnboardingReady) {
     return <View style={styles.root} testID="root-navigator-backdrop" />;
   }
 
   // Una sesión provisional de registro no concede acceso. El valor estricto
   // evita que una respuesta incompleta del proveedor abra datos locales.
   const hasVerifiedSession = session?.user.emailVerified === true;
-  const content = hasVerifiedSession ? <MainTabsNavigator /> : <AccessScreen />;
+  const content = !hasCompletedOnboarding ? (
+    <OnboardingNavigator onComplete={completeOnboarding} />
+  ) : hasVerifiedSession ? (
+    <MainTabsNavigator />
+  ) : (
+    <AccessScreen />
+  );
 
   // El fondo del root nativo es blanco. Las escenas del drawer y de las pestañas
   // son transparentes y las pestañas se cruzan con `animation: 'fade'`, así que

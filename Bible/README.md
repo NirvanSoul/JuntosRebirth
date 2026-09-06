@@ -158,13 +158,16 @@ El cliente no es la autoridad final de permisos.
 Flujo previsto:
 
 1. El usuario abre la aplicación.
-2. Ve la pantalla de acceso y crea una cuenta o inicia sesión.
-3. Al crear una cuenta, verifica su correo con OTP.
-4. Solo una sesión con correo verificado habilita la aplicación principal.
-5. Se crea o restaura su espacio personal remoto.
-6. Sus datos se guardan localmente como caché de su cuenta y se sincronizan.
+2. En la primera apertura de la instalación, completa el onboarding.
+3. Ve la pantalla de acceso y crea una cuenta o inicia sesión.
+4. Al crear una cuenta, verifica su correo con OTP.
+5. Solo una sesión con correo verificado habilita la aplicación principal.
+6. Se crea o restaura su espacio personal remoto.
+7. Sus datos se guardan localmente como caché de su cuenta y se sincronizan.
 
-No existe un modo invitado ni una vía para consultar datos sin sesión.
+El onboarding es el único flujo local previo a una sesión; no habilita la
+aplicación principal ni la consulta de datos de una cuenta. Al cerrarla, la
+marca de finalización permanece y se vuelve siempre a Acceso.
 
 ---
 

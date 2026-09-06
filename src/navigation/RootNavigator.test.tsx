@@ -5,6 +5,8 @@ import { renderWithTheme } from '@/test/renderWithTheme';
 import { darkColors, lightColors } from '@/theme/colors';
 
 let mockAuthReady = true;
+let mockOnboardingReady = true;
+let mockOnboardingCompleted = true;
 let mockSession: {
   user: { id: string; email: string; emailVerified: boolean };
 } | null = {
@@ -19,6 +21,14 @@ jest.mock('@/features/auth/hooks/useBetterAuthSession', () => ({
   }),
 }));
 
+jest.mock('@/features/onboarding/hooks/useOnboardingCompletion', () => ({
+  useOnboardingCompletion: () => ({
+    complete: jest.fn(),
+    hasCompleted: mockOnboardingCompleted,
+    isReady: mockOnboardingReady,
+  }),
+}));
+
 jest.mock('@/lib/auth-client', () => ({
   authClient: { signIn: { social: jest.fn() } },
 }));
@@ -27,6 +37,13 @@ jest.mock('@/navigation/MainTabsNavigator', () => {
   const { Text: RNText } = jest.requireActual('react-native');
   return {
     MainTabsNavigator: () => <RNText>pestañas</RNText>,
+  };
+});
+
+jest.mock('@/features/onboarding/OnboardingNavigator', () => {
+  const { Text: RNText } = jest.requireActual('react-native');
+  return {
+    OnboardingNavigator: () => <RNText>onboarding</RNText>,
   };
 });
 
@@ -44,6 +61,8 @@ function backdropBackgroundColor(style: StyleProp<ViewStyle>) {
 describe('RootNavigator', () => {
   beforeEach(() => {
     mockAuthReady = true;
+    mockOnboardingReady = true;
+    mockOnboardingCompleted = true;
     mockSession = {
       user: { id: 'user-1', email: 'ana@ejemplo.com', emailVerified: true },
     };
@@ -74,6 +93,33 @@ describe('RootNavigator', () => {
         screen.getByTestId('root-navigator-backdrop').props.style,
       ),
     ).toBe(darkColors.background);
+    expect(screen.queryByText('pestañas')).toBeNull();
+  });
+
+  it('mantiene el fondo del tema mientras se restaura el estado del onboarding', async () => {
+    mockOnboardingReady = false;
+
+    const screen = await renderWithTheme(<RootNavigator />, {
+      appearance: 'dark',
+    });
+
+    expect(screen.queryByText('onboarding')).toBeNull();
+    expect(screen.queryByText('pestañas')).toBeNull();
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('root-navigator-backdrop').props.style,
+      ),
+    ).toBe(darkColors.background);
+  });
+
+  it('muestra el onboarding antes de Acceso en una instalación nueva', async () => {
+    mockOnboardingCompleted = false;
+    mockSession = null;
+
+    const screen = await renderWithTheme(<RootNavigator />);
+
+    expect(await screen.findByText('onboarding')).toBeTruthy();
+    expect(screen.queryByText('acceso')).toBeNull();
     expect(screen.queryByText('pestañas')).toBeNull();
   });
 

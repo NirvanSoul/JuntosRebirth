@@ -480,18 +480,22 @@ reintentar, solicitar otro código o iniciar sesión.
 
 # 12. Entrada autenticada
 
-No hay límites ni pantallas de prueba locales. Toda función que muestre o
-modifique datos financieros requiere una sesión verificada. Al cerrar sesión,
-la siguiente pantalla es Acceso y no existe una ruta de regreso a la aplicación
-principal mediante navegación o enlaces profundos.
+El onboarding es la excepción previa a la autenticación: se muestra solo en la
+primera apertura de una instalación y, al terminar, entrega el control a
+Acceso. No habilita la aplicación principal ni la consulta de datos de una
+cuenta. Toda función fuera de ese flujo que muestre o modifique datos
+financieros requiere una sesión verificada. Al cerrar sesión, la siguiente
+pantalla es Acceso y no existe una ruta de regreso a la aplicación principal
+mediante navegación o enlaces profundos.
 
 ---
 
 # 13. Primera sesión
 
-El onboarding, si se conserva, solo puede ejecutarse después de verificar el
-correo. Sus datos se guardan como parte de la cuenta actual y no necesitan
-migración posterior.
+El onboarding se completa antes de Acceso y su marca se guarda por instalación,
+no por cuenta. Por eso un cierre de sesión no lo reinicia. Al crear o restaurar
+una sesión verificada, los datos locales creados durante el flujo se asocian a
+esa cuenta mediante la inicialización normal de sesión.
 
 ---
 
@@ -689,7 +693,11 @@ Guardar:
 Flujo:
 
 ```text
-Primera apertura o sesión ausente
+Primera apertura de la instalación
+  -> Onboarding
+  -> Pantalla de acceso
+
+Onboarding ya completado y sesión ausente
   -> Pantalla de acceso
 
 Correo verificado

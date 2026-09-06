@@ -26,7 +26,11 @@ export type OnboardingStackParamList = {
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
 
-export function OnboardingNavigator() {
+type OnboardingNavigatorProps = {
+  onComplete: () => Promise<void>;
+};
+
+export function OnboardingNavigator({ onComplete }: OnboardingNavigatorProps) {
   const [areIllustrationsReady, setIllustrationsReady] = useState(false);
 
   useEffect(() => {
@@ -63,7 +67,9 @@ export function OnboardingNavigator() {
       />
       <Stack.Screen component={AddFirstIncomeScreen} name="AddFirstIncome" />
       <Stack.Screen component={AddFirstExpenseScreen} name="AddFirstExpense" />
-      <Stack.Screen component={ReadyToExploreScreen} name="ReadyToExplore" />
+      <Stack.Screen name="ReadyToExplore">
+        {(props) => <ReadyToExploreScreen {...props} onComplete={onComplete} />}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 }

@@ -231,8 +231,9 @@ El acceso a la aplicación requiere una cuenta con correo verificado.
 ### Reglas
 
 - Nueve pantallas en total.
-- El onboarding no es una vía de entrada: se ejecuta solo después de autenticar,
-  cuando esté habilitado para una cuenta.
+- El onboarding es la primera pantalla de una instalación nueva, antes de
+  Acceso, y se marca como completado al terminar.
+- Tras cerrar sesión, no se repite: el usuario vuelve directamente a Acceso.
 - No pedir permisos sin explicar por qué.
 - Pedir un primer ingreso y un primer gasto al final, para dejar el espacio local con datos reales.
 - En los pasos 6, 7 y 8, enseñar la creación con el mismo botón flotante y el
