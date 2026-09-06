@@ -280,7 +280,12 @@ Las categorías te ayudan a organizar tus gastos e ingresos, para entender mejor
 
 No dice «Continuar». Dice **Crear categoría** y, al tocarlo, abre el mismo selector de categorías sugeridas que el resto de la aplicación (`CategoryPickerModal`, catálogo de 18 plantillas): el usuario elige una o varias y las guarda, o —si ninguna le sirve— toca «Crear otra categoría» para abrir el mismo formulario de categoría personalizada del resto de la app (`CreateCategoryModal`). Ambos modales son literalmente los mismos componentes que usa la aplicación ya autenticada, no una versión simplificada para onboarding.
 
-El usuario debe crear al menos tres categorías, de plantilla o personalizadas. Puede seleccionarlas y guardarlas juntas o añadirlas en varias tandas; la pantalla indica cuántas faltan. Solo al alcanzar ese mínimo se completa el paso y continúa el flujo hacia la Pantalla 7 (añadir el primer ingreso).
+El usuario debe crear al menos tres categorías, de plantilla o personalizadas.
+Cuando abre el selector de plantillas desde el onboarding, el botón Guardar
+permanece deshabilitado hasta seleccionar tres categorías; esta restricción no
+se aplica al selector usado fuera del onboarding. Solo al alcanzar ese mínimo
+se completa el paso y continúa el flujo hacia la Pantalla 7 (añadir el primer
+ingreso).
 
 ---
 

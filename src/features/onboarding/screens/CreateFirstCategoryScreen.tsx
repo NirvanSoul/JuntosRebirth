@@ -208,6 +208,7 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
       <CategoryPickerModal
         categories={categories}
         mode="create"
+        minimumTemplateSelections={minimumOnboardingCategories}
         onClose={() => setPickerVisible(false)}
         onCreateCategory={() => setCustomVisible(true)}
         onCreateTemplates={(definitions) =>

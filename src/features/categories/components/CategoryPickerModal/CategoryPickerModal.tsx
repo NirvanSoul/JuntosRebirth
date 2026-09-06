@@ -30,6 +30,11 @@ import {
   defaultCategoryPages,
   type DefaultCategoryDefinition,
 } from '@/features/categories/constants/defaultCategories';
+import {
+  isCreatedCategory,
+  paginateCategories,
+  type CategoryPickerItem,
+} from '@/features/categories/components/CategoryPickerModal/categoryPickerItem';
 import type { Category } from '@/features/categories/types';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
@@ -53,6 +58,8 @@ export type CategoryPickerSelection = {
 type CategoryPickerModalProps = {
   categories: readonly Category[];
   mode: 'create' | 'select';
+  /** Mínimo de plantillas que se deben escoger antes de guardarlas. */
+  minimumTemplateSelections?: number;
   selectedCategoryId: string | null;
   visible: boolean;
   onClose: () => void;
@@ -67,24 +74,6 @@ const saveButtonMinWidth = 80;
 const categoryRowsPerPage = 3;
 const categoryColumnsPerPage = 3;
 const categoriesPerPage = categoryRowsPerPage * categoryColumnsPerPage;
-type CategoryPickerItem = Category | DefaultCategoryDefinition;
-
-function isCreatedCategory(item: CategoryPickerItem): item is Category {
-  return 'spaceId' in item;
-}
-
-function paginateCategories(
-  categories: readonly Category[],
-): readonly (readonly Category[])[] {
-  const pages: Category[][] = [];
-
-  for (let index = 0; index < categories.length; index += categoriesPerPage) {
-    pages.push(categories.slice(index, index + categoriesPerPage));
-  }
-
-  return pages;
-}
-
 function CategoryPageIndicatorDot({
   active,
   index,
@@ -123,6 +112,7 @@ function CategoryPageIndicatorDot({
 export function CategoryPickerModal({
   categories,
   mode,
+  minimumTemplateSelections = 1,
   selectedCategoryId,
   visible,
   onClose,
@@ -142,7 +132,7 @@ export function CategoryPickerModal({
     (pageContentWidth - spacing.sm * (categoryColumnsPerPage - 1)) /
     categoryColumnsPerPage;
   const createdCategoryPages = useMemo(
-    () => paginateCategories(categories),
+    () => paginateCategories(categories, categoriesPerPage),
     [categories],
   );
   const displayedPages: readonly (readonly CategoryPickerItem[])[] =
@@ -427,7 +417,7 @@ export function CategoryPickerModal({
           {displayMode === 'create' && (
             <ModalPrimaryAction
               accessibilityLabel="Guardar categorías"
-              disabled={selectedDefinitions.length === 0}
+              disabled={selectedDefinitions.length < minimumTemplateSelections}
               label="Guardar"
               onPress={() => onCreateTemplates(selectedDefinitions)}
               style={styles.saveButton}

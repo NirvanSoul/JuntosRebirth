@@ -126,7 +126,7 @@ describe('CreateFirstCategoryScreen', () => {
     });
   });
 
-  it('acumula las categorías creadas antes de avanzar', async () => {
+  it('no permite guardar una sola plantilla durante el onboarding', async () => {
     const screen = await renderWithTheme(
       <CreateFirstCategoryScreen navigation={navigation} route={route} />,
     );
@@ -134,17 +134,13 @@ describe('CreateFirstCategoryScreen', () => {
     await fireEvent.press(screen.getByTestId('floating-create-button'));
     await fireEvent.press(screen.getByLabelText('Crear categoría'));
     await fireEvent.press(screen.getByLabelText('Salario'));
-    await fireEvent.press(screen.getByLabelText('Guardar categorías'));
 
-    await waitFor(() => {
-      expect(
-        screen.getByText('Te faltan 2 categorías para continuar.'),
-      ).toBeTruthy();
-    });
+    expect(
+      screen.getByLabelText('Guardar categorías').props.accessibilityState,
+    ).toMatchObject({ disabled: true });
     expect(mockNavigation.navigate).not.toHaveBeenCalled();
+    expect(mockCreateLocalCategories).not.toHaveBeenCalled();
 
-    await fireEvent.press(screen.getByTestId('floating-create-button'));
-    await fireEvent.press(screen.getByLabelText('Crear categoría'));
     await fireEvent.press(screen.getByLabelText('Supermercado'));
     await fireEvent.press(screen.getByLabelText('Vivienda'));
     await fireEvent.press(screen.getByLabelText('Guardar categorías'));
