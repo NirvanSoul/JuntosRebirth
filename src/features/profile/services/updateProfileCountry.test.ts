@@ -2,6 +2,7 @@ import { updateProfileCountry } from '@/features/profile/services/updateProfileC
 import { saveLocalProfileCountry } from '@/features/profile/repositories/localProfileRepository';
 import { syncOwnCountry } from '@/features/profile/services/syncOwnCountry';
 import type { LocalProfile } from '@/features/profile/types';
+import { saveCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
   saveLocalProfileCountry: jest.fn(),
@@ -9,6 +10,10 @@ jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
 
 jest.mock('@/features/profile/services/syncOwnCountry', () => ({
   syncOwnCountry: jest.fn(),
+}));
+
+jest.mock('@/state/appPreferences/currencyPreferencesRepository', () => ({
+  saveCurrencyPreferences: jest.fn(),
 }));
 
 const savedProfile: LocalProfile = {
@@ -32,6 +37,9 @@ describe('updateProfileCountry', () => {
     expect(syncOwnCountry).toHaveBeenCalledWith('VE', {
       throwOnFailure: true,
     });
+    expect(saveCurrencyPreferences).toHaveBeenCalledWith({
+      currencies: ['USD', 'VES'],
+    });
     expect(saveLocalProfileCountry).toHaveBeenCalledWith('VE');
     expect(profile).toEqual(savedProfile);
   });
@@ -41,5 +49,17 @@ describe('updateProfileCountry', () => {
 
     await expect(updateProfileCountry('VE')).rejects.toThrow('conflicto');
     expect(saveLocalProfileCountry).not.toHaveBeenCalled();
+    expect(saveCurrencyPreferences).not.toHaveBeenCalled();
+  });
+
+  it('permite guardar el país localmente antes de que exista una sesión', async () => {
+    const profile = await updateProfileCountry('es', { sync: 'deferred' });
+
+    expect(syncOwnCountry).not.toHaveBeenCalled();
+    expect(saveCurrencyPreferences).toHaveBeenCalledWith({
+      currencies: ['EUR'],
+    });
+    expect(saveLocalProfileCountry).toHaveBeenCalledWith('ES');
+    expect(profile).toEqual(savedProfile);
   });
 });

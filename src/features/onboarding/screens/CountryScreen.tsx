@@ -14,7 +14,6 @@ import {
   searchCountryCatalog,
   type CountryCatalogEntry,
 } from '@/lib/geography/countryCatalog';
-import { saveCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 import { spacing } from '@/theme/spacing';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Country'>;
@@ -44,10 +43,7 @@ export function CountryScreen({ navigation }: Props) {
     setSaving(true);
     setError(null);
     try {
-      await Promise.all([
-        saveCurrencyPreferences({ currencies: [selected.currencyCode] }),
-        updateProfileCountry(selected.iso2),
-      ]);
+      await updateProfileCountry(selected.iso2, { sync: 'deferred' });
       navigation.navigate('Welcome');
     } catch (error) {
       console.error('[onboarding] No se pudo guardar el país/moneda', error);

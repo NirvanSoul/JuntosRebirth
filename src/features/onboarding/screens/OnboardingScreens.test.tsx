@@ -137,6 +137,11 @@ describe('pantallas de onboarding', () => {
     await waitFor(() => {
       expect(mockNavigation.navigate).toHaveBeenCalledWith('Welcome');
     });
-    expect(mockUpdateProfileCountry).toHaveBeenCalledWith('VE');
+    expect(mockUpdateProfileCountry).toHaveBeenCalledWith('VE', {
+      sync: 'deferred',
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Continuar')).toBeTruthy();
+    });
   });
 });
