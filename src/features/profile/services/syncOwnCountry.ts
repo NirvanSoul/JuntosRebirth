@@ -11,7 +11,10 @@ import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemote
  */
 export async function syncOwnCountry(
   countryCode: string,
-  { throwOnFailure = false }: { throwOnFailure?: boolean } = {},
+  {
+    ensureBootstrap = true,
+    throwOnFailure = false,
+  }: { ensureBootstrap?: boolean; throwOnFailure?: boolean } = {},
 ): Promise<boolean> {
   const userId = await getAuthenticatedUserId();
   if (!userId) {
@@ -22,10 +25,10 @@ export async function syncOwnCountry(
   }
 
   try {
-    // El país se guarda al terminar el onboarding, que puede adelantarse a
-    // la inicialización de sesión. Bootstrap es idempotente y garantiza que
-    // el perfil remoto exista antes del PATCH.
-    await bootstrapRemoteAccount();
+    // Para cambios desde Ajustes, Bootstrap garantiza que el perfil remoto
+    // exista antes del PATCH. La inicialización de sesión ya lo ejecutó y
+    // puede evitar una segunda petición usando `ensureBootstrap: false`.
+    if (ensureBootstrap) await bootstrapRemoteAccount();
     // El perfil que se actualiza es el de la sesión: la API no acepta un
     // identificador de usuario en el cuerpo.
     await apiClient.patch('/v1/me/profile', { countryCode });

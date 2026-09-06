@@ -1,4 +1,6 @@
 import { prepareLocalCacheForSession } from '@/features/auth/services/prepareLocalCacheForSession';
+import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
+import { syncOwnCountry } from '@/features/profile/services/syncOwnCountry';
 import { loadSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
@@ -13,6 +15,14 @@ export async function initializeAuthenticatedSession(): Promise<void> {
   // presenta como si el correo o la contraseña fueran incorrectos.
   await prepareLocalCacheForSession();
   await bootstrapRemoteAccount();
+
+  // El onboarding puede haber elegido el país antes de que existiera una
+  // sesión. Publícalo ahora, antes de pedir el snapshot: así el servidor crea
+  // y devuelve el espacio personal del contexto monetario correcto.
+  const { countryCode } = await getLocalProfile();
+  if (countryCode) {
+    await syncOwnCountry(countryCode, { ensureBootstrap: false });
+  }
 
   // El snapshot crea los enlaces local→remoto. Sin él, el espacio local fijo
   // `personal` se enviaría erróneamente como si fuera su UUID remoto.

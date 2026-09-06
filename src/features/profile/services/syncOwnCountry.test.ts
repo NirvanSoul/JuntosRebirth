@@ -56,4 +56,15 @@ describe('syncOwnCountry', () => {
       rejection,
     );
   });
+
+  it('publica sin repetir bootstrap cuando la sesión ya fue inicializada', async () => {
+    await expect(
+      syncOwnCountry('ES', { ensureBootstrap: false }),
+    ).resolves.toBe(true);
+
+    expect(bootstrapRemoteAccount).not.toHaveBeenCalled();
+    expect(apiClient.patch).toHaveBeenCalledWith('/v1/me/profile', {
+      countryCode: 'ES',
+    });
+  });
 });

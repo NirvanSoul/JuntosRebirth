@@ -1,4 +1,6 @@
 import { prepareLocalCacheForSession } from '@/features/auth/services/prepareLocalCacheForSession';
+import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
+import { syncOwnCountry } from '@/features/profile/services/syncOwnCountry';
 import { loadSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
@@ -7,6 +9,8 @@ import { initializeAuthenticatedSession } from '@/features/auth/services/session
 
 jest.mock('@/features/spaces/repositories/localSpaceRepository');
 jest.mock('@/features/auth/services/prepareLocalCacheForSession');
+jest.mock('@/features/profile/repositories/localProfileRepository');
+jest.mock('@/features/profile/services/syncOwnCountry');
 jest.mock('@/features/sync/services/bootstrapRemoteAccount');
 jest.mock('@/features/sync/services/restoreRemoteAccount');
 jest.mock('@/features/sync/services/syncCoupleSpaceData');
@@ -21,6 +25,7 @@ describe('initializeAuthenticatedSession', () => {
       ],
     });
     (prepareLocalCacheForSession as jest.Mock).mockResolvedValue('kept');
+    (getLocalProfile as jest.Mock).mockResolvedValue({ countryCode: null });
     (bootstrapRemoteAccount as jest.Mock).mockResolvedValue(undefined);
     (restoreRemoteAccountForCurrentSession as jest.Mock).mockResolvedValue(
       undefined,
@@ -75,5 +80,32 @@ describe('initializeAuthenticatedSession', () => {
     await initializeAuthenticatedSession();
 
     expect(order.slice(0, 3)).toEqual(['cache', 'bootstrap', 'restore']);
+  });
+
+  it('publica el país elegido antes de restaurar el snapshot remoto', async () => {
+    (getLocalProfile as jest.Mock).mockResolvedValue({ countryCode: 'ES' });
+    (syncOwnCountry as jest.Mock).mockResolvedValue(true);
+
+    await initializeAuthenticatedSession();
+
+    expect(syncOwnCountry).toHaveBeenCalledWith('ES', {
+      ensureBootstrap: false,
+    });
+    expect(restoreRemoteAccountForCurrentSession).toHaveBeenCalled();
+    const bootstrapCall = (bootstrapRemoteAccount as jest.Mock).mock
+      .invocationCallOrder[0];
+    const countryCall = (syncOwnCountry as jest.Mock).mock
+      .invocationCallOrder[0];
+    const restoreCall = (restoreRemoteAccountForCurrentSession as jest.Mock)
+      .mock.invocationCallOrder[0];
+    if (
+      bootstrapCall === undefined ||
+      countryCall === undefined ||
+      restoreCall === undefined
+    ) {
+      throw new Error('Falta una llamada esperada en la inicialización');
+    }
+    expect(bootstrapCall).toBeLessThan(countryCall);
+    expect(countryCall).toBeLessThan(restoreCall);
   });
 });
