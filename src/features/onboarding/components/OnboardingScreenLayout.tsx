@@ -1,4 +1,4 @@
-import type { PropsWithChildren, ReactNode } from 'react';
+import { useState, type PropsWithChildren, type ReactNode } from 'react';
 import {
   Image,
   type ImageSourcePropType,
@@ -14,6 +14,7 @@ import { Screen } from '@/components/layout/Screen/Screen';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { OnboardingProgressIndicator } from '@/features/onboarding/components/OnboardingProgressIndicator';
+import { useOnboardingFlow } from '@/features/onboarding/context/OnboardingFlowContext';
 import {
   estimateRevealDuration,
   OnboardingRevealText,
@@ -24,6 +25,7 @@ import { layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { getDisclosureLayoutTransition } from '@/theme/transitions';
+import { Text } from '@/components/ui/Text/Text';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -115,10 +117,25 @@ export function OnboardingScreenLayout({
   const density = useLayoutDensity();
   const { width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReduceMotionPreference();
+  const onboardingFlow = useOnboardingFlow();
+  const [isSkipping, setSkipping] = useState(false);
   const subtitleDelay =
     estimateRevealDuration() + motion.onboardingTextRevealBlockPause;
   const layoutTransition = getDisclosureLayoutTransition();
   const raiseActions = isCompact && compactRaisesActions;
+  const canSkip = currentStep >= 3 && onboardingFlow !== null;
+
+  const handleSkip = async () => {
+    if (!onboardingFlow || isSkipping) return;
+
+    setSkipping(true);
+    try {
+      await onboardingFlow.completeOnboarding();
+    } catch (error) {
+      console.error('[onboarding] No se pudo omitir el onboarding', error);
+      setSkipping(false);
+    }
+  };
 
   const illustrationStyle = (() => {
     if (illustrationFullBleed) {
@@ -166,7 +183,24 @@ export function OnboardingScreenLayout({
         style={styles.dismissArea}
         testID={testID ? `${testID}-dismiss-area` : undefined}
       >
-        <OnboardingProgressIndicator currentStep={currentStep} />
+        <View style={styles.topBar}>
+          <OnboardingProgressIndicator currentStep={currentStep} />
+          {canSkip ? (
+            <Pressable
+              accessibilityLabel="Omitir onboarding"
+              accessibilityRole="button"
+              disabled={isSkipping}
+              hitSlop={spacing.sm}
+              onPress={() => void handleSkip()}
+              style={styles.skipAction}
+              testID={testID ? `${testID}-skip` : undefined}
+            >
+              <Text tone="secondary" variant="label" weight="medium">
+                {isSkipping ? 'Omitiendo…' : 'Omitir'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
         <Animated.View
           layout={layoutTransition}
           style={isCompact ? styles.headerCompact : styles.header}
@@ -255,6 +289,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.huge + spacing.lg,
   },
   dismissArea: { flex: 1, gap: spacing.xxl },
+  topBar: { alignItems: 'center', flexDirection: 'row' },
+  skipAction: { marginLeft: 'auto', minHeight: 44, justifyContent: 'center' },
   header: { gap: spacing.xxl },
   headerCompact: {
     flexDirection: 'row',

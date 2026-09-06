@@ -10,6 +10,7 @@ import { JuntosScreen } from '@/features/onboarding/screens/JuntosScreen';
 import { NameScreen } from '@/features/onboarding/screens/NameScreen';
 import { ReadyToExploreScreen } from '@/features/onboarding/screens/ReadyToExploreScreen';
 import { WelcomeScreen } from '@/features/onboarding/screens/WelcomeScreen';
+import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { preloadOnboardingIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
 
 export type OnboardingStackParamList = {
@@ -51,25 +52,37 @@ export function OnboardingNavigator({ onComplete }: OnboardingNavigatorProps) {
   if (!areIllustrationsReady) return null;
 
   return (
-    <Stack.Navigator screenOptions={{ animation: 'fade', headerShown: false }}>
-      <Stack.Screen
-        component={NameScreen}
-        name="Name"
-        options={{ gestureEnabled: false }}
-      />
-      <Stack.Screen component={CountryScreen} name="Country" />
-      <Stack.Screen component={WelcomeScreen} name="Welcome" />
-      <Stack.Screen component={CalendarPreviewScreen} name="CalendarPreview" />
-      <Stack.Screen component={JuntosScreen} name="Juntos" />
-      <Stack.Screen
-        component={CreateFirstCategoryScreen}
-        name="CreateFirstCategory"
-      />
-      <Stack.Screen component={AddFirstIncomeScreen} name="AddFirstIncome" />
-      <Stack.Screen component={AddFirstExpenseScreen} name="AddFirstExpense" />
-      <Stack.Screen name="ReadyToExplore">
-        {(props) => <ReadyToExploreScreen {...props} onComplete={onComplete} />}
-      </Stack.Screen>
-    </Stack.Navigator>
+    <OnboardingFlowContext.Provider value={{ completeOnboarding: onComplete }}>
+      <Stack.Navigator
+        screenOptions={{ animation: 'fade', headerShown: false }}
+      >
+        <Stack.Screen
+          component={NameScreen}
+          name="Name"
+          options={{ gestureEnabled: false }}
+        />
+        <Stack.Screen component={CountryScreen} name="Country" />
+        <Stack.Screen component={WelcomeScreen} name="Welcome" />
+        <Stack.Screen
+          component={CalendarPreviewScreen}
+          name="CalendarPreview"
+        />
+        <Stack.Screen component={JuntosScreen} name="Juntos" />
+        <Stack.Screen
+          component={CreateFirstCategoryScreen}
+          name="CreateFirstCategory"
+        />
+        <Stack.Screen component={AddFirstIncomeScreen} name="AddFirstIncome" />
+        <Stack.Screen
+          component={AddFirstExpenseScreen}
+          name="AddFirstExpense"
+        />
+        <Stack.Screen name="ReadyToExplore">
+          {(props) => (
+            <ReadyToExploreScreen {...props} onComplete={onComplete} />
+          )}
+        </Stack.Screen>
+      </Stack.Navigator>
+    </OnboardingFlowContext.Provider>
   );
 }

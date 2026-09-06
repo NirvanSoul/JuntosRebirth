@@ -364,7 +364,8 @@ Cada pantalla debe incluir:
   posterior, incluida la lámina de bienvenida/simplicidad. Solo la primera
   pantalla (captura de nombre) no lo muestra, porque no hay nada anterior a
   donde volver.
-- Opción de omitir, si el diseño la incluye.
+- Opción **Omitir** en la esquina superior derecha desde la tercera pantalla:
+  solo se habilita después de guardar nombre y país y lleva a Acceso.
 
 ## Textos recomendados
 

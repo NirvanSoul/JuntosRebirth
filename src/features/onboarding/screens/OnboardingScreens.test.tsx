@@ -3,16 +3,13 @@ import { Keyboard } from 'react-native';
 
 import { CountryScreen } from '@/features/onboarding/screens/CountryScreen';
 import { NameScreen } from '@/features/onboarding/screens/NameScreen';
+import { WelcomeScreen } from '@/features/onboarding/screens/WelcomeScreen';
+import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
-import { saveCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
   saveLocalProfileDisplayName: jest.fn(),
-}));
-
-jest.mock('@/state/appPreferences/currencyPreferencesRepository', () => ({
-  saveCurrencyPreferences: jest.fn(),
 }));
 
 jest.mock('@/features/profile/services/updateProfileCountry', () => ({
@@ -20,15 +17,30 @@ jest.mock('@/features/profile/services/updateProfileCountry', () => ({
 }));
 
 const mockUpdateProfileCountry = updateProfileCountry as jest.Mock;
-const mockSaveCurrencyPreferences = saveCurrencyPreferences as jest.Mock;
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 const navigation = mockNavigation as never;
 const route = {} as never;
+const completeOnboarding = jest.fn(async (): Promise<void> => undefined);
 
 describe('pantallas de onboarding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUpdateProfileCountry.mockResolvedValue(undefined);
+  });
+
+  it('permite omitir desde la bienvenida, después de guardar nombre y país', async () => {
+    const screen = await renderWithTheme(
+      <OnboardingFlowContext.Provider value={{ completeOnboarding }}>
+        <WelcomeScreen navigation={navigation} route={route} />
+      </OnboardingFlowContext.Provider>,
+    );
+
+    fireEvent.press(screen.getByTestId('onboarding-welcome-skip'));
+
+    await waitFor(() => {
+      expect(completeOnboarding).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('cierra el teclado al tocar fuera del campo de nombre', async () => {
@@ -101,7 +113,7 @@ describe('pantallas de onboarding', () => {
     expect(screen.queryByTestId('onboarding-country-selected')).toBeNull();
   });
 
-  it('al elegir Venezuela guarda el país y la moneda en bolívares con una sola respuesta', async () => {
+  it('al elegir Venezuela activa su contexto monetario con una sola respuesta', async () => {
     const screen = await renderWithTheme(
       <CountryScreen navigation={navigation} route={route} />,
     );
@@ -124,9 +136,6 @@ describe('pantallas de onboarding', () => {
 
     await waitFor(() => {
       expect(mockNavigation.navigate).toHaveBeenCalledWith('Welcome');
-    });
-    expect(mockSaveCurrencyPreferences).toHaveBeenCalledWith({
-      currencies: ['VES'],
     });
     expect(mockUpdateProfileCountry).toHaveBeenCalledWith('VE');
   });
