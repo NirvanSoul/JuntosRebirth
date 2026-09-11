@@ -147,6 +147,12 @@ aviso global: confirmaciones, avisos recuperables y sin conexión, con tono y
 acción opcional) ofrece "Reintentar"; sin conexión se reintenta también al
 recuperar la red, y un 401 cierra sesión sin aviso.
 
+### Diagnóstico de arranque y optimización de bundle
+
+Para medir el rendimiento del arranque en desarrollo, `src/lib/diagnostics/startupTrace.ts` registra marcas temporales clave (`bundle_evaluated`, `fonts_ready`, `session_ready`, `local_finance_ready`, `init_done`) e imprime una tabla diagnóstica en `console.info` al completarse la inicialización (no-op en producción).
+
+La configuración de Metro (`metro.config.js`) activa `inlineRequires: true` para diferir la evaluación de módulos hasta su primer uso, acelerando la llegada a la primera pintura y a `local_finance_ready`. Los efectos de módulo secundarios (como `ensureNotificationHandlerRegistered`) se ejecutan dentro del ciclo de vida de React (`useEffect` en `AppBootstrap`) para evitar efectos colaterales prematuros.
+
 ---
 
 ## 5. `src/navigation/`

@@ -1,5 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { linking } from '@/navigation/linking';
@@ -13,6 +13,7 @@ import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import { fontFamily } from '@/theme/fonts';
+import { markStartup } from '@/lib/diagnostics/startupTrace';
 
 export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   const { colors, isDark, isReady: isThemeReady } = useTheme();
@@ -23,6 +24,12 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     hasCompleted: hasCompletedOnboarding,
     isReady: isOnboardingReady,
   } = useOnboardingCompletion();
+
+  useEffect(() => {
+    if (isAuthReady) {
+      markStartup('session_ready');
+    }
+  }, [isAuthReady]);
 
   const navigationTheme = useMemo(
     () => ({
