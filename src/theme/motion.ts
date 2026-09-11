@@ -1,5 +1,6 @@
 export const motion = {
-  loadingPulseDuration: 900,
+  loadingBarDuration: 900,
+  loadingTransitionDuration: 280,
   categoryPageIndicatorSpring: {
     dampingRatio: 0.62,
     duration: 680,

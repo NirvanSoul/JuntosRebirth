@@ -107,10 +107,14 @@ No contiene lógica específica de movimientos, categorías o espacios.
 El arranque monta `RootNavigator` mientras Expo carga las fuentes: la lectura
 de sesión y de la marca de onboarding empieza en paralelo. La navegación sigue
 bloqueada hasta completar esas tres condiciones y conserva la exigencia de
-correo verificado. `LoadingState` muestra una espera indeterminada compartida
+correo verificado. `LoadingState` muestra una barra indeterminada compartida
 con la preparación del espacio, sin texto hasta disponer de las fuentes, con
 colores del tema y movimiento reducido del sistema mediante Reanimated.
-No impone una duración mínima ni espera a terminar la animación para continuar.
+Al estar listos los espacios y las finanzas, la barra sale hacia la izquierda
+y el contenido entra desde la derecha simultáneamente en 280 ms. El contenido
+se monta solo cuando está listo; la animación no controla la disponibilidad
+de datos ni impone una espera mínima. Con movimiento reducido se omiten tanto
+el recorrido de la barra como el deslizamiento de entrada y salida.
 Las ilustraciones del onboarding se precargan solo al montar ese flujo, en
 segundo plano; su primera pantalla no depende de completar toda la precarga.
 La inicialización y sincronización de la cuenta mantienen su orden actual.

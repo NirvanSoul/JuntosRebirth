@@ -912,13 +912,7 @@ export function MainTabsNavigator() {
       .catch(showSaveError);
   };
 
-  if (!isReady || !isFinanceReady) {
-    return (
-      <LoadingState label="Preparando tu espacio" testID="spaces-loading" />
-    );
-  }
-
-  return (
+  const content = (
     <SpaceMembershipProvider space={activeSpace}>
       <Drawer.Navigator
         drawerContent={({ navigation }) => (
@@ -1374,5 +1368,11 @@ export function MainTabsNavigator() {
         visible={isInvitePartnerVisible}
       />
     </SpaceMembershipProvider>
+  );
+
+  return (
+    <LoadingState loading={!isReady || !isFinanceReady} testID="spaces-loading">
+      {content}
+    </LoadingState>
   );
 }
