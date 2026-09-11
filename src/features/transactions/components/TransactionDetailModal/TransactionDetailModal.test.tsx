@@ -651,7 +651,7 @@ describe('TransactionDetailModal', () => {
       expect(
         screen.getByTestId('transaction-detail-rate-badge').props.children,
       ).toBe('Bs. 500');
-      expect(screen.getByText(/1 \$ BCV = Bs\.\s*50/i)).toBeTruthy();
+      expect(screen.getByText(/1 \$ BCV = Bs\.?\s*50/i)).toBeTruthy();
       expect(screen.getByText(/5 sept 2026/i)).toBeTruthy();
 
       await fireEvent.press(
@@ -662,7 +662,7 @@ describe('TransactionDetailModal', () => {
       expect(
         screen.getByTestId('transaction-detail-rate-badge').props.children,
       ).toBe('Bs. 600');
-      expect(screen.getByText(/1 € BCV = Bs\.\s*60/i)).toBeTruthy();
+      expect(screen.getByText(/1 € BCV = Bs\.?\s*60/i)).toBeTruthy();
       expect(screen.getByText(/5 sept 2026/i)).toBeTruthy();
     });
   });

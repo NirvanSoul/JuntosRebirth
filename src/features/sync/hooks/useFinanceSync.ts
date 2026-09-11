@@ -29,7 +29,10 @@ type FinanceSyncController = {
   /** Vuelca la caché local de SQLite al estado de la pantalla. */
   reloadLocalFinance: () => Promise<void>;
   /** Sube lo pendiente y baja el snapshot remoto; sin `spaceId`, de todos. */
-  refreshSharedCoupleData: (spaceId?: string) => Promise<void>;
+  refreshSharedCoupleData: (
+    spaceId?: string,
+    options?: { mode?: 'full' | 'delta' },
+  ) => Promise<void>;
   /** Comprueba el espacio de pareja antes de sincronizar sus datos. */
   refreshCoupleSpaceAndData: () => Promise<void>;
   /** Recarga tras un cambio de país, que activa otro contexto financiero. */
@@ -93,7 +96,10 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
   }, [session, spaces]);
 
   const refreshSharedCoupleData = useCallback(
-    async (spaceId?: string): Promise<void> => {
+    async (
+      spaceId?: string,
+      options?: { mode?: 'full' | 'delta' },
+    ): Promise<void> => {
       if (!session) return;
 
       if (spaceId) {
@@ -110,15 +116,21 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
       }
 
       try {
-        await restoreRemoteAccountForCurrentSession();
-        await reloadLocalFinance();
+        const mode = options?.mode ?? 'full';
+        const restored = await restoreRemoteAccountForCurrentSession({ mode });
+        if (restored.outcome.catalogueChanged) {
+          await reloadSpaces();
+        }
+        if (mode === 'full' || restored.outcome.receivedRows > 0) {
+          await reloadLocalFinance();
+        }
       } catch (error) {
         console.error('[sync] Restauración remota falló:', error);
         // Un 401 tardío de una instancia desmontada pertenece a la sesión anterior.
         if (isMountedRef.current) void endExpiredSession(error);
       }
     },
-    [reloadLocalFinance, session, syncAllUserSpaces, spaces],
+    [reloadLocalFinance, reloadSpaces, session, syncAllUserSpaces, spaces],
   );
 
   const refreshCoupleSpaceAndData = useCallback(async (): Promise<void> => {

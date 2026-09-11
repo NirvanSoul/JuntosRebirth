@@ -8,15 +8,22 @@ import {
   classifySyncFailure,
   type SyncFailureKind,
 } from '@/features/sync/services/syncFailure';
+import {
+  useSharedDataPolling,
+  sharedDataMaxBackoffMs,
+  sharedDataRefreshIntervalMs,
+} from '@/features/sync/hooks/useSharedDataPolling';
 import { listLocalNotificationRules } from '@/features/transactions/repositories/localTransactionNotificationRuleRepository';
 import type { TransactionNotificationRule } from '@/features/transactions/types';
 import { useNetworkAvailability } from '@/hooks/useNetworkAvailability';
 
-/** Cadencia con la que se baja el snapshot compartido mientras la app está abierta. */
-export const sharedDataRefreshIntervalMs = 15_000;
+export { sharedDataMaxBackoffMs, sharedDataRefreshIntervalMs };
 
 type SessionStartupInput = {
-  refreshSharedCoupleData: () => Promise<void>;
+  refreshSharedCoupleData: (
+    partition?: string,
+    options?: { mode?: 'full' | 'delta' },
+  ) => Promise<void>;
   reloadLocalFinance: () => Promise<void>;
   reloadSpaces: () => Promise<void>;
   session: BetterAuthSession | null;
@@ -162,16 +169,10 @@ export function useSessionStartup(
     }
   }, [isOffline, retrySession, syncIssue?.kind]);
 
-  useEffect(() => {
-    if (!isSessionSynced || !session) return;
-
-    // La inicialización acaba de dejar el snapshot en SQLite: el primer
-    // refresco espera un intervalo completo en vez de repetirlo al instante.
-    const refreshTimer = setInterval(() => {
-      void refreshSharedCoupleData();
-    }, sharedDataRefreshIntervalMs);
-    return () => clearInterval(refreshTimer);
-  }, [isSessionSynced, refreshSharedCoupleData, session]);
+  useSharedDataPolling({
+    enabled: isSessionSynced && Boolean(session),
+    onPoll: () => refreshSharedCoupleData(undefined, { mode: 'delta' }),
+  });
 
   return { dismissSyncIssue, isFinanceReady, retrySession, syncIssue };
 }

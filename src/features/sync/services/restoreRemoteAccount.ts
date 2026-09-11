@@ -1,17 +1,26 @@
-import { type RemoteAccountSnapshot } from '@/features/sync/gateways/juntossRemoteAccountGateway';
 import {
-  loadRemoteEntityLinks,
-  type RemoteEntityType,
-  upsertRemoteEntityLink,
-} from '@/features/sync/repositories/localRemoteEntityLinkRepository';
-import type { LocalSqlExecutor } from '@/lib/storage/localSqlExecutor';
+  applyRemoteCollections,
+  createLinkResolver,
+} from '@/features/sync/services/applyRemoteCollections';
+import {
+  fetchRemoteAccountChanges,
+  fetchRemoteAccountSnapshot,
+  type RemoteAccountChanges,
+  type RemoteAccountSnapshot,
+} from '@/features/sync/gateways/juntossRemoteAccountGateway';
+import {
+  readRemoteChangesCursor,
+  type RemoteChangesCursor,
+  writeRemoteChangesCursor,
+} from '@/features/sync/repositories/localSyncCursorRepository';
 import { updateSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import type { Space } from '@/features/spaces/types';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
-import { fetchRemoteAccountSnapshot } from '@/features/sync/gateways/juntossRemoteAccountGateway';
 import { fetchRemoteImportReviews } from '@/features/import/gateways/juntossImportReviewGateway';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { restoreRemoteImportReviews } from '@/features/sync/services/restoreRemoteImportReviews';
+
+export { applyRemoteCollections };
 
 export type RestoredRemoteAccount = {
   spaces: readonly Space[];
@@ -19,31 +28,24 @@ export type RestoredRemoteAccount = {
   localSpaceIdByRemoteId: ReadonlyMap<string, string>;
 };
 
-const restoreInFlightByUserId = new Map<
-  string,
-  Promise<RestoredRemoteAccount>
->();
+export type RestoreOutcome = {
+  mode: 'full' | 'delta';
+  receivedRows: number;
+  catalogueChanged: boolean;
+};
 
-/**
- * Traduce ids remotos a locales con los enlaces ya cargados en memoria. El
- * enlace existente manda; si no lo hay, el id local es el remoto. Cada enlace
- * se escribe igualmente para refrescar `updated_at`, pero sin releerlo: el
- * enlace de cada fila pasa de tres sentencias SQLite (buscar, escribir,
- * releer) a una, lo que en una cuenta con miles de movimientos es la mayor
- * parte del coste local del snapshot.
- */
-async function createLinkResolver(input: {
-  executor: LocalSqlExecutor;
-  userId: string;
-  entityType: RemoteEntityType;
-}): Promise<(remoteId: string) => Promise<string>> {
-  const links = await loadRemoteEntityLinks(input);
-  return async (remoteId) => {
-    const localId = links.get(remoteId) ?? remoteId;
-    await upsertRemoteEntityLink({ ...input, remoteId, localId });
-    return localId;
-  };
-}
+export type RestoredRemoteAccountWithOutcome = RestoredRemoteAccount & {
+  outcome: RestoreOutcome;
+};
+
+type InFlightRestore = {
+  mode: 'full' | 'delta';
+  task: Promise<RestoredRemoteAccountWithOutcome>;
+};
+
+const restoreInFlightByUserId = new Map<string, InFlightRestore>();
+
+const CURSOR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export async function restoreRemoteAccount(input: {
   userId: string;
@@ -59,35 +61,26 @@ export async function restoreRemoteAccount(input: {
     entityType: 'space',
   });
   for (const remoteSpace of input.snapshot.spaces) {
-    // Un contexto personal por país tiene un espacio remoto distinto. Reusar
-    // el id local fijo `personal` mezclaría, por ejemplo, España y Venezuela.
-    // Las cuentas previas conservan su enlace histórico hacia `personal`; los
-    // contextos nuevos usan su UUID remoto como id local.
-    const localId = await linkSpace(remoteSpace.remoteId);
+    const localId = (await linkSpace(remoteSpace.remoteId))!;
     localSpaceIdByRemoteId.set(remoteSpace.remoteId, localId);
     remoteSpaces.push({
       id: localId,
       name: remoteSpace.name,
       type: remoteSpace.type,
       currency: remoteSpace.currency,
-      // El snapshot es fuente completa: un espacio juntos sin activar sigue
-      // esperando a la pareja, y así no depende de otra petición.
       ...(remoteSpace.type === 'couple'
         ? { isAwaitingPartner: remoteSpace.activatedAt === null }
         : {}),
     });
   }
 
-  // El servidor filtra este snapshot al país activo. No se conservan aquí
-  // espacios ausentes: podrían pertenecer al contexto financiero anterior y
-  // volver a exponer sus categorías, cuentas o movimientos en la interfaz.
   const spaces = remoteSpaces;
   const personalSpace = spaces.find((space) => space.type === 'personal');
   const fallbackActiveSpaceId = personalSpace?.id ?? spaces[0]?.id;
-  if (!fallbackActiveSpaceId)
+  if (!fallbackActiveSpaceId) {
     throw new Error('La cuenta remota no tiene espacios activos');
-  // La selección activa se decide sobre lo guardado en el instante de
-  // escribir, dentro de la cola del catálogo.
+  }
+
   await updateSpaces((stored) => ({
     spaces,
     activeSpaceId: spaces.some((space) => space.id === stored.activeSpaceId)
@@ -95,272 +88,256 @@ export async function restoreRemoteAccount(input: {
       : fallbackActiveSpaceId,
   }));
 
-  const localCategoryIdByRemoteId = new Map<string, string>();
-  const localMoneyAccountIdByRemoteId = new Map<string, string>();
   const currencyBySpaceRemoteId = new Map(
     input.snapshot.spaces.map((space) => [space.remoteId, space.currency]),
   );
+
+  let localCategoryIdByRemoteId = new Map<string, string>();
   await database.withExclusiveTransactionAsync(async (transaction) => {
-    const linkCategory = await createLinkResolver({
-      executor: transaction,
+    const result = await applyRemoteCollections(transaction, {
       userId: input.userId,
-      entityType: 'category',
+      collections: input.snapshot,
+      localSpaceIdByRemoteId,
+      currencyBySpaceRemoteId,
+      linkMode: 'full',
     });
-    const linkMoneyAccount = await createLinkResolver({
-      executor: transaction,
-      userId: input.userId,
-      entityType: 'money_account',
-    });
-    const linkTransaction = await createLinkResolver({
-      executor: transaction,
-      userId: input.userId,
-      entityType: 'transaction',
-    });
-
-    for (const remoteCategory of input.snapshot.categories) {
-      const spaceId = localSpaceIdByRemoteId.get(remoteCategory.spaceRemoteId);
-      if (!spaceId) continue;
-      const categoryId = await linkCategory(remoteCategory.remoteId);
-      localCategoryIdByRemoteId.set(remoteCategory.remoteId, categoryId);
-      await transaction.runAsync(
-        `INSERT INTO categories (
-           id, space_id, name, icon, color_token, budget_minor, is_default,
-           template_key, note, source_category_id, created_by, sync_status,
-           is_archived, created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 'synced', ?, ?, ?, NULL)
-         ON CONFLICT (id) DO UPDATE SET
-           space_id = excluded.space_id, name = excluded.name,
-           icon = excluded.icon, color_token = excluded.color_token,
-           budget_minor = excluded.budget_minor,
-           is_default = excluded.is_default, template_key = excluded.template_key,
-           is_archived = excluded.is_archived, updated_at = excluded.updated_at
-         WHERE categories.sync_status = 'synced'`,
-        categoryId,
-        spaceId,
-        remoteCategory.name,
-        remoteCategory.icon,
-        remoteCategory.colorToken,
-        remoteCategory.budgets.find(
-          (budget) =>
-            budget.currency ===
-            currencyBySpaceRemoteId.get(remoteCategory.spaceRemoteId),
-        )?.budgetMinor ?? null,
-        remoteCategory.isDefault ? 1 : 0,
-        remoteCategory.templateKey,
-        remoteCategory.remoteId,
-        input.userId,
-        remoteCategory.isArchived ? 1 : 0,
-        remoteCategory.createdAt,
-        remoteCategory.updatedAt,
-      );
-
-      for (const budget of remoteCategory.budgets) {
-        await transaction.runAsync(
-          `INSERT INTO category_budgets (
-             id, category_id, currency, budget_minor, sync_status,
-             created_at, updated_at
-           ) VALUES (?, ?, ?, ?, 'synced', ?, ?)
-           ON CONFLICT (category_id, currency) DO UPDATE SET
-             budget_minor = excluded.budget_minor,
-             updated_at = excluded.updated_at
-           WHERE category_budgets.sync_status = 'synced'`,
-          `${categoryId}:${budget.currency}`,
-          categoryId,
-          budget.currency,
-          budget.budgetMinor,
-          remoteCategory.createdAt,
-          remoteCategory.updatedAt,
-        );
-      }
-    }
-    for (const remoteAccount of input.snapshot.moneyAccounts) {
-      const spaceId = localSpaceIdByRemoteId.get(remoteAccount.spaceRemoteId);
-      if (!spaceId) continue;
-      const moneyAccountId = await linkMoneyAccount(remoteAccount.remoteId);
-      localMoneyAccountIdByRemoteId.set(remoteAccount.remoteId, moneyAccountId);
-      await transaction.runAsync(
-        `INSERT INTO money_accounts (
-           id, space_id, name, kind, icon, color_token, currency,
-           opening_balance_minor, created_by, sync_status, is_archived,
-           created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'synced', ?, ?, ?, NULL)
-         ON CONFLICT (id) DO UPDATE SET
-           space_id = excluded.space_id, name = excluded.name,
-           kind = excluded.kind, icon = excluded.icon,
-           color_token = excluded.color_token, currency = excluded.currency,
-           is_archived = excluded.is_archived, updated_at = excluded.updated_at
-         WHERE money_accounts.sync_status = 'synced'`,
-        moneyAccountId,
-        spaceId,
-        remoteAccount.name,
-        remoteAccount.kind,
-        remoteAccount.icon,
-        remoteAccount.colorToken,
-        remoteAccount.currency,
-        input.userId,
-        remoteAccount.isArchived ? 1 : 0,
-        remoteAccount.createdAt,
-        remoteAccount.updatedAt,
-      );
-
-      await transaction.runAsync(
-        `DELETE FROM money_account_balances WHERE money_account_id = ?`,
-        moneyAccountId,
-      );
-      for (const [position, balance] of remoteAccount.balances.entries()) {
-        await transaction.runAsync(
-          `INSERT INTO money_account_balances (
-             id, money_account_id, currency, opening_balance_minor, position,
-             created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          `${moneyAccountId}--${balance.currency}`,
-          moneyAccountId,
-          balance.currency,
-          balance.openingBalanceMinor,
-          position,
-          remoteAccount.createdAt,
-          remoteAccount.updatedAt,
-        );
-      }
-    }
-    for (const series of input.snapshot.recurringSeries) {
-      const spaceId = localSpaceIdByRemoteId.get(series.spaceRemoteId);
-      const categoryId = localCategoryIdByRemoteId.get(series.categoryRemoteId);
-      if (!spaceId || !categoryId) continue;
-      await transaction.runAsync(
-        `INSERT INTO recurring_transaction_series (
-           id, space_id, category_id, money_account_id, created_by, type,
-           amount_minor, currency,
-           title, frequency, starts_on, generated_occurrences, next_occurrence_on,
-           sync_status, is_archived, created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?, ?, ?)
-         ON CONFLICT (id) DO UPDATE SET
-           category_id = excluded.category_id,
-           money_account_id = excluded.money_account_id, type = excluded.type,
-           amount_minor = excluded.amount_minor, currency = excluded.currency,
-           title = excluded.title, frequency = excluded.frequency,
-           starts_on = excluded.starts_on,
-           generated_occurrences = excluded.generated_occurrences,
-           next_occurrence_on = excluded.next_occurrence_on,
-           is_archived = excluded.is_archived, updated_at = excluded.updated_at,
-           archived_at = excluded.archived_at
-         WHERE recurring_transaction_series.sync_status = 'synced'`,
-        series.remoteId,
-        spaceId,
-        categoryId,
-        (series.moneyAccountRemoteId
-          ? localMoneyAccountIdByRemoteId.get(series.moneyAccountRemoteId)
-          : null) ?? null,
-        // La API permite movimientos antiguos sin autor. SQLite no: al
-        // restaurarlos se atribuyen a la cuenta propietaria de esta copia.
-        series.createdBy ?? input.userId,
-        series.type,
-        series.amountMinor,
-        series.currency,
-        series.title,
-        series.frequency,
-        series.startsOn,
-        series.generatedOccurrences,
-        series.nextOccurrenceOn,
-        series.isArchived ? 1 : 0,
-        series.createdAt,
-        series.updatedAt,
-        series.archivedAt,
-      );
-    }
-    for (const remoteTransaction of input.snapshot.transactions) {
-      const spaceId = localSpaceIdByRemoteId.get(
-        remoteTransaction.spaceRemoteId,
-      );
-      const categoryId = localCategoryIdByRemoteId.get(
-        remoteTransaction.categoryRemoteId,
-      );
-      if (!spaceId || !categoryId) continue;
-      const transactionId = await linkTransaction(remoteTransaction.remoteId);
-      await transaction.runAsync(
-        `INSERT INTO transactions (
-           id, space_id, category_id, money_account_id, created_by, type,
-           amount_minor, currency,
-           title, occurred_on, recurrence, recurrence_group_id,
-           recurrence_series_id, source_transaction_id, note, sync_status,
-           accounting_amount_minor_usd, exchange_snapshot_json,
-           is_archived, created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                   'synced', ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (id) DO UPDATE SET
-           category_id = excluded.category_id,
-           money_account_id = excluded.money_account_id, type = excluded.type,
-           amount_minor = excluded.amount_minor, currency = excluded.currency,
-           title = excluded.title, occurred_on = excluded.occurred_on,
-           recurrence = excluded.recurrence,
-           recurrence_group_id = excluded.recurrence_group_id,
-           recurrence_series_id = excluded.recurrence_series_id,
-           note = excluded.note,
-           accounting_amount_minor_usd = excluded.accounting_amount_minor_usd,
-           exchange_snapshot_json = excluded.exchange_snapshot_json,
-           is_archived = excluded.is_archived, updated_at = excluded.updated_at,
-           archived_at = excluded.archived_at
-         WHERE transactions.sync_status = 'synced'`,
-        transactionId,
-        spaceId,
-        categoryId,
-        (remoteTransaction.moneyAccountRemoteId
-          ? localMoneyAccountIdByRemoteId.get(
-              remoteTransaction.moneyAccountRemoteId,
-            )
-          : null) ?? null,
-        remoteTransaction.createdBy ?? input.userId,
-        remoteTransaction.type,
-        remoteTransaction.amountMinor,
-        remoteTransaction.currency,
-        remoteTransaction.title,
-        remoteTransaction.occurredOn,
-        remoteTransaction.recurrence,
-        remoteTransaction.recurrenceGroupId,
-        remoteTransaction.recurrenceSeriesRemoteId,
-        remoteTransaction.sourceTransactionId,
-        remoteTransaction.note,
-        remoteTransaction.accountingAmountMinorUsd ?? null,
-        remoteTransaction.exchangeSnapshot
-          ? JSON.stringify(remoteTransaction.exchangeSnapshot)
-          : null,
-        remoteTransaction.isArchived ? 1 : 0,
-        remoteTransaction.createdAt,
-        remoteTransaction.updatedAt,
-        remoteTransaction.archivedAt,
-      );
-    }
+    localCategoryIdByRemoteId = result.localCategoryIdByRemoteId;
   });
+
+  if (input.snapshot.serverTime) {
+    const spaceRemoteIds = input.snapshot.spaces.map((s) => s.remoteId).sort();
+    await writeRemoteChangesCursor(database, input.userId, {
+      serverTime: input.snapshot.serverTime,
+      activeFinancialContextId: input.snapshot.activeFinancialContextId,
+      spaceRemoteIds,
+    });
+  }
 
   return { spaces, localCategoryIdByRemoteId, localSpaceIdByRemoteId };
 }
 
-export async function restoreRemoteAccountForCurrentSession(): Promise<RestoredRemoteAccount> {
+export type ApplyRemoteChangesResult =
+  | { needsFullRestore: true }
+  | ({ needsFullRestore?: false } & RestoredRemoteAccount & {
+        outcome: {
+          mode: 'delta';
+          receivedRows: number;
+          catalogueChanged: boolean;
+        };
+      });
+
+export async function applyRemoteChanges(input: {
+  userId: string;
+  changes: RemoteAccountChanges;
+  cursor: RemoteChangesCursor;
+}): Promise<ApplyRemoteChangesResult> {
+  const database = await getLocalDatabase();
+
+  // 1. Contexto financiero distinto → requiere restauración completa
+  if (
+    input.changes.activeFinancialContextId !==
+    input.cursor.activeFinancialContextId
+  ) {
+    return { needsFullRestore: true };
+  }
+
+  // 2. Conjunto de espacios distinto → requiere restauración completa
+  const currentSpaceRemoteIds = input.changes.spaces
+    .map((s) => s.remoteId)
+    .sort();
+  if (
+    currentSpaceRemoteIds.length !== input.cursor.spaceRemoteIds.length ||
+    currentSpaceRemoteIds.some((id, i) => id !== input.cursor.spaceRemoteIds[i])
+  ) {
+    return { needsFullRestore: true };
+  }
+
+  // 3. Guarda extra: cursor con más de 24 horas → restauración completa
+  const cursorTime = new Date(input.cursor.serverTime).getTime();
+  if (isNaN(cursorTime) || Date.now() - cursorTime > CURSOR_MAX_AGE_MS) {
+    return { needsFullRestore: true };
+  }
+
+  const localSpaceIdByRemoteId = new Map<string, string>();
+  const linkSpace = await createLinkResolver({
+    executor: database,
+    userId: input.userId,
+    entityType: 'space',
+  });
+
+  const remoteSpaces: Space[] = [];
+  for (const remoteSpace of input.changes.spaces) {
+    const localId = (await linkSpace(remoteSpace.remoteId))!;
+    localSpaceIdByRemoteId.set(remoteSpace.remoteId, localId);
+    remoteSpaces.push({
+      id: localId,
+      name: remoteSpace.name,
+      type: remoteSpace.type,
+      currency: remoteSpace.currency,
+      ...(remoteSpace.type === 'couple'
+        ? { isAwaitingPartner: remoteSpace.activatedAt === null }
+        : {}),
+    });
+  }
+
+  const spaces = remoteSpaces;
+  let catalogueChanged = false;
+
+  await updateSpaces((stored) => {
+    catalogueChanged =
+      spaces.length !== stored.spaces.length ||
+      spaces.some((incoming) => {
+        const matching = stored.spaces.find((s) => s.id === incoming.id);
+        if (!matching) return true;
+        return (
+          matching.name !== incoming.name ||
+          matching.currency !== incoming.currency ||
+          matching.isAwaitingPartner !== incoming.isAwaitingPartner
+        );
+      });
+
+    if (!catalogueChanged) return stored;
+
+    const personalSpace = spaces.find((space) => space.type === 'personal');
+    const fallbackActiveSpaceId = personalSpace?.id ?? spaces[0]?.id;
+    return {
+      spaces,
+      activeSpaceId: spaces.some((space) => space.id === stored.activeSpaceId)
+        ? stored.activeSpaceId
+        : (fallbackActiveSpaceId ?? stored.activeSpaceId),
+    };
+  });
+
+  const currencyBySpaceRemoteId = new Map(
+    input.changes.spaces.map((space) => [space.remoteId, space.currency]),
+  );
+
+  const totalDeltaRows =
+    input.changes.categories.length +
+    input.changes.moneyAccounts.length +
+    input.changes.recurringSeries.length +
+    input.changes.transactions.length;
+
+  if (totalDeltaRows === 0) {
+    await writeRemoteChangesCursor(database, input.userId, {
+      serverTime: input.changes.serverTime,
+      activeFinancialContextId: input.changes.activeFinancialContextId,
+      spaceRemoteIds: currentSpaceRemoteIds,
+    });
+    return {
+      needsFullRestore: false,
+      spaces,
+      localCategoryIdByRemoteId: new Map(),
+      localSpaceIdByRemoteId,
+      outcome: { mode: 'delta', receivedRows: 0, catalogueChanged },
+    };
+  }
+
+  let appliedResult: {
+    receivedRows: number;
+    localCategoryIdByRemoteId: Map<string, string>;
+  };
+  await database.withExclusiveTransactionAsync(async (transaction) => {
+    appliedResult = await applyRemoteCollections(transaction, {
+      userId: input.userId,
+      collections: input.changes,
+      localSpaceIdByRemoteId,
+      currencyBySpaceRemoteId,
+      linkMode: 'delta',
+    });
+  });
+
+  await writeRemoteChangesCursor(database, input.userId, {
+    serverTime: input.changes.serverTime,
+    activeFinancialContextId: input.changes.activeFinancialContextId,
+    spaceRemoteIds: currentSpaceRemoteIds,
+  });
+
+  return {
+    needsFullRestore: false,
+    spaces,
+    localCategoryIdByRemoteId: appliedResult!.localCategoryIdByRemoteId,
+    localSpaceIdByRemoteId,
+    outcome: {
+      mode: 'delta',
+      receivedRows: appliedResult!.receivedRows,
+      catalogueChanged,
+    },
+  };
+}
+
+export async function restoreRemoteAccountForCurrentSession(options?: {
+  mode?: 'full' | 'delta';
+}): Promise<RestoredRemoteAccountWithOutcome> {
   const userId = await getAuthenticatedUserId();
   if (!userId) {
     throw new Error('Debes iniciar sesión antes de restaurar tus datos');
   }
 
+  const requestedMode = options?.mode ?? 'full';
   const existing = restoreInFlightByUserId.get(userId);
-  if (existing) return existing;
 
-  let task: Promise<RestoredRemoteAccount>;
-  task = (async () => {
-    // Las dos descargas son independientes: pedirlas a la vez ahorra una ida
-    // y vuelta completa. La API ya filtra las revisiones por usuario, así que
-    // no hace falta pasarle los espacios.
+  if (requestedMode === 'delta' && existing) {
+    return existing.task;
+  }
+  if (requestedMode === 'full' && existing?.mode === 'full') {
+    return existing.task;
+  }
+
+  const runTask = async (): Promise<RestoredRemoteAccountWithOutcome> => {
+    if (requestedMode === 'full' && existing) {
+      await existing.task.catch(() => undefined);
+    }
+
+    const database = await getLocalDatabase();
+
+    if (requestedMode === 'delta') {
+      const cursor = await readRemoteChangesCursor(database, userId);
+      if (cursor) {
+        try {
+          const changes = await fetchRemoteAccountChanges(cursor.serverTime);
+          const result = await applyRemoteChanges({ userId, changes, cursor });
+          if (!result.needsFullRestore) {
+            return result;
+          }
+        } catch (error) {
+          console.error(
+            '[sync] Delta falló, recurriendo a full restore:',
+            error,
+          );
+        }
+      }
+    }
+
+    // Full restore
     const [snapshot, reviews] = await Promise.all([
       fetchRemoteAccountSnapshot(),
       fetchRemoteImportReviews(),
     ]);
     const restored = await restoreRemoteAccount({ userId, snapshot });
     await restoreRemoteImportReviews({ reviews, restored });
-    return restored;
-  })().finally(() => {
-    if (restoreInFlightByUserId.get(userId) === task) {
+    const receivedRows =
+      snapshot.categories.length +
+      snapshot.moneyAccounts.length +
+      snapshot.recurringSeries.length +
+      snapshot.transactions.length;
+
+    return {
+      ...restored,
+      outcome: { mode: 'full', receivedRows, catalogueChanged: true },
+    };
+  };
+
+  const taskPromise = runTask().finally(() => {
+    if (restoreInFlightByUserId.get(userId)?.task === taskPromise) {
       restoreInFlightByUserId.delete(userId);
     }
   });
-  restoreInFlightByUserId.set(userId, task);
-  return task;
+
+  restoreInFlightByUserId.set(userId, {
+    mode: requestedMode,
+    task: taskPromise,
+  });
+
+  return taskPromise;
 }

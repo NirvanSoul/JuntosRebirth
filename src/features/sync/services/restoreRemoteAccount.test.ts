@@ -10,7 +10,14 @@ import {
 import { authClient } from '@/lib/auth-client';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { fetchRemoteImportReviews } from '@/features/import/gateways/juntossImportReviewGateway';
-import { fetchRemoteAccountSnapshot } from '@/features/sync/gateways/juntossRemoteAccountGateway';
+import {
+  fetchRemoteAccountChanges,
+  fetchRemoteAccountSnapshot,
+} from '@/features/sync/gateways/juntossRemoteAccountGateway';
+import {
+  readRemoteChangesCursor,
+  writeRemoteChangesCursor,
+} from '@/features/sync/repositories/localSyncCursorRepository';
 
 import {
   restoreRemoteAccount,
@@ -32,6 +39,12 @@ jest.mock('@/lib/auth-client', () => ({
 }));
 jest.mock('@/features/sync/gateways/juntossRemoteAccountGateway', () => ({
   fetchRemoteAccountSnapshot: jest.fn(),
+  fetchRemoteAccountChanges: jest.fn(),
+}));
+jest.mock('@/features/sync/repositories/localSyncCursorRepository', () => ({
+  readRemoteChangesCursor: jest.fn(),
+  writeRemoteChangesCursor: jest.fn(),
+  clearRemoteChangesCursor: jest.fn(),
 }));
 jest.mock('@/features/import/gateways/juntossImportReviewGateway', () => ({
   fetchRemoteImportReviews: jest.fn(),
@@ -94,6 +107,7 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     await restoreRemoteAccount({
       userId: 'test-user-id',
       snapshot: {
+        serverTime: '2026-03-30T10:00:00.000Z',
         activeFinancialContextId: null,
         moneyAccounts: [],
         spaces: [
@@ -296,6 +310,7 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     const restored = await restoreRemoteAccount({
       userId: 'test-user-id',
       snapshot: {
+        serverTime: '2026-03-30T10:00:00.000Z',
         activeFinancialContextId: null,
         spaces: [
           {
@@ -355,6 +370,7 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     const restored = await restoreRemoteAccount({
       userId: 'test-user-id',
       snapshot: {
+        serverTime: '2026-03-30T10:00:00.000Z',
         activeFinancialContextId: null,
         spaces: [
           {
@@ -474,6 +490,7 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     await restoreRemoteAccount({
       userId: 'test-user-id',
       snapshot: {
+        serverTime: '2026-03-30T10:00:00.000Z',
         activeFinancialContextId: 'context-ve',
         spaces: [
           {
@@ -548,5 +565,401 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     });
 
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+  });
+});
+
+describe('restoreRemoteAccount (delta sync y cursor)', () => {
+  const mockGetLocalDatabase = getLocalDatabase as unknown as jest.Mock;
+  const mockLoadSpaces = loadSpaces as unknown as jest.Mock;
+  const mockSaveSpaces = saveSpaces as unknown as jest.Mock;
+  const mockGetSession = authClient.getSession as jest.Mock;
+  const mockFetchSnapshot = fetchRemoteAccountSnapshot as jest.Mock;
+  const mockFetchChanges = fetchRemoteAccountChanges as jest.Mock;
+  const mockFetchImportReviews = fetchRemoteImportReviews as jest.Mock;
+  const mockReadCursor = readRemoteChangesCursor as jest.Mock;
+  const mockWriteCursor = writeRemoteChangesCursor as jest.Mock;
+
+  let database: SQLiteDatabase;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockLoadSpaces.mockResolvedValue({
+      spaces: [
+        {
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+        },
+      ],
+      activeSpaceId: 'personal',
+    });
+    mockSaveSpaces.mockResolvedValue(undefined);
+    (updateSpaces as unknown as jest.Mock).mockImplementation(
+      async (mutate: (stored: SpacesState) => SpacesState) => {
+        const next = mutate((await loadSpaces()) as SpacesState);
+        await saveSpaces(next);
+        return next;
+      },
+    );
+    mockGetSession.mockResolvedValue({
+      data: { user: { id: 'test-user-id' } },
+    });
+    mockFetchImportReviews.mockResolvedValue([]);
+
+    database = {
+      getAllAsync: jest.fn().mockResolvedValue([]),
+      getFirstAsync: jest.fn().mockResolvedValue(null),
+      runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      withExclusiveTransactionAsync: jest
+        .fn()
+        .mockImplementation(
+          async (callback: (tx: SQLiteDatabase) => Promise<void>) =>
+            callback(database),
+        ),
+    } as unknown as SQLiteDatabase;
+    mockGetLocalDatabase.mockResolvedValue(database);
+  });
+
+  it('full guarda el cursor si el snapshot incluye serverTime', async () => {
+    await restoreRemoteAccount({
+      userId: 'test-user-id',
+      snapshot: {
+        serverTime: '2026-09-11T12:00:00.000Z',
+        activeFinancialContextId: 'ctx-1',
+        spaces: [
+          {
+            remoteId: 'space-b',
+            name: 'Pareja',
+            type: 'couple',
+            currency: 'EUR',
+            activatedAt: null,
+          },
+          {
+            remoteId: 'space-a',
+            name: 'Personal',
+            type: 'personal',
+            currency: 'EUR',
+            activatedAt: null,
+          },
+        ],
+        categories: [],
+        moneyAccounts: [],
+        recurringSeries: [],
+        transactions: [],
+      },
+    });
+
+    expect(mockWriteCursor).toHaveBeenCalledWith(database, 'test-user-id', {
+      serverTime: '2026-09-11T12:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaceRemoteIds: ['space-a', 'space-b'],
+    });
+  });
+
+  it('delta sin cursor realiza un restore full', async () => {
+    mockReadCursor.mockResolvedValue(null);
+    mockFetchSnapshot.mockResolvedValue({
+      activeFinancialContextId: null,
+      serverTime: '2026-09-11T12:00:00.000Z',
+      spaces: [
+        {
+          remoteId: 'personal-remote',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+          activatedAt: null,
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [],
+    });
+
+    const result = await restoreRemoteAccountForCurrentSession({
+      mode: 'delta',
+    });
+
+    expect(mockFetchSnapshot).toHaveBeenCalled();
+    expect(mockFetchChanges).not.toHaveBeenCalled();
+    expect(result.outcome.mode).toBe('full');
+  });
+
+  it('delta con contexto financiero o espacios distintos realiza restore full', async () => {
+    mockReadCursor.mockResolvedValue({
+      serverTime: '2026-09-11T11:00:00.000Z',
+      activeFinancialContextId: 'ctx-old',
+      spaceRemoteIds: ['space-1'],
+    });
+    mockFetchChanges.mockResolvedValue({
+      serverTime: '2026-09-11T12:00:00.000Z',
+      activeFinancialContextId: 'ctx-new',
+      spaces: [
+        {
+          remoteId: 'space-1',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+          activatedAt: null,
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [],
+    });
+    mockFetchSnapshot.mockResolvedValue({
+      activeFinancialContextId: 'ctx-new',
+      serverTime: '2026-09-11T12:00:00.000Z',
+      spaces: [
+        {
+          remoteId: 'space-1',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+          activatedAt: null,
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [],
+    });
+
+    const result = await restoreRemoteAccountForCurrentSession({
+      mode: 'delta',
+    });
+
+    expect(mockFetchChanges).toHaveBeenCalledWith('2026-09-11T11:00:00.000Z');
+    expect(mockFetchSnapshot).toHaveBeenCalled();
+    expect(result.outcome.mode).toBe('full');
+  });
+
+  it('delta vacío no abre transacción ni toca catálogo (receivedRows: 0)', async () => {
+    mockReadCursor.mockResolvedValue({
+      serverTime: '2026-09-11T11:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaceRemoteIds: ['space-1'],
+    });
+    (database.getAllAsync as jest.Mock).mockImplementation(
+      async (sql: string, ...params: unknown[]) => {
+        if (
+          typeof sql === 'string' &&
+          sql.includes('FROM remote_entity_links')
+        ) {
+          const entityType = params[1];
+          if (entityType === 'space')
+            return [{ remote_id: 'space-1', local_id: 'personal' }];
+        }
+        return [];
+      },
+    );
+    mockFetchChanges.mockResolvedValue({
+      serverTime: '2026-09-11T12:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaces: [
+        {
+          remoteId: 'space-1',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+          activatedAt: null,
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [],
+    });
+
+    const result = await restoreRemoteAccountForCurrentSession({
+      mode: 'delta',
+    });
+
+    expect(result.outcome).toEqual({
+      mode: 'delta',
+      receivedRows: 0,
+      catalogueChanged: false,
+    });
+    expect(database.withExclusiveTransactionAsync).not.toHaveBeenCalled();
+    expect(mockWriteCursor).toHaveBeenCalledWith(
+      database,
+      'test-user-id',
+      expect.objectContaining({ serverTime: '2026-09-11T12:00:00.000Z' }),
+    );
+  });
+
+  it('delta no pide import-reviews', async () => {
+    mockReadCursor.mockResolvedValue({
+      serverTime: '2026-09-11T11:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaceRemoteIds: ['space-1'],
+    });
+    mockFetchChanges.mockResolvedValue({
+      serverTime: '2026-09-11T12:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaces: [
+        {
+          remoteId: 'space-1',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+          activatedAt: null,
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [],
+    });
+
+    await restoreRemoteAccountForCurrentSession({ mode: 'delta' });
+
+    expect(mockFetchImportReviews).not.toHaveBeenCalled();
+  });
+
+  it('full pedido durante un delta espera a que termine el delta', async () => {
+    mockReadCursor.mockResolvedValue({
+      serverTime: '2026-09-11T11:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaceRemoteIds: ['space-1'],
+    });
+    let resolveDelta: ((val: object) => void) | undefined;
+    mockFetchChanges.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveDelta = resolve;
+        }),
+    );
+    mockFetchSnapshot.mockResolvedValue({
+      activeFinancialContextId: 'ctx-1',
+      serverTime: '2026-09-11T12:00:00.000Z',
+      spaces: [
+        {
+          remoteId: 'space-1',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+          activatedAt: null,
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [],
+    });
+
+    const deltaPromise = restoreRemoteAccountForCurrentSession({
+      mode: 'delta',
+    });
+    const fullPromise = restoreRemoteAccountForCurrentSession({
+      mode: 'full',
+    });
+
+    await new Promise(setImmediate);
+    expect(mockFetchSnapshot).not.toHaveBeenCalled();
+
+    resolveDelta?.({
+      serverTime: '2026-09-11T11:30:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaces: [
+        {
+          remoteId: 'space-1',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+          activatedAt: null,
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [],
+    });
+
+    await deltaPromise;
+    const fullResult = await fullPromise;
+
+    expect(mockFetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(fullResult.outcome.mode).toBe('full');
+  });
+
+  it('delta resuelve categoría por enlace existente sin reescribir enlace', async () => {
+    mockReadCursor.mockResolvedValue({
+      serverTime: '2026-09-11T11:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaceRemoteIds: ['space-1'],
+    });
+    (database.getAllAsync as jest.Mock).mockImplementation(
+      async (sql: string, ...params: unknown[]) => {
+        if (
+          typeof sql === 'string' &&
+          sql.includes('FROM remote_entity_links')
+        ) {
+          const entityType = params[1];
+          if (entityType === 'space')
+            return [{ remote_id: 'space-1', local_id: 'personal' }];
+          if (entityType === 'category')
+            return [{ remote_id: 'cat-remota', local_id: 'cat-local' }];
+        }
+        return [];
+      },
+    );
+
+    mockFetchChanges.mockResolvedValue({
+      serverTime: '2026-09-11T12:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaces: [
+        {
+          remoteId: 'space-1',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+          activatedAt: null,
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [
+        {
+          remoteId: 'tx-remota',
+          spaceRemoteId: 'space-1',
+          categoryRemoteId: 'cat-remota',
+          moneyAccountRemoteId: null,
+          createdBy: 'user-1',
+          type: 'expense',
+          amountMinor: 100,
+          currency: 'EUR',
+          title: 'Café',
+          occurredOn: '2026-09-11',
+          note: null,
+          recurrence: 'once',
+          recurrenceGroupId: null,
+          recurrenceSeriesRemoteId: null,
+          sourceTransactionId: null,
+          isArchived: false,
+          createdAt: '2026-09-11T11:30:00.000Z',
+          updatedAt: '2026-09-11T11:30:00.000Z',
+          archivedAt: null,
+        },
+      ],
+    });
+
+    const result = await restoreRemoteAccountForCurrentSession({
+      mode: 'delta',
+    });
+
+    expect(result.outcome.receivedRows).toBe(1);
+    const linkCategoryInserts = (
+      database.runAsync as jest.Mock
+    ).mock.calls.filter(
+      ([sql, ...params]) =>
+        typeof sql === 'string' &&
+        sql.includes('INSERT INTO remote_entity_links') &&
+        params.includes('category'),
+    );
+    expect(linkCategoryInserts).toHaveLength(0);
   });
 });

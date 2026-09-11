@@ -24,15 +24,18 @@ mano. Apple Sign In no está disponible.
   está presente, el cliente lo guarda en `local_profile` antes de restaurar el
   snapshot para que las capacidades monetarias estén disponibles desde el
   primer render.
-- La restauración remota usa `GET /v1/sync/snapshot`. Las revisiones de
+- La restauración remota inicial usa `GET /v1/sync/snapshot`. Las revisiones de
   importación (`GET /v1/sync/import-reviews`) se piden a la vez que el snapshot;
   se escriben después, sobre los espacios ya restaurados. Al restaurar, los
   enlaces remoto→local de `remote_entity_links` se leen de una vez por tipo y
   se escriben sin releerse: un enlace existente conserva su id local.
+  Tras la inicialización o al haber cursor previo guardado en `local_sync_cursor`,
+  los refrescos periódicos usan `GET /v1/sync/changes?since=...` para descargar
+  únicamente las modificaciones incrementales sin transferir colecciones completas.
 - La restauración resuelve la identidad con `getAuthenticatedUserId`: si la
   consulta de sesión pierde la conexión, reutiliza la sesión en memoria. Una
   respuesta explícita sin sesión o con 401 sigue impidiendo restaurar. El
-  snapshot siempre se solicita al backend con la cookie y sus permisos vigentes.
+  snapshot y los deltas siempre se solicitan al backend con la cookie y sus permisos vigentes.
 - Los cortes de red al enviar o leer una respuesta se normalizan como
   `ApiError` con `code: NETWORK_ERROR`, `status: 0` y el endpoint afectado.
   No equivalen a un 401 ni disparan reenvíos automáticos de escrituras.

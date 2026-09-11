@@ -93,6 +93,18 @@ export type RemoteAccountTransaction = {
 export type RemoteAccountSnapshot = {
   /** Contexto personal activo en el servidor; cambia al cambiar de país. */
   activeFinancialContextId: string | null;
+  /** Reloj de base de datos del snapshot o null con APIs anteriores. */
+  serverTime: string | null;
+  spaces: readonly RemoteAccountSpace[];
+  categories: readonly RemoteAccountCategory[];
+  moneyAccounts: readonly RemoteAccountMoneyAccount[];
+  recurringSeries: readonly RemoteAccountSeries[];
+  transactions: readonly RemoteAccountTransaction[];
+};
+
+export type RemoteAccountChanges = {
+  serverTime: string;
+  activeFinancialContextId: string | null;
   spaces: readonly RemoteAccountSpace[];
   categories: readonly RemoteAccountCategory[];
   moneyAccounts: readonly RemoteAccountMoneyAccount[];
@@ -183,63 +195,67 @@ function exchangeSnapshot(value: unknown): TransactionExchangeSnapshot | null {
   };
 }
 
-type RawSnapshot = {
-  activeFinancialContextId?: unknown;
-  spaces: Record<string, unknown>[];
+type RawCollections = {
   categories: Record<string, unknown>[];
   moneyAccounts: Record<string, unknown>[];
   recurringSeries: Record<string, unknown>[];
   transactions: Record<string, unknown>[];
 };
 
-/** Estado remoto completo. Sustituye a las cinco lecturas PostgREST anteriores. */
-export async function fetchRemoteAccountSnapshot(): Promise<RemoteAccountSnapshot> {
-  const response = await apiClient.get<{ data: RawSnapshot }>(
-    '/v1/sync/snapshot',
-  );
-  const snapshot = response.data;
+type RawSnapshot = RawCollections & {
+  activeFinancialContextId?: unknown;
+  serverTime?: unknown;
+  spaces: Record<string, unknown>[];
+};
 
+function parseSpaces(spaces: Record<string, unknown>[]): RemoteAccountSpace[] {
+  return (Array.isArray(spaces) ? spaces : []).map((space) => {
+    const type = space.type;
+    if (type !== 'personal' && type !== 'couple' && type !== 'other') {
+      throw new Error(
+        `[sync] Integridad comprometida en espacio remoto ${text(space.id)}: type=${String(type)}`,
+      );
+    }
+    return {
+      remoteId: text(space.id),
+      name: text(space.name),
+      type,
+      currency: currency(space.currency, `espacio ${text(space.id)}`),
+      activatedAt: optionalString(space.activatedAt),
+    };
+  });
+}
+
+function parseCollections(raw: RawCollections) {
   return {
-    activeFinancialContextId: optionalString(snapshot.activeFinancialContextId),
-    spaces: snapshot.spaces.map((space) => {
-      const type = space.type;
-      if (type !== 'personal' && type !== 'couple' && type !== 'other') {
-        throw new Error(
-          `[sync] Integridad comprometida en espacio remoto ${text(space.id)}: type=${String(type)}`,
-        );
-      }
-      return {
-        remoteId: text(space.id),
-        name: text(space.name),
-        type,
-        currency: currency(space.currency, `espacio ${text(space.id)}`),
-        activatedAt: optionalString(space.activatedAt),
-      };
-    }),
+    categories: (Array.isArray(raw.categories) ? raw.categories : []).map(
+      (category) => ({
+        remoteId: text(category.id),
+        spaceRemoteId: text(category.spaceId),
+        name: text(category.name),
+        icon: text(category.icon),
+        colorToken: text(category.colorToken),
+        isDefault: Boolean(category.isDefault),
+        templateKey: optionalString(category.templateKey),
+        isArchived: Boolean(category.isArchived),
+        createdAt: text(category.createdAt),
+        updatedAt: text(category.updatedAt),
+        budgets: (Array.isArray(category.budgets) ? category.budgets : []).map(
+          (budget: Record<string, unknown>) => ({
+            currency: currency(
+              budget.currency,
+              `presupuesto ${text(category.id)}`,
+            ),
+            budgetMinor: minorAmount(budget.budgetAmountMinor),
+          }),
+        ),
+      }),
+    ),
 
-    categories: snapshot.categories.map((category) => ({
-      remoteId: text(category.id),
-      spaceRemoteId: text(category.spaceId),
-      name: text(category.name),
-      icon: text(category.icon),
-      colorToken: text(category.colorToken),
-      isDefault: Boolean(category.isDefault),
-      templateKey: optionalString(category.templateKey),
-      isArchived: Boolean(category.isArchived),
-      createdAt: text(category.createdAt),
-      updatedAt: text(category.updatedAt),
-      budgets: (Array.isArray(category.budgets) ? category.budgets : []).map(
-        (budget: Record<string, unknown>) => ({
-          currency: currency(
-            budget.currency,
-            `presupuesto ${text(category.id)}`,
-          ),
-          budgetMinor: minorAmount(budget.budgetAmountMinor),
-        }),
-      ),
-    })),
-
-    moneyAccounts: snapshot.moneyAccounts.map((account) => ({
+    moneyAccounts: (Array.isArray(raw.moneyAccounts)
+      ? raw.moneyAccounts
+      : []
+    ).map((account) => ({
       remoteId: text(account.id),
       spaceRemoteId: text(account.spaceId),
       name: text(account.name),
@@ -259,7 +275,10 @@ export async function fetchRemoteAccountSnapshot(): Promise<RemoteAccountSnapsho
       updatedAt: text(account.updatedAt),
     })),
 
-    recurringSeries: snapshot.recurringSeries.map((series) => ({
+    recurringSeries: (Array.isArray(raw.recurringSeries)
+      ? raw.recurringSeries
+      : []
+    ).map((series) => ({
       remoteId: text(series.id),
       spaceRemoteId: text(series.spaceId),
       categoryRemoteId: text(series.categoryId),
@@ -279,30 +298,74 @@ export async function fetchRemoteAccountSnapshot(): Promise<RemoteAccountSnapsho
       archivedAt: optionalString(series.archivedAt),
     })),
 
-    transactions: snapshot.transactions.map((transaction) => ({
-      remoteId: text(transaction.id),
-      spaceRemoteId: text(transaction.spaceId),
-      categoryRemoteId: text(transaction.categoryId),
-      moneyAccountRemoteId: optionalString(transaction.moneyAccountId),
-      createdBy: optionalString(transaction.createdBy),
-      type: text(transaction.type),
-      amountMinor: minorAmount(transaction.amountMinor),
-      currency: text(transaction.currency),
-      title: text(transaction.title),
-      occurredOn: text(transaction.occurredOn),
-      note: optionalString(transaction.note),
-      recurrence: text(transaction.recurrence) || 'once',
-      recurrenceGroupId: optionalString(transaction.recurrenceGroupId),
-      recurrenceSeriesRemoteId: optionalString(transaction.recurrenceSeriesId),
-      sourceTransactionId: optionalString(transaction.sourceLocalTransactionId),
-      isArchived: Boolean(transaction.isArchived),
-      createdAt: text(transaction.createdAt),
-      updatedAt: text(transaction.updatedAt),
-      archivedAt: optionalString(transaction.archivedAt),
-      accountingAmountMinorUsd: optionalMinorAmount(
-        transaction.accountingAmountMinorUsd,
-      ),
-      exchangeSnapshot: exchangeSnapshot(transaction.exchangeSnapshot),
-    })),
+    transactions: (Array.isArray(raw.transactions) ? raw.transactions : []).map(
+      (transaction) => ({
+        remoteId: text(transaction.id),
+        spaceRemoteId: text(transaction.spaceId),
+        categoryRemoteId: text(transaction.categoryId),
+        moneyAccountRemoteId: optionalString(transaction.moneyAccountId),
+        createdBy: optionalString(transaction.createdBy),
+        type: text(transaction.type),
+        amountMinor: minorAmount(transaction.amountMinor),
+        currency: text(transaction.currency),
+        title: text(transaction.title),
+        occurredOn: text(transaction.occurredOn),
+        note: optionalString(transaction.note),
+        recurrence: text(transaction.recurrence) || 'once',
+        recurrenceGroupId: optionalString(transaction.recurrenceGroupId),
+        recurrenceSeriesRemoteId: optionalString(
+          transaction.recurrenceSeriesId,
+        ),
+        sourceTransactionId: optionalString(
+          transaction.sourceLocalTransactionId,
+        ),
+        isArchived: Boolean(transaction.isArchived),
+        createdAt: text(transaction.createdAt),
+        updatedAt: text(transaction.updatedAt),
+        archivedAt: optionalString(transaction.archivedAt),
+        accountingAmountMinorUsd: optionalMinorAmount(
+          transaction.accountingAmountMinorUsd,
+        ),
+        exchangeSnapshot: exchangeSnapshot(transaction.exchangeSnapshot),
+      }),
+    ),
+  };
+}
+
+/** Estado remoto completo. Sustituye a las cinco lecturas PostgREST anteriores. */
+export async function fetchRemoteAccountSnapshot(): Promise<RemoteAccountSnapshot> {
+  const response = await apiClient.get<{ data: RawSnapshot }>(
+    '/v1/sync/snapshot',
+  );
+  const snapshot = response.data;
+
+  return {
+    activeFinancialContextId: optionalString(snapshot.activeFinancialContextId),
+    serverTime: optionalString(snapshot.serverTime),
+    spaces: parseSpaces(snapshot.spaces),
+    ...parseCollections(snapshot),
+  };
+}
+
+/** Cambios incrementales desde un cursor temporal de base de datos. */
+export async function fetchRemoteAccountChanges(
+  since: string,
+): Promise<RemoteAccountChanges> {
+  const response = await apiClient.get<{ data: RawSnapshot }>(
+    `/v1/sync/changes?since=${encodeURIComponent(since)}`,
+  );
+  const data = response.data;
+  const serverTime = optionalString(data.serverTime);
+  if (!serverTime) {
+    throw new Error(
+      '[sync] La respuesta de cambios remotos no incluye serverTime',
+    );
+  }
+
+  return {
+    serverTime,
+    activeFinancialContextId: optionalString(data.activeFinancialContextId),
+    spaces: parseSpaces(data.spaces),
+    ...parseCollections(data),
   };
 }

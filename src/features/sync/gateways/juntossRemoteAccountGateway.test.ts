@@ -1,4 +1,7 @@
-import { fetchRemoteAccountSnapshot } from '@/features/sync/gateways/juntossRemoteAccountGateway';
+import {
+  fetchRemoteAccountChanges,
+  fetchRemoteAccountSnapshot,
+} from '@/features/sync/gateways/juntossRemoteAccountGateway';
 import { apiClient } from '@/services/api/juntossApiClient';
 
 jest.mock('@/services/api/juntossApiClient', () => ({
@@ -232,11 +235,55 @@ describe('juntossRemoteAccountGateway', () => {
 
     await expect(fetchRemoteAccountSnapshot()).resolves.toEqual({
       activeFinancialContextId: null,
+      serverTime: null,
       spaces: [],
       categories: [],
       moneyAccounts: [],
       recurringSeries: [],
       transactions: [],
     });
+  });
+
+  it('propaga serverTime si el snapshot lo incluye', async () => {
+    mockedGet.mockResolvedValue(
+      snapshot({ serverTime: '2026-09-11T12:00:00.000Z' }) as never,
+    );
+
+    const result = await fetchRemoteAccountSnapshot();
+    expect(result.serverTime).toBe('2026-09-11T12:00:00.000Z');
+  });
+
+  it('fetchRemoteAccountChanges codifica since y devuelve cambios con serverTime', async () => {
+    mockedGet.mockResolvedValue(
+      snapshot({
+        serverTime: '2026-09-11T12:05:00.000Z',
+        activeFinancialContextId: 'ctx-1',
+        spaces: [
+          {
+            id: 'space-1',
+            name: 'Personal',
+            type: 'personal',
+            currency: 'EUR',
+          },
+        ],
+      }) as never,
+    );
+
+    const changes = await fetchRemoteAccountChanges('2026-09-11T12:00:00.000Z');
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/v1/sync/changes?since=2026-09-11T12%3A00%3A00.000Z',
+    );
+    expect(changes.serverTime).toBe('2026-09-11T12:05:00.000Z');
+    expect(changes.activeFinancialContextId).toBe('ctx-1');
+    expect(changes.spaces).toHaveLength(1);
+  });
+
+  it('fetchRemoteAccountChanges lanza si serverTime falta en la respuesta', async () => {
+    mockedGet.mockResolvedValue(snapshot({ serverTime: null }) as never);
+
+    await expect(
+      fetchRemoteAccountChanges('2026-09-11T12:00:00.000Z'),
+    ).rejects.toThrow(/serverTime/);
   });
 });
