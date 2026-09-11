@@ -175,7 +175,6 @@ export function CreateTransactionModal({
     readonly string[]
   >([]);
   const [occurredOn, setOccurredOn] = useState(getLocalTodayKey);
-  const [hasSelectedDate, setHasSelectedDate] = useState(false);
   const [currency, setCurrency] = useState<CurrencyCode>(spaceCurrency);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isRecurrencePickerVisible, setRecurrencePickerVisible] =
@@ -194,9 +193,6 @@ export function CreateTransactionModal({
   const amountCursorOpacity = useSharedValue(1);
   const amountMinor = parseAmountMinor(amountInput);
   const recurrence = recurrenceOptions[recurrenceIndex] ?? defaultRecurrence;
-  const isDateSelected = hasSelectedDate || occurredOn !== getLocalTodayKey();
-  const isRecurrenceSelected =
-    recurrence.value !== 'once' || customOccurrenceDates.length > 0;
   const isCalculationPending = pendingOperations.length > 0;
   const lastPendingOperation =
     pendingOperations[pendingOperations.length - 1] ?? null;
@@ -242,9 +238,6 @@ export function CreateTransactionModal({
   const selectedMoneyAccount = useMemo(
     () => moneyAccounts.find((account) => account.id === moneyAccountId),
     [moneyAccountId, moneyAccounts],
-  );
-  const isMoneyAccountSelected = Boolean(
-    moneyAccountId || selectedMoneyAccount,
   );
   /**
    * La moneda solo se elige cuando hay más de una y ninguna cuenta la fija:
@@ -330,7 +323,6 @@ export function CreateTransactionModal({
     setOccurredOn(
       initialDraft?.occurredOn ?? initialDate ?? getLocalTodayKey(),
     );
-    setHasSelectedDate(Boolean(initialDraft?.occurredOn || initialDate));
     setCustomOccurrenceDates(
       initialDraft?.recurrence === 'custom'
         ? (initialDraft.customOccurrenceDates ?? [initialDraft.occurredOn])
@@ -770,7 +762,7 @@ export function CreateTransactionModal({
               testID="transaction-date-button"
             >
               <Ionicons
-                color={isDateSelected ? colors.cta : colors.textPrimary}
+                color={colors.textPrimary}
                 name="calendar-outline"
                 size={iconSize.md}
                 testID="transaction-date-icon"
@@ -778,7 +770,7 @@ export function CreateTransactionModal({
               <Text
                 numberOfLines={1}
                 style={styles.metadataLabel}
-                tone={isDateSelected ? 'cta' : 'secondary'}
+                tone="primary"
                 variant="label"
                 weight="semibold"
               >
@@ -801,7 +793,7 @@ export function CreateTransactionModal({
               testID="transaction-recurrence-button"
             >
               <Ionicons
-                color={isRecurrenceSelected ? colors.cta : colors.textPrimary}
+                color={colors.textPrimary}
                 name="sync-outline"
                 size={iconSize.md}
                 testID="transaction-recurrence-icon"
@@ -809,7 +801,7 @@ export function CreateTransactionModal({
               <Text
                 numberOfLines={1}
                 style={styles.metadataLabel}
-                tone={isRecurrenceSelected ? 'cta' : 'secondary'}
+                tone="primary"
                 variant="label"
                 weight="semibold"
               >
@@ -838,9 +830,7 @@ export function CreateTransactionModal({
                   testID="transaction-money-account-button"
                 >
                   <Ionicons
-                    color={
-                      isMoneyAccountSelected ? colors.cta : colors.textPrimary
-                    }
+                    color={colors.textPrimary}
                     name="wallet-outline"
                     size={iconSize.md}
                     testID="transaction-money-account-icon"
@@ -848,7 +838,7 @@ export function CreateTransactionModal({
                   <Text
                     numberOfLines={1}
                     style={styles.metadataLabel}
-                    tone={isMoneyAccountSelected ? 'cta' : 'secondary'}
+                    tone="primary"
                     variant="label"
                     weight="semibold"
                   >
@@ -992,7 +982,6 @@ export function CreateTransactionModal({
         onClose={() => setDatePickerVisible(false)}
         onSelect={(value) => {
           setOccurredOn(value);
-          setHasSelectedDate(true);
           setDatePickerVisible(false);
         }}
         selectedDate={occurredOn}
@@ -1010,7 +999,6 @@ export function CreateTransactionModal({
         onSelectCustomDates={(dates) => {
           setCustomOccurrenceDates(dates);
           setOccurredOn(dates[0] ?? occurredOn);
-          setHasSelectedDate(true);
         }}
         recurrenceIndex={recurrenceIndex}
         visible={isRecurrencePickerVisible}

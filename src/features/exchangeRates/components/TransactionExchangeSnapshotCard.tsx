@@ -4,20 +4,13 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text/Text';
 import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
 import {
+  getHistoricalRateDescription,
   getVenezuelaDisplayValue,
   type VenezuelaDisplayMode,
-  type VenezuelaDisplayValue,
 } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import type { TransactionExchangeSnapshot } from '@/features/transactions/types';
-import {
-  isCurrencyCode,
-  type CurrencyCode,
-} from '@/lib/currency/currencyCatalog';
-import {
-  formatCurrency,
-  formatExchangeRate,
-} from '@/lib/currency/formatCurrency';
-import { getExchangeRateSourceLabel } from '@/lib/currency/exchangeRateSource';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
@@ -81,30 +74,6 @@ export function TransactionExchangeSnapshotCard({
       )}
     </View>
   );
-}
-
-function getHistoricalRateDescription(
-  displayValue: VenezuelaDisplayValue,
-): string {
-  if (!displayValue.rate || !displayValue.source) return 'Importe original';
-
-  const { baseCurrency, observedAt, quoteCurrency, rate } = displayValue.rate;
-  const source = getExchangeRateSourceLabel(displayValue.source);
-  const formattedDate = observedAt
-    ? new Intl.DateTimeFormat('es-ES', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      }).format(new Date(observedAt))
-    : null;
-  const formattedRate =
-    isCurrencyCode(baseCurrency) && isCurrencyCode(quoteCurrency)
-      ? formatExchangeRate(rate, baseCurrency, quoteCurrency, 'es-ES')
-      : source;
-
-  return formattedDate
-    ? `${source} · ${formattedRate} · ${formattedDate}`
-    : `${source} · ${formattedRate}`;
 }
 
 function createStyles(colors: ColorTokens) {

@@ -6,9 +6,12 @@ import { MoneyAccountDetailModal } from '@/features/accounts/components/MoneyAcc
 import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
+
+jest.mock('@/features/profile/hooks/useCurrencyCapabilities');
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
   AppModal: ({
@@ -79,7 +82,7 @@ const transactions: SessionTransaction[] = [
   },
 ];
 
-function renderModal(
+async function renderModal(
   props: Partial<React.ComponentProps<typeof MoneyAccountDetailModal>> = {},
 ) {
   return renderWithTheme(
@@ -99,7 +102,27 @@ function renderModal(
 }
 
 describe('MoneyAccountDetailModal', () => {
+  beforeEach(() => {
+    jest.mocked(useCurrencyCapabilities).mockReturnValue({
+      accountingCurrency: undefined,
+      allowedTransactionInputCurrencies: undefined,
+      allowsMultipleAccountCurrencies: true,
+      countryCode: null,
+      venezuelaCurrencyMode: false,
+      customExchangeRate: false,
+      multiRateMovementDisplay: false,
+    });
+  });
   it('muestra los movimientos convertidos como un valor histórico separado del balance', async () => {
+    jest.mocked(useCurrencyCapabilities).mockReturnValue({
+      accountingCurrency: 'USD',
+      allowedTransactionInputCurrencies: ['USD', 'VES'],
+      allowsMultipleAccountCurrencies: false,
+      countryCode: 'VE',
+      venezuelaCurrencyMode: true,
+      customExchangeRate: true,
+      multiRateMovementDisplay: true,
+    });
     const venezuelaAccount: MoneyAccount = {
       ...account,
       balances: [{ currency: 'USD', openingBalanceMinor: 0 }],
@@ -138,17 +161,24 @@ describe('MoneyAccountDetailModal', () => {
       screen.getByTestId('money-account-historical-valuation'),
     ).toBeTruthy();
     expect(
-      screen.getByText('Movimientos valorados históricamente'),
-    ).toBeTruthy();
+      screen.queryByText('Movimientos valorados históricamente'),
+    ).toBeNull();
+    expect(screen.getByText('Dolar')).toBeTruthy();
+    expect(screen.getByText('$ BCV')).toBeTruthy();
+    expect(screen.getByText('€ BCV')).toBeTruthy();
+    expect(screen.getByText('Gastos USD')).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByTestId('money-account-historical-valuation-control-VES_BCV'),
+    );
+
     expect(screen.getByText(/Bs\. 1\.250/)).toBeTruthy();
 
     await fireEvent.press(
-      screen.getByTestId(
-        'money-account-historical-valuation-source-selector-control-EURO',
-      ),
+      screen.getByTestId('money-account-historical-valuation-control-EUR'),
     );
 
-    expect(screen.getByText(/22,75/)).toBeTruthy();
+    expect(screen.getAllByText(/22,75/).length).toBeGreaterThanOrEqual(1);
   });
 
   beforeAll(() => {
@@ -270,5 +300,88 @@ describe('MoneyAccountDetailModal', () => {
     expect(screen.getByText('Ingresos USD')).toBeTruthy();
     expect(screen.getByText('Gastos USD')).toBeTruthy();
     expect(screen.getByText('Compra')).toBeTruthy();
+  });
+
+  it('conmuta la valoración del saldo y métricas entre Dolar, $ BCV y € BCV con el color de la cuenta', async () => {
+    jest.mocked(useCurrencyCapabilities).mockReturnValue({
+      accountingCurrency: 'USD',
+      allowedTransactionInputCurrencies: ['USD', 'VES'],
+      allowsMultipleAccountCurrencies: false,
+      countryCode: 'VE',
+      venezuelaCurrencyMode: true,
+      customExchangeRate: true,
+      multiRateMovementDisplay: true,
+    });
+
+    const venezuelaTransaction: SessionTransaction = {
+      id: 'tx-ve',
+      spaceId: 'personal',
+      categoryId: 'category-1',
+      moneyAccountId: 'account-1',
+      createdBy: 'user-1',
+      type: 'expense',
+      amountMinor: 1_000,
+      currency: 'USD',
+      title: 'Almuerzo',
+      occurredOn: '2026-08-15',
+      recurrence: 'once',
+      updatedAt: '2026-08-15T12:00:00.000Z',
+      exchangeSnapshot: {
+        countryCode: 'VE',
+        createdWithCurrency: 'USD',
+        rates: {
+          BCV: {
+            baseCurrency: 'USD',
+            quoteCurrency: 'VES',
+            rate: '50',
+            convertedAmountMinor: 50_000,
+            convertedCurrency: 'VES',
+            observedAt: '2026-09-05T04:00:00.000Z',
+          },
+          EURO: {
+            baseCurrency: 'USD',
+            quoteCurrency: 'VES',
+            rate: '60',
+            convertedAmountMinor: 60_000,
+            convertedCurrency: 'VES',
+            observedAt: '2026-09-05T04:00:00.000Z',
+          },
+        },
+      },
+    };
+
+    const screen = await renderModal({
+      account: {
+        ...account,
+        balances: [{ currency: 'USD', openingBalanceMinor: 10_000 }],
+      },
+      transactions: [venezuelaTransaction],
+    });
+
+    expect(screen.getByText('Dolar')).toBeTruthy();
+    expect(screen.getByText('$ BCV')).toBeTruthy();
+    expect(screen.getByText('€ BCV')).toBeTruthy();
+    expect(screen.getByText('Balance USD')).toBeTruthy();
+    expect(screen.queryByTestId('money-account-currency-selector')).toBeNull();
+
+    await fireEvent.press(
+      screen.getByTestId('money-account-historical-valuation-control-VES_BCV'),
+    );
+
+    expect(screen.getByText('Balance VES')).toBeTruthy();
+    expect(screen.getByText('Gastos VES')).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByTestId('money-account-historical-valuation-control-EUR'),
+    );
+
+    expect(screen.getByText('Balance VES')).toBeTruthy();
+    expect(screen.getByText('Gastos VES')).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByTestId('money-account-historical-valuation-control-USD'),
+    );
+
+    expect(screen.getByText('Balance USD')).toBeTruthy();
   });
 });

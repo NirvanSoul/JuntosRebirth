@@ -1,7 +1,6 @@
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   AppModal,
@@ -16,12 +15,17 @@ import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import { getMoneyAccountKindLabel } from '@/features/accounts/constants/moneyAccountKindDefinitions';
 import type { MoneyAccount } from '@/features/accounts/types';
+import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
 import {
-  type MoneyAccountCurrencyBalance,
-  summarizeMoneyAccounts,
-} from '@/features/accounts/utils/moneyAccountSummary';
-import { HistoricalTransactionValuation } from '@/features/exchangeRates/components/HistoricalTransactionValuation';
+  computeCombinedAccountBalance,
+  computeEffectiveAccountBalance,
+  extractRatesFromTransactions,
+} from '@/features/accounts/utils/moneyAccountValuation';
+import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
+import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import { useHistoricalTransactionValuation } from '@/features/exchangeRates/hooks/useHistoricalTransactionValuation';
+import { summarizeHistoricalTransactions } from '@/features/exchangeRates/utils/transactionSnapshot';
+import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
@@ -30,11 +34,13 @@ import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
-import { radii } from '@/theme/radii';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { spacing } from '@/theme/spacing';
-import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
+
+import { AccountTransactionMetric } from './AccountTransactionMetric';
+import { createStyles } from './MoneyAccountDetailModal.styles';
 
 type MoneyAccountDetailModalProps = {
   account: MoneyAccount | null;
@@ -48,55 +54,6 @@ type MoneyAccountDetailModalProps = {
   visible: boolean;
 };
 
-const heroIconSize = 76;
-
-type AccountTransactionMetricProps = {
-  balance: MoneyAccountCurrencyBalance;
-  type: 'expense' | 'income';
-};
-
-function AccountTransactionMetric({
-  balance,
-  type,
-}: AccountTransactionMetricProps) {
-  const { colors } = useTheme();
-  const styles = useThemedStyles((palette) => createMetricStyles(palette));
-  const isIncome = type === 'income';
-  const amountMinor = isIncome ? balance.incomeMinor : balance.expenseMinor;
-  const label = `${isIncome ? 'Ingresos' : 'Gastos'} ${balance.currency}`;
-  const amount = formatCurrency(amountMinor, balance.currency, 'es-ES');
-
-  return (
-    <View
-      accessibilityLabel={`${label} en ${balance.currency}: ${amount}`}
-      style={styles.metric}
-      testID={`money-account-${type}-${balance.currency}`}
-    >
-      <View style={styles.metricHeading}>
-        <View
-          style={styles.metricIcon}
-          testID={`money-account-${type}-${balance.currency}-icon`}
-        >
-          <View style={styles.diagonalArrow}>
-            <Ionicons
-              color={isIncome ? colors.income : colors.expense}
-              name={isIncome ? 'arrow-up' : 'arrow-down'}
-              size={iconSize.sm}
-              testID={`money-account-${type}-${balance.currency}-glyph`}
-            />
-          </View>
-        </View>
-        <Text tone="secondary" variant="caption">
-          {label}
-        </Text>
-      </View>
-      <Text numberOfLines={1} variant="body" weight="semibold">
-        {amount}
-      </Text>
-    </View>
-  );
-}
-
 export function MoneyAccountDetailModal({
   account,
   categories,
@@ -109,6 +66,7 @@ export function MoneyAccountDetailModal({
   visible,
 }: MoneyAccountDetailModalProps) {
   const { colors } = useTheme();
+  const { venezuelaCurrencyMode } = useCurrencyCapabilities();
   const styles = useThemedStyles((palette) => createStyles(palette));
   const [isDeletePanelVisible, setDeletePanelVisible] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
@@ -127,9 +85,13 @@ export function MoneyAccountDetailModal({
     [account, transactions],
   );
 
+  const [valuationMode, setValuationMode] =
+    useState<VenezuelaDisplayMode>('USD');
+
   if (useDepsChanged([visible, account]) && visible && account) {
     setDeletePanelVisible(false);
     setSelectedCurrency(account.balances[0]?.currency ?? null);
+    setValuationMode('USD');
   }
 
   const selectedBalance =
@@ -142,8 +104,79 @@ export function MoneyAccountDetailModal({
   const historicalValuation = useHistoricalTransactionValuation(
     selectedCurrencyTransactions,
   );
+  const hasHistoricalValuation =
+    historicalValuation.availableSources.length > 0;
+  const bcvSummary = useMemo(
+    () =>
+      hasHistoricalValuation
+        ? summarizeHistoricalTransactions(selectedCurrencyTransactions, 'BCV')
+        : null,
+    [hasHistoricalValuation, selectedCurrencyTransactions],
+  );
+  const eurSummary = useMemo(
+    () =>
+      hasHistoricalValuation
+        ? summarizeHistoricalTransactions(selectedCurrencyTransactions, 'EURO')
+        : null,
+    [hasHistoricalValuation, selectedCurrencyTransactions],
+  );
+
+  const exchangeRatesState = useExchangeRates();
+  const apiRates =
+    exchangeRatesState.status === 'success' ||
+    exchangeRatesState.status === 'stale'
+      ? exchangeRatesState.rates.rates
+      : null;
+
+  const snapshotRates = useMemo(
+    () =>
+      extractRatesFromTransactions(
+        selectedCurrencyTransactions.length > 0
+          ? selectedCurrencyTransactions
+          : transactions,
+      ),
+    [selectedCurrencyTransactions, transactions],
+  );
+
+  const effectiveRates = useMemo(
+    () => ({
+      bcvRate: apiRates?.BCV?.rate
+        ? Number(apiRates.BCV.rate)
+        : snapshotRates.bcvRate,
+      eurRate: apiRates?.EURO?.rate
+        ? Number(apiRates.EURO.rate)
+        : snapshotRates.eurRate,
+    }),
+    [apiRates, snapshotRates],
+  );
+
+  const hasValuation =
+    venezuelaCurrencyMode ||
+    hasHistoricalValuation ||
+    effectiveRates.bcvRate !== null;
 
   if (!account || !summary || !selectedBalance) return null;
+
+  const effective = venezuelaCurrencyMode
+    ? computeCombinedAccountBalance({
+        balances: summary.balanceByCurrency,
+        bcvSummary,
+        eurSummary,
+        mode: valuationMode,
+        rates: effectiveRates,
+      })
+    : computeEffectiveAccountBalance({
+        balance: selectedBalance,
+        bcvSummary,
+        eurSummary,
+        mode: valuationMode,
+        rates: effectiveRates,
+      });
+
+  const effectiveCurrency = effective.currency;
+  const effectiveBalanceMinor = effective.balanceMinor;
+  const effectiveIncomeMinor = effective.incomeMinor;
+  const effectiveExpenseMinor = effective.expenseMinor;
 
   const accountColor = categoryColors[account.colorToken];
   const hasMultipleCurrencies = summary.balanceByCurrency.length > 1;
@@ -217,8 +250,19 @@ export function MoneyAccountDetailModal({
             />
           ) : null}
 
+          {hasValuation ? (
+            <VenezuelaDisplayModeSelector
+              hideLabel
+              indicatorColor={accountColor}
+              mode={valuationMode}
+              onChange={setValuationMode}
+              style={styles.valuationSelector}
+              testID="money-account-historical-valuation"
+            />
+          ) : null}
+
           <View style={styles.summary}>
-            {hasMultipleCurrencies ? (
+            {!venezuelaCurrencyMode && hasMultipleCurrencies ? (
               <SegmentedControl
                 onChange={(currency) => setSelectedCurrency(currency)}
                 options={summary.balanceByCurrency.map(({ currency }) => ({
@@ -232,45 +276,43 @@ export function MoneyAccountDetailModal({
             ) : null}
 
             <View
-              accessibilityLabel={`Balance ${selectedBalance.currency}: ${formatCurrency(
-                selectedBalance.balanceMinor,
-                selectedBalance.currency,
+              accessibilityLabel={`Balance ${effectiveCurrency}: ${formatCurrency(
+                effectiveBalanceMinor,
+                effectiveCurrency,
                 'es-ES',
               )}`}
               style={styles.balanceMetric}
-              testID={`money-account-balance-${selectedBalance.currency}`}
+              testID={`money-account-balance-${effectiveCurrency}`}
             >
               <Text tone="secondary" variant="caption">
-                Balance {selectedBalance.currency}
+                Balance {effectiveCurrency}
               </Text>
               <Text variant="amount">
                 {formatCurrency(
-                  selectedBalance.balanceMinor,
-                  selectedBalance.currency,
+                  effectiveBalanceMinor,
+                  effectiveCurrency,
                   'es-ES',
                 )}
               </Text>
             </View>
             <View style={styles.metricRow}>
               <AccountTransactionMetric
-                balance={selectedBalance}
+                balance={{
+                  ...selectedBalance,
+                  currency: effectiveCurrency,
+                  incomeMinor: effectiveIncomeMinor,
+                }}
                 type="income"
               />
               <AccountTransactionMetric
-                balance={selectedBalance}
+                balance={{
+                  ...selectedBalance,
+                  currency: effectiveCurrency,
+                  expenseMinor: effectiveExpenseMinor,
+                }}
                 type="expense"
               />
             </View>
-            {historicalValuation.summary &&
-            historicalValuation.selectedSource ? (
-              <HistoricalTransactionValuation
-                availableSources={historicalValuation.availableSources}
-                onChangeSource={historicalValuation.setSelectedSource}
-                selectedSource={historicalValuation.selectedSource}
-                summary={historicalValuation.summary}
-                testID="money-account-historical-valuation"
-              />
-            ) : null}
           </View>
 
           <View style={styles.actions} testID="money-account-detail-actions">
@@ -307,87 +349,4 @@ export function MoneyAccountDetailModal({
       </View>
     </AppModal>
   );
-}
-
-function createStyles(colors: ColorTokens) {
-  return StyleSheet.create({
-    container: { flex: 1 },
-    topBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingBottom: spacing.md,
-    },
-    scroll: { flex: 1 },
-    scrollContent: { gap: spacing.lg },
-    hero: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.lg,
-    },
-    heroIcon: {
-      width: heroIconSize,
-      height: heroIconSize,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-    },
-    titleBlock: {
-      minWidth: 0,
-      flexShrink: 1,
-      alignItems: 'flex-start',
-      gap: spacing.xxs,
-    },
-    summary: {
-      gap: spacing.sm,
-    },
-    currencySelector: { alignSelf: 'center', width: 216 },
-    balanceMetric: {
-      alignItems: 'center',
-      gap: spacing.xs,
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      padding: spacing.md,
-    },
-    metricRow: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-    },
-    actions: { flexDirection: 'row', gap: spacing.sm },
-    movementsHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-      marginTop: spacing.xxl,
-    },
-  });
-}
-
-function createMetricStyles(colors: ColorTokens) {
-  return StyleSheet.create({
-    metric: {
-      minWidth: 0,
-      flex: 1,
-      gap: spacing.xs,
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      padding: spacing.md,
-    },
-    metricHeading: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-    },
-    metricIcon: {
-      width: iconSize.lg,
-      height: iconSize.lg,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      flexShrink: 0,
-    },
-    diagonalArrow: { transform: [{ rotate: '45deg' }] },
-  });
 }

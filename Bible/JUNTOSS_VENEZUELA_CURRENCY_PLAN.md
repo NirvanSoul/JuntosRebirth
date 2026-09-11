@@ -9,8 +9,9 @@
 > de este documento que hable de cuentas multimoneda, de agregar USD y VES
 > como saldos independientes, o de permitir países diferentes dentro de un
 > espacio compartido. La Entrega A y la parte autónoma de la Entrega B ya se
-> iniciaron en frontend; el contrato remoto de `0A` sigue siendo bloqueante
-> para balances, agregados y espacios compartidos.
+> iniciaron en frontend. El backend ya entrega snapshots con valor contable
+> USD y contextos financieros aislados por país; quedan pendientes los
+> agregados y selectores de lectura que los consumen.
 
 ---
 
@@ -22,6 +23,10 @@ Una persona cuyo `countryCode` sea `VE` trabaja con una única moneda contable
 principal: **USD**. No es una opción del usuario ni una segunda divisa que se
 pueda añadir a una cuenta. La razón es evitar balances ambiguos y el modelo de
 "sumar divisas" que rompería cuentas, categorías y espacios.
+
+Al activar `VE`, el cliente fija automáticamente las preferencias visibles en
+`USD` y `VES`; no conserva ni permite seleccionar `EUR` desde Ajustes. Al
+activar otro país, fija la moneda principal definida para ese país.
 
 El importe de un movimiento sí puede introducirse en una de estas dos monedas:
 
@@ -126,14 +131,34 @@ capacidades del espacio para todos los países.
 
 - El botón `Ir a ajustes` lleva a la pantalla correspondiente; nunca cambia
   el país de forma automática ni altera datos financieros.
-- Cambiar el país mientras se pertenece a un espacio compartido activo se
-  bloquea inicialmente con `COUNTRY_CHANGE_BLOCKED_BY_SHARED_SPACE`. La salida
-  segura de la primera versión es abandonar/disolver ese espacio, ajustar el
-  país y volver a crear o aceptar una invitación. Una migración coordinada de
-  país para todos los miembros es una futura funcionalidad, no un efecto
-  lateral del ajuste.
+- Si una persona cambia de país mientras pertenece a un espacio compartido,
+  el backend la retira de ese espacio y devuelve `leftSharedSpaceIds`. La app
+  debe avisarlo antes de confirmar el cambio; no intenta migrar el espacio ni
+  altera los datos de los demás miembros.
 
-## 0.6 Consecuencia para lo ya explorado
+## 0.6 Contextos financieros personales por país
+
+Los datos personales no se convierten ni se borran al cambiar de país. El
+backend mantiene un `financial_context` personal por combinación usuario-país,
+con su espacio personal y moneda canónica. Al cambiar a `VE`, por ejemplo,
+activa o crea el contexto USD; al volver a `ES`, reactiva el contexto EUR que
+ya existía.
+
+- `GET /v1/me` devuelve `activeFinancialContext`.
+- `PATCH /v1/me/profile` devuelve el contexto resultante y
+  `leftSharedSpaceIds`.
+- `GET /v1/sync/snapshot` devuelve `activeFinancialContextId` y solo espacios
+  del país activo. Listados y acceso directo a espacios aplican el mismo filtro.
+- El cliente trata ese catálogo como autoritativo: no conserva espacios locales
+  ausentes del snapshot, pues pertenecen a otro contexto y deben quedar ocultos.
+- Las filas SQLite ya están separadas por `space_id`. Un espacio personal nuevo
+  usa su UUID remoto como id local; los enlaces históricos conservan el id
+  `personal` de instalaciones antiguas. Así los datos antiguos quedan intactos
+  y reaparecen al volver al país correspondiente.
+- El frontend recarga snapshot, catálogo de espacios y finanzas justo después
+  de confirmar el cambio.
+
+## 0.7 Consecuencia para lo ya explorado
 
 La interfaz experimental que permite múltiples monedas en cuentas o suma
 snapshots por moneda no cumple este contrato final para VE. Antes de lanzar
@@ -1446,7 +1471,7 @@ diferente secundaria
 
 ---
 
-# 51. Testing de cambio de país
+# 51. Testing de cambio de país y contexto financiero
 
 Caso:
 
@@ -1457,8 +1482,8 @@ VE → ES
 Verificar:
 
 - desaparece selector especial en creación;
-- movimientos VES existentes siguen legibles;
-- datos no se eliminan.
+- no aparecen movimientos, categorías ni cuentas VE mientras ES está activo;
+- datos VE no se eliminan y vuelven a aparecer al regresar a VE.
 
 Caso:
 
@@ -1469,7 +1494,10 @@ ES → VE
 Verificar:
 
 - aparecen capacidades Venezuela;
-- puede definir custom rate.
+- no aparecen movimientos, categorías ni cuentas EUR del contexto ES;
+- al volver a ES se reactiva exactamente su espacio personal previo;
+- si había espacio compartido, se muestra el aviso y el backend retira al
+  usuario de él antes de completar el cambio.
 
 ---
 

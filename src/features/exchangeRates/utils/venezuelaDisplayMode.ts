@@ -2,7 +2,12 @@ import type {
   TransactionExchangeSnapshot,
   ExchangeSnapshotRate,
 } from '@/features/transactions/types';
-import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+import {
+  isCurrencyCode,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
+import { getExchangeRateSourceLabel } from '@/lib/currency/exchangeRateSource';
+import { formatExchangeRate } from '@/lib/currency/formatCurrency';
 
 export type VenezuelaDisplayMode = 'USD' | 'VES_BCV' | 'EUR';
 
@@ -61,4 +66,28 @@ export function getVenezuelaDisplayValue({
     rate,
     source,
   };
+}
+
+export function getHistoricalRateDescription(
+  displayValue: VenezuelaDisplayValue,
+): string {
+  if (!displayValue.rate || !displayValue.source) return 'Importe original';
+
+  const { baseCurrency, observedAt, quoteCurrency, rate } = displayValue.rate;
+  const source = getExchangeRateSourceLabel(displayValue.source);
+  const formattedDate = observedAt
+    ? new Intl.DateTimeFormat('es-ES', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }).format(new Date(observedAt))
+    : null;
+  const formattedRate =
+    isCurrencyCode(baseCurrency) && isCurrencyCode(quoteCurrency)
+      ? formatExchangeRate(rate, baseCurrency, quoteCurrency, 'es-ES')
+      : source;
+
+  return formattedDate
+    ? `${source} · ${formattedRate} · ${formattedDate}`
+    : `${source} · ${formattedRate}`;
 }

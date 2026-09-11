@@ -30,7 +30,12 @@ export function RateSourceSelector({
       <SegmentedControl
         onChange={onChange}
         options={availableSources.map((source) => ({
-          label: getExchangeRateSourceLabel(source),
+          label:
+            source === 'BCV'
+              ? '$ BCV'
+              : source === 'EURO'
+                ? '€ BCV'
+                : getExchangeRateSourceLabel(source),
           value: source,
         }))}
         selectedValue={selectedSource}

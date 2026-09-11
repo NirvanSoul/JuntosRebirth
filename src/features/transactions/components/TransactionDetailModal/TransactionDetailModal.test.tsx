@@ -603,5 +603,67 @@ describe('TransactionDetailModal', () => {
         screen.queryByTestId('transaction-money-account-picker'),
       ).toBeNull();
     });
+
+    it('muestra el selector Dolar, $ BCV y € BCV y actualiza el importe', async () => {
+      const venezuelaTransaction: SessionTransaction = {
+        ...transaction,
+        amountMinor: 1_000,
+        currency: 'USD',
+        exchangeSnapshot: {
+          countryCode: 'VE',
+          createdWithCurrency: 'USD',
+          rates: {
+            BCV: {
+              baseCurrency: 'USD',
+              quoteCurrency: 'VES',
+              rate: '50',
+              convertedAmountMinor: 50_000,
+              convertedCurrency: 'VES',
+              observedAt: '2026-09-05T04:00:00.000Z',
+            },
+            EURO: {
+              baseCurrency: 'USD',
+              quoteCurrency: 'VES',
+              rate: '60',
+              convertedAmountMinor: 60_000,
+              convertedCurrency: 'VES',
+              observedAt: '2026-09-05T04:00:00.000Z',
+            },
+          },
+        },
+      };
+
+      const screen = await renderDetail({ transaction: venezuelaTransaction });
+
+      expect(screen.queryByText('Valor histórico')).toBeNull();
+      expect(screen.getByText('Dolar')).toBeTruthy();
+      expect(screen.getByText('$ BCV')).toBeTruthy();
+      expect(screen.getByText('€ BCV')).toBeTruthy();
+      expect(
+        screen.getByTestId('transaction-detail-rate-badge').props.children,
+      ).toBe('$ 10');
+
+      await fireEvent.press(
+        screen.getByTestId(
+          'transaction-detail-display-mode-selector-control-VES_BCV',
+        ),
+      );
+      expect(
+        screen.getByTestId('transaction-detail-rate-badge').props.children,
+      ).toBe('Bs. 500');
+      expect(screen.getByText(/1 \$ BCV = Bs\.\s*50/i)).toBeTruthy();
+      expect(screen.getByText(/5 sept 2026/i)).toBeTruthy();
+
+      await fireEvent.press(
+        screen.getByTestId(
+          'transaction-detail-display-mode-selector-control-EUR',
+        ),
+      );
+      expect(
+        screen.getByTestId('transaction-detail-rate-badge').props.children,
+      ).toBe('Bs. 600');
+      expect(screen.getByText(/1 € BCV = Bs\.\s*60/i)).toBeTruthy();
+      expect(screen.getByText(/5 sept 2026/i)).toBeTruthy();
+    });
   });
 });

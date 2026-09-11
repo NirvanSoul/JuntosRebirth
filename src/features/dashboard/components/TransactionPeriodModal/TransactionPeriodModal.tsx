@@ -1,7 +1,7 @@
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import {
   AppModal,
@@ -10,7 +10,11 @@ import {
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
+import { extractRatesFromTransactions } from '@/features/accounts/utils/moneyAccountValuation';
 import type { Category } from '@/features/categories/types';
+import { PeriodCurrencyPickerModal } from '@/features/dashboard/components/TransactionPeriodModal/PeriodCurrencyPickerModal';
+import { PeriodTotalAmount } from '@/features/dashboard/components/TransactionPeriodModal/PeriodTotalAmount';
+import { computePeriodValuation } from '@/features/dashboard/utils/periodValuation';
 import {
   describePreviousPeriod,
   getPreviousPeriodTransactions,
@@ -18,17 +22,18 @@ import {
   shiftTransactionPeriod,
   type TransactionPeriod,
 } from '@/features/dashboard/utils/transactionPeriod';
-import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
+import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
+import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
+import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { PeriodComparisonIndicator } from '@/features/transactions/components/PeriodComparisonIndicator/PeriodComparisonIndicator';
 import { TransactionPeriodSelector } from '@/features/transactions/components/TransactionPeriodSelector/TransactionPeriodSelector';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
-import { PeriodTotalAmount } from '@/features/dashboard/components/TransactionPeriodModal/PeriodTotalAmount';
 import type {
   SessionTransaction,
   TransactionType,
 } from '@/features/transactions/types';
 import { calculatePeriodComparison } from '@/features/transactions/utils/periodComparison';
-import { useDepsChanged } from '@/hooks/useDepsChanged';
 import {
   getAvailableCurrencies,
   pickEffectiveCurrency,
@@ -41,12 +46,11 @@ import {
 } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { triggerHaptic } from '@/lib/haptics/haptics';
-import { iconSize, layout } from '@/theme/layout';
-import { radii } from '@/theme/radii';
-import { spacing } from '@/theme/spacing';
-import type { ColorTokens, ThemeShadows } from '@/theme/types';
+import { useDepsChanged } from '@/hooks/useDepsChanged';
+import { iconSize } from '@/theme/layout';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
+import { createStyles } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal.styles';
 
 export type TransactionPeriodModalType = TransactionType | 'balance';
 
@@ -71,11 +75,14 @@ export function TransactionPeriodModal({
 }: TransactionPeriodModalProps) {
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
+  const { venezuelaCurrencyMode } = useCurrencyCapabilities();
   const [period, setPeriod] = useState<TransactionPeriod>('month');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode | null>(
     null,
   );
+  const [valuationMode, setValuationMode] =
+    useState<VenezuelaDisplayMode>('USD');
   const [isCurrencyPickerVisible, setCurrencyPickerVisible] = useState(false);
   const modalBottomInset = useAppModalBottomInset();
   const isBalance = type === 'balance';
@@ -85,6 +92,28 @@ export function TransactionPeriodModal({
       : type === 'expense'
         ? 'gastos'
         : 'movimientos';
+
+  const exchangeRatesState = useExchangeRates({
+    enabled: visible && venezuelaCurrencyMode,
+  });
+  const apiRates =
+    exchangeRatesState.status === 'success' ||
+    exchangeRatesState.status === 'stale'
+      ? exchangeRatesState.rates.rates
+      : null;
+
+  const fallbackRates = useMemo(
+    () => extractRatesFromTransactions(transactions),
+    [transactions],
+  );
+
+  const bcvRate = apiRates?.BCV?.rate
+    ? Number(apiRates.BCV.rate)
+    : fallbackRates.bcvRate;
+  const eurRate = apiRates?.EURO?.rate
+    ? Number(apiRates.EURO.rate)
+    : fallbackRates.eurRate;
+
   const typeTransactions = useMemo(
     () =>
       isBalance
@@ -96,10 +125,6 @@ export function TransactionPeriodModal({
     () => listTransactionsByPeriod(typeTransactions, period, selectedDate),
     [period, selectedDate, typeTransactions],
   );
-  // Se calculan sobre todas las transacciones del tipo (no solo las del
-  // periodo visible) para que la moneda elegida por el usuario se mantenga
-  // al navegar entre periodos o cambiar el filtro, aunque el periodo actual
-  // no tenga movimientos en esa moneda.
   const availableCurrencies = useMemo(
     () => getAvailableCurrencies(typeTransactions),
     [typeTransactions],
@@ -116,39 +141,76 @@ export function TransactionPeriodModal({
       ),
     [effectiveCurrency, filteredTransactions],
   );
+
+  const periodValuation = useMemo(
+    () =>
+      computePeriodValuation({
+        bcvRate,
+        eurRate,
+        mode: valuationMode,
+        transactions: filteredTransactions,
+        type,
+      }),
+    [bcvRate, eurRate, filteredTransactions, type, valuationMode],
+  );
+
+  const previousTransactions = useMemo(
+    () =>
+      getPreviousPeriodTransactions(
+        isBalance
+          ? transactions
+          : transactions.filter((transaction) => transaction.type === type),
+        period,
+        selectedDate,
+      ),
+    [isBalance, period, selectedDate, transactions, type],
+  );
+
+  const previousCurrencyTransactions = useMemo(
+    () =>
+      previousTransactions.filter(
+        (transaction) => transaction.currency === effectiveCurrency,
+      ),
+    [effectiveCurrency, previousTransactions],
+  );
+
   const totals = useMemo(
     () => summarizeTransactionTotals(currencyTransactions),
     [currencyTransactions],
   );
-  const totalMinor =
-    type === 'income'
-      ? totals.incomeMinor
-      : type === 'expense'
-        ? totals.expenseMinor
-        : totals.balanceMinor;
-  const previousCurrencyTransactions = useMemo(() => {
-    const previousTransactions = getPreviousPeriodTransactions(
-      isBalance
-        ? transactions
-        : transactions.filter((transaction) => transaction.type === type),
-      period,
-      selectedDate,
-    );
-
-    return previousTransactions.filter(
-      (transaction) => transaction.currency === effectiveCurrency,
-    );
-  }, [effectiveCurrency, isBalance, period, selectedDate, transactions, type]);
   const previousTotals = useMemo(
     () => summarizeTransactionTotals(previousCurrencyTransactions),
     [previousCurrencyTransactions],
   );
-  const previousTotalMinor =
-    type === 'income'
+
+  const previousPeriodValuation = useMemo(
+    () =>
+      computePeriodValuation({
+        bcvRate,
+        eurRate,
+        mode: valuationMode,
+        transactions: previousTransactions,
+        type,
+      }),
+    [bcvRate, eurRate, previousTransactions, type, valuationMode],
+  );
+
+  const totalMinor = venezuelaCurrencyMode
+    ? periodValuation.totalMinor
+    : type === 'income'
+      ? totals.incomeMinor
+      : type === 'expense'
+        ? totals.expenseMinor
+        : totals.balanceMinor;
+
+  const previousTotalMinor = venezuelaCurrencyMode
+    ? previousPeriodValuation.totalMinor
+    : type === 'income'
       ? previousTotals.incomeMinor
       : type === 'expense'
         ? previousTotals.expenseMinor
         : previousTotals.balanceMinor;
+
   const comparison = calculatePeriodComparison(totalMinor, previousTotalMinor);
   const comparisonTone: 'balance' | 'expense' | 'income' =
     type === 'balance' ? 'balance' : type;
@@ -158,7 +220,15 @@ export function TransactionPeriodModal({
       : type === 'expense'
         ? 'Total de gastos'
         : 'Balance del periodo';
-  const formattedTotal = formatCurrency(totalMinor, effectiveCurrency, 'es-ES');
+
+  const displayedCurrency = venezuelaCurrencyMode
+    ? periodValuation.currency
+    : effectiveCurrency;
+  const formattedTotal = formatCurrency(totalMinor, displayedCurrency, 'es-ES');
+  const displayedTransactions = venezuelaCurrencyMode
+    ? filteredTransactions
+    : currencyTransactions;
+
   const title =
     type === 'income' ? 'Ingresos' : type === 'expense' ? 'Gastos' : 'Balance';
   const addLabel =
@@ -167,11 +237,13 @@ export function TransactionPeriodModal({
       : type === 'expense'
         ? 'Añadir gasto'
         : 'Añadir movimiento';
+
   if (useDepsChanged([visible]) && visible) {
     setPeriod('month');
     setSelectedDate(new Date());
     setSelectedCurrency(null);
     setCurrencyPickerVisible(false);
+    setValuationMode('USD');
   }
   useEffect(() => {
     if (visible) {
@@ -181,6 +253,13 @@ export function TransactionPeriodModal({
   if (selectedCurrency && !availableCurrencies.includes(selectedCurrency)) {
     setSelectedCurrency(null);
   }
+
+  const selectorIndicatorColor =
+    type === 'income'
+      ? colors.income
+      : type === 'expense'
+        ? colors.expense
+        : colors.cta;
 
   return (
     <>
@@ -231,10 +310,24 @@ export function TransactionPeriodModal({
             showsVerticalScrollIndicator={false}
             testID={`${type}-period-scroll-view`}
           >
+            {venezuelaCurrencyMode ? (
+              <VenezuelaDisplayModeSelector
+                hideLabel
+                indicatorColor={selectorIndicatorColor}
+                mode={valuationMode}
+                onChange={setValuationMode}
+                style={styles.valuationSelector}
+                testID={`${type}-period-valuation-selector`}
+              />
+            ) : null}
+
             <View
               accessibilityLabel={`${totalLabel}: ${formattedTotal}`}
               accessible
-              style={styles.totalCard}
+              style={[
+                styles.totalCard,
+                venezuelaCurrencyMode && styles.totalCardWithValuation,
+              ]}
               testID={`${type}-period-total-card`}
             >
               <View style={styles.totalCardCopy}>
@@ -256,7 +349,7 @@ export function TransactionPeriodModal({
                 ) : null}
               </View>
 
-              {hasMultipleCurrencies ? (
+              {!venezuelaCurrencyMode && hasMultipleCurrencies ? (
                 <Pressable
                   accessibilityHint="Abre las opciones de moneda"
                   accessibilityLabel={`Moneda: ${getCurrencyName(effectiveCurrency)}`}
@@ -287,13 +380,13 @@ export function TransactionPeriodModal({
             </View>
 
             <View style={styles.results}>
-              {currencyTransactions.length > 0 ? (
+              {displayedTransactions.length > 0 ? (
                 <TransactionPreviewList
                   categories={categories}
                   groupingTransactions={transactions}
                   onOpenTransactionDetail={onOpenTransactionDetail}
                   testID={`${type}-period-transaction-list`}
-                  transactions={currencyTransactions}
+                  transactions={displayedTransactions}
                 />
               ) : (
                 <View style={styles.empty}>
@@ -340,112 +433,17 @@ export function TransactionPeriodModal({
         </View>
       </AppModal>
 
-      <AppModal
+      <PeriodCurrencyPickerModal
+        availableCurrencies={availableCurrencies}
+        effectiveCurrency={effectiveCurrency}
         onClose={() => setCurrencyPickerVisible(false)}
-        stackBehavior="push"
-        testID={`${type}-period-currency-picker`}
+        onSelectCurrency={(code) => {
+          setSelectedCurrency(code);
+          setCurrencyPickerVisible(false);
+        }}
+        type={type}
         visible={isCurrencyPickerVisible}
-      >
-        <View style={styles.currencyPicker}>
-          <View style={styles.currencyPickerHeader}>
-            <ModalCloseButton
-              onPress={() => setCurrencyPickerVisible(false)}
-              variant="back"
-            />
-            <Text accessibilityRole="header" variant="heading">
-              Elige la moneda
-            </Text>
-          </View>
-
-          <View
-            accessibilityRole="radiogroup"
-            style={styles.currencyPickerList}
-          >
-            {availableCurrencies.map((code) => (
-              <SelectableOption
-                accessibilityLabel={`${getCurrencyFlag(code)} ${getCurrencyName(code)} (${code})`}
-                indicatorTestID={`${type}-period-currency-${code}-check`}
-                key={code}
-                label={`${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`}
-                onPress={() => {
-                  setSelectedCurrency(code);
-                  setCurrencyPickerVisible(false);
-                }}
-                selected={code === effectiveCurrency}
-                testID={`${type}-period-currency-${code}-option`}
-              />
-            ))}
-          </View>
-        </View>
-      </AppModal>
+      />
     </>
   );
-}
-
-function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
-  return StyleSheet.create({
-    container: { flex: 1 },
-    header: {
-      minHeight: layout.minTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      marginBottom: spacing.lg,
-    },
-    headerCopy: { flex: 1 },
-    scrollContent: { flexGrow: 1 },
-    totalCard: {
-      ...shadows.subtle,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.sm,
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      marginTop: spacing.xl,
-      padding: spacing.lg,
-    },
-    totalCardCopy: { flex: 1, gap: spacing.xs },
-    comparisonRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      marginTop: spacing.xxs,
-    },
-    currencyButton: {
-      ...shadows.subtle,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      borderColor: colors.border,
-      borderRadius: radii.round,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-    },
-    currencyButtonFlag: { fontSize: 18 },
-    currencyPicker: { flex: 1, gap: spacing.lg },
-    currencyPickerHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-    },
-    currencyPickerList: { gap: spacing.sm },
-    results: { marginTop: spacing.lg },
-    empty: {
-      flex: 1,
-      minHeight: layout.controlHeight.regular * 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      borderColor: colors.border,
-      borderRadius: radii.md,
-      borderWidth: 1,
-      padding: spacing.xl,
-    },
-    diagonalArrow: { transform: [{ rotate: '45deg' }] },
-    addAction: { marginTop: spacing.xl },
-    pressed: { opacity: 0.72 },
-  });
 }

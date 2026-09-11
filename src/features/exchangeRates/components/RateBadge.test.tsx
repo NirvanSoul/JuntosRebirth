@@ -13,7 +13,7 @@ describe('RateBadge', () => {
     );
 
     expect(screen.getByTestId('rate-badge')).toHaveTextContent(
-      '≈ $ 190,99 · BCV',
+      '≈ $ 190,99 · $ BCV',
     );
   });
 
@@ -29,7 +29,7 @@ describe('RateBadge', () => {
     );
 
     expect(screen.getByTestId('rate-badge')).toHaveTextContent(
-      '≈ $ 190,99 · BCV · tasa no actualizada hoy',
+      '≈ $ 190,99 · $ BCV · conversión no actualizada hoy',
     );
   });
 

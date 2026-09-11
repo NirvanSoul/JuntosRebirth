@@ -16,6 +16,7 @@ type CurrencyPreferencesController = {
   error: string | null;
   isReady: boolean;
   preferences: CurrencyPreferences;
+  reloadCurrencyPreferences: () => Promise<void>;
   setCurrencyPreferences: (next: CurrencyPreferences) => Promise<void>;
 };
 
@@ -62,11 +63,18 @@ export function useCurrencyPreferences(): CurrencyPreferencesController {
     [],
   );
 
+  const reloadCurrencyPreferences = useCallback(async (): Promise<void> => {
+    const stored = await loadCurrencyPreferences();
+    setPreferences(stored);
+    setError(null);
+  }, []);
+
   return {
     activeCurrencies: preferences.currencies,
     error,
     isReady,
     preferences,
+    reloadCurrencyPreferences,
     setCurrencyPreferences,
   };
 }

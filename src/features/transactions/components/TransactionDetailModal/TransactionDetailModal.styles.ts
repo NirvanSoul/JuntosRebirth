@@ -49,6 +49,9 @@ export function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: radii.round,
       flexShrink: 0,
     },
+    valuationSelector: {
+      marginTop: spacing.lg,
+    },
     amountCard: {
       alignItems: 'center',
       gap: spacing.xs,
@@ -61,6 +64,13 @@ export function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
+    },
+    rateFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      width: '100%',
+      marginTop: spacing.xs,
     },
     directionIcon: {
       width: iconSize.lg,

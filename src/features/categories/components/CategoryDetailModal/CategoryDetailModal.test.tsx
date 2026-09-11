@@ -12,7 +12,10 @@ import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { iconSize, layout } from '@/theme/layout';
 import { shadows } from '@/theme/shadows';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { spacing } from '@/theme/spacing';
+
+jest.mock('@/features/profile/hooks/useCurrencyCapabilities');
 
 jest.mock('@/features/legal/services/authenticatedUser', () => ({
   getAuthenticatedUserId: jest.fn(async () => 'uuid-ana'),
@@ -78,6 +81,17 @@ const coupleSpace: Space = {
 };
 
 describe('CategoryDetailModal', () => {
+  beforeEach(() => {
+    jest.mocked(useCurrencyCapabilities).mockReturnValue({
+      accountingCurrency: undefined,
+      allowedTransactionInputCurrencies: undefined,
+      allowsMultipleAccountCurrencies: true,
+      countryCode: null,
+      venezuelaCurrencyMode: false,
+      customExchangeRate: false,
+      multiRateMovementDisplay: false,
+    });
+  });
   it('filtra los movimientos de un espacio juntos por autor', async () => {
     const ownTransaction = {
       ...transaction,
@@ -683,5 +697,109 @@ describe('CategoryDetailModal', () => {
     expect(within(upcomingList).getByText('Compra programada')).toBeTruthy();
     expect(within(upcomingList).queryByText('Almuerzo')).toBeNull();
     expect(within(detail).getByText('Movimientos futuros')).toBeTruthy();
+  });
+
+  it('permite alternar la valoración histórica con botones Dolar, $ BCV y € BCV actualizando el gasto', async () => {
+    jest.mocked(useCurrencyCapabilities).mockReturnValue({
+      accountingCurrency: 'USD',
+      allowedTransactionInputCurrencies: ['USD', 'VES'],
+      allowsMultipleAccountCurrencies: false,
+      countryCode: 'VE',
+      venezuelaCurrencyMode: true,
+      customExchangeRate: true,
+      multiRateMovementDisplay: true,
+    });
+
+    const venezuelaTransaction: SessionTransaction = {
+      ...transaction,
+      currency: 'USD',
+      amountMinor: 2_000,
+      exchangeSnapshot: {
+        countryCode: 'VE',
+        createdWithCurrency: 'USD',
+        rates: {
+          BCV: {
+            baseCurrency: 'USD',
+            quoteCurrency: 'VES',
+            rate: '50',
+            convertedAmountMinor: 100_000,
+            convertedCurrency: 'VES',
+            observedAt: '2026-09-05T04:00:00.000Z',
+          },
+          EURO: {
+            baseCurrency: 'USD',
+            quoteCurrency: 'VES',
+            rate: '60',
+            convertedAmountMinor: 120_000,
+            convertedCurrency: 'VES',
+            observedAt: '2026-09-05T04:00:00.000Z',
+          },
+        },
+      },
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={category}
+            displayCurrency="USD"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={jest.fn()}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            spaceCurrency="USD"
+            transactions={[venezuelaTransaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(
+      screen.queryByText('Movimientos valorados históricamente'),
+    ).toBeNull();
+    expect(
+      screen.queryByText('Con la tasa guardada en cada movimiento'),
+    ).toBeNull();
+
+    expect(screen.getByText('Dolar')).toBeTruthy();
+    expect(screen.getByText('$ BCV')).toBeTruthy();
+    expect(screen.getByText('€ BCV')).toBeTruthy();
+    expect(screen.queryByTestId('category-currency-selector')).toBeNull();
+
+    expect(
+      within(screen.getByTestId('category-expense-metric')).getByText(/20/),
+    ).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByTestId('category-historical-valuation-control-VES_BCV'),
+    );
+    expect(
+      within(screen.getByTestId('category-expense-metric')).getByText(/1\.000/),
+    ).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByTestId('category-historical-valuation-control-EUR'),
+    );
+    expect(
+      within(screen.getByTestId('category-expense-metric')).getByText(/1\.200/),
+    ).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByTestId('category-historical-valuation-control-USD'),
+    );
+    expect(
+      within(screen.getByTestId('category-expense-metric')).getByText(/20/),
+    ).toBeTruthy();
   });
 });

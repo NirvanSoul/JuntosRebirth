@@ -13,7 +13,7 @@ type RateBadgeProps = {
   testID?: string;
 };
 
-/** Sección 10 del plan: «≈ $190,99 · BCV» bajo el importe. */
+/** Sección 10 del plan: «≈ Bs. 190,99 · $ BCV» bajo el importe. */
 export function RateBadge({
   convertedAmountMinor,
   currency,
@@ -26,12 +26,17 @@ export function RateBadge({
     currency,
     'es-ES',
   );
-  const sourceLabel = getExchangeRateSourceLabel(source);
+  const sourceLabel =
+    source === 'BCV'
+      ? '$ BCV'
+      : source === 'EURO'
+        ? '€ BCV'
+        : getExchangeRateSourceLabel(source);
 
   return (
     <Text testID={testID} tone="secondary" variant="footnote">
       {`≈ ${formattedAmount} · ${sourceLabel}`}
-      {stale ? ' · tasa no actualizada hoy' : ''}
+      {stale ? ' · conversión no actualizada hoy' : ''}
     </Text>
   );
 }

@@ -1,7 +1,7 @@
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import {
   AppModal,
@@ -15,9 +15,12 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal';
 import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
-import { HistoricalTransactionValuation } from '@/features/exchangeRates/components/HistoricalTransactionValuation';
-import { useHistoricalTransactionValuation } from '@/features/exchangeRates/hooks/useHistoricalTransactionValuation';
+import { extractRatesFromTransactions } from '@/features/accounts/utils/moneyAccountValuation';
+import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
+import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
+import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
+import { createStyles } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal.styles';
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
 import { CategoryTransactionMetrics } from '@/features/categories/components/CategoryDetailModal/CategoryTransactionMetrics';
 import {
@@ -31,6 +34,8 @@ import type {
   CategoryShareTarget,
 } from '@/features/categories/types';
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
+import { computeCategoryMetrics } from '@/features/categories/utils/categoryValuation';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { useSpaceMembership } from '@/features/profile/state/SpaceMembershipContext';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { SessionTransaction } from '@/features/transactions/types';
@@ -42,10 +47,8 @@ import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { getLocalTodayKey } from '@/lib/date/localDate';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { categoryColors } from '@/theme/categoryColors';
-import { iconSize, layout } from '@/theme/layout';
-import { radii } from '@/theme/radii';
+import { iconSize } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
-import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
@@ -71,8 +74,6 @@ type CategoryDetailModalProps = {
   visible: boolean;
 };
 
-const heroIconSize = 76;
-
 export function CategoryDetailModal({
   category,
   displayCurrency,
@@ -90,6 +91,7 @@ export function CategoryDetailModal({
   visible,
 }: CategoryDetailModalProps) {
   const { colors, shadows } = useTheme();
+  const { venezuelaCurrencyMode } = useCurrencyCapabilities();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const membership = useSpaceMembership();
   const [panel, setPanel] = useState<DetailPanel>(null);
@@ -100,6 +102,8 @@ export function CategoryDetailModal({
   const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
   const [selectedCurrency, setSelectedCurrency] =
     useState<CurrencyCode>(displayCurrency);
+  const [valuationMode, setValuationMode] =
+    useState<VenezuelaDisplayMode>('USD');
   const modalBottomInset = useAppModalBottomInset();
   const detailCurrencies = useMemo<readonly CurrencyCode[]>(() => {
     if (!category) return [];
@@ -130,20 +134,32 @@ export function CategoryDetailModal({
             authorFilteredTransactions,
           ).filter(
             (t) =>
-              t.categoryId === category.id && t.currency === selectedCurrency,
+              t.categoryId === category.id &&
+              (venezuelaCurrencyMode ? true : t.currency === selectedCurrency),
           )
         : [],
-    [authorFilteredTransactions, category, selectedCurrency],
+    [
+      authorFilteredTransactions,
+      category,
+      selectedCurrency,
+      venezuelaCurrencyMode,
+    ],
   );
   const allCategoryTransactions = useMemo(
     () =>
       category
         ? authorFilteredTransactions.filter(
             (t) =>
-              t.categoryId === category.id && t.currency === selectedCurrency,
+              t.categoryId === category.id &&
+              (venezuelaCurrencyMode ? true : t.currency === selectedCurrency),
           )
         : [],
-    [authorFilteredTransactions, category, selectedCurrency],
+    [
+      authorFilteredTransactions,
+      category,
+      selectedCurrency,
+      venezuelaCurrencyMode,
+    ],
   );
   const todayKey = getLocalTodayKey();
   const pastCategoryTransactions = useMemo(
@@ -177,8 +193,29 @@ export function CategoryDetailModal({
         : undefined,
     [authorFilteredTransactions, category, selectedCurrency],
   );
-  const historicalValuation =
-    useHistoricalTransactionValuation(categoryTransactions);
+  const exchangeRatesState = useExchangeRates();
+  const apiRates =
+    exchangeRatesState.status === 'success' ||
+    exchangeRatesState.status === 'stale'
+      ? exchangeRatesState.rates.rates
+      : null;
+
+  const fallbackRates = useMemo(
+    () =>
+      extractRatesFromTransactions(
+        categoryTransactions.length > 0 ? categoryTransactions : transactions,
+      ),
+    [categoryTransactions, transactions],
+  );
+
+  const bcvRate = apiRates?.BCV?.rate
+    ? Number(apiRates.BCV.rate)
+    : fallbackRates.bcvRate;
+  const eurRate = apiRates?.EURO?.rate
+    ? Number(apiRates.EURO.rate)
+    : fallbackRates.eurRate;
+
+  const hasValuation = venezuelaCurrencyMode || bcvRate !== null;
   const budgetExpenseMinor = useMemo(() => {
     if (!category) return 0;
     return listTransactionsThroughCurrentMonth(transactions)
@@ -205,7 +242,7 @@ export function CategoryDetailModal({
         ? displayCurrency
         : (detailCurrencies[0] ?? displayCurrency),
     );
-    historicalValuation.setSelectedSource(null);
+    setValuationMode('USD');
   }
 
   useEffect(() => {
@@ -216,12 +253,27 @@ export function CategoryDetailModal({
 
   if (!category || !summary) return null;
 
-  const expense = formatCurrency(
-    summary.expenseMinor,
+  const metrics = computeCategoryMetrics({
+    bcvRate,
+    eurRate,
+    mode: valuationMode,
     selectedCurrency,
+    transactions: categoryTransactions,
+    venezuelaCurrencyMode,
+  });
+  const effectiveExpenseMinor = metrics.expenseMinor;
+  const effectiveIncomeMinor = metrics.incomeMinor;
+  const effectiveCurrency = metrics.currency;
+  const expense = formatCurrency(
+    effectiveExpenseMinor,
+    effectiveCurrency,
     'es-ES',
   );
-  const income = formatCurrency(summary.incomeMinor, selectedCurrency, 'es-ES');
+  const income = formatCurrency(
+    effectiveIncomeMinor,
+    effectiveCurrency,
+    'es-ES',
+  );
   const budget = category.budgetMinor
     ? formatCurrency(category.budgetMinor, spaceCurrency, 'es-ES')
     : null;
@@ -321,7 +373,7 @@ export function CategoryDetailModal({
               />
             ) : null}
 
-            {detailCurrencies.length > 1 ? (
+            {!venezuelaCurrencyMode && detailCurrencies.length > 1 ? (
               <SegmentedControl
                 onChange={setSelectedCurrency}
                 options={detailCurrencies.map((currency) => ({
@@ -334,22 +386,22 @@ export function CategoryDetailModal({
               />
             ) : null}
 
-            {historicalValuation.summary &&
-            historicalValuation.selectedSource ? (
-              <HistoricalTransactionValuation
-                availableSources={historicalValuation.availableSources}
-                onChangeSource={historicalValuation.setSelectedSource}
-                selectedSource={historicalValuation.selectedSource}
-                summary={historicalValuation.summary}
+            {hasValuation ? (
+              <VenezuelaDisplayModeSelector
+                hideLabel
+                indicatorColor={categoryColors[category.colorToken]}
+                mode={valuationMode}
+                onChange={setValuationMode}
+                style={styles.valuationSelector}
                 testID="category-historical-valuation"
               />
             ) : null}
 
             <CategoryTransactionMetrics
               expense={expense}
-              expenseMinor={summary.expenseMinor}
+              expenseMinor={effectiveExpenseMinor}
               income={income}
-              incomeMinor={summary.incomeMinor}
+              incomeMinor={effectiveIncomeMinor}
             />
 
             <Pressable
@@ -546,94 +598,4 @@ export function CategoryDetailModal({
       />
     </>
   );
-}
-
-function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
-  return StyleSheet.create({
-    container: { flex: 1 },
-    topBar: {
-      zIndex: 2,
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingTop: spacing.xl,
-    },
-    scroll: { flex: 1 },
-    scrollContent: {
-      paddingTop: spacing.xl + layout.minTouchTarget,
-    },
-    hero: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.lg,
-      marginTop: spacing.lg,
-    },
-    titleBlock: {
-      minWidth: 0,
-      flexShrink: 1,
-      alignItems: 'flex-start',
-      gap: spacing.xxs,
-    },
-    heroIcon: {
-      width: heroIconSize,
-      height: heroIconSize,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      flexShrink: 0,
-    },
-    currencySelector: {
-      alignSelf: 'center',
-      marginTop: spacing.xl,
-      width: 216,
-    },
-    noteButton: {
-      minHeight: layout.controlHeight.regular,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.sm,
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      marginTop: spacing.lg,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-    },
-    noteButtonCopy: { flex: 1, minWidth: 0, gap: spacing.xxs },
-    budgetCard: {
-      gap: spacing.md,
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      marginTop: spacing.lg,
-      padding: spacing.lg,
-    },
-    budgetHeader: {
-      flexDirection: 'row',
-      alignItems: 'flex-end',
-      justifyContent: 'space-between',
-      gap: spacing.md,
-    },
-    budgetTotal: { flexShrink: 1 },
-    actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-    movementsHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-      marginTop: spacing.xxl,
-    },
-    emptyMovements: {
-      alignItems: 'center',
-      gap: spacing.md,
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      padding: spacing.xl,
-    },
-    pressed: { opacity: 0.64 },
-  });
 }

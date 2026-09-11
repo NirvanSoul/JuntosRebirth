@@ -3,6 +3,7 @@ import {
   maxActiveCurrencies,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
+import { getCountryByIso2 } from '@/lib/geography/countryCatalog';
 
 export type CurrencyPreferences = {
   /** Monedas activas del usuario, en orden de elección. La primera es la
@@ -13,6 +14,21 @@ export type CurrencyPreferences = {
 export const defaultCurrencyPreferences: CurrencyPreferences = {
   currencies: [defaultCurrencyCode],
 };
+
+/** Monedas permitidas por defecto al activar el contexto de un país. */
+export function currencyPreferencesForCountry(
+  countryCode: string,
+): CurrencyPreferences {
+  if (countryCode.toUpperCase() === 'VE') {
+    return { currencies: ['USD', 'VES'] };
+  }
+
+  return {
+    currencies: [
+      getCountryByIso2(countryCode)?.currencyCode ?? defaultCurrencyCode,
+    ],
+  };
+}
 
 /**
  * Aplica las reglas del catálogo activo: sin duplicados, como máximo

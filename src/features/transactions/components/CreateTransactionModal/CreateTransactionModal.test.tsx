@@ -1482,7 +1482,7 @@ describe('CreateTransactionModal', () => {
     });
   });
 
-  describe('resaltado morado en botones de metadatos interactuados', () => {
+  describe('tono neutral en botones de metadatos interactuados', () => {
     const bankAccount = {
       id: 'account-1',
       spaceId: 'personal',
@@ -1494,7 +1494,7 @@ describe('CreateTransactionModal', () => {
       isArchived: false,
     };
 
-    it('muestra los botones en tono neutral por defecto y en morado al seleccionarlos', async () => {
+    it('mantiene los botones en tono neutral (textPrimary) al seleccionarlos o modificarlos', async () => {
       const screen = await renderWithTheme(
         <CreateTransactionModal
           activeSpaceId="personal"
@@ -1525,16 +1525,16 @@ describe('CreateTransactionModal', () => {
         ).color,
       ).toBe(colors.textPrimary);
 
-      // 1. Seleccionar fecha -> cambia a morado (cta)
+      // 1. Seleccionar fecha -> permanece en textPrimary (no cambia a morado)
       await fireEvent.press(screen.getByTestId('transaction-date-button'));
       await fireEvent.press(screen.getByLabelText('Guardar fecha'));
       expect(
         StyleSheet.flatten(
           screen.getByTestId('transaction-date-icon').props.style,
         ).color,
-      ).toBe(colors.cta);
+      ).toBe(colors.textPrimary);
 
-      // 2. Seleccionar recurrencia -> cambia a morado (cta)
+      // 2. Seleccionar recurrencia -> permanece en textPrimary (no cambia a morado)
       await fireEvent.press(
         screen.getByTestId('transaction-recurrence-button'),
       );
@@ -1544,9 +1544,9 @@ describe('CreateTransactionModal', () => {
         StyleSheet.flatten(
           screen.getByTestId('transaction-recurrence-icon').props.style,
         ).color,
-      ).toBe(colors.cta);
+      ).toBe(colors.textPrimary);
 
-      // 3. Seleccionar cuenta -> cambia a morado (cta)
+      // 3. Seleccionar cuenta -> permanece en textPrimary (no cambia a morado)
       await fireEvent.press(
         screen.getByTestId('transaction-money-account-button'),
       );
@@ -1556,10 +1556,10 @@ describe('CreateTransactionModal', () => {
         StyleSheet.flatten(
           screen.getByTestId('transaction-money-account-icon').props.style,
         ).color,
-      ).toBe(colors.cta);
+      ).toBe(colors.textPrimary);
     });
 
-    it('precarga en morado los metadatos cuando provienen de initialDraft o initialDate', async () => {
+    it('mantiene en textPrimary los metadatos cuando provienen de initialDraft o initialDate', async () => {
       const screen = await renderWithTheme(
         <CreateTransactionModal
           activeSpaceId="personal"
@@ -1589,17 +1589,17 @@ describe('CreateTransactionModal', () => {
         StyleSheet.flatten(
           screen.getByTestId('transaction-date-icon').props.style,
         ).color,
-      ).toBe(colors.cta);
+      ).toBe(colors.textPrimary);
       expect(
         StyleSheet.flatten(
           screen.getByTestId('transaction-recurrence-icon').props.style,
         ).color,
-      ).toBe(colors.cta);
+      ).toBe(colors.textPrimary);
       expect(
         StyleSheet.flatten(
           screen.getByTestId('transaction-money-account-icon').props.style,
         ).color,
-      ).toBe(colors.cta);
+      ).toBe(colors.textPrimary);
     });
   });
 
@@ -1721,10 +1721,10 @@ describe('CreateTransactionModal', () => {
 
       expect(
         await screen.findByTestId('transaction-exchange-preview-badge'),
-      ).toHaveTextContent('≈ $ 200 · BCV');
+      ).toHaveTextContent('≈ $ 200 · $ BCV');
       expect(
         screen.getByTestId('transaction-exchange-preview-euro-badge'),
-      ).toHaveTextContent('≈ $ 166,67 · Tasa EUR');
+      ).toHaveTextContent('≈ $ 166,67 · € BCV');
       expect(previewExchangeRate).toHaveBeenCalledWith(
         expect.objectContaining({ fromCurrency: 'VES' }),
       );

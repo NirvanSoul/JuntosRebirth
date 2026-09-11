@@ -13,12 +13,16 @@ export type ExchangeRatesState =
  * la persona escriba un importe. `useExchangePreview` es quien resuelve la
  * conversión en vivo mientras escribe.
  */
-export function useExchangeRates(): ExchangeRatesState {
+export function useExchangeRates(options?: {
+  enabled?: boolean;
+}): ExchangeRatesState {
+  const enabled = options?.enabled ?? true;
   const [state, setState] = useState<ExchangeRatesState>({
     status: 'loading',
   });
 
   useEffect(() => {
+    if (!enabled) return;
     let isMounted = true;
     // Reinicia a `loading` al montar; el análisis estático
     // no distingue esto de un `setState` sin frontera asíncrona.
@@ -39,7 +43,7 @@ export function useExchangeRates(): ExchangeRatesState {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [enabled]);
 
   return state;
 }

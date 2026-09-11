@@ -17,7 +17,8 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { Avatar } from '@/components/ui/Avatar/Avatar';
 import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal';
 import { Text } from '@/components/ui/Text/Text';
-import { TransactionExchangeSnapshotCard } from '@/features/exchangeRates/components/TransactionExchangeSnapshotCard';
+import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
+import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import type { MoneyAccount } from '@/features/accounts/types';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
@@ -25,8 +26,12 @@ import type { Category } from '@/features/categories/types';
 import { createStyles } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal.styles';
 import {
   formatTransactionDetailDate,
+  getNextRecurrenceLabel,
+  hasVenezuelaExchangeSnapshot,
   transactionRecurrenceLabels,
 } from '@/features/transactions/components/TransactionDetailModal/transactionDetailPresentation';
+import { TransactionDetailAmount } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailAmount';
+import { TransactionDetailSecondaryActions } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailSecondaryActions';
 import {
   TransactionDetailQuickEditors,
   type TransactionQuickEditField,
@@ -45,7 +50,6 @@ import {
   parseProjectedTransactionId,
 } from '@/features/transactions/utils/transactionRecurrence';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import {
   categoryColors,
@@ -123,6 +127,8 @@ export function TransactionDetailModal({
   const [isRecurrenceExpanded, setRecurrenceExpanded] = useState(false);
   const [visibleRecurrenceCount, setVisibleRecurrenceCount] =
     useState(recurrencePageSize);
+  const [valuationMode, setValuationMode] =
+    useState<VenezuelaDisplayMode>('USD');
   const modalBottomInset = useAppModalBottomInset();
   const author = useTransactionAuthor(transaction?.createdBy ?? '');
 
@@ -134,6 +140,7 @@ export function TransactionDetailModal({
     setDeleteVisible(false);
     setRecurrenceExpanded(false);
     setVisibleRecurrenceCount(recurrencePageSize);
+    setValuationMode('USD');
   }
 
   useEffect(() => {
@@ -144,12 +151,7 @@ export function TransactionDetailModal({
 
   if (!transaction) return null;
 
-  const isIncome = transaction.type === 'income';
-  const amount = formatCurrency(
-    transaction.amountMinor,
-    transaction.currency,
-    'es-ES',
-  );
+  const hasExchangeSnapshot = hasVenezuelaExchangeSnapshot(transaction);
   const title = transaction.title.trim() || category?.name || 'Movimiento';
   const openCategory = () => category && onOpenCategoryDetail?.(category.id);
   const isProjected = parseProjectedTransactionId(transaction.id) !== null;
@@ -164,13 +166,10 @@ export function TransactionDetailModal({
     transaction.recurrence !== 'custom'
       ? nextOccurrenceOn !== undefined
       : upcomingDates.length > visibleRecurrenceCount;
-  const nextRecurrenceValue = nextOccurrenceOn
-    ? formatTransactionDetailDate(nextOccurrenceOn)
-    : transaction.recurrence === 'once'
-      ? 'No se repetirá'
-      : transaction.recurrence === 'custom'
-        ? 'No quedan repeticiones'
-        : 'Sin próxima fecha';
+  const nextRecurrenceValue = getNextRecurrenceLabel(
+    transaction.recurrence,
+    nextOccurrenceOn,
+  );
 
   return (
     <>
@@ -269,6 +268,19 @@ export function TransactionDetailModal({
               </Pressable>
             </View>
 
+            {hasExchangeSnapshot ? (
+              <VenezuelaDisplayModeSelector
+                hideLabel
+                indicatorColor={
+                  category ? categoryColors[category.colorToken] : colors.brand
+                }
+                mode={valuationMode}
+                onChange={setValuationMode}
+                style={styles.valuationSelector}
+                testID="transaction-detail-display-mode-selector"
+              />
+            ) : null}
+
             {isDeleteVisible ? (
               <DestructiveConfirmationPanel
                 description={
@@ -283,90 +295,19 @@ export function TransactionDetailModal({
               />
             ) : null}
 
-            <Pressable
-              accessibilityLabel={`Editar importe: ${isIncome ? 'Ingreso' : 'Gasto'} de ${amount}`}
-              accessibilityRole="button"
+            <TransactionDetailAmount
+              mode={valuationMode}
               onPress={() => onEdit(transaction.id)}
-              style={({ pressed }) => [
-                styles.amountCard,
-                pressed && styles.pressed,
-              ]}
-              testID="transaction-detail-amount"
-            >
-              <Text tone="secondary" variant="caption">
-                {isIncome ? 'Importe ingresado' : 'Importe gastado'}
-              </Text>
-              <View style={styles.amountRow}>
-                <Text variant="amount">{amount}</Text>
-                <View
-                  style={styles.directionIcon}
-                  testID="transaction-detail-direction-icon"
-                >
-                  <View style={styles.diagonalArrow}>
-                    <Ionicons
-                      color={isIncome ? colors.income : colors.expense}
-                      name={isIncome ? 'arrow-up' : 'arrow-down'}
-                      size={iconSize.sm}
-                      testID="transaction-detail-direction-glyph"
-                    />
-                  </View>
-                </View>
-              </View>
-            </Pressable>
-
-            <TransactionExchangeSnapshotCard
-              accountingAmountMinorUsd={transaction.accountingAmountMinorUsd}
-              amountMinor={transaction.amountMinor}
-              currency={transaction.currency}
-              exchangeSnapshot={transaction.exchangeSnapshot}
-              key={transaction.id}
+              transaction={transaction}
             />
 
             {!isProjected ? (
-              <View style={styles.actionsRow}>
-                <Pressable
-                  accessibilityLabel={
-                    reminder ? 'Editar recordatorio' : 'Programar recordatorio'
-                  }
-                  accessibilityRole="button"
-                  onPress={() => setReminderModalVisible(true)}
-                  style={({ pressed }) => [
-                    styles.secondaryAction,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Ionicons
-                    color={colors.textMuted}
-                    name="alarm-outline"
-                    size={iconSize.md}
-                    testID="transaction-action-icon-alarm-outline"
-                  />
-                  <Text align="center" variant="footnote" weight="semibold">
-                    {reminder ? 'Editar recordatorio' : 'Recordar'}
-                  </Text>
-                </Pressable>
-                {shareTargets.length > 0 ? (
-                  <Pressable
-                    accessibilityLabel="Copiar en otro espacio"
-                    accessibilityRole="button"
-                    onPress={() => setSpacePickerVisible(true)}
-                    style={({ pressed }) => [
-                      styles.secondaryAction,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Ionicons
-                      color={colors.textMuted}
-                      name="copy-outline"
-                      size={iconSize.md}
-                      testID="transaction-action-icon-copy-outline"
-                    />
-                    <Text align="center" variant="footnote" weight="semibold">
-                      Copiar en otro espacio
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
+              <TransactionDetailSecondaryActions
+                hasReminder={Boolean(reminder)}
+                hasShareTargets={shareTargets.length > 0}
+                onPressCopy={() => setSpacePickerVisible(true)}
+                onPressReminder={() => setReminderModalVisible(true)}
+              />
             ) : null}
 
             <View style={styles.detailsCard}>
