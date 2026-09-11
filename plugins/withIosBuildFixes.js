@@ -1,8 +1,41 @@
 const { withDangerousMod } = require('expo/config-plugins');
+const {
+  withBuildSourceFile,
+} = require('@expo/config-plugins/build/ios/XcodeProjectFile');
 const fs = require('fs');
 const path = require('path');
 
 const deploymentTarget = '16.4';
+
+const sceneDelegateSource = `internal import Expo
+import React
+import ReactAppDependencyProvider
+
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+  private var reactNativeDelegate: ExpoReactNativeFactoryDelegate?
+  private var reactNativeFactory: RCTReactNativeFactory?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene else { return }
+
+    let delegate = ReactNativeDelegate()
+    let factory = ExpoReactNativeFactory(delegate: delegate)
+    delegate.dependencyProvider = RCTAppDependencyProvider()
+
+    reactNativeDelegate = delegate
+    reactNativeFactory = factory
+
+    let window = UIWindow(windowScene: windowScene)
+    self.window = window
+    factory.startReactNative(withModuleName: "main", in: window, launchOptions: nil)
+  }
+}
+`;
 
 function patchPodfile(contents) {
   if (contents.includes('Juntoss: compatibilidad con Xcode 27')) {
@@ -34,25 +67,34 @@ function patchPodfile(contents) {
 
 function patchBundleScript(contents) {
   const generatedCommand =
-    "`\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`";
+    /`\\?"\$NODE_BINARY\\?" --print \\?"require\('path'\)\.dirname\(require\.resolve\('react-native\/package\.json'\)\) \+ '\/scripts\/react-native-xcode\.sh'\\?"`/;
   const safeCommand =
-    'REACT_NATIVE_XCODE_SCRIPT="$("$NODE_BINARY" --print "require(\'path\').dirname(require.resolve(\'react-native/package.json\')) + \'/scripts/react-native-xcode.sh\'")"\\n"$REACT_NATIVE_XCODE_SCRIPT"';
+    'REACT_NATIVE_XCODE_SCRIPT=\\"$(\\"$NODE_BINARY\\" --print \\"require(\'path\').dirname(require.resolve(\'react-native/package.json\')) + \'/scripts/react-native-xcode.sh\'\\")\\"\\n\\"$REACT_NATIVE_XCODE_SCRIPT\\"';
 
   return contents.replace(generatedCommand, safeCommand);
 }
 
 function patchAppDelegate(contents) {
-  if (contents.includes('bindReactNativeFactory(factory)')) {
-    return contents;
-  }
-
-  return contents.replace(
-    '    let factory = ExpoReactNativeFactory(delegate: delegate)',
-    '    let factory = ExpoReactNativeFactory(delegate: delegate)\n    bindReactNativeFactory(factory)',
-  );
+  return contents
+    .replace(/^import Expo$/m, 'internal import Expo')
+    .replace(/\n    bindReactNativeFactory\(factory\)/, '')
+    .replace(
+      /  var window: UIWindow\?\n\n  var reactNativeDelegate: ExpoReactNativeFactoryDelegate\?\n  var reactNativeFactory: RCTReactNativeFactory\?\n\n/,
+      '',
+    )
+    .replace(
+      /    let delegate = ReactNativeDelegate\(\)[\s\S]*?#endif\n\n/,
+      '',
+    );
 }
 
 module.exports = function withIosBuildFixes(config) {
+  config = withBuildSourceFile(config, {
+    filePath: 'SceneDelegate.swift',
+    contents: sceneDelegateSource,
+    overwrite: true,
+  });
+
   return withDangerousMod(config, [
     'ios',
     async (modConfig) => {
@@ -76,10 +118,10 @@ module.exports = function withIosBuildFixes(config) {
         );
       }
       if (fs.existsSync(appDelegatePath)) {
-        const appDelegate = fs
-          .readFileSync(appDelegatePath, 'utf8')
-          .replace('internal import Expo', 'import Expo');
-        fs.writeFileSync(appDelegatePath, patchAppDelegate(appDelegate));
+        fs.writeFileSync(
+          appDelegatePath,
+          patchAppDelegate(fs.readFileSync(appDelegatePath, 'utf8')),
+        );
       }
       if (fs.existsSync(projectPath)) {
         fs.writeFileSync(

@@ -13,11 +13,14 @@ jest.mock('expo-file-system', () => ({
   })),
 }));
 
-function buildWorkbookBase64(rows: readonly (readonly unknown[])[]): string {
+function buildWorkbookBase64(
+  rows: readonly (readonly unknown[])[],
+  bookType: 'xls' | 'xlsx' = 'xlsx',
+): string {
   const sheet = XLSX.utils.aoa_to_sheet(rows as unknown[][]);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Sheet1');
-  return XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+  return XLSX.write(workbook, { type: 'base64', bookType });
 }
 
 describe('parseSpreadsheetFile', () => {
@@ -39,6 +42,23 @@ describe('parseSpreadsheetFile', () => {
     expect(result.headers).toEqual(['Fecha', 'Concepto', 'Importe']);
     expect(result.rows).toHaveLength(2);
     expect(result.rows[0]).toEqual(['2026-08-01', 'Supermercado', -32.44]);
+  });
+
+  it('conserva la lectura de extractos XLS heredados', async () => {
+    mockBase64.mockResolvedValue(
+      buildWorkbookBase64(
+        [
+          ['Fecha', 'Concepto', 'Importe'],
+          ['2026-08-01', 'Supermercado', -32.44],
+        ],
+        'xls',
+      ),
+    );
+
+    const result = await parseSpreadsheetFile('file:///fake.xls');
+
+    expect(result.headers).toEqual(['Fecha', 'Concepto', 'Importe']);
+    expect(result.rows).toEqual([['2026-08-01', 'Supermercado', -32.44]]);
   });
 
   it('detecta la fila de encabezados aunque haya filas vacías antes', async () => {

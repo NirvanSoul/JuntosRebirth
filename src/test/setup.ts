@@ -85,3 +85,23 @@ jest.mock('@/lib/auth-client', () => {
     },
   };
 });
+
+jest.mock('expo-sqlite', () => ({
+  deleteDatabaseAsync: jest.fn(async () => {}),
+  openDatabaseAsync: jest.fn(async () => ({
+    closeAsync: jest.fn(async () => {}),
+    execAsync: jest.fn(async () => {}),
+    getFirstAsync: jest.fn(async () => null),
+    getAllAsync: jest.fn(async () => []),
+    runAsync: jest.fn(async () => ({ changes: 0, lastInsertRowId: 0 })),
+    withExclusiveTransactionAsync: jest.fn(
+      async (callback: (tx: unknown) => Promise<unknown>) =>
+        callback({
+          execAsync: jest.fn(async () => {}),
+          getFirstAsync: jest.fn(async () => null),
+          getAllAsync: jest.fn(async () => []),
+          runAsync: jest.fn(async () => ({ changes: 0, lastInsertRowId: 0 })),
+        }),
+    ),
+  })),
+}));

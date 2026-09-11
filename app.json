@@ -9,6 +9,19 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.juntoss.app",
+      "infoPlist": {
+        "UIApplicationSceneManifest": {
+          "UIApplicationSupportsMultipleScenes": false,
+          "UISceneConfigurations": {
+            "UIWindowSceneSessionRoleApplication": [
+              {
+                "UISceneConfigurationName": "Default Configuration",
+                "UISceneDelegateClassName": "$(PRODUCT_MODULE_NAME).SceneDelegate"
+              }
+            ]
+          }
+        }
+      },
       "privacyManifests": {
         "NSPrivacyTracking": false,
         "NSPrivacyTrackingDomains": [],
