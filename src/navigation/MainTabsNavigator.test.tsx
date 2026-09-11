@@ -1200,7 +1200,7 @@ describe('MainTabsNavigator', () => {
       within(updatedDetail).getByRole('button', { name: 'Eliminar' }),
     );
 
-    expect(await screen.findByText('Aún no hay movimientos')).toBeTruthy();
+    expect(await screen.findByTestId('home-empty-activity')).toBeTruthy();
   });
 
   describe('sincronización y registro de errores (Tarea 1)', () => {

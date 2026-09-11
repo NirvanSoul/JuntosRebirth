@@ -22,15 +22,11 @@ export function AppBootstrap() {
     throw fontError;
   }
 
-  if (!fontsLoaded) {
-    return null;
-  }
-
   return (
     <>
       <AppStatusBar />
-      <RootNavigator />
-      <InvitationPushRegistration />
+      <RootNavigator fontsReady={fontsLoaded} />
+      {fontsLoaded && <InvitationPushRegistration />}
     </>
   );
 }

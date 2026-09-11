@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { linking } from '@/navigation/linking';
+import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
@@ -13,7 +14,7 @@ import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import { fontFamily } from '@/theme/fonts';
 
-export function RootNavigator() {
+export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(createStyles);
   const { isReady: isAuthReady, session } = useBetterAuthSession();
@@ -44,8 +45,12 @@ export function RootNavigator() {
     [colors, isDark],
   );
 
-  if (!isAuthReady || !isOnboardingReady) {
-    return <View style={styles.root} testID="root-navigator-backdrop" />;
+  if (!fontsReady || !isAuthReady || !isOnboardingReady) {
+    return (
+      <View style={styles.root} testID="root-navigator-backdrop">
+        <LoadingState showLabel={fontsReady} />
+      </View>
+    );
   }
 
   // Una sesión provisional de registro no concede acceso. El valor estricto

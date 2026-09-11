@@ -104,6 +104,17 @@ Responsabilidades:
 
 No contiene lógica específica de movimientos, categorías o espacios.
 
+El arranque monta `RootNavigator` mientras Expo carga las fuentes: la lectura
+de sesión y de la marca de onboarding empieza en paralelo. La navegación sigue
+bloqueada hasta completar esas tres condiciones y conserva la exigencia de
+correo verificado. `LoadingState` muestra una espera indeterminada compartida
+con la preparación del espacio, sin texto hasta disponer de las fuentes, con
+colores del tema y movimiento reducido del sistema mediante Reanimated.
+No impone una duración mínima ni espera a terminar la animación para continuar.
+Las ilustraciones del onboarding se precargan solo al montar ese flujo, en
+segundo plano; su primera pantalla no depende de completar toda la precarga.
+La inicialización y sincronización de la cuenta mantienen su orden actual.
+
 ---
 
 ## 5. `src/navigation/`

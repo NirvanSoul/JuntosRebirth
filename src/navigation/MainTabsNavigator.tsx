@@ -1,14 +1,10 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Alert, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
 import { ActiveSpaceHeader } from '@/components/navigation/ActiveSpaceHeader/ActiveSpaceHeader';
 import { FloatingCreateButton } from '@/components/navigation/FloatingCreateButton/FloatingCreateButton';
 import { AppTabBar } from '@/components/navigation/AppTabBar/AppTabBar';
@@ -918,17 +914,7 @@ export function MainTabsNavigator() {
 
   if (!isReady || !isFinanceReady) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.background,
-        }}
-        testID="spaces-loading"
-      >
-        <ActivityIndicator color={colors.brand} />
-      </View>
+      <LoadingState label="Preparando tu espacio" testID="spaces-loading" />
     );
   }
 

@@ -21,8 +21,8 @@ const onboardingIllustrations = [
 ];
 
 /**
- * Descarga y cachea las ilustraciones antes de que se monte la primera
- * lámina. `Asset.loadAsync` resuelve las fuentes empaquetadas y `prefetch`
+ * Descarga y cachea las ilustraciones al entrar al onboarding, sin bloquear
+ * la primera lámina. `Asset.loadAsync` resuelve las fuentes empaquetadas y `prefetch`
  * adelanta también la caché nativa de `Image`.
  */
 let preloadPromise: Promise<void> | null = null;
@@ -49,8 +49,3 @@ export function preloadOnboardingIllustrations(): Promise<void> {
 
   return preloadPromise;
 }
-
-// Este módulo se carga como dependencia de RootNavigator, antes de comprobar
-// la sesión y el estado de onboarding. Así los nueve assets empiezan a cargar
-// durante el arranque, no después de pintar la pantalla de nombre.
-void preloadOnboardingIllustrations();

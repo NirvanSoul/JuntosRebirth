@@ -1,5 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import { AddFirstExpenseScreen } from '@/features/onboarding/screens/AddFirstExpenseScreen';
 import { AddFirstIncomeScreen } from '@/features/onboarding/screens/AddFirstIncomeScreen';
@@ -34,24 +34,9 @@ type OnboardingNavigatorProps = {
 };
 
 export function OnboardingNavigator({ onComplete }: OnboardingNavigatorProps) {
-  const [areIllustrationsReady, setIllustrationsReady] = useState(false);
-
   useEffect(() => {
-    let isMounted = true;
-
-    void preloadOnboardingIllustrations().finally(() => {
-      if (isMounted) setIllustrationsReady(true);
-    });
-
-    return () => {
-      isMounted = false;
-    };
+    void preloadOnboardingIllustrations();
   }, []);
-
-  // Las nueve ilustraciones ya comenzaron a cargarse al importar el módulo.
-  // Esperamos su caché antes de montar la primera lámina para que no aparezca
-  // tarde respecto de su copy al entrar o cambiar de pantalla.
-  if (!areIllustrationsReady) return null;
 
   return (
     <OnboardingFlowContext.Provider value={{ completeOnboarding: onComplete }}>

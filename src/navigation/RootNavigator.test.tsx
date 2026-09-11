@@ -94,6 +94,19 @@ describe('RootNavigator', () => {
       ),
     ).toBe(darkColors.background);
     expect(screen.queryByText('pestañas')).toBeNull();
+    expect(screen.getByRole('progressbar')).toBeTruthy();
+  });
+
+  it('espera las fuentes sin mostrar texto ni abrir la cuenta prematuramente', async () => {
+    const screen = await renderWithTheme(<RootNavigator fontsReady={false} />);
+
+    expect(screen.getByRole('progressbar')).toBeTruthy();
+    expect(screen.queryByText('Abriendo juntoss')).toBeNull();
+    expect(screen.queryByText('pestañas')).toBeNull();
+
+    await screen.rerender(<RootNavigator fontsReady />);
+    expect(screen.getByText('pestañas')).toBeTruthy();
+    expect(screen.queryByRole('progressbar')).toBeNull();
   });
 
   it('mantiene el fondo del tema mientras se restaura el estado del onboarding', async () => {
