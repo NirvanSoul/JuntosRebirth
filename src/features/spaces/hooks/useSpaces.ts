@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import { createJuntossInvitationGateway } from '@/features/spaces/gateways/juntossInvitationGateway';
@@ -7,6 +7,7 @@ import {
   createSpaceId,
   loadSpaces,
   saveSpaces,
+  updateSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
 import {
   initialSpacesState,
@@ -151,10 +152,6 @@ export function useSpaces(): SpacesController {
   const [error, setError] = useState<string | null>(null);
   const { isReady: isAuthReady, session } = useAuthSession();
   const userId = session?.user.id ?? null;
-  const stateRef = useRef(state);
-  useEffect(() => {
-    stateRef.current = state;
-  });
 
   useEffect(() => {
     let isMounted = true;
@@ -207,14 +204,15 @@ export function useSpaces(): SpacesController {
       currentError === remoteSpaceIntegrityErrorMessage ? null : currentError,
     );
 
-    const merged = mergeRemoteCoupleSpace(stateRef.current, remoteSpace);
-    if (merged === stateRef.current) return;
-
+    // Se fusiona sobre lo guardado, no sobre el estado en memoria: el snapshot
+    // puede haber reescrito el catálogo mientras esta petición estaba en vuelo.
+    let merged: SpacesState;
     try {
-      await saveSpaces(merged);
+      merged = await updateSpaces((stored) =>
+        mergeRemoteCoupleSpace(stored, remoteSpace),
+      );
     } catch {
-      // El catálogo local sigue siendo válido; se reintentará más adelante.
-      return;
+      return; // El catálogo local sigue siendo válido; se reintentará.
     }
     setState(merged);
   }, [userId]);

@@ -1,12 +1,11 @@
 import { type RemoteAccountSnapshot } from '@/features/sync/gateways/juntossRemoteAccountGateway';
 import {
-  findLocalIdForRemoteEntity,
-  linkRemoteEntity,
+  loadRemoteEntityLinks,
+  type RemoteEntityType,
+  upsertRemoteEntityLink,
 } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
-import {
-  loadSpaces,
-  saveSpaces,
-} from '@/features/spaces/repositories/localSpaceRepository';
+import type { LocalSqlExecutor } from '@/lib/storage/localSqlExecutor';
+import { updateSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import type { Space } from '@/features/spaces/types';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { fetchRemoteAccountSnapshot } from '@/features/sync/gateways/juntossRemoteAccountGateway';
@@ -25,40 +24,57 @@ const restoreInFlightByUserId = new Map<
   Promise<RestoredRemoteAccount>
 >();
 
+/**
+ * Traduce ids remotos a locales con los enlaces ya cargados en memoria. El
+ * enlace existente manda; si no lo hay, el id local es el remoto. Cada enlace
+ * se escribe igualmente para refrescar `updated_at`, pero sin releerlo: el
+ * enlace de cada fila pasa de tres sentencias SQLite (buscar, escribir,
+ * releer) a una, lo que en una cuenta con miles de movimientos es la mayor
+ * parte del coste local del snapshot.
+ */
+async function createLinkResolver(input: {
+  executor: LocalSqlExecutor;
+  userId: string;
+  entityType: RemoteEntityType;
+}): Promise<(remoteId: string) => Promise<string>> {
+  const links = await loadRemoteEntityLinks(input);
+  return async (remoteId) => {
+    const localId = links.get(remoteId) ?? remoteId;
+    await upsertRemoteEntityLink({ ...input, remoteId, localId });
+    return localId;
+  };
+}
+
 export async function restoreRemoteAccount(input: {
   userId: string;
   snapshot: RemoteAccountSnapshot;
 }): Promise<RestoredRemoteAccount> {
-  const stored = await loadSpaces();
   const database = await getLocalDatabase();
   const localSpaceIdByRemoteId = new Map<string, string>();
   const remoteSpaces: Space[] = [];
 
+  const linkSpace = await createLinkResolver({
+    executor: database,
+    userId: input.userId,
+    entityType: 'space',
+  });
   for (const remoteSpace of input.snapshot.spaces) {
-    const linked = await findLocalIdForRemoteEntity({
-      executor: database,
-      userId: input.userId,
-      entityType: 'space',
-      remoteId: remoteSpace.remoteId,
-    });
     // Un contexto personal por país tiene un espacio remoto distinto. Reusar
     // el id local fijo `personal` mezclaría, por ejemplo, España y Venezuela.
     // Las cuentas previas conservan su enlace histórico hacia `personal`; los
     // contextos nuevos usan su UUID remoto como id local.
-    const localId = linked ?? remoteSpace.remoteId;
-    await linkRemoteEntity({
-      executor: database,
-      userId: input.userId,
-      entityType: 'space',
-      remoteId: remoteSpace.remoteId,
-      localId,
-    });
+    const localId = await linkSpace(remoteSpace.remoteId);
     localSpaceIdByRemoteId.set(remoteSpace.remoteId, localId);
     remoteSpaces.push({
       id: localId,
       name: remoteSpace.name,
       type: remoteSpace.type,
       currency: remoteSpace.currency,
+      // El snapshot es fuente completa: un espacio juntos sin activar sigue
+      // esperando a la pareja, y así no depende de otra petición.
+      ...(remoteSpace.type === 'couple'
+        ? { isAwaitingPartner: remoteSpace.activatedAt === null }
+        : {}),
     });
   }
 
@@ -67,14 +83,17 @@ export async function restoreRemoteAccount(input: {
   // volver a exponer sus categorías, cuentas o movimientos en la interfaz.
   const spaces = remoteSpaces;
   const personalSpace = spaces.find((space) => space.type === 'personal');
-  const activeSpaceId = spaces.some(
-    (space) => space.id === stored.activeSpaceId,
-  )
-    ? stored.activeSpaceId
-    : (personalSpace?.id ?? spaces[0]?.id);
-  if (!activeSpaceId)
+  const fallbackActiveSpaceId = personalSpace?.id ?? spaces[0]?.id;
+  if (!fallbackActiveSpaceId)
     throw new Error('La cuenta remota no tiene espacios activos');
-  await saveSpaces({ spaces, activeSpaceId });
+  // La selección activa se decide sobre lo guardado en el instante de
+  // escribir, dentro de la cola del catálogo.
+  await updateSpaces((stored) => ({
+    spaces,
+    activeSpaceId: spaces.some((space) => space.id === stored.activeSpaceId)
+      ? stored.activeSpaceId
+      : fallbackActiveSpaceId,
+  }));
 
   const localCategoryIdByRemoteId = new Map<string, string>();
   const localMoneyAccountIdByRemoteId = new Map<string, string>();
@@ -82,22 +101,26 @@ export async function restoreRemoteAccount(input: {
     input.snapshot.spaces.map((space) => [space.remoteId, space.currency]),
   );
   await database.withExclusiveTransactionAsync(async (transaction) => {
+    const linkCategory = await createLinkResolver({
+      executor: transaction,
+      userId: input.userId,
+      entityType: 'category',
+    });
+    const linkMoneyAccount = await createLinkResolver({
+      executor: transaction,
+      userId: input.userId,
+      entityType: 'money_account',
+    });
+    const linkTransaction = await createLinkResolver({
+      executor: transaction,
+      userId: input.userId,
+      entityType: 'transaction',
+    });
+
     for (const remoteCategory of input.snapshot.categories) {
       const spaceId = localSpaceIdByRemoteId.get(remoteCategory.spaceRemoteId);
       if (!spaceId) continue;
-      const linked = await findLocalIdForRemoteEntity({
-        executor: transaction,
-        userId: input.userId,
-        entityType: 'category',
-        remoteId: remoteCategory.remoteId,
-      });
-      const categoryId = await linkRemoteEntity({
-        executor: transaction,
-        userId: input.userId,
-        entityType: 'category',
-        remoteId: remoteCategory.remoteId,
-        localId: linked ?? remoteCategory.remoteId,
-      });
+      const categoryId = await linkCategory(remoteCategory.remoteId);
       localCategoryIdByRemoteId.set(remoteCategory.remoteId, categoryId);
       await transaction.runAsync(
         `INSERT INTO categories (
@@ -153,19 +176,7 @@ export async function restoreRemoteAccount(input: {
     for (const remoteAccount of input.snapshot.moneyAccounts) {
       const spaceId = localSpaceIdByRemoteId.get(remoteAccount.spaceRemoteId);
       if (!spaceId) continue;
-      const linked = await findLocalIdForRemoteEntity({
-        executor: transaction,
-        userId: input.userId,
-        entityType: 'money_account',
-        remoteId: remoteAccount.remoteId,
-      });
-      const moneyAccountId = await linkRemoteEntity({
-        executor: transaction,
-        userId: input.userId,
-        entityType: 'money_account',
-        remoteId: remoteAccount.remoteId,
-        localId: linked ?? remoteAccount.remoteId,
-      });
+      const moneyAccountId = await linkMoneyAccount(remoteAccount.remoteId);
       localMoneyAccountIdByRemoteId.set(remoteAccount.remoteId, moneyAccountId);
       await transaction.runAsync(
         `INSERT INTO money_accounts (
@@ -265,13 +276,7 @@ export async function restoreRemoteAccount(input: {
         remoteTransaction.categoryRemoteId,
       );
       if (!spaceId || !categoryId) continue;
-      const transactionId = await linkRemoteEntity({
-        executor: transaction,
-        userId: input.userId,
-        entityType: 'transaction',
-        remoteId: remoteTransaction.remoteId,
-        localId: remoteTransaction.remoteId,
-      });
+      const transactionId = await linkTransaction(remoteTransaction.remoteId);
       await transaction.runAsync(
         `INSERT INTO transactions (
            id, space_id, category_id, money_account_id, created_by, type,
@@ -341,14 +346,15 @@ export async function restoreRemoteAccountForCurrentSession(): Promise<RestoredR
 
   let task: Promise<RestoredRemoteAccount>;
   task = (async () => {
-    const snapshot = await fetchRemoteAccountSnapshot();
+    // Las dos descargas son independientes: pedirlas a la vez ahorra una ida
+    // y vuelta completa. La API ya filtra las revisiones por usuario, así que
+    // no hace falta pasarle los espacios.
+    const [snapshot, reviews] = await Promise.all([
+      fetchRemoteAccountSnapshot(),
+      fetchRemoteImportReviews(),
+    ]);
     const restored = await restoreRemoteAccount({ userId, snapshot });
-    // La API ya filtra las revisiones por usuario, así que no hace falta pasarle
-    // los espacios.
-    await restoreRemoteImportReviews({
-      reviews: await fetchRemoteImportReviews(),
-      restored,
-    });
+    await restoreRemoteImportReviews({ reviews, restored });
     return restored;
   })().finally(() => {
     if (restoreInFlightByUserId.get(userId) === task) {

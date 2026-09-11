@@ -14,6 +14,21 @@ import { loadCurrencyPreferences } from '@/state/appPreferences/currencyPreferen
 
 const spacesStorageKey = '@juntoss/spaces/v1';
 
+/**
+ * AsyncStorage no serializa a quienes escriben el catálogo. Sin esta cola, la
+ * comprobación remota del espacio de pareja y la restauración del snapshot
+ * (que arrancan a la vez al abrir la cuenta) se pisaban: ganaba el último
+ * `setItem`, y se perdía o el catálogo del snapshot o la marca de "esperando
+ * pareja". Todas las escrituras pasan por aquí, en orden.
+ */
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+function enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = writeQueue.then(task, task);
+  writeQueue = run.catch(() => undefined);
+  return run;
+}
+
 type StoredSpacesState = {
   version: 2;
   activeSpaceId: string;
@@ -87,7 +102,8 @@ async function resolveSeedCurrency(): Promise<CurrencyCode> {
     : defaultCurrencyCode;
 }
 
-export async function loadSpaces(): Promise<SpacesState> {
+/** Lectura sin cola: la usan la cola misma y `loadSpaces`. */
+async function readSpaces(): Promise<SpacesState> {
   const stored = await AsyncStorage.getItem(spacesStorageKey);
 
   if (stored === null) {
@@ -96,7 +112,7 @@ export async function loadSpaces(): Promise<SpacesState> {
       activeSpaceId: personalSpace.id,
       spaces: [{ ...personalSpace, currency: seedCurrency }],
     };
-    await saveSpaces(initialState);
+    await writeSpaces(initialState);
     return initialState;
   }
 
@@ -160,14 +176,14 @@ export async function loadSpaces(): Promise<SpacesState> {
       activeSpaceId: candidate.activeSpaceId,
       spaces: migratedSpaces,
     };
-    await saveSpaces(migratedState);
+    await writeSpaces(migratedState);
     return migratedState;
   }
 
   throw new Error('El catálogo de espacios guardado no es válido');
 }
 
-export async function saveSpaces(state: SpacesState): Promise<void> {
+async function writeSpaces(state: SpacesState): Promise<void> {
   const stored: StoredSpacesState = {
     version: 2,
     activeSpaceId: state.activeSpaceId,
@@ -175,6 +191,33 @@ export async function saveSpaces(state: SpacesState): Promise<void> {
   };
 
   await AsyncStorage.setItem(spacesStorageKey, JSON.stringify(stored));
+}
+
+export function loadSpaces(): Promise<SpacesState> {
+  // La siembra y la migración v1 escriben; deben esperar a la cola para no
+  // devolver un catálogo que otra escritura en curso va a sustituir.
+  return enqueueWrite(readSpaces);
+}
+
+export function saveSpaces(state: SpacesState): Promise<void> {
+  return enqueueWrite(() => writeSpaces(state));
+}
+
+/**
+ * Lee, transforma y guarda el catálogo como una sola operación de la cola.
+ * Quien fusiona datos remotos debe partir de lo guardado en ese instante, no
+ * de una copia en memoria que otra escritura pudo dejar atrás. Si `mutate`
+ * devuelve la misma referencia no se escribe nada.
+ */
+export function updateSpaces(
+  mutate: (stored: SpacesState) => SpacesState,
+): Promise<SpacesState> {
+  return enqueueWrite(async () => {
+    const stored = await readSpaces();
+    const next = mutate(stored);
+    if (next !== stored) await writeSpaces(next);
+    return next;
+  });
 }
 
 export function createSpaceId(): string {

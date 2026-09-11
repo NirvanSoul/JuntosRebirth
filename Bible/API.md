@@ -24,7 +24,11 @@ mano. Apple Sign In no está disponible.
   está presente, el cliente lo guarda en `local_profile` antes de restaurar el
   snapshot para que las capacidades monetarias estén disponibles desde el
   primer render.
-- La restauración remota usa `GET /v1/sync/snapshot`.
+- La restauración remota usa `GET /v1/sync/snapshot`. Las revisiones de
+  importación (`GET /v1/sync/import-reviews`) se piden a la vez que el snapshot;
+  se escriben después, sobre los espacios ya restaurados. Al restaurar, los
+  enlaces remoto→local de `remote_entity_links` se leen de una vez por tipo y
+  se escriben sin releerse: un enlace existente conserva su id local.
 - La restauración resuelve la identidad con `getAuthenticatedUserId`: si la
   consulta de sesión pierde la conexión, reutiliza la sesión en memoria. Una
   respuesta explícita sin sesión o con 401 sigue impidiendo restaurar. El
@@ -50,11 +54,25 @@ mano. Apple Sign In no está disponible.
   `GET /v1/sync/snapshot` solo sobrescribe filas locales en `synced`, así que lo
   pendiente de subir sobrevive a la restauración.
 - La identidad que firma las escrituras locales sale siempre de la sesión de
-  Better Auth. `authClient.getSession()` es una petición de red sin caché, así
-  que un corte la resuelve igual que una sesión ausente; el cliente cae
-  entonces a la sesión que `useSession()` conserva en memoria, que es la misma
-  sesión verificada y solo se vacía ante un `401`. Sin esa caída, una conexión
-  inestable convertía a una persona conectada en anónima y detenía sus subidas.
+  Better Auth. Primero se lee la que `useSession()` conserva en memoria —tanto
+  la respuesta ya resuelta como la copia que el cliente Expo hidrata desde
+  SecureStore mientras `/get-session` sigue en vuelo— siempre que esté
+  verificada, no haya caducado y no tenga error; así el arranque no gasta una
+  petición de red por cada paso de la inicialización. Si esa lectura no vale,
+  `authClient.getSession()` consulta al servidor: un corte la resuelve igual
+  que una sesión ausente y el cliente cae entonces a la sesión en memoria,
+  que solo se vacía ante un `401`. Sin esa caída, una conexión inestable
+  convertía a una persona conectada en anónima y detenía sus subidas.
+- Al abrir la app con sesión, la caché local que pertenece a la cuenta se
+  muestra antes de `POST /v1/bootstrap`; el snapshot y la subida de pendientes
+  la actualizan en segundo plano. Ver `ARCHITECTURE.md` §4.
+- El `activatedAt` de cada espacio del snapshot es la fuente de "esperando
+  pareja" (`isAwaitingPartner`), igual que en `GET /v1/spaces`. Las
+  escrituras del catálogo local de espacios se serializan en el repositorio y
+  toda fusión con datos remotos parte de lo guardado en ese instante
+  (`updateSpaces`), no de una copia en memoria: así la comprobación del
+  espacio de pareja y la restauración del snapshot, que arrancan a la vez,
+  no se pisan.
 
 Las rutas `/v1/*` requieren sesión de Better Auth con correo verificado. Las respuestas correctas
 envuelven su contenido en `data`; los errores usan `error.code` y

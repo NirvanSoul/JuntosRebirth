@@ -13,8 +13,9 @@ const expoConfig = require('eslint-config-expo/flat');
 // congelación.
 const frozenLineDebt = {
   // Bajado de 1372 a 1317 el 2026-09-06 al extraer la sincronización financiera
-  // a `features/sync/hooks/useFinanceSync.ts`.
-  'src/navigation/MainTabsNavigator.tsx': 1317,
+  // a `features/sync/hooks/useFinanceSync.ts`, y a 1261 el 2026-09-11 al
+  // extraer la apertura de sesión a `features/sync/hooks/useSessionStartup.ts`.
+  'src/navigation/MainTabsNavigator.tsx': 1261,
   // Umbral elevado de 1209 (techo 1216) el 2026-08-16 por la corrección del
   // stale closure del catálogo (F4, commit 5c19b3b), con aprobación explícita
   // del responsable. La encapsulación en `updateLocalCategories` lo dejó en

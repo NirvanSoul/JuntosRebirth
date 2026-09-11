@@ -105,19 +105,40 @@ Responsabilidades:
 No contiene lógica específica de movimientos, categorías o espacios.
 
 El arranque monta `RootNavigator` mientras Expo carga las fuentes: la lectura
-de sesión y de la marca de onboarding empieza en paralelo. La navegación sigue
-bloqueada hasta completar esas tres condiciones y conserva la exigencia de
-correo verificado. `LoadingState` muestra una barra indeterminada compartida
-con la preparación del espacio, sin texto hasta disponer de las fuentes, con
-colores del tema y movimiento reducido del sistema mediante Reanimated.
-Al estar listos los espacios y las finanzas, la barra sale hacia la izquierda
-y el contenido entra desde la derecha simultáneamente en 280 ms. El contenido
-se monta solo cuando está listo; la animación no controla la disponibilidad
-de datos ni impone una espera mínima. Con movimiento reducido se omiten tanto
-el recorrido de la barra como el deslizamiento de entrada y salida.
+de sesión, de la apariencia guardada y de la marca de onboarding empieza en
+paralelo. La navegación sigue bloqueada hasta completar esas cuatro
+condiciones y conserva la exigencia de correo verificado. La sesión cuenta
+como lista en cuanto el cliente Expo de Better Auth la hidrata desde
+SecureStore, sin esperar a que `/get-session` responda: es la misma sesión
+verificada de la visita anterior y, si el servidor la niega, la navegación
+vuelve al acceso. `LoadingState` muestra una barra de progreso sin texto, en
+el morado `cta` del tema, que avanza una sola vez de izquierda a derecha:
+un tramo rápido y luego un avance lento hasta el 92 % para no parecer
+detenida. `LoadingProgressProvider` comparte ese avance entre la etapa de
+fuentes y sesión (`RootNavigator`) y la de datos (`MainTabsNavigator`): la
+barra que se desmonta ofrece su avance y la siguiente lo continúa solo si se
+monta en el mismo commit; en otro caso vuelve a empezar. `NavigationContainer`
+recibe la misma barra como `fallback` porque, mientras `linking` resuelve la
+URL inicial, no monta hijos y ese hueco reiniciaría el avance. Al estar listos los
+espacios y las finanzas, la barra se completa y el fondo se desvanece mientras
+cada bloque de Home entra por separado con `getStartupEntering` (fundido y
+desplazamiento corto, desfase acotado). Todo se hace con Reanimated y respeta
+el movimiento reducido del sistema. El contenido se monta solo cuando está
+listo; la animación no controla la disponibilidad de datos ni impone una
+espera mínima.
 Las ilustraciones del onboarding se precargan solo al montar ese flujo, en
 segundo plano; su primera pantalla no depende de completar toda la precarga.
-La inicialización y sincronización de la cuenta mantienen su orden actual.
+
+La apertura de la cuenta es local-first (`useSessionStartup`, en
+`features/sync/hooks/`): `initializeAuthenticatedSession` decide primero si la
+caché SQLite pertenece a quien entra y, si la conserva, avisa por
+`onLocalCacheReady` antes de la primera petición de red; la navegación
+principal pinta entonces la caché tal cual. El bootstrap, el snapshot y la
+subida de cambios pendientes siguen en segundo plano en su orden habitual, y
+al terminar el estado se vuelve a leer de SQLite. Solo cuando la caché era de
+otra cuenta se espera al snapshot. El refresco periódico del snapshot arranca
+después de esa inicialización y espera un intervalo completo: repetir la
+descarga que acaba de terminar sería trabajo duplicado.
 
 ---
 
@@ -528,7 +549,10 @@ UI
 La estrategia detallada está en `API.md`.
 
 El catálogo pequeño de espacios y el identificador activo continúan guardándose
-mediante un repositorio encapsulado sobre AsyncStorage. Las categorías y los
+mediante un repositorio encapsulado sobre AsyncStorage, que serializa sus
+escrituras y expone `updateSpaces(mutate)` para leer, transformar y guardar
+como una sola operación; quien fusiona datos remotos usa esa vía en vez de
+guardar una copia en memoria. Las categorías y los
 movimientos usan SQLite mediante `expo-sqlite`, con migraciones versionadas y
 repositorios dentro de cada feature. La interfaz conserva arrays de dominio para
 presentación, pero restaura y confirma cada mutación a través del repositorio; no

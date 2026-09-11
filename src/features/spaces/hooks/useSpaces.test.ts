@@ -8,6 +8,7 @@ import {
   createSpaceId,
   loadSpaces,
   saveSpaces,
+  updateSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
 import { personalSpace, type Space } from '@/features/spaces/types';
 import { listRemoteSpaces } from '@/services/api/spaces';
@@ -81,6 +82,14 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(saveSpaces).mockResolvedValue(undefined);
+    // El doble reproduce el contrato real: lee lo guardado, aplica la
+    // mutación y solo escribe si cambió.
+    jest.mocked(updateSpaces).mockImplementation(async (mutate) => {
+      const stored = await loadSpaces();
+      const next = mutate(stored);
+      if (next !== stored) await saveSpaces(next);
+      return next;
+    });
     jest.mocked(createSpaceId).mockReturnValue('space-generated');
     jest
       .mocked(createJuntossInvitationGateway)
@@ -166,6 +175,64 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
       activeSpaceId: personalSpace.id,
       spaces: [personalSpace, remoteCoupleSpace],
     });
+  });
+
+  it('fusiona el espacio de pareja sobre el catálogo guardado aunque el estado en memoria sea anterior', async () => {
+    // Al montar se lee un catálogo con el id local fijo `personal`; mientras
+    // `/v1/spaces` está en vuelo, la restauración del snapshot lo sustituye
+    // por el UUID remoto. La fusión debe partir de esto último.
+    mockAuthSession(fakeSession);
+    const restoredPersonal: Space = {
+      id: 'personal-remote-uuid',
+      name: 'Personal',
+      type: 'personal',
+      currency: 'EUR',
+    };
+    jest
+      .mocked(loadSpaces)
+      .mockResolvedValueOnce({
+        activeSpaceId: personalSpace.id,
+        spaces: [personalSpace],
+      })
+      .mockResolvedValue({
+        activeSpaceId: restoredPersonal.id,
+        spaces: [restoredPersonal],
+      });
+    mockRemoteCoupleSpace({
+      data: {
+        id: 'space-remote',
+        name: 'Juntos',
+        type: 'couple',
+        currency: 'EUR',
+        activated_at: null,
+      },
+      error: null,
+    });
+
+    const { result } = await renderHook(() => useSpaces());
+
+    await waitFor(() =>
+      expect(result.current.spaces.map((space) => space.id)).toEqual([
+        'personal-remote-uuid',
+        'space-remote',
+      ]),
+    );
+    expect(saveSpaces).toHaveBeenCalledWith({
+      activeSpaceId: restoredPersonal.id,
+      spaces: [
+        restoredPersonal,
+        {
+          id: 'space-remote',
+          name: 'Juntos',
+          type: 'couple',
+          currency: 'EUR',
+          isAwaitingPartner: true,
+        },
+      ],
+    });
+    expect(saveSpaces).not.toHaveBeenCalledWith(
+      expect.objectContaining({ activeSpaceId: personalSpace.id }),
+    );
   });
 
   it('marca el espacio de pareja como pendiente mientras la otra persona no acepta', async () => {

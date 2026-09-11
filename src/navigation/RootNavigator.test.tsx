@@ -1,8 +1,18 @@
-import { type StyleProp, StyleSheet, type ViewStyle } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { act, render } from '@testing-library/react-native';
+import {
+  Linking,
+  type StyleProp,
+  StyleSheet,
+  type ViewStyle,
+} from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { RootNavigator } from '@/navigation/RootNavigator';
+import { saveAppPreferences } from '@/state/appPreferences/appPreferencesRepository';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import { darkColors, lightColors } from '@/theme/colors';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 
 let mockAuthReady = true;
 let mockOnboardingReady = true;
@@ -107,6 +117,74 @@ describe('RootNavigator', () => {
     await screen.rerender(<RootNavigator fontsReady />);
     expect(screen.getByText('pestañas')).toBeTruthy();
     expect(screen.queryByRole('progressbar')).toBeNull();
+  });
+
+  it('mantiene la barra mientras la navegación resuelve la URL inicial', async () => {
+    let resolveInitialUrl: ((value: string | null) => void) | undefined;
+    const getInitialURL = jest
+      .spyOn(Linking, 'getInitialURL')
+      .mockImplementationOnce(
+        () =>
+          new Promise<string | null>((resolve) => {
+            resolveInitialUrl = resolve;
+          }),
+      );
+    try {
+      const screen = await renderWithTheme(<RootNavigator />);
+
+      expect(screen.getByRole('progressbar')).toBeTruthy();
+      expect(screen.queryByText('pestañas')).toBeNull();
+
+      await act(async () => {
+        resolveInitialUrl?.(null);
+      });
+      expect(screen.getByText('pestañas')).toBeTruthy();
+      expect(screen.queryByRole('progressbar')).toBeNull();
+    } finally {
+      getInitialURL.mockRestore();
+    }
+  });
+
+  it('espera la apariencia guardada antes de abrir, sin pintar el fondo claro', async () => {
+    await saveAppPreferences({ appearance: 'dark' });
+    // La lectura de AsyncStorage sigue pendiente: aún no se sabe la apariencia.
+    let resolveStoredPreferences: ((value: string | null) => void) | undefined;
+    const getItem = jest.spyOn(AsyncStorage, 'getItem').mockImplementationOnce(
+      () =>
+        new Promise<string | null>((resolve) => {
+          resolveStoredPreferences = resolve;
+        }),
+    );
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider>
+          <RootNavigator />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getByRole('progressbar')).toBeTruthy();
+    expect(screen.queryByText('pestañas')).toBeNull();
+
+    await act(async () => {
+      resolveStoredPreferences?.(
+        JSON.stringify({ version: 1, appearance: 'dark' }),
+      );
+    });
+
+    expect(await screen.findByText('pestañas')).toBeTruthy();
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('root-navigator-backdrop').props.style,
+      ),
+    ).toBe(darkColors.background);
+    getItem.mockRestore();
   });
 
   it('mantiene el fondo del tema mientras se restaura el estado del onboarding', async () => {

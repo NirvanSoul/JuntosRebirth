@@ -23,7 +23,7 @@ describe('getAuthenticatedUserId', () => {
     });
 
     await expect(getAuthenticatedUserId()).resolves.toBe('user-ana');
-    expect(mockReadCachedSession).not.toHaveBeenCalled();
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
   });
 
   it('devuelve null cuando el servidor confirma que ya no hay sesión', async () => {
@@ -85,4 +85,69 @@ describe('getAuthenticatedUserId', () => {
 
     await expect(getAuthenticatedUserId()).resolves.toBeNull();
   });
+});
+
+describe('lectura de identidad durante el arranque', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function cachedSession(id = 'user-ana') {
+    return {
+      data: {
+        user: { id, emailVerified: true },
+        session: { expiresAt: new Date(Date.now() + 60_000) },
+      },
+      error: null,
+      isPending: false,
+    };
+  }
+
+  it('reutiliza la sesión verificada vigente sin otra petición de red', async () => {
+    mockReadCachedSession.mockReturnValue(cachedSession());
+    mockGetSession.mockResolvedValue({ data: null, error: null });
+
+    await expect(getAuthenticatedUserId()).resolves.toBe('user-ana');
+    await expect(getAuthenticatedUserId()).resolves.toBe('user-ana');
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
+  it('lee el estado actual de Better Auth después de cambiar de cuenta o salir', async () => {
+    mockReadCachedSession.mockReturnValue(cachedSession('user-ana'));
+    await expect(getAuthenticatedUserId()).resolves.toBe('user-ana');
+    mockReadCachedSession.mockReturnValue(cachedSession('user-luis'));
+    await expect(getAuthenticatedUserId()).resolves.toBe('user-luis');
+    mockReadCachedSession.mockReturnValue({ data: null, isPending: false });
+    mockGetSession.mockResolvedValue({ data: null, error: null });
+    await expect(getAuthenticatedUserId()).resolves.toBeNull();
+  });
+
+  it('reutiliza la sesión hidratada desde el dispositivo mientras la petición sigue en vuelo', async () => {
+    // El cliente Expo rellena `data` desde SecureStore antes de que responda
+    // `/get-session`; `isPending` sigue en `true` hasta entonces.
+    mockReadCachedSession.mockReturnValue({
+      ...cachedSession(),
+      isPending: true,
+    });
+    mockGetSession.mockResolvedValue({ data: null, error: null });
+
+    await expect(getAuthenticatedUserId()).resolves.toBe('user-ana');
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
+  it.each(['expired', 'unverified', 'unauthorized', 'invalidExpiry'])(
+    'consulta al servidor si la caché está %s y respeta su 401',
+    async (condition) => {
+      const cached = cachedSession();
+      if (condition === 'expired') cached.data.session.expiresAt = new Date(0);
+      if (condition === 'invalidExpiry')
+        cached.data.session.expiresAt = new Date('invalid');
+      if (condition === 'unverified') cached.data.user.emailVerified = false;
+      mockReadCachedSession.mockReturnValue({
+        ...cached,
+        error: condition === 'unauthorized' ? { status: 401 } : null,
+      });
+      mockGetSession.mockResolvedValue({ data: null, error: { status: 401 } });
+      await expect(getAuthenticatedUserId()).resolves.toBeNull();
+      expect(mockGetSession).toHaveBeenCalledTimes(1);
+    },
+  );
 });

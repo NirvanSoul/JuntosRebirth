@@ -29,7 +29,13 @@ describe('initializeAuthenticatedSession', () => {
     (prepareLocalCacheForSession as jest.Mock).mockResolvedValue('kept');
     (getLocalProfile as jest.Mock).mockResolvedValue({ countryCode: null });
     (bootstrapRemoteAccount as jest.Mock).mockResolvedValue(undefined);
-    (restoreOwnProfile as jest.Mock).mockResolvedValue(undefined);
+    (restoreOwnProfile as jest.Mock).mockResolvedValue(null);
+    (syncSpaceDataForCurrentSession as jest.Mock).mockResolvedValue({
+      categoryCount: 0,
+      moneyAccountCount: 0,
+      recurringSeriesCount: 0,
+      transactionCount: 0,
+    });
     (restoreRemoteAccountForCurrentSession as jest.Mock).mockResolvedValue(
       undefined,
     );
@@ -113,6 +119,46 @@ describe('initializeAuthenticatedSession', () => {
     expect(countryCall).toBeLessThan(restoreCall);
   });
 
+  it('evita un segundo snapshot cuando no hay cambios locales que subir', async () => {
+    await initializeAuthenticatedSession();
+    expect(restoreRemoteAccountForCurrentSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('restaura de nuevo cuando se subieron cambios', async () => {
+    (syncSpaceDataForCurrentSession as jest.Mock).mockResolvedValueOnce({
+      categoryCount: 0,
+      moneyAccountCount: 0,
+      recurringSeriesCount: 0,
+      transactionCount: 1,
+    });
+    await initializeAuthenticatedSession();
+    expect(restoreRemoteAccountForCurrentSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('restaura de nuevo tras una subida incierta sin reintentar la escritura', async () => {
+    const errorLog = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      (syncSpaceDataForCurrentSession as jest.Mock).mockRejectedValueOnce(
+        new Error('Network request failed'),
+      );
+      await initializeAuthenticatedSession();
+      expect(restoreRemoteAccountForCurrentSession).toHaveBeenCalledTimes(2);
+      expect(syncSpaceDataForCurrentSession).toHaveBeenCalledTimes(2);
+    } finally {
+      errorLog.mockRestore();
+    }
+  });
+
+  it('no vuelve a publicar el país que acaba de confirmar el servidor', async () => {
+    (restoreOwnProfile as jest.Mock).mockResolvedValue('VE');
+    (getLocalProfile as jest.Mock).mockResolvedValue({ countryCode: 'VE' });
+    await initializeAuthenticatedSession();
+    expect(syncOwnCountry).not.toHaveBeenCalled();
+    expect(restoreRemoteAccountForCurrentSession).toHaveBeenCalledTimes(1);
+  });
+
   it('reutiliza la inicialización que ya está en curso', async () => {
     let resolveBootstrap: (() => void) | undefined;
     (bootstrapRemoteAccount as jest.Mock).mockImplementation(
@@ -132,5 +178,68 @@ describe('initializeAuthenticatedSession', () => {
       undefined,
       undefined,
     ]);
+  });
+
+  describe('onLocalCacheReady', () => {
+    it('avisa de la caché conservada antes de la primera petición remota', async () => {
+      const order: string[] = [];
+      (bootstrapRemoteAccount as jest.Mock).mockImplementation(async () => {
+        order.push('bootstrap');
+      });
+
+      await initializeAuthenticatedSession({
+        onLocalCacheReady: (preparation) => order.push(`cache:${preparation}`),
+      });
+
+      expect(order[0]).toBe('cache:kept');
+      expect(order).toContain('bootstrap');
+    });
+
+    it('avisa aunque el resto de la inicialización falle después', async () => {
+      const onLocalCacheReady = jest.fn();
+      (bootstrapRemoteAccount as jest.Mock).mockRejectedValue(
+        new Error('sin red'),
+      );
+
+      await expect(
+        initializeAuthenticatedSession({ onLocalCacheReady }),
+      ).rejects.toThrow('sin red');
+
+      expect(onLocalCacheReady).toHaveBeenCalledWith('kept');
+    });
+
+    it('propaga como rechazo único un fallo al decidir sobre la caché', async () => {
+      const onLocalCacheReady = jest.fn();
+      (prepareLocalCacheForSession as jest.Mock).mockRejectedValue(
+        new Error('SQLite bloqueada'),
+      );
+
+      await expect(
+        initializeAuthenticatedSession({ onLocalCacheReady }),
+      ).rejects.toThrow('SQLite bloqueada');
+
+      expect(onLocalCacheReady).not.toHaveBeenCalled();
+      expect(bootstrapRemoteAccount).not.toHaveBeenCalled();
+    });
+
+    it('también avisa a quien se suma a una inicialización en curso', async () => {
+      let resolveBootstrap: (() => void) | undefined;
+      (bootstrapRemoteAccount as jest.Mock).mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveBootstrap = resolve;
+          }),
+      );
+
+      const first = initializeAuthenticatedSession();
+      await new Promise(setImmediate);
+      const onLocalCacheReady = jest.fn();
+      const second = initializeAuthenticatedSession({ onLocalCacheReady });
+      await new Promise(setImmediate);
+
+      expect(onLocalCacheReady).toHaveBeenCalledWith('kept');
+      resolveBootstrap?.();
+      await Promise.all([first, second]);
+    });
   });
 });

@@ -183,6 +183,36 @@ describe('juntossRemoteAccountGateway', () => {
     );
   });
 
+  it('conserva la activación de cada espacio para saber si espera a la pareja', async () => {
+    mockedGet.mockResolvedValue(
+      snapshot({
+        spaces: [
+          {
+            id: 'couple-1',
+            name: 'Juntos',
+            type: 'couple',
+            currency: 'EUR',
+            activatedAt: null,
+          },
+          {
+            id: 'couple-2',
+            name: 'Juntos',
+            type: 'couple',
+            currency: 'EUR',
+            activatedAt: '2026-09-01T10:00:00.000Z',
+          },
+        ],
+      }),
+    );
+
+    const result = await fetchRemoteAccountSnapshot();
+
+    expect(result.spaces.map((space) => space.activatedAt)).toEqual([
+      null,
+      '2026-09-01T10:00:00.000Z',
+    ]);
+  });
+
   it('rechaza un tipo de espacio desconocido', async () => {
     mockedGet.mockResolvedValue(
       snapshot({

@@ -4,6 +4,7 @@ import {
   loadSpaces,
   localSpaceStorage,
   saveSpaces,
+  updateSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
 import { initialSpacesState, type SpacesState } from '@/features/spaces/types';
 import { saveCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
@@ -208,5 +209,90 @@ describe('localSpaceRepository', () => {
     await expect(loadSpaces()).rejects.toThrow(
       'El catálogo de espacios guardado no es válido',
     );
+  });
+
+  describe('updateSpaces', () => {
+    const couple = {
+      id: 'couple-1',
+      name: 'Juntos',
+      type: 'couple' as const,
+      currency: 'EUR' as const,
+    };
+    const other = {
+      id: 'other-1',
+      name: 'Viaje',
+      type: 'other' as const,
+      currency: 'EUR' as const,
+    };
+
+    it('aplica dos mutaciones concurrentes en orden, sin perder ninguna', async () => {
+      await saveSpaces(initialSpacesState);
+
+      const [first, second] = await Promise.all([
+        updateSpaces((stored) => ({
+          ...stored,
+          spaces: [...stored.spaces, couple],
+        })),
+        updateSpaces((stored) => ({
+          ...stored,
+          spaces: [...stored.spaces, other],
+        })),
+      ]);
+
+      expect(first.spaces.map((space) => space.id)).toEqual([
+        'personal',
+        'couple-1',
+      ]);
+      expect(second.spaces.map((space) => space.id)).toEqual([
+        'personal',
+        'couple-1',
+        'other-1',
+      ]);
+      expect((await loadSpaces()).spaces.map((space) => space.id)).toEqual([
+        'personal',
+        'couple-1',
+        'other-1',
+      ]);
+    });
+
+    it('un saveSpaces directo espera a la actualización en curso', async () => {
+      await saveSpaces(initialSpacesState);
+      let releaseUpdate: (() => void) | undefined;
+      const gate = new Promise<void>((resolve) => {
+        releaseUpdate = resolve;
+      });
+
+      // La mutación es síncrona; la espera se mete en la lectura previa
+      // simulando una escritura lenta que sigue en la cola.
+      const slowUpdate = updateSpaces((stored) => ({
+        ...stored,
+        spaces: [...stored.spaces, couple],
+      }));
+      const directSave = gate.then(() =>
+        saveSpaces({
+          activeSpaceId: 'personal',
+          spaces: [...initialSpacesState.spaces, other],
+        }),
+      );
+      releaseUpdate?.();
+      await Promise.all([slowUpdate, directSave]);
+
+      // La escritura directa es posterior en la cola y prevalece entera.
+      expect((await loadSpaces()).spaces.map((space) => space.id)).toEqual([
+        'personal',
+        'other-1',
+      ]);
+    });
+
+    it('no escribe cuando la mutación devuelve la misma referencia', async () => {
+      await saveSpaces(initialSpacesState);
+      // El mock de AsyncStorage ya es un jest.fn: se limpia su historial.
+      jest.mocked(AsyncStorage.setItem).mockClear();
+
+      const result = await updateSpaces((stored) => stored);
+
+      expect(result).toEqual(initialSpacesState);
+      expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+    });
   });
 });

@@ -10,6 +10,8 @@ export type RemoteAccountSpace = {
   name: string;
   type: 'personal' | 'couple' | 'other';
   currency: CurrencyCode;
+  /** Un espacio juntos sin activar sigue esperando a la otra persona. */
+  activatedAt: string | null;
 };
 
 export type RemoteAccountCategory = {
@@ -211,6 +213,7 @@ export async function fetchRemoteAccountSnapshot(): Promise<RemoteAccountSnapsho
         name: text(space.name),
         type,
         currency: currency(space.currency, `espacio ${text(space.id)}`),
+        activatedAt: optionalString(space.activatedAt),
       };
     }),
 

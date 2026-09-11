@@ -1,24 +1,16 @@
 import { authClient } from '@/lib/auth-client';
 
 /**
- * Uuid de quien usa el móvil si hay una sesión.
- *
- * La identidad sale de la sesión de Better Auth, que es la que autentica todas
- * las llamadas a la API. Leerla de otra fuente abriría la puerta a firmar
- * filas con un uuid que el servidor no reconoce.
- *
- * `authClient.getSession()` es una petición de red sin caché, así que un corte
- * la resuelve igual que una sesión ausente. Cuando eso pasa se lee la sesión
- * que `useSession()` mantiene en memoria: es la misma sesión verificada, no
- * otra fuente de identidad, y es la que ya decide si la app deja pasar a las
- * pantallas de datos. Sin esa caída, una conexión inestable convertía a una
- * persona conectada en anónima y detenía sus subidas.
- *
- * No lanza: la navegación raíz impide llegar a las pantallas de datos sin una
- * sesión verificada, y este helper permite que las tareas de segundo plano se
- * retiren con seguridad si la sesión desaparece.
+ * Lee primero la sesión verificada y vigente que Better Auth ya mantiene para
+ * la navegación. No crea otra caché ni prolonga su caducidad. Los endpoints
+ * privados siguen validando la cookie en el servidor en cada petición.
+ * Si esa lectura no es utilizable, consulta al proveedor y conserva la
+ * recuperación de identidad ante un fallo de transporte.
  */
 export async function getAuthenticatedUserId(): Promise<string | null> {
+  const cachedUserId = readVerifiedCachedSessionUserId();
+  if (cachedUserId) return cachedUserId;
+
   try {
     const { data, error } = await authClient.getSession();
     // El servidor contestó: su respuesta manda, también cuando dice que ya no
@@ -33,13 +25,42 @@ export async function getAuthenticatedUserId(): Promise<string | null> {
 }
 
 /**
+ * Solo acelera una sesión verificada y aún no caducada.
+ *
+ * Vale tanto la respuesta ya resuelta de `/get-session` como la copia que el
+ * cliente Expo hidrata desde SecureStore mientras esa petición sigue en vuelo:
+ * es la misma sesión verificada de la visita anterior, con su caducidad, y
+ * cada endpoint privado sigue validando la cookie en el servidor. Esperar a
+ * que termine la petición devolvería la red al arranque en frío.
+ */
+function readVerifiedCachedSessionUserId(): string | null {
+  const cached: unknown = authClient.$store?.atoms.session?.get();
+  if (readObjectProperty(cached, 'error')) return null;
+
+  const data = readObjectProperty(cached, 'data');
+  const user = readObjectProperty(data, 'user');
+  if (readObjectProperty(user, 'emailVerified') !== true) return null;
+  const session = readObjectProperty(data, 'session');
+  const expiresAt = readObjectProperty(session, 'expiresAt');
+  const expiration =
+    expiresAt instanceof Date
+      ? expiresAt.getTime()
+      : typeof expiresAt === 'string'
+        ? Date.parse(expiresAt)
+        : NaN;
+  if (!Number.isFinite(expiration) || expiration <= Date.now()) return null;
+  const id = readObjectProperty(user, 'id');
+  return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
+/**
  * Lee sin red la sesión que Better Auth conserva en memoria.
  *
  * `$store.atoms` está tipado como `Record<string, WritableAtom<any>>`, así que
  * el contenido se comprueba en runtime antes de tratarlo como una identidad.
  */
 function readCachedSessionUserId(): string | null {
-  const cached: unknown = authClient.$store.atoms.session?.get();
+  const cached: unknown = authClient.$store?.atoms.session?.get();
   const data = readObjectProperty(cached, 'data');
   const user = readObjectProperty(data, 'user');
   const id = readObjectProperty(user, 'id');

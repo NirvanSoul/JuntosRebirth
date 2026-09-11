@@ -23,10 +23,14 @@ jest.mock('./restoreRemoteImportReviews', () => ({
 jest.mock('@/features/spaces/repositories/localSpaceRepository', () => ({
   loadSpaces: async () => ({ spaces: [], activeSpaceId: null }),
   saveSpaces: jest.fn(),
+  updateSpaces: jest.fn(async (mutate: (stored: unknown) => unknown) =>
+    mutate({ spaces: [], activeSpaceId: null }),
+  ),
 }));
 jest.mock('@/lib/storage/localDatabase', () => ({
   getLocalDatabase: async () => {
     const database = {
+      getAllAsync: async () => [],
       getFirstAsync: async () => null,
       runAsync: mockRun,
       withExclusiveTransactionAsync: async (

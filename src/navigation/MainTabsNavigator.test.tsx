@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  act,
   fireEvent,
   render,
   waitFor,
@@ -9,7 +10,9 @@ import {
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
 import { listLocalCategories } from '@/features/categories/repositories/localCategoryRepository';
+import { sharedDataRefreshIntervalMs } from '@/features/sync/hooks/useSessionStartup';
 import { listLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { ThemeProvider } from '@/theme/ThemeProvider';
@@ -1220,10 +1223,7 @@ describe('MainTabsNavigator', () => {
       (listLocalTransactions as jest.Mock).mockResolvedValue([]);
     });
 
-    it('registra error estructurado en console.error cuando la subida de datos falla, sin lanzar excepción y manteniendo visibles los datos locales', async () => {
-      const uploadError = new Error('Fallo de red en subida');
-      mockSyncCoupleSpaceData.mockRejectedValueOnce(uploadError);
-      mockRestoreRemoteAccount.mockResolvedValueOnce(undefined);
+    const localCatalog = () => {
       (listLocalCategories as jest.Mock).mockResolvedValue([
         {
           id: 'category-local-1',
@@ -1274,8 +1274,10 @@ describe('MainTabsNavigator', () => {
           },
         ],
       });
+    };
 
-      const screen = await render(
+    const renderNavigator = () =>
+      render(
         <SafeAreaProvider
           initialMetrics={{
             frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -1290,10 +1292,71 @@ describe('MainTabsNavigator', () => {
         </SafeAreaProvider>,
       );
 
+    it('muestra la caché local en cuanto se confirma que es de esta cuenta, sin esperar al snapshot', async () => {
+      localCatalog();
+      let finishInitialization: (() => void) | undefined;
+      (initializeAuthenticatedSession as jest.Mock).mockImplementationOnce(
+        (options?: { onLocalCacheReady?: (p: string) => void }) => {
+          options?.onLocalCacheReady?.('kept');
+          return new Promise<void>((resolve) => {
+            finishInitialization = resolve;
+          });
+        },
+      );
+
+      const screen = await renderNavigator();
+
+      // La inicialización remota sigue en curso y la Home ya está pintada.
+      expect(await screen.findByText('Compra semanal')).toBeTruthy();
+      expect(screen.getByText('Alimentación')).toBeTruthy();
+      expect(screen.queryByTestId('spaces-loading')).toBeNull();
+      expect(mockRestoreRemoteAccount).not.toHaveBeenCalled();
+
+      await act(async () => {
+        finishInitialization?.();
+      });
+      expect(screen.getByText('Compra semanal')).toBeTruthy();
+    });
+
+    it('espera al snapshot cuando la caché era de otra cuenta', async () => {
+      localCatalog();
+      let finishInitialization: (() => void) | undefined;
+      (initializeAuthenticatedSession as jest.Mock).mockImplementationOnce(
+        (options?: { onLocalCacheReady?: (p: string) => void }) => {
+          options?.onLocalCacheReady?.('discarded');
+          return new Promise<void>((resolve) => {
+            finishInitialization = resolve;
+          });
+        },
+      );
+
+      const screen = await renderNavigator();
+
+      expect(screen.getByTestId('spaces-loading')).toBeTruthy();
+      expect(screen.queryByText('Compra semanal')).toBeNull();
+
+      await act(async () => {
+        finishInitialization?.();
+      });
+      expect(await screen.findByText('Compra semanal')).toBeTruthy();
+    });
+
+    it('registra el fallo de la inicialización remota en console.error y conserva visibles los datos locales', async () => {
+      localCatalog();
+      const initializationError = new Error('Fallo de red en bootstrap');
+      (initializeAuthenticatedSession as jest.Mock).mockImplementationOnce(
+        async (options?: { onLocalCacheReady?: (p: string) => void }) => {
+          options?.onLocalCacheReady?.('kept');
+          throw initializationError;
+        },
+      );
+
+      const screen = await renderNavigator();
+
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '[sync] Subida de espacio compartido falló:',
-          uploadError,
+          '[MainTabsNavigator] Error al sincronizar sesión:',
+          initializationError,
         );
       });
 
@@ -1301,85 +1364,36 @@ describe('MainTabsNavigator', () => {
       expect(screen.getByText('Alimentación')).toBeTruthy();
     });
 
-    it('registra error estructurado en console.error cuando la restauración remota falla, sin romper la interfaz y conservando los datos locales', async () => {
-      const restoreError = new Error('Bloqueo SQLite en restauración');
-      mockSyncCoupleSpaceData.mockResolvedValueOnce(undefined);
-      mockRestoreRemoteAccount.mockRejectedValueOnce(restoreError);
-      (listLocalCategories as jest.Mock).mockResolvedValue([
-        {
-          id: 'category-local-1',
-          spaceId: 'couple-space-1',
-          name: 'Alimentación',
-          icon: 'fork-knife',
-          colorToken: 'orange',
-          isDefault: true,
-          isArchived: false,
-        },
-      ]);
-      (listLocalTransactions as jest.Mock).mockResolvedValue([
-        {
-          id: 'tx-local-1',
-          spaceId: 'couple-space-1',
-          type: 'expense',
-          amountMinor: 2500,
-          currency: 'EUR',
-          title: 'Compra semanal',
-          categoryId: 'category-local-1',
-          occurredOn: dateInCurrentMonth(1),
-          recurrence: 'once',
-          updatedAt: '2026-08-01T12:00:00.000Z',
-        },
-      ]);
-      mockSession = {
-        user: { id: 'user-1', email: 'test@example.com' },
-        access_token: 'fake-token',
-      };
-      mockUseSpaces.mockReturnValue({
-        activeSpace: {
-          currency: 'EUR',
-          id: 'couple-space-1',
-          name: 'Juntos',
-          type: 'couple',
-        },
-        createSpace: jest.fn(),
-        error: null,
-        isReady: true,
-        reloadSpaces: jest.fn(async () => undefined),
-        selectSpace: jest.fn(),
-        spaces: [
-          {
-            currency: 'EUR',
-            id: 'couple-space-1',
-            name: 'Juntos',
-            type: 'couple',
-          },
-        ],
-      });
+    it('no repite el snapshot al abrir y registra el fallo del refresco periódico sin romper la interfaz', async () => {
+      jest.useFakeTimers();
+      try {
+        localCatalog();
+        const restoreError = new Error('Bloqueo SQLite en restauración');
+        mockSyncCoupleSpaceData.mockResolvedValueOnce(undefined);
+        mockRestoreRemoteAccount.mockRejectedValueOnce(restoreError);
 
-      const screen = await render(
-        <SafeAreaProvider
-          initialMetrics={{
-            frame: { x: 0, y: 0, width: 390, height: 844 },
-            insets: { top: 47, right: 0, bottom: 34, left: 0 },
-          }}
-        >
-          <ThemeProvider initialAppearance="light">
-            <NavigationContainer>
-              <MainTabsNavigator />
-            </NavigationContainer>
-          </ThemeProvider>
-        </SafeAreaProvider>,
-      );
+        const screen = await renderNavigator();
 
-      await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '[sync] Restauración remota falló:',
-          restoreError,
-        );
-      });
+        expect(await screen.findByText('Compra semanal')).toBeTruthy();
+        // La inicialización acaba de restaurar la cuenta: nada que repetir.
+        expect(mockRestoreRemoteAccount).not.toHaveBeenCalled();
 
-      expect(await screen.findByText('Compra semanal')).toBeTruthy();
-      expect(screen.getByText('Alimentación')).toBeTruthy();
+        await act(async () => {
+          jest.advanceTimersByTime(sharedDataRefreshIntervalMs);
+        });
+
+        await waitFor(() => {
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            '[sync] Restauración remota falló:',
+            restoreError,
+          );
+        });
+        expect(mockRestoreRemoteAccount).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('Compra semanal')).toBeTruthy();
+        expect(screen.getByText('Alimentación')).toBeTruthy();
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });

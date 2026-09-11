@@ -15,7 +15,7 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 import { fontFamily } from '@/theme/fonts';
 
 export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isReady: isThemeReady } = useTheme();
   const styles = useThemedStyles(createStyles);
   const { isReady: isAuthReady, session } = useBetterAuthSession();
   const {
@@ -45,10 +45,12 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     [colors, isDark],
   );
 
-  if (!fontsReady || !isAuthReady || !isOnboardingReady) {
+  // La apariencia guardada se lee de AsyncStorage en paralelo con las fuentes;
+  // esperarla evita pintar el fondo claro un instante a quien fijó el oscuro.
+  if (!fontsReady || !isThemeReady || !isAuthReady || !isOnboardingReady) {
     return (
       <View style={styles.root} testID="root-navigator-backdrop">
-        <LoadingState showLabel={fontsReady} />
+        <LoadingState />
       </View>
     );
   }
@@ -70,7 +72,13 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   // transición: imperceptible en claro, evidente en oscuro.
   return (
     <View style={styles.root} testID="root-navigator-backdrop">
-      <NavigationContainer linking={linking} theme={navigationTheme}>
+      {/* Mientras `linking` resuelve la URL inicial no hay hijos montados; la
+          misma barra ocupa ese hueco para que su avance continúe sin reinicio. */}
+      <NavigationContainer
+        fallback={<LoadingState />}
+        linking={linking}
+        theme={navigationTheme}
+      >
         {content}
       </NavigationContainer>
     </View>

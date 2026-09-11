@@ -68,9 +68,8 @@ import { AcceptInvitationScreen } from '@/features/spaces/screens/AcceptInvitati
 import { AwaitingPartnerScreen } from '@/features/spaces/screens/AwaitingPartnerScreen';
 import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScreen';
 import { isAwaitingPartnerSpace } from '@/features/spaces/types';
-import { endExpiredSession } from '@/features/auth/services/expiredSession';
-import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
 import { useFinanceSync } from '@/features/sync/hooks/useFinanceSync';
+import { useSessionStartup } from '@/features/sync/hooks/useSessionStartup';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
 import { useActivitySectionsPreference } from '@/state/appPreferences/useActivitySectionsPreference';
 import { useHomeComparisonIndicatorsPreference } from '@/state/appPreferences/useHomeComparisonIndicatorsPreference';
@@ -223,7 +222,6 @@ export function MainTabsNavigator() {
   const [notificationRules, setNotificationRules] = useState<
     TransactionNotificationRule[]
   >([]);
-  const [isFinanceReady, setFinanceReady] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     null,
   );
@@ -416,63 +414,13 @@ export function MainTabsNavigator() {
     setTransactions,
     spaces,
   });
-
-  // La caché se lee solo después de decidir si pertenece a esta sesión.
-  useEffect(() => {
-    let isMounted = true;
-
-    const openSession = async () => {
-      try {
-        if (session?.user) {
-          await initializeAuthenticatedSession();
-          await reloadSpaces();
-        }
-      } finally {
-        // Un 5xx de bootstrap o snapshot no invalida ni descarta la caché.
-        // Mostrarla permite seguir trabajando y deja la recuperación en manos
-        // del botón explícito de reintento.
-        await reloadLocalFinance();
-      }
-      if (!isMounted) return;
-      // Un fallo al cargar reglas no bloquea el acceso a las finanzas.
-      void listLocalNotificationRules()
-        .then((storedRules) => {
-          if (!isMounted) return;
-          setNotificationRules(storedRules);
-        })
-        .catch(() => undefined);
-    };
-
-    const runOpenSession = () =>
-      openSession()
-        .catch((error: unknown) => {
-          console.error(
-            '[MainTabsNavigator] Error al sincronizar sesión:',
-            error,
-          );
-          // No cerrar la sesión nueva por una promesa tardía de la anterior.
-          if (isMounted) {
-            void endExpiredSession(error);
-            Alert.alert(
-              'No pudimos sincronizar tus datos',
-              'Tus datos locales siguen guardados en este dispositivo.',
-              [
-                { text: 'Ahora no', style: 'cancel' },
-                { text: 'Reintentar', onPress: () => void runOpenSession() },
-              ],
-            );
-          }
-        })
-        .finally(() => {
-          if (isMounted) setFinanceReady(true);
-        });
-
-    runOpenSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [reloadLocalFinance, reloadSpaces, session?.user]);
+  const { isFinanceReady } = useSessionStartup({
+    refreshSharedCoupleData,
+    reloadLocalFinance,
+    reloadSpaces,
+    session,
+    setNotificationRules,
+  });
 
   useEffect(() => {
     const transactionId = detailTransaction?.id;
@@ -504,17 +452,6 @@ export function MainTabsNavigator() {
     void reconcileDailyReminder({ transactions }).catch(() => undefined);
     if (session) void refreshSharedCoupleData();
   });
-
-  useEffect(() => {
-    if (!isFinanceReady || !session) return;
-
-    void refreshSharedCoupleData();
-
-    const refreshTimer = setInterval(() => {
-      void refreshSharedCoupleData();
-    }, 15_000);
-    return () => clearInterval(refreshTimer);
-  }, [isFinanceReady, refreshSharedCoupleData, session]);
 
   const showSaveError = useCallback(() => {
     Alert.alert(
