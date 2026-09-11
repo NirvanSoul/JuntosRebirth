@@ -1,9 +1,9 @@
 import { expoClient } from '@better-auth/expo/client';
 import { emailOTPClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
-import * as SecureStore from 'expo-secure-store';
 
 import { apiEnvironment } from '@/app/config/environment';
+import { authSecureStorage } from '@/lib/auth-secure-storage';
 
 /**
  * La sesión Better Auth vive en SecureStore. Ninguna cookie se replica en
@@ -16,7 +16,7 @@ export const authClient = createAuthClient({
     expoClient({
       scheme: 'juntoss',
       storagePrefix: 'juntoss',
-      storage: SecureStore,
+      storage: authSecureStorage,
     }),
     // Verificación de correo y recuperación de contraseña por código de un
     // solo uso, que es lo que piden VerifyCodeScreen y ResetPasswordScreen.

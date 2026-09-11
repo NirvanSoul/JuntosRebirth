@@ -8,7 +8,7 @@ import { unregisterCurrentDeviceFromInvitationPush } from '@/lib/notifications/i
 
 /**
  * Se lanza cuando la API reporta que la cuenta quedó bloqueada por intentos
- * fallidos (9 intentos, Bible/ROADMAP.md Fase 7, ADR-075). `lockedUntil`
+ * fallidos (15 intentos; bloqueo real de cinco minutos). `lockedUntil`
  * permite a la interfaz decir cuándo puede reintentarse.
  */
 export class AccountLockedError extends Error {
@@ -16,7 +16,7 @@ export class AccountLockedError extends Error {
 
   constructor(lockedUntil: Date) {
     super(
-      'Por tu seguridad, debes esperar 1 hora antes de volver a intentarlo.',
+      'Has hecho demasiados intentos. Podrás volver a intentarlo en 5 minutos.',
     );
     this.name = 'AccountLockedError';
     this.lockedUntil = lockedUntil;
@@ -147,7 +147,9 @@ function describeAuthError(error: ApiError, fallback: string): string {
 /** El bloqueo llega como 429 con la fecha hasta la que dura. */
 function readLockout(error: ApiError): Date | null {
   const candidate = error;
-  if (candidate.code !== 'ACCOUNT_LOCKED') return null;
+  // El normalizador público de la API convierte ACCOUNT_LOCKED en
+  // TOO_MANY_ATTEMPTS, pero conserva lockedUntil. Esa fecha es la señal
+  // estable del bloqueo de contraseña; los otros rate limits no la incluyen.
   if (typeof candidate.lockedUntil !== 'string') return null;
   const lockedUntil = new Date(candidate.lockedUntil);
   return Number.isNaN(lockedUntil.getTime()) ? null : lockedUntil;

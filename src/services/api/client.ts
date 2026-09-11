@@ -24,22 +24,38 @@ type ApiClientDependencies = {
 /** Error normalizado para que la interfaz no exponga respuestas del servidor. */
 export class ApiError extends Error {
   readonly code: string;
+  readonly endpoint?: string;
+  readonly requestId?: string;
   readonly status: number;
 
   constructor({
     status,
     code,
+    endpoint,
     message,
+    requestId,
   }: {
     status: number;
     code: string;
+    endpoint?: string;
     message: string;
+    requestId?: string;
   }) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.endpoint = endpoint;
+    this.requestId = requestId;
   }
+}
+
+function requestIdFrom(response: Response): string | undefined {
+  return (
+    response.headers.get('request-id') ??
+    response.headers.get('x-request-id') ??
+    undefined
+  );
 }
 
 function apiErrorMessage(status: number): string {
@@ -63,6 +79,30 @@ async function readErrorBody(response: Response): Promise<ApiErrorBody | null> {
 
 function joinUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+}
+
+function throwRequestFailure(error: unknown, path: string): never {
+  const nativeError =
+    error && typeof error === 'object'
+      ? (error as { message?: unknown; name?: unknown })
+      : undefined;
+  if (
+    !(error instanceof ApiError) &&
+    nativeError?.name !== 'SyntaxError' &&
+    typeof nativeError?.message === 'string' &&
+    /network request failed|network connection was lost|fetch failed|failed to fetch|load failed|networkerror/i.test(
+      nativeError.message,
+    )
+  ) {
+    throw new ApiError({
+      status: 0,
+      code: 'NETWORK_ERROR',
+      endpoint: path,
+      message:
+        'Se interrumpió la conexión. Comprueba Internet e inténtalo de nuevo.',
+    });
+  }
+  throw error;
 }
 
 export function createApiClient({
@@ -120,11 +160,23 @@ export function createApiClient({
         typeof errorBody?.error?.code === 'string'
           ? errorBody.error.code
           : 'API_ERROR';
-      throw new ApiError({
+      const error = new ApiError({
         status: response.status,
         code,
+        endpoint: path,
         message: apiErrorMessage(response.status),
+        requestId: requestIdFrom(response),
       });
+      // El mensaje de `ApiError` es deliberadamente apto para UI. El detalle
+      // operativo se conserva únicamente en el log, sin incluir el body ni la
+      // cookie de la petición.
+      console.error('[api] Request failed', {
+        status: error.status,
+        code: error.code,
+        endpoint: error.endpoint,
+        ...(error.requestId ? { requestId: error.requestId } : {}),
+      });
+      throw error;
     }
 
     return response;
@@ -134,9 +186,13 @@ export function createApiClient({
     path: string,
     options: RequestOptions = {},
   ): Promise<T> {
-    const response = await send(path, options);
-    if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
+    try {
+      const response = await send(path, options);
+      if (response.status === 204) return undefined as T;
+      return (await response.json()) as T;
+    } catch (error) {
+      throwRequestFailure(error, path);
+    }
   }
 
   return {
@@ -152,16 +208,15 @@ export function createApiClient({
      * normal y no un fallo que deba alertar a nadie.
      */
     getBytes: async (path: string): Promise<Uint8Array | null> => {
-      let response: Response;
       try {
-        response = await send(path);
+        const response = await send(path);
+        const buffer = await response.arrayBuffer();
+        if (buffer.byteLength === 0) return null;
+        return new Uint8Array(buffer);
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) return null;
-        throw error;
+        throwRequestFailure(error, path);
       }
-      const buffer = await response.arrayBuffer();
-      if (buffer.byteLength === 0) return null;
-      return new Uint8Array(buffer);
     },
     patch: <T>(path: string, body: unknown) =>
       request<T>(path, { body, method: 'PATCH' }),

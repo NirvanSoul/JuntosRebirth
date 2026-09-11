@@ -110,6 +110,31 @@ describe('juntossAuthGateway', () => {
     await expect(promise).rejects.toBeInstanceOf(AccountLockedError);
     await expect(promise).rejects.toMatchObject({
       lockedUntil: new Date('2026-08-30T12:00:00.000Z'),
+      message:
+        'Has hecho demasiados intentos. Podrás volver a intentarlo en 5 minutos.',
+    });
+  });
+
+  it('reconoce el bloqueo después de que la API lo normalice', async () => {
+    mockedClient.signIn.email.mockResolvedValueOnce({
+      data: null,
+      error: {
+        error: {
+          code: 'TOO_MANY_ATTEMPTS',
+          lockedUntil: '2026-08-30T12:00:00.000Z',
+        },
+      },
+    } as never);
+
+    await expect(
+      createJuntossAuthGateway().signInWithPassword({
+        email: 'ana@example.test',
+        password: 'incorrecta',
+      }),
+    ).rejects.toMatchObject({
+      lockedUntil: new Date('2026-08-30T12:00:00.000Z'),
+      message:
+        'Has hecho demasiados intentos. Podrás volver a intentarlo en 5 minutos.',
     });
   });
 

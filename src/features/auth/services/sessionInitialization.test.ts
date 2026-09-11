@@ -1,6 +1,7 @@
 import { prepareLocalCacheForSession } from '@/features/auth/services/prepareLocalCacheForSession';
 import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
 import { syncOwnCountry } from '@/features/profile/services/syncOwnCountry';
+import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
 import { loadSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
@@ -11,6 +12,7 @@ jest.mock('@/features/spaces/repositories/localSpaceRepository');
 jest.mock('@/features/auth/services/prepareLocalCacheForSession');
 jest.mock('@/features/profile/repositories/localProfileRepository');
 jest.mock('@/features/profile/services/syncOwnCountry');
+jest.mock('@/features/profile/services/restoreOwnProfile');
 jest.mock('@/features/sync/services/bootstrapRemoteAccount');
 jest.mock('@/features/sync/services/restoreRemoteAccount');
 jest.mock('@/features/sync/services/syncCoupleSpaceData');
@@ -27,6 +29,7 @@ describe('initializeAuthenticatedSession', () => {
     (prepareLocalCacheForSession as jest.Mock).mockResolvedValue('kept');
     (getLocalProfile as jest.Mock).mockResolvedValue({ countryCode: null });
     (bootstrapRemoteAccount as jest.Mock).mockResolvedValue(undefined);
+    (restoreOwnProfile as jest.Mock).mockResolvedValue(undefined);
     (restoreRemoteAccountForCurrentSession as jest.Mock).mockResolvedValue(
       undefined,
     );
@@ -37,6 +40,7 @@ describe('initializeAuthenticatedSession', () => {
 
     expect(prepareLocalCacheForSession).toHaveBeenCalledTimes(1);
     expect(bootstrapRemoteAccount).toHaveBeenCalled();
+    expect(restoreOwnProfile).toHaveBeenCalled();
     expect(syncSpaceDataForCurrentSession).toHaveBeenCalledWith({
       spaceId: 'personal',
       includeLocalOnly: true,
@@ -107,5 +111,26 @@ describe('initializeAuthenticatedSession', () => {
     }
     expect(bootstrapCall).toBeLessThan(countryCall);
     expect(countryCall).toBeLessThan(restoreCall);
+  });
+
+  it('reutiliza la inicialización que ya está en curso', async () => {
+    let resolveBootstrap: (() => void) | undefined;
+    (bootstrapRemoteAccount as jest.Mock).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveBootstrap = resolve;
+        }),
+    );
+
+    const first = initializeAuthenticatedSession();
+    const second = initializeAuthenticatedSession();
+    await new Promise(setImmediate);
+    expect(bootstrapRemoteAccount).toHaveBeenCalledTimes(1);
+
+    resolveBootstrap?.();
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      undefined,
+      undefined,
+    ]);
   });
 });

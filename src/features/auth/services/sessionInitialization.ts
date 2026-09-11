@@ -1,12 +1,26 @@
 import { prepareLocalCacheForSession } from '@/features/auth/services/prepareLocalCacheForSession';
 import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
 import { syncOwnCountry } from '@/features/profile/services/syncOwnCountry';
+import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
 import { loadSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
 import { syncSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
 
-export async function initializeAuthenticatedSession(): Promise<void> {
+let initializationInFlight: Promise<void> | null = null;
+
+export function initializeAuthenticatedSession(): Promise<void> {
+  if (initializationInFlight) return initializationInFlight;
+
+  let task: Promise<void>;
+  task = performSessionInitialization().finally(() => {
+    if (initializationInFlight === task) initializationInFlight = null;
+  });
+  initializationInFlight = task;
+  return task;
+}
+
+async function performSessionInitialization(): Promise<void> {
   // La caché local solo se descarta si pertenece a otra cuenta. Conservarla
   // cuando es de quien entra es lo que permite trabajar sin conexión: esas
   // filas siguen aquí y se suben en la sincronización de abajo. Esta decisión
@@ -15,6 +29,7 @@ export async function initializeAuthenticatedSession(): Promise<void> {
   // presenta como si el correo o la contraseña fueran incorrectos.
   await prepareLocalCacheForSession();
   await bootstrapRemoteAccount();
+  await restoreOwnProfile();
 
   // El onboarding puede haber elegido el país antes de que existiera una
   // sesión. Publícalo ahora, antes de pedir el snapshot: así el servidor crea

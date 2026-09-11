@@ -1,9 +1,13 @@
 import { createApiClient } from '@/services/api/client';
 
-function createResponse(body: unknown, status = 200): Response {
+function createResponse(
+  body: unknown,
+  status = 200,
+  headers: HeadersInit = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
   });
 }
 
@@ -50,6 +54,7 @@ describe('apiClient', () => {
   });
 
   it('no expone el mensaje técnico de un error API', async () => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => {});
     const client = createApiClient({
       baseUrl: 'https://api.example.test',
       fetchImpl: jest.fn().mockResolvedValue(
@@ -58,6 +63,7 @@ describe('apiClient', () => {
             error: { code: 'INVALID_INPUT', message: 'column users leaked' },
           },
           400,
+          { 'x-request-id': 'req-123' },
         ),
       ),
       getCookie: async () => '',
@@ -67,9 +73,18 @@ describe('apiClient', () => {
       expect.objectContaining({
         code: 'INVALID_INPUT',
         message: 'Revisa los datos e inténtalo de nuevo.',
+        endpoint: '/v1/spaces',
+        requestId: 'req-123',
         status: 400,
       }),
     );
+    expect(log).toHaveBeenCalledWith('[api] Request failed', {
+      status: 400,
+      code: 'INVALID_INPUT',
+      endpoint: '/v1/spaces',
+      requestId: 'req-123',
+    });
+    log.mockRestore();
   });
 
   it('sube bytes con su propio Content-Type y sin serializarlos', async () => {
