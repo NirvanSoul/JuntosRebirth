@@ -158,7 +158,7 @@ function createStyles(colors: ColorTokens) {
   return StyleSheet.create({
     control: {
       flexDirection: 'row',
-      backgroundColor: colors.keypad,
+      backgroundColor: colors.surface,
       borderRadius: radii.round,
       padding: controlPadding,
     },
@@ -167,7 +167,7 @@ function createStyles(colors: ColorTokens) {
       top: controlPadding,
       bottom: controlPadding,
       left: controlPadding,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceMuted,
       borderRadius: radii.round,
     },
     segment: {

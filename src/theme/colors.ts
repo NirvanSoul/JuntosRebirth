@@ -3,10 +3,10 @@ import type { ColorTokens } from '@/theme/types';
 const cta = '#9933FF';
 
 export const lightColors = {
-  background: '#EDEEF0',
+  background: '#F2F2F7',
   surface: '#FFFFFF',
   surfaceMuted: '#E9EDE7',
-  modalBackground: '#F4F4F8',
+  modalBackground: '#EDEEF0',
   keypad: '#E5E6EB',
   brand: '#244D3B',
   brandPressed: '#19392B',
@@ -30,11 +30,11 @@ export const lightColors = {
 } as const satisfies ColorTokens;
 
 export const darkColors = {
-  background: '#121412',
-  surface: '#1E211E',
-  surfaceMuted: '#252825',
-  modalBackground: '#181B18',
-  keypad: '#2A2D2A',
+  background: '#000000',
+  surface: '#1C1C1E',
+  surfaceMuted: '#383B3F',
+  modalBackground: '#141517',
+  keypad: '#34373C',
   brand: '#5CB88A',
   brandPressed: '#4A9A72',
   brandSoft: '#1A3328',
@@ -42,8 +42,8 @@ export const darkColors = {
   textPrimary: '#E8ECE8',
   textSecondary: '#B4BEB6',
   textMuted: '#8A948C',
-  border: '#3A403A',
-  categoryPreviewBorder: '#333633',
+  border: '#404348',
+  categoryPreviewBorder: '#383B3E',
   income: '#00E066',
   incomeSoft: '#00E066',
   expense: '#FF3370',

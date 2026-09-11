@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import type { ReactNode } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -25,6 +26,8 @@ type ModalPrimaryActionProps = {
   gradientTestID?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
+  /** Icono arbitrario para proveedores cuya marca no usa un glyph nativo. */
+  iconContent?: ReactNode;
   label: string;
   mutedWhenDisabled?: boolean;
   onPress: () => void;
@@ -41,6 +44,7 @@ export function ModalPrimaryAction({
   gradientTestID,
   icon,
   iconColor,
+  iconContent,
   label,
   mutedWhenDisabled = false,
   onPress,
@@ -85,19 +89,20 @@ export function ModalPrimaryAction({
         </GradientCard>
       ) : (
         <>
-          {icon ? (
-            <Ionicons
-              color={
-                iconColor && !disabled
-                  ? iconColor
-                  : disabled && mutedWhenDisabled
-                    ? colors.textMuted
-                    : colors.textSecondary
-              }
-              name={icon}
-              size={iconSize.md}
-            />
-          ) : null}
+          {iconContent ??
+            (icon ? (
+              <Ionicons
+                color={
+                  iconColor && !disabled
+                    ? iconColor
+                    : disabled && mutedWhenDisabled
+                      ? colors.textMuted
+                      : colors.textSecondary
+                }
+                name={icon}
+                size={iconSize.md}
+              />
+            ) : null)}
           <Text
             numberOfLines={1}
             tone={

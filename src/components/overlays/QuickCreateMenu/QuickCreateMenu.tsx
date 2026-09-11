@@ -70,7 +70,7 @@ export function QuickCreateMenu({
   const actions = createActions(colors);
 
   return (
-    <AppModal onClose={onClose} visible={visible}>
+    <AppModal backgroundVariant="modal" onClose={onClose} visible={visible}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text accessibilityRole="header" variant="subheading">
@@ -170,7 +170,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: radii.md,
       borderColor: colors.border,
       borderWidth: 1,
-      backgroundColor: colors.surfaceMuted,
+      backgroundColor: colors.surface,
       padding: spacing.md,
     },
     actionLight: {

@@ -170,6 +170,7 @@ jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
     avatarUri: null,
     displayName: null,
   })),
+  subscribeToLocalProfileCountry: jest.fn(() => () => undefined),
 }));
 
 // Reglas de notificación, recordatorios manuales y su caché de programación
@@ -213,7 +214,7 @@ jest.mock(
 describe('MainTabsNavigator', () => {
   beforeEach(async () => {
     await AsyncStorage.removeItem('@juntoss/activity-sections/v1');
-    mockCountryCode = null;
+    mockCountryCode = 'ES';
     mockSession = null;
     mockUseSpaces.mockReturnValue({
       activeSpace: {
@@ -225,6 +226,7 @@ describe('MainTabsNavigator', () => {
       createSpace: jest.fn(),
       error: null,
       isReady: true,
+      reloadSpaces: jest.fn(async () => undefined),
       selectSpace: jest.fn(),
       spaces: [
         {
@@ -253,6 +255,7 @@ describe('MainTabsNavigator', () => {
       isReady: true,
       leaveCoupleSpace: jest.fn(),
       refreshCoupleSpace: jest.fn(async () => undefined),
+      reloadSpaces: jest.fn(async () => undefined),
       selectSpace: jest.fn(),
       spaces: [pendingSpace],
     });
@@ -303,7 +306,7 @@ describe('MainTabsNavigator', () => {
       </SafeAreaProvider>,
     );
 
-    expect(screen.getByTestId('persistent-app-header')).toBeTruthy();
+    expect(await screen.findByTestId('persistent-app-header')).toBeTruthy();
     const spaceButton = screen.getByLabelText('Espacio Personal');
     expect(spaceButton).toBeTruthy();
     expect(
@@ -343,10 +346,15 @@ describe('MainTabsNavigator', () => {
     ).toMatchObject(shadows.mainMenu);
 
     await fireEvent.press(screen.getByLabelText('Espacio Personal'));
-    expect(await screen.findByText('Espacios')).toBeTruthy();
+    expect(
+      await screen.findByText('Espacios', { includeHiddenElements: true }),
+    ).toBeTruthy();
     expect(screen.queryByText('Crear nuevo espacio')).toBeNull();
-    expect(screen.getByText('Ajustes')).toBeTruthy();
-    await fireEvent.press(screen.getByText('Ajustes'));
+    const settings = screen.getByText('Ajustes', {
+      includeHiddenElements: true,
+    });
+    expect(settings).toBeTruthy();
+    await fireEvent.press(settings);
     expect(await screen.findByTestId('settings-screen')).toBeTruthy();
     expect(screen.getByText('Datos y privacidad')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Volver'));
@@ -1255,6 +1263,7 @@ describe('MainTabsNavigator', () => {
         createSpace: jest.fn(),
         error: null,
         isReady: true,
+        reloadSpaces: jest.fn(async () => undefined),
         selectSpace: jest.fn(),
         spaces: [
           {
@@ -1335,6 +1344,7 @@ describe('MainTabsNavigator', () => {
         createSpace: jest.fn(),
         error: null,
         isReady: true,
+        reloadSpaces: jest.fn(async () => undefined),
         selectSpace: jest.fn(),
         spaces: [
           {

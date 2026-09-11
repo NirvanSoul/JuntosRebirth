@@ -205,7 +205,7 @@ Objetivo financiero individual o compartido. Su implementación completa no form
 
 ### Objetivo
 
-Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y completar el flujo con nombre, país, al menos tres categorías, primer ingreso, primer gasto y cierre.
+Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y completar el flujo con nombre, país, al menos tres categorías, primer ingreso, primer gasto, cierre y acceso.
 
 ### Flujo propuesto
 
@@ -218,6 +218,7 @@ Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y c
 7. Primer ingreso.
 8. Primer gasto.
 9. Cierre y listo para explorar.
+10. Acceso: iniciar sesión o crear cuenta.
 
 El acceso a la aplicación requiere una cuenta con correo verificado.
 
@@ -230,12 +231,12 @@ El acceso a la aplicación requiere una cuenta con correo verificado.
 
 ### Reglas
 
-- Nueve pantallas en total.
-- El onboarding es la primera pantalla de una instalación nueva, antes de
-  Acceso, y se marca como completado al terminar.
+- Diez pantallas en total; la última reutiliza el flujo real de Acceso.
+- El onboarding es la primera pantalla de una instalación nueva y se marca
+  como completado al autenticar una cuenta.
 - Tras cerrar sesión, no se repite: el usuario vuelve directamente a Acceso.
 - Solo después de guardar nombre y país (desde la tercera pantalla), se puede
-  omitir desde la esquina superior derecha y pasar a Acceso.
+  omitir desde la esquina superior derecha y pasar a la última lámina de Acceso.
 - No pedir permisos sin explicar por qué.
 - Pedir un primer ingreso y un primer gasto al final, para dejar el espacio local con datos reales.
 - En los pasos 6, 7 y 8, enseñar la creación con el mismo botón flotante y el
@@ -871,6 +872,13 @@ Principios:
 - Los datos personales permanecen aislados.
 - Los movimientos compartidos conservan autor.
 - Salir revoca solo el acceso de quien lo solicita.
+- Cambiar a un país distinto provoca la salida automática del espacio
+  compartido. Ajustes muestra una confirmación breve. Al abrir «Espacio de
+  pareja» sin un espacio actual, explica la salida y cómo regresar: configurar
+  el país anterior y pedir una nueva invitación a quien permanece dentro.
+  También ofrece invitar a otra persona con el mismo país actual para crear un
+  nuevo espacio. Este aviso se guarda por cuenta en el dispositivo al confirmar
+  el cambio desde Ajustes y se retira cuando vuelve a existir un espacio.
 - Mientras quede otra persona dentro, quien salió puede volver a entrar con una nueva invitación.
 - Cuando ya no queda nadie dentro, el espacio y sus datos se eliminan automáticamente.
 - Las acciones sensibles requieren confirmación.

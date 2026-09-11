@@ -29,7 +29,6 @@ import { CategoryDetailModal } from '@/features/categories/components/CategoryDe
 import { CreateCategoryModal } from '@/features/categories/components/CreateCategoryModal/CreateCategoryModal';
 import { MoneyAccountModals } from '@/features/accounts/components/MoneyAccountModals';
 import { useMoneyAccounts } from '@/features/accounts/hooks/useMoneyAccounts';
-import { listLocalMoneyAccounts } from '@/features/accounts/repositories/localMoneyAccountRepository';
 import { moneyAccountSupportsCurrency } from '@/features/accounts/types';
 import {
   createDefaultCategoryInputForSpace,
@@ -39,7 +38,6 @@ import {
   archiveLocalCategory,
   createLocalCategories,
   createLocalCategory,
-  listLocalCategories,
   updateLocalCategory,
   updateLocalCategoryNote,
 } from '@/features/categories/repositories/localCategoryRepository';
@@ -76,8 +74,7 @@ import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScre
 import { isAwaitingPartnerSpace } from '@/features/spaces/types';
 import { endExpiredSession } from '@/features/auth/services/expiredSession';
 import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
-import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
-import { syncSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
+import { useFinanceSync } from '@/features/sync/hooks/useFinanceSync';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
 import { useActivitySectionsPreference } from '@/state/appPreferences/useActivitySectionsPreference';
 import { useHomeComparisonIndicatorsPreference } from '@/state/appPreferences/useHomeComparisonIndicatorsPreference';
@@ -95,7 +92,6 @@ import type {
 import {
   archiveLocalTransaction,
   createLocalTransaction,
-  listLocalTransactions,
   updateLocalTransactionNote,
 } from '@/features/transactions/repositories/localTransactionRepository';
 import {
@@ -147,6 +143,7 @@ export function MainTabsNavigator() {
     error: spacesError,
     isReady,
     refreshCoupleSpace,
+    reloadSpaces,
     selectSpace,
     spaces,
   } = useSpaces();
@@ -188,9 +185,10 @@ export function MainTabsNavigator() {
   const {
     activeCurrencies,
     preferences: currencyPreferences,
+    reloadCurrencyPreferences,
     setCurrencyPreferences,
   } = useCurrencyPreferences();
-  const { venezuelaCurrencyMode } = useCurrencyCapabilities();
+  const { countryCode, venezuelaCurrencyMode } = useCurrencyCapabilities();
   const {
     selectedCurrency: selectedHomeCurrency,
     setSelectedCurrency: setSelectedHomeCurrency,
@@ -258,13 +256,6 @@ export function MainTabsNavigator() {
     useState<CategoryCreationContext | null>(null);
   const activityRequestId = useRef(0);
   const mapScreenRef = useRef<MapScreenHandle>(null);
-  // Evita que un 401 tardío de una sesión desmontada cierre la sesión nueva.
-  const isMountedRef = useRef(true);
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
   const handleScrollDirectionChange = useCallback(
     (direction: 'down' | 'up') => {
       setFloatingCreateButtonVisible(direction === 'up');
@@ -410,81 +401,42 @@ export function MainTabsNavigator() {
     spaces,
     transactions,
   });
-  const reloadLocalFinance = useCallback(async (): Promise<void> => {
-    const [storedCategories, storedMoneyAccounts, storedTransactions] =
-      await Promise.all([
-        listLocalCategories(),
-        listLocalMoneyAccounts(),
-        listLocalTransactions(),
-      ]);
-    setCategories(storedCategories);
-    setMoneyAccounts(storedMoneyAccounts);
-    setTransactions(storedTransactions);
-    void reconcileNotificationRules({
-      categories: storedCategories,
-      transactions: storedTransactions,
-    }).catch(() => undefined);
-  }, [setMoneyAccounts]);
-  const syncAllUserSpaces = useCallback(async (): Promise<void> => {
-    if (!session) return;
-    for (const space of spaces) {
-      if (isAwaitingPartnerSpace(space)) {
-        continue;
-      }
-      try {
-        await syncSpaceDataForCurrentSession({ spaceId: space.id });
-      } catch (error) {
-        console.error('[sync] Subida de espacio compartido falló:', error);
-      }
-    }
-  }, [session, spaces]);
-
-  const refreshSharedCoupleData = useCallback(
-    async (spaceId?: string): Promise<void> => {
-      if (!session) return;
-
-      if (spaceId) {
-        const targetSpace = spaces.find((s) => s.id === spaceId);
-        if (targetSpace && !isAwaitingPartnerSpace(targetSpace)) {
-          try {
-            await syncSpaceDataForCurrentSession({ spaceId });
-          } catch (error) {
-            console.error('[sync] Subida de espacio compartido falló:', error);
-          }
-        }
-      } else {
-        await syncAllUserSpaces();
-      }
-
-      try {
-        await restoreRemoteAccountForCurrentSession();
-        await reloadLocalFinance();
-      } catch (error) {
-        console.error('[sync] Restauración remota falló:', error);
-        // Un 401 tardío de una instancia desmontada pertenece a la sesión anterior.
-        if (isMountedRef.current) void endExpiredSession(error);
-      }
-    },
-    [reloadLocalFinance, session, syncAllUserSpaces, spaces],
-  );
 
   const { publishCoupleSpaceChanges, publishActiveCoupleChanges } =
     useCoupleSpacePublisher(session, spaces, activeSpace.id);
 
-  const refreshCoupleSpaceAndData = useCallback(async (): Promise<void> => {
-    await refreshCoupleSpace();
-    await refreshSharedCoupleData();
-  }, [refreshCoupleSpace, refreshSharedCoupleData]);
+  const {
+    refreshCoupleSpaceAndData,
+    refreshFinancialContext,
+    refreshSharedCoupleData,
+    reloadLocalFinance,
+  } = useFinanceSync({
+    refreshCoupleSpace,
+    reloadCurrencyPreferences,
+    reloadSpaces,
+    session,
+    setCategories,
+    setMoneyAccounts,
+    setTransactions,
+    spaces,
+  });
 
   // La caché se lee solo después de decidir si pertenece a esta sesión.
   useEffect(() => {
     let isMounted = true;
 
     const openSession = async () => {
-      if (session?.user) {
-        await initializeAuthenticatedSession();
+      try {
+        if (session?.user) {
+          await initializeAuthenticatedSession();
+          await reloadSpaces();
+        }
+      } finally {
+        // Un 5xx de bootstrap o snapshot no invalida ni descarta la caché.
+        // Mostrarla permite seguir trabajando y deja la recuperación en manos
+        // del botón explícito de reintento.
+        await reloadLocalFinance();
       }
-      await reloadLocalFinance();
       if (!isMounted) return;
       // Un fallo al cargar reglas no bloquea el acceso a las finanzas.
       void listLocalNotificationRules()
@@ -495,29 +447,36 @@ export function MainTabsNavigator() {
         .catch(() => undefined);
     };
 
-    openSession()
-      .catch((error: unknown) => {
-        console.error(
-          '[MainTabsNavigator] Error al sincronizar sesión:',
-          error,
-        );
-        // No cerrar la sesión nueva por una promesa tardía de la anterior.
-        if (isMounted) {
-          void endExpiredSession(error);
-          Alert.alert(
-            'No pudimos abrir tus datos',
-            'Cierra y vuelve a abrir la app para intentarlo de nuevo.',
+    const runOpenSession = () =>
+      openSession()
+        .catch((error: unknown) => {
+          console.error(
+            '[MainTabsNavigator] Error al sincronizar sesión:',
+            error,
           );
-        }
-      })
-      .finally(() => {
-        if (isMounted) setFinanceReady(true);
-      });
+          // No cerrar la sesión nueva por una promesa tardía de la anterior.
+          if (isMounted) {
+            void endExpiredSession(error);
+            Alert.alert(
+              'No pudimos sincronizar tus datos',
+              'Tus datos locales siguen guardados en este dispositivo.',
+              [
+                { text: 'Ahora no', style: 'cancel' },
+                { text: 'Reintentar', onPress: () => void runOpenSession() },
+              ],
+            );
+          }
+        })
+        .finally(() => {
+          if (isMounted) setFinanceReady(true);
+        });
+
+    runOpenSession();
 
     return () => {
       isMounted = false;
     };
-  }, [reloadLocalFinance, session?.user]);
+  }, [reloadLocalFinance, reloadSpaces, session?.user]);
 
   useEffect(() => {
     const transactionId = detailTransaction?.id;
@@ -553,7 +512,6 @@ export function MainTabsNavigator() {
   useEffect(() => {
     if (!isFinanceReady || !session) return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- arranca el setInterval de abajo
     void refreshSharedCoupleData();
 
     const refreshTimer = setInterval(() => {
@@ -1008,6 +966,7 @@ export function MainTabsNavigator() {
             <View style={{ flex: 1, backgroundColor: 'transparent' }}>
               <ActiveSpaceHeader
                 currencyFlag={
+                  countryCode !== null &&
                   (activeMainTab === 'Home' || activeMainTab === 'Activity') &&
                   homeCurrencies.length > 1
                     ? getHomeCurrencyButtonLabel(
@@ -1399,6 +1358,7 @@ export function MainTabsNavigator() {
                 await leaveCoupleSpace();
                 navigation.navigate('Main');
               }}
+              onCountryChanged={refreshFinancialContext}
               onSaveCurrencyPreferences={(next) => {
                 setCurrencyPreferences(next).catch(showSaveError);
               }}

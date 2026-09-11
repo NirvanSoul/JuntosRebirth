@@ -265,7 +265,7 @@ describe('ActivityScreen', () => {
       StyleSheet.flatten(
         within(chart).getByTestId('category-mode-control').props.style,
       ).backgroundColor,
-    ).toBe(colors.keypad);
+    ).toBe(colors.surface);
     expect(within(chart).getByText('Julio 2026')).toBeTruthy();
     expect(within(chart).queryByText('Distribución mensual')).toBeNull();
     expect(within(chart).getByText(/12,50/)).toBeTruthy();
