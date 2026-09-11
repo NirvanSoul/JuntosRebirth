@@ -38,7 +38,11 @@ mano. Apple Sign In no está disponible.
   No equivalen a un 401 ni disparan reenvíos automáticos de escrituras.
 - El cliente comparte la inicialización y el snapshot que ya están en curso
   para una misma sesión. Ante un error recuperable no descarta la caché local
-  ni reintenta automáticamente: expone una acción explícita de reintento.
+  ni reintenta a ciegas: muestra un aviso no bloqueante (`NoticeToast`) con
+  la acción explícita de reintento sobre la caché ya visible. Un fallo de
+  red (`NETWORK_ERROR`) se distingue como "sin conexión" y, además del
+  botón, se reintenta una vez al recuperar la red (`expo-network`). Un `401`
+  cierra sesión sin aviso adicional (`classifySyncFailure`).
 - La sincronización de un espacio usa `POST /v1/spaces/:spaceId/sync` e
   incluye siempre categorías, cuentas, recurrencias y transacciones.
 - Al cerrar sesión, la aplicación vuelve al acceso autenticado, oculta la

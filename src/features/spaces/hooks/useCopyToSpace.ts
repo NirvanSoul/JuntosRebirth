@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 
-import type { CopySuccessNotice } from '@/components/overlays/CopySuccessToast/CopySuccessToast';
+import type { ToastNotice } from '@/components/overlays/NoticeToast/NoticeToast';
 import { copyCategoryToSpace } from '@/features/categories/services/copyCategoryToSpace';
 import type { Category } from '@/features/categories/types';
 import { copyTransactionToSpace } from '@/features/transactions/services/copyTransactionToSpace';
@@ -32,11 +32,16 @@ export function useCopyToSpace({
   spaces,
   transactions,
 }: UseCopyToSpaceInput) {
-  const [notice, setNotice] = useState<CopySuccessNotice | null>(null);
+  const [notice, setNotice] = useState<ToastNotice | null>(null);
   const nextNoticeId = useRef(1);
 
   const announce = (destinationName: string, itemName: string) => {
-    setNotice({ destinationName, id: nextNoticeId.current, itemName });
+    setNotice({
+      id: nextNoticeId.current,
+      message: `${itemName} copiado en ${destinationName} `,
+      emphasis: 'exitosamente.',
+      tone: 'success',
+    });
     nextNoticeId.current += 1;
   };
 

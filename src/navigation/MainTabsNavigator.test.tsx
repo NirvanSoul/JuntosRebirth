@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
@@ -15,6 +15,7 @@ import { listLocalCategories } from '@/features/categories/repositories/localCat
 import { sharedDataRefreshIntervalMs } from '@/features/sync/hooks/useSessionStartup';
 import { listLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
+import { ApiError } from '@/services/api/client';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
@@ -1362,6 +1363,78 @@ describe('MainTabsNavigator', () => {
 
       expect(await screen.findByText('Compra semanal')).toBeTruthy();
       expect(screen.getByText('Alimentación')).toBeTruthy();
+    });
+
+    it('muestra un aviso no bloqueante con Reintentar cuando la inicialización falla sin conexión y vuelve a inicializar al pulsarlo', async () => {
+      localCatalog();
+      const alertSpy = jest.spyOn(Alert, 'alert');
+      (initializeAuthenticatedSession as jest.Mock)
+        .mockImplementationOnce(
+          async (options?: { onLocalCacheReady?: (p: string) => void }) => {
+            options?.onLocalCacheReady?.('kept');
+            throw new ApiError({
+              status: 0,
+              code: 'NETWORK_ERROR',
+              message: 'Se interrumpió la conexión.',
+            });
+          },
+        )
+        .mockImplementationOnce(async () => undefined);
+
+      const initializationsBefore = (
+        initializeAuthenticatedSession as jest.Mock
+      ).mock.calls.length;
+      const screen = await renderNavigator();
+
+      const toast = await screen.findByTestId('sync-issue-toast');
+      expect(toast).toBeTruthy();
+      expect(
+        screen.getByText(
+          'Sin conexión. Mostramos lo guardado en este dispositivo.',
+        ),
+      ).toBeTruthy();
+      expect(screen.getByText('Compra semanal')).toBeTruthy();
+      expect(alertSpy).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.press(screen.getByRole('button', { name: 'Reintentar' }));
+      });
+
+      await waitFor(() =>
+        expect(initializeAuthenticatedSession).toHaveBeenCalledTimes(
+          initializationsBefore + 2,
+        ),
+      );
+      expect(screen.queryByTestId('sync-issue-toast')).toBeNull();
+      expect(screen.getByText('Compra semanal')).toBeTruthy();
+      alertSpy.mockRestore();
+    });
+
+    it('avisa de un fallo recuperable con su propio texto y no avisa ante una sesión caducada', async () => {
+      localCatalog();
+      (initializeAuthenticatedSession as jest.Mock).mockRejectedValueOnce(
+        new ApiError({ status: 503, code: 'UNAVAILABLE', message: 'x' }),
+      );
+      const screen = await renderNavigator();
+      expect(await screen.findByTestId('sync-issue-toast')).toBeTruthy();
+      expect(
+        screen.getByText(
+          'No pudimos sincronizar tus datos. Lo guardado en este dispositivo sigue intacto.',
+        ),
+      ).toBeTruthy();
+      await screen.unmount();
+
+      (initializeAuthenticatedSession as jest.Mock).mockRejectedValueOnce(
+        new ApiError({ status: 401, code: 'UNAUTHORIZED', message: 'x' }),
+      );
+      const expired = await renderNavigator();
+      await waitFor(() =>
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '[MainTabsNavigator] Error al sincronizar sesión:',
+          expect.objectContaining({ status: 401 }),
+        ),
+      );
+      expect(expired.queryByTestId('sync-issue-toast')).toBeNull();
     });
 
     it('no repite el snapshot al abrir y registra el fallo del refresco periódico sin romper la interfaz', async () => {

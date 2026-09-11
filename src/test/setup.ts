@@ -86,6 +86,16 @@ jest.mock('@/lib/auth-client', () => {
   };
 });
 
+// El módulo nativo de red no existe en Jest: por defecto el dispositivo está
+// conectado y nadie escucha cambios. Quien pruebe la desconexión lo sustituye.
+jest.mock('expo-network', () => ({
+  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
+  getNetworkStateAsync: jest.fn(async () => ({
+    isConnected: true,
+    isInternetReachable: true,
+  })),
+}));
+
 jest.mock('expo-sqlite', () => ({
   deleteDatabaseAsync: jest.fn(async () => {}),
   openDatabaseAsync: jest.fn(async () => ({

@@ -1,6 +1,12 @@
 export const motion = {
-  loadingBarDuration: 900,
-  loadingTransitionDuration: 280,
+  loadingBarDuration: 700,
+  loadingBarCrawlDuration: 4000,
+  loadingCompletionDuration: 160,
+  loadingTransitionDuration: 260,
+  startupRevealDuration: 480,
+  startupRevealStagger: 36,
+  startupRevealMaxDelay: 216,
+  startupRevealTravel: 16,
   categoryPageIndicatorSpring: {
     dampingRatio: 0.62,
     duration: 680,
@@ -50,6 +56,8 @@ export const motion = {
   },
   toastTransitionDuration: 260,
   toastVisibleDuration: 3200,
+  /** Un aviso con acción espera a que la persona pueda leerlo y pulsar. */
+  toastActionVisibleDuration: 8000,
   disclosureSpring: {
     damping: 18,
     mass: 0.72,

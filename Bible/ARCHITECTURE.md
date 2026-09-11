@@ -138,7 +138,11 @@ subida de cambios pendientes siguen en segundo plano en su orden habitual, y
 al terminar el estado se vuelve a leer de SQLite. Solo cuando la caché era de
 otra cuenta se espera al snapshot. El refresco periódico del snapshot arranca
 después de esa inicialización y espera un intervalo completo: repetir la
-descarga que acaba de terminar sería trabajo duplicado.
+descarga que acaba de terminar sería trabajo duplicado. Si esa
+inicialización falla, la caché sigue en pantalla y `NoticeToast` (único
+aviso global: confirmaciones, avisos recuperables y sin conexión, con tono y
+acción opcional) ofrece "Reintentar"; sin conexión se reintenta también al
+recuperar la red, y un 401 cierra sesión sin aviso.
 
 ---
 
@@ -195,7 +199,7 @@ src/components/
 │   ├── AppModal/
 │   ├── BottomSheet/
 │   ├── ConfirmDialog/
-│   └── Toast/
+│   └── NoticeToast/
 └── navigation/
     ├── ScreenHeader/
     └── ActiveSpaceSelector/

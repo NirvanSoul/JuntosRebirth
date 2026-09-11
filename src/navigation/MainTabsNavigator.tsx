@@ -8,7 +8,7 @@ import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
 import { ActiveSpaceHeader } from '@/components/navigation/ActiveSpaceHeader/ActiveSpaceHeader';
 import { FloatingCreateButton } from '@/components/navigation/FloatingCreateButton/FloatingCreateButton';
 import { AppTabBar } from '@/components/navigation/AppTabBar/AppTabBar';
-import { CopySuccessToast } from '@/components/overlays/CopySuccessToast/CopySuccessToast';
+import { NoticeToast } from '@/components/overlays/NoticeToast/NoticeToast';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { ActivityTabContent } from '@/navigation/components/ActivityTabContent';
 import {
@@ -54,7 +54,7 @@ import {
   type MapScreenHandle,
 } from '@/features/map/screens/MapScreen';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
-import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
+import { useLocalDisplayName } from '@/features/profile/hooks/useLocalDisplayName';
 import { useSpaceMemberAvatars } from '@/features/profile/hooks/useSpaceMemberAvatars';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
@@ -69,6 +69,7 @@ import { AwaitingPartnerScreen } from '@/features/spaces/screens/AwaitingPartner
 import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScreen';
 import { isAwaitingPartnerSpace } from '@/features/spaces/types';
 import { useFinanceSync } from '@/features/sync/hooks/useFinanceSync';
+import { SyncIssueToast } from '@/features/sync/components/SyncIssueToast';
 import { useSessionStartup } from '@/features/sync/hooks/useSessionStartup';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
 import { useActivitySectionsPreference } from '@/state/appPreferences/useActivitySectionsPreference';
@@ -143,18 +144,7 @@ export function MainTabsNavigator() {
     spaces,
   } = useSpaces();
   const { session } = useAuthSession();
-  const [localDisplayName, setLocalDisplayName] = useState<string | null>(null);
-
-  const loadLocalDisplayName = useCallback(() => {
-    void getLocalProfile().then((profile) => {
-      setLocalDisplayName(profile.displayName);
-    });
-  }, []);
-
-  useEffect(() => {
-    loadLocalDisplayName();
-  }, [loadLocalDisplayName]);
-  useAppForeground(loadLocalDisplayName);
+  const localDisplayName = useLocalDisplayName();
 
   const userDisplayName =
     localDisplayName?.trim() || session?.user.name?.trim() || null;
@@ -414,13 +404,14 @@ export function MainTabsNavigator() {
     setTransactions,
     spaces,
   });
-  const { isFinanceReady } = useSessionStartup({
-    refreshSharedCoupleData,
-    reloadLocalFinance,
-    reloadSpaces,
-    session,
-    setNotificationRules,
-  });
+  const { dismissSyncIssue, isFinanceReady, retrySession, syncIssue } =
+    useSessionStartup({
+      refreshSharedCoupleData,
+      reloadLocalFinance,
+      reloadSpaces,
+      session,
+      setNotificationRules,
+    });
 
   useEffect(() => {
     const transactionId = detailTransaction?.id;
@@ -1243,9 +1234,15 @@ export function MainTabsNavigator() {
                 transactions={activeSpaceTransactions}
                 visible={detailTransaction !== null}
               />
-              <CopySuccessToast
+              <NoticeToast
                 notice={copySuccessNotice}
                 onDismiss={handleDismissCopyNotice}
+                testID="copy-success-toast"
+              />
+              <SyncIssueToast
+                issue={syncIssue}
+                onDismiss={dismissSyncIssue}
+                onRetry={retrySession}
               />
               <HomeCurrencyPickerModal
                 currencies={homeCurrencies}

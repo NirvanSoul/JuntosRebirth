@@ -37,9 +37,9 @@ import {
 } from '@/components/layout/SettingsList/SettingsList';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import {
-  SaveConfirmationToast,
-  type SaveConfirmationNotice,
-} from '@/components/overlays/SaveConfirmationToast/SaveConfirmationToast';
+  NoticeToast,
+  type ToastNotice,
+} from '@/components/overlays/NoticeToast/NoticeToast';
 import { Text } from '@/components/ui/Text/Text';
 import { createJuntossAuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
@@ -147,7 +147,7 @@ export function SettingsScreen({
   const [isPermissionsVisible, setPermissionsVisible] = useState(false);
   const [isDataRightsVisible, setDataRightsVisible] = useState(false);
   const [saveConfirmationNotice, setSaveConfirmationNotice] =
-    useState<SaveConfirmationNotice | null>(null);
+    useState<ToastNotice | null>(null);
   const [coupleSpaceExit, setCoupleSpaceExit] = useState<CoupleSpaceExitState>({
     step: 'idle',
   });
@@ -197,7 +197,11 @@ export function SettingsScreen({
   }, [coupleSpaceExit.step, coupleSpaceExitProgress]);
 
   const showSaveConfirmation = (message: string) => {
-    setSaveConfirmationNotice({ id: nextSaveConfirmationId.current, message });
+    setSaveConfirmationNotice({
+      id: nextSaveConfirmationId.current,
+      message,
+      tone: 'success',
+    });
     nextSaveConfirmationId.current += 1;
   };
 
@@ -585,9 +589,10 @@ export function SettingsScreen({
         visible={isNotificationRulesModalVisible}
       />
 
-      <SaveConfirmationToast
+      <NoticeToast
         notice={saveConfirmationNotice}
         onDismiss={dismissSaveConfirmation}
+        testID="save-confirmation-toast"
       />
 
       <PrivacyLegalScreen

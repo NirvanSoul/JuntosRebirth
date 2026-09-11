@@ -1,12 +1,16 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { BetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
 import { endExpiredSession } from '@/features/auth/services/expiredSession';
 import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
+import {
+  classifySyncFailure,
+  type SyncFailureKind,
+} from '@/features/sync/services/syncFailure';
 import { listLocalNotificationRules } from '@/features/transactions/repositories/localTransactionNotificationRuleRepository';
 import type { TransactionNotificationRule } from '@/features/transactions/types';
+import { useNetworkAvailability } from '@/hooks/useNetworkAvailability';
 
 /** Cadencia con la que se baja el snapshot compartido mientras la app está abierta. */
 export const sharedDataRefreshIntervalMs = 15_000;
@@ -19,9 +23,20 @@ type SessionStartupInput = {
   setNotificationRules: Dispatch<SetStateAction<TransactionNotificationRule[]>>;
 };
 
+export type SyncIssue = {
+  /** Cambia con cada fallo para que el aviso vuelva a mostrarse. */
+  id: number;
+  kind: Exclude<SyncFailureKind, 'expired'>;
+};
+
 type SessionStartupState = {
   /** Hay datos financieros que mostrar: la caché local o el snapshot ya restaurado. */
   isFinanceReady: boolean;
+  /** Fallo de la inicialización remota pendiente de mostrar; nunca bloquea. */
+  syncIssue: SyncIssue | null;
+  dismissSyncIssue: (issueId: number) => void;
+  /** Reintento explícito de la inicialización completa. */
+  retrySession: () => void;
 };
 
 /**
@@ -32,6 +47,10 @@ type SessionStartupState = {
  * pendientes siguen en segundo plano. Al terminar se vuelve a leer SQLite,
  * y solo entonces arranca el refresco periódico: repetir el snapshot que la
  * inicialización acaba de traer sería trabajo duplicado.
+ *
+ * Un fallo remoto no interrumpe: la caché sigue en pantalla y se expone un
+ * aviso con reintento. Sin conexión, el reintento también ocurre solo al
+ * recuperar la red; una sesión caducada cierra sesión sin aviso adicional.
  */
 export function useSessionStartup(
   input: SessionStartupInput,
@@ -47,6 +66,20 @@ export function useSessionStartup(
   // La inicialización terminó (con o sin éxito): a partir de aquí el
   // refresco periódico ya no compite con el snapshot inicial.
   const [isSessionSynced, setSessionSynced] = useState(false);
+  const [syncIssue, setSyncIssue] = useState<SyncIssue | null>(null);
+  const nextIssueId = useRef(0);
+  // El efecto de apertura registra aquí cómo relanzarse; así el reintento
+  // explícito y el de reconexión reutilizan la misma secuencia.
+  const runOpenSessionRef = useRef<() => void>(() => undefined);
+  const { isOffline } = useNetworkAvailability();
+
+  const retrySession = useCallback(() => {
+    setSyncIssue(null);
+    runOpenSessionRef.current();
+  }, []);
+  const dismissSyncIssue = useCallback((issueId: number) => {
+    setSyncIssue((current) => (current?.id === issueId ? null : current));
+  }, []);
 
   // La caché se lee solo después de decidir si pertenece a esta sesión.
   useEffect(() => {
@@ -95,17 +128,14 @@ export function useSessionStartup(
             error,
           );
           // No cerrar la sesión nueva por una promesa tardía de la anterior.
-          if (isMounted) {
+          if (!isMounted) return;
+          const kind = classifySyncFailure(error);
+          if (kind === 'expired') {
             void endExpiredSession(error);
-            Alert.alert(
-              'No pudimos sincronizar tus datos',
-              'Tus datos locales siguen guardados en este dispositivo.',
-              [
-                { text: 'Ahora no', style: 'cancel' },
-                { text: 'Reintentar', onPress: () => void runOpenSession() },
-              ],
-            );
+            return;
           }
+          nextIssueId.current += 1;
+          setSyncIssue({ id: nextIssueId.current, kind });
         })
         .finally(() => {
           if (!isMounted) return;
@@ -113,12 +143,24 @@ export function useSessionStartup(
           setSessionSynced(true);
         });
 
+    runOpenSessionRef.current = () => void runOpenSession();
     runOpenSession();
 
     return () => {
       isMounted = false;
+      runOpenSessionRef.current = () => undefined;
     };
   }, [reloadLocalFinance, reloadSpaces, session?.user, setNotificationRules]);
+
+  // Recuperar la red es el momento natural de reintentar sin pedirlo.
+  const wasOfflineRef = useRef(isOffline);
+  useEffect(() => {
+    const wasOffline = wasOfflineRef.current;
+    wasOfflineRef.current = isOffline;
+    if (wasOffline && !isOffline && syncIssue?.kind === 'offline') {
+      retrySession();
+    }
+  }, [isOffline, retrySession, syncIssue?.kind]);
 
   useEffect(() => {
     if (!isSessionSynced || !session) return;
@@ -131,5 +173,5 @@ export function useSessionStartup(
     return () => clearInterval(refreshTimer);
   }, [isSessionSynced, refreshSharedCoupleData, session]);
 
-  return { isFinanceReady };
+  return { dismissSyncIssue, isFinanceReady, retrySession, syncIssue };
 }
