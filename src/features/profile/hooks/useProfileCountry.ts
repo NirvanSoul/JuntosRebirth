@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
+import {
+  getLocalProfile,
+  subscribeToLocalProfileCountry,
+} from '@/features/profile/repositories/localProfileRepository';
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
 import { ApiError } from '@/services/api/client';
 
@@ -43,8 +46,12 @@ export function useProfileCountry(): ProfileCountryState {
     void getLocalProfile().then((profile) => {
       if (isMountedRef.current) setCountryCode(profile.countryCode);
     });
+    const unsubscribe = subscribeToLocalProfileCountry((nextCountryCode) => {
+      if (isMountedRef.current) setCountryCode(nextCountryCode);
+    });
     return () => {
       isMountedRef.current = false;
+      unsubscribe();
     };
   }, []);
 

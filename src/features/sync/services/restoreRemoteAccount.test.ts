@@ -4,9 +4,15 @@ import {
   loadSpaces,
   saveSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
+import { authClient } from '@/lib/auth-client';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
+import { fetchRemoteImportReviews } from '@/features/import/gateways/juntossImportReviewGateway';
+import { fetchRemoteAccountSnapshot } from '@/features/sync/gateways/juntossRemoteAccountGateway';
 
-import { restoreRemoteAccount } from './restoreRemoteAccount';
+import {
+  restoreRemoteAccount,
+  restoreRemoteAccountForCurrentSession,
+} from './restoreRemoteAccount';
 
 jest.mock('@/lib/storage/localDatabase', () => ({
   getLocalDatabase: jest.fn(),
@@ -17,10 +23,26 @@ jest.mock('@/features/spaces/repositories/localSpaceRepository', () => ({
   saveSpaces: jest.fn(),
 }));
 
+jest.mock('@/lib/auth-client', () => ({
+  authClient: { getSession: jest.fn() },
+}));
+jest.mock('@/features/sync/gateways/juntossRemoteAccountGateway', () => ({
+  fetchRemoteAccountSnapshot: jest.fn(),
+}));
+jest.mock('@/features/import/gateways/juntossImportReviewGateway', () => ({
+  fetchRemoteImportReviews: jest.fn(),
+}));
+jest.mock('@/features/sync/services/restoreRemoteImportReviews', () => ({
+  restoreRemoteImportReviews: jest.fn(),
+}));
+
 describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
   const mockGetLocalDatabase = getLocalDatabase as unknown as jest.Mock;
   const mockLoadSpaces = loadSpaces as unknown as jest.Mock;
   const mockSaveSpaces = saveSpaces as unknown as jest.Mock;
+  const mockGetSession = authClient.getSession as jest.Mock;
+  const mockFetchSnapshot = fetchRemoteAccountSnapshot as jest.Mock;
+  const mockFetchImportReviews = fetchRemoteImportReviews as jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -29,6 +51,10 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
       activeSpaceId: 'personal',
     });
     mockSaveSpaces.mockResolvedValue(undefined);
+    mockGetSession.mockResolvedValue({
+      data: { user: { id: 'test-user-id' } },
+    });
+    mockFetchImportReviews.mockResolvedValue([]);
   });
 
   it('ejecuta todos los accesos a SQLite dentro del bloque exclusivo usando el handle transaction', async () => {
@@ -54,6 +80,7 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     await restoreRemoteAccount({
       userId: 'test-user-id',
       snapshot: {
+        activeFinancialContextId: null,
         moneyAccounts: [],
         spaces: [
           {
@@ -211,5 +238,101 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     expect(transactionInsert).not.toContain(
       'exchange_snapshot_json, sync_status,',
     );
+  });
+
+  it('reemplaza el catálogo visible al restaurar otro contexto financiero', async () => {
+    mockLoadSpaces.mockResolvedValue({
+      activeSpaceId: 'personal',
+      spaces: [
+        { id: 'personal', name: 'Personal', type: 'personal', currency: 'EUR' },
+        { id: 'shared-es', name: 'España', type: 'couple', currency: 'EUR' },
+      ],
+    });
+    const database = {
+      getFirstAsync: jest.fn().mockResolvedValue(null),
+      runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      withExclusiveTransactionAsync: jest
+        .fn()
+        .mockImplementation(
+          async (callback: (tx: SQLiteDatabase) => Promise<void>) =>
+            callback(database),
+        ),
+    } as unknown as SQLiteDatabase;
+    mockGetLocalDatabase.mockResolvedValue(database);
+
+    await restoreRemoteAccount({
+      userId: 'test-user-id',
+      snapshot: {
+        activeFinancialContextId: 'context-ve',
+        spaces: [
+          {
+            remoteId: 'personal-ve',
+            name: 'Personal',
+            type: 'personal',
+            currency: 'USD',
+          },
+        ],
+        categories: [],
+        moneyAccounts: [],
+        recurringSeries: [],
+        transactions: [],
+      },
+    });
+
+    expect(mockSaveSpaces).toHaveBeenCalledWith({
+      activeSpaceId: 'personal-ve',
+      spaces: [
+        {
+          id: 'personal-ve',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'USD',
+        },
+      ],
+    });
+  });
+
+  it('comparte el snapshot en curso de la misma sesión', async () => {
+    let resolveSnapshot: ((value: object) => void) | undefined;
+    mockFetchSnapshot.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSnapshot = resolve;
+        }),
+    );
+    const database = {
+      getFirstAsync: jest.fn().mockResolvedValue(null),
+      runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      withExclusiveTransactionAsync: jest
+        .fn()
+        .mockImplementation(
+          async (callback: (tx: SQLiteDatabase) => Promise<void>) =>
+            callback(database),
+        ),
+    } as unknown as SQLiteDatabase;
+    mockGetLocalDatabase.mockResolvedValue(database);
+
+    const first = restoreRemoteAccountForCurrentSession();
+    const second = restoreRemoteAccountForCurrentSession();
+    await new Promise(setImmediate);
+    expect(mockFetchSnapshot).toHaveBeenCalledTimes(1);
+
+    resolveSnapshot?.({
+      activeFinancialContextId: null,
+      spaces: [
+        {
+          remoteId: 'personal-remote',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [],
+    });
+
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
   });
 });

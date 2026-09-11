@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadCountryChangeNotice } from '@/features/spaces/repositories/countryChangeNoticeRepository';
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { Alert, StyleSheet } from 'react-native';
@@ -7,6 +9,7 @@ import {
   removeProfileAvatar,
   updateProfileAvatar,
 } from '@/features/profile/services/updateProfileAvatar';
+import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
 import { updateProfileDisplayName } from '@/features/profile/services/updateProfileDisplayName';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
 import { ApiError } from '@/services/api/client';
@@ -15,6 +18,14 @@ import type { CurrencyPreferences } from '@/state/appPreferences/currencyPrefere
 import { categoryColors } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import type { AppearancePreference } from '@/theme/types';
+
+jest.mock('@/features/auth/hooks/useAuthSession', () => ({
+  useAuthSession: () => ({
+    session: { user: { id: 'settings-user' } },
+    userId: 'settings-user',
+    isReady: true,
+  }),
+}));
 
 const emptyProfile = {
   avatarUri: null,
@@ -32,6 +43,7 @@ jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
     displayName: null,
     countryCode: null,
   })),
+  subscribeToLocalProfileCountry: jest.fn(() => () => undefined),
 }));
 
 jest.mock('@/features/profile/services/updateProfileAvatar', () => ({
@@ -43,17 +55,26 @@ jest.mock('@/features/profile/services/updateProfileDisplayName', () => ({
   updateProfileDisplayName: jest.fn(),
 }));
 
+jest.mock('@/features/profile/services/updateProfileCountry', () => ({
+  updateProfileCountry: jest.fn(),
+}));
+
 const mockGetLocalProfile = jest.mocked(getLocalProfile);
 const mockUpdateProfileAvatar = jest.mocked(updateProfileAvatar);
 const mockRemoveProfileAvatar = jest.mocked(removeProfileAvatar);
 const mockUpdateProfileDisplayName = jest.mocked(updateProfileDisplayName);
+const mockUpdateProfileCountry = jest.mocked(updateProfileCountry);
 
 describe('SettingsScreen', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
     mockGetLocalProfile.mockClear().mockResolvedValue(emptyProfile);
     mockUpdateProfileAvatar.mockClear();
     mockRemoveProfileAvatar.mockClear();
     mockUpdateProfileDisplayName.mockClear();
+    mockUpdateProfileCountry
+      .mockClear()
+      .mockResolvedValue({ ...emptyProfile, countryCode: 'VE' });
   });
 
   const renderScreen = async (
@@ -236,6 +257,117 @@ describe('SettingsScreen', () => {
 
     expect(screen.getByTestId('country-preferences-modal')).toBeTruthy();
     expect(screen.queryByTestId('currency-preferences-modal')).toBeNull();
+  });
+
+  it('cierra el selector de País aunque la recarga del contexto financiero falle', async () => {
+    // El país ya cambió en el servidor. Si la recarga local pudiera tumbar el
+    // guardado, el modal quedaría abierto sin explicación y su rechazo saldría
+    // sin capturar, porque los llamadores invocan el guardado con `void`.
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const onCountryChanged = jest
+      .fn()
+      .mockRejectedValue(new Error('Network request failed'));
+
+    try {
+      const { screen } = await renderScreen({ currencies: ['EUR'] }, true, {
+        onCountryChanged,
+      });
+
+      await fireEvent.press(screen.getByText('País'));
+      await fireEvent.press(screen.getByTestId('country-option-VE'));
+      await fireEvent.press(screen.getByTestId('country-preferences-save'));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('country-preferences-modal')).toBeNull();
+      });
+      expect(mockUpdateProfileCountry).toHaveBeenCalledWith('VE');
+      expect(onCountryChanged).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        '[settings] No se pudo recargar el contexto financiero:',
+        expect.any(Error),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it.each([true, false])(
+    'guarda los detalles sin otra alerta solo si tenía espacio compartido (%s)',
+    async (hasSharedSpace) => {
+      mockGetLocalProfile.mockResolvedValue({
+        ...emptyProfile,
+        countryCode: 'ES',
+      });
+      const alert = jest
+        .spyOn(Alert, 'alert')
+        .mockImplementation(() => undefined);
+      try {
+        const { screen } = await renderScreen({ currencies: ['EUR'] }, true, {
+          hasSharedSpace,
+          onCountryChanged: jest.fn().mockResolvedValue(undefined),
+        });
+        await fireEvent.press(screen.getByText('País'));
+        await fireEvent.press(screen.getByTestId('country-option-VE'));
+        await fireEvent.press(screen.getByTestId('country-preferences-save'));
+        expect(alert).not.toHaveBeenCalled();
+        if (hasSharedSpace) {
+          expect(mockUpdateProfileCountry).not.toHaveBeenCalled();
+          await fireEvent.press(screen.getByLabelText('Cambiar país'));
+        }
+        await waitFor(() =>
+          expect(mockUpdateProfileCountry).toHaveBeenCalledWith('VE'),
+        );
+        await waitFor(() =>
+          expect(screen.queryByTestId('country-preferences-modal')).toBeNull(),
+        );
+        expect(await loadCountryChangeNotice('settings-user')).toEqual(
+          hasSharedSpace ? { previousCountryName: 'España' } : null,
+        );
+        expect(alert).not.toHaveBeenCalled();
+      } finally {
+        alert.mockRestore();
+      }
+    },
+  );
+
+  it('no anuncia la salida si se cancela o falla el cambio de país', async () => {
+    mockGetLocalProfile.mockResolvedValue({
+      ...emptyProfile,
+      countryCode: 'ES',
+    });
+    mockUpdateProfileCountry.mockRejectedValueOnce(new Error('Sin conexión'));
+    const alert = jest
+      .spyOn(Alert, 'alert')
+      .mockImplementation(() => undefined);
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const { screen } = await renderScreen({ currencies: ['EUR'] }, true, {
+        hasSharedSpace: true,
+      });
+      await fireEvent.press(screen.getByText('País'));
+      await fireEvent.press(screen.getByTestId('country-option-VE'));
+      await fireEvent.press(screen.getByTestId('country-preferences-save'));
+      await fireEvent.press(screen.getByLabelText('Cancelar cambio de país'));
+      expect(mockUpdateProfileCountry).not.toHaveBeenCalled();
+      expect(alert).not.toHaveBeenCalled();
+      await fireEvent.press(screen.getByTestId('country-option-VE'));
+      await fireEvent.press(screen.getByTestId('country-preferences-save'));
+      await fireEvent.press(screen.getByLabelText('Cambiar país'));
+      await waitFor(() =>
+        expect(
+          screen.getByText('No pudimos guardar tu país. Inténtalo de nuevo.'),
+        ).toBeTruthy(),
+      );
+      expect(alert).not.toHaveBeenCalled();
+      expect(await loadCountryChangeNotice('settings-user')).toBeNull();
+    } finally {
+      alert.mockRestore();
+      consoleError.mockRestore();
+    }
   });
 
   it('filtra el catálogo con el buscador por país, moneda o código', async () => {

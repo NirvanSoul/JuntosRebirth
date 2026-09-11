@@ -180,6 +180,67 @@ describe('syncSpaceDataForCurrentSession', () => {
     expect(runAsync).not.toHaveBeenCalled();
   });
 
+  it('se retira sin subir ni rechazar si la sesión desaparece', async () => {
+    jest.mocked(getAuthenticatedUserId).mockResolvedValue(null);
+
+    await expect(
+      syncSpaceDataForCurrentSession({ spaceId: 'couple-without-session' }),
+    ).resolves.toEqual({
+      categoryCount: 0,
+      moneyAccountCount: 0,
+      recurringSeriesCount: 0,
+      transactionCount: 0,
+    });
+
+    expect(getLocalDatabase).not.toHaveBeenCalled();
+    expect(getOrCreateInstallationId).not.toHaveBeenCalled();
+    expect(findRemoteIdForLocalEntity).not.toHaveBeenCalled();
+    expect(syncCoupleSpaceRemotely).not.toHaveBeenCalled();
+  });
+
+  it('propaga el fallo de subida sin dejar un segundo rechazo sin capturar', async () => {
+    // El bloqueo por espacio se limpiaba con `finally`, cuya promesa derivada
+    // hereda el rechazo. Al ignorarla, el mismo error llegaba dos veces: una
+    // al llamador y otra como excepción no capturada.
+    const unhandledReasons: unknown[] = [];
+    const collectUnhandled = (reason: unknown) => {
+      unhandledReasons.push(reason);
+    };
+    process.on('unhandledRejection', collectUnhandled);
+
+    try {
+      getAllAsync
+        .mockResolvedValueOnce([
+          {
+            id: 'category-a',
+            name: 'Casa',
+            icon: 'home',
+            colorToken: 'blue',
+            budgetMinor: null,
+            isDefault: 0,
+            templateKey: null,
+            isArchived: 0,
+            createdAt: '2026-08-13T10:00:00.000Z',
+            updated_at: '2026-08-13T10:00:00.000Z',
+          },
+        ])
+        .mockResolvedValue([]);
+      jest
+        .mocked(syncCoupleSpaceRemotely)
+        .mockRejectedValue(new Error('La red no responde'));
+
+      await expect(
+        syncSpaceDataForCurrentSession({ spaceId: 'couple-offline' }),
+      ).rejects.toThrow('La red no responde');
+
+      await new Promise<void>((resolve) => setImmediate(() => resolve()));
+      expect(unhandledReasons).toEqual([]);
+      expect(runAsync).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', collectUnhandled);
+    }
+  });
+
   it('guarda el snapshot que el backend devuelve para el movimiento sincronizado', async () => {
     jest.mocked(syncCoupleSpaceRemotely).mockResolvedValue({
       categoryCount: 0,

@@ -28,7 +28,7 @@ export function CountryChangeSharedSpaceWarningModal({
     >
       <View style={styles.content}>
         <Text accessibilityRole="header" variant="heading">
-          Cambiarás de espacio compartido
+          Saldrás del espacio compartido
         </Text>
         <Text tone="secondary" variant="body">
           Al cambiar tu país a {countryName}, dejarás tu espacio compartido

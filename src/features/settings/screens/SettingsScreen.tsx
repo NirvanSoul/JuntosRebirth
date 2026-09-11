@@ -52,6 +52,7 @@ import { PrivacyLegalScreen } from '@/features/legal/screens/PrivacyLegalScreen'
 import { CountryPreferencesModal } from '@/features/settings/components/CountryPreferencesModal/CountryPreferencesModal';
 import { CountryChangeBlockedModal } from '@/features/settings/components/CountryPreferencesModal/CountryChangeBlockedModal';
 import { CountryChangeSharedSpaceWarningModal } from '@/features/settings/components/CountryPreferencesModal/CountryChangeSharedSpaceWarningModal';
+import { saveCountryChangeNotice } from '@/features/spaces/repositories/countryChangeNoticeRepository';
 import { ProfileHeader } from '@/features/settings/components/ProfileHeader/ProfileHeader';
 import { CurrencyPreferencesModal } from '@/features/settings/components/CurrencyPreferencesModal/CurrencyPreferencesModal';
 import { useProfileCountry } from '@/features/profile/hooks/useProfileCountry';
@@ -77,6 +78,7 @@ type SettingsScreenProps = {
   currencyPreferences: CurrencyPreferences;
   notificationRules: readonly TransactionNotificationRule[];
   onBack: () => void;
+  onCountryChanged?: () => Promise<void>;
   onLeaveCoupleSpace: () => Promise<void>;
   onSaveCurrencyPreferences: (preferences: CurrencyPreferences) => void;
   onSaveNotificationRule: (
@@ -113,6 +115,7 @@ export function SettingsScreen({
   currencyPreferences,
   notificationRules,
   onBack,
+  onCountryChanged,
   onLeaveCoupleSpace,
   onSaveCurrencyPreferences,
   onSaveNotificationRule,
@@ -155,8 +158,10 @@ export function SettingsScreen({
     width: `${coupleSpaceExitProgress.value * 100}%`,
   }));
   const nextSaveConfirmationId = useRef(1);
-  const currencyValueLabel =
-    currencyPreferences.currencies.length > 1
+  const isVenezuela = countryCode === 'VE';
+  const currencyValueLabel = isVenezuela
+    ? 'USD · VES'
+    : currencyPreferences.currencies.length > 1
       ? currencyPreferences.currencies.join(' · ')
       : getCurrencyName(currencyPreferences.currencies[0]!);
   const countryValueLabel = countryCode
@@ -205,7 +210,29 @@ export function SettingsScreen({
   const saveSelectedCountry = async (next: string) => {
     const result = await saveCountry(next);
     if (result.success) {
-      setCountryModalVisible(false);
+      if (hasSharedSpace && next !== countryCode && session) {
+        await saveCountryChangeNotice(session.user.id, {
+          previousCountryName: countryCode
+            ? countryValueLabel
+            : 'tu país anterior',
+        }).catch(() => undefined);
+      }
+      // El país ya cambió en el servidor: recargar el contexto financiero es
+      // una puesta al día del dispositivo, no parte del guardado. El modal se
+      // mantiene encima mientras tanto para no enseñar los datos del país
+      // anterior, y se cierra pase lo que pase. Sin este `catch`, un fallo de
+      // red dejaría el modal abierto sin explicación y escaparía como rechazo
+      // sin capturar, porque los dos llamadores invocan esto con `void`.
+      try {
+        await onCountryChanged?.();
+      } catch (error) {
+        console.error(
+          '[settings] No se pudo recargar el contexto financiero:',
+          error,
+        );
+      } finally {
+        setCountryModalVisible(false);
+      }
     } else if (result.errorCode === 'country_change_blocked_by_shared_space') {
       setCountryModalVisible(false);
       setCountryChangeBlockedVisible(true);
@@ -324,7 +351,9 @@ export function SettingsScreen({
             iconComponent={Coins}
             iconBackgroundColor={categoryColors.green}
             label="Moneda"
-            onPress={() => setCurrencyModalVisible(true)}
+            onPress={
+              isVenezuela ? undefined : () => setCurrencyModalVisible(true)
+            }
             value={currencyValueLabel}
           />
           <SettingsDivider />
@@ -499,7 +528,7 @@ export function SettingsScreen({
           setCurrencyModalVisible(false);
         }}
         preferences={currencyPreferences}
-        visible={isCurrencyModalVisible}
+        visible={isCurrencyModalVisible && !isVenezuela}
       />
 
       <CountryPreferencesModal
@@ -532,7 +561,10 @@ export function SettingsScreen({
         onConfirm={() => {
           const next = pendingCountryChange;
           setPendingCountryChange(null);
-          if (next) void saveSelectedCountry(next);
+          if (next) {
+            setCountryModalVisible(true);
+            void saveSelectedCountry(next);
+          }
         }}
         visible={pendingCountryChange !== null}
       />

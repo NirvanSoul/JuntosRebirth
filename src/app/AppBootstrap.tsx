@@ -7,7 +7,7 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { useTheme } from '@/theme/useTheme';
 import { fontAssets } from '@/theme/fonts';
 
-ensureNotificationHandlerRegistered();
+void ensureNotificationHandlerRegistered();
 
 function AppStatusBar() {
   const { isDark } = useTheme();

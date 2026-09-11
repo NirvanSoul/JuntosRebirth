@@ -201,6 +201,7 @@ describe('juntossRemoteAccountGateway', () => {
     mockedGet.mockResolvedValue(snapshot() as never);
 
     await expect(fetchRemoteAccountSnapshot()).resolves.toEqual({
+      activeFinancialContextId: null,
       spaces: [],
       categories: [],
       moneyAccounts: [],

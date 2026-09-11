@@ -20,8 +20,21 @@ mano. Apple Sign In no está disponible.
 
 - Tras registro con OTP válido o inicio de sesión: `POST /v1/bootstrap` con `{ timezone }`,
   una zona IANA como `Europe/Madrid`.
-- El estado de cuenta se lee con `GET /v1/me`.
+- El estado de cuenta se lee con `GET /v1/me`. Si `data.profile.countryCode`
+  está presente, el cliente lo guarda en `local_profile` antes de restaurar el
+  snapshot para que las capacidades monetarias estén disponibles desde el
+  primer render.
 - La restauración remota usa `GET /v1/sync/snapshot`.
+- La restauración resuelve la identidad con `getAuthenticatedUserId`: si la
+  consulta de sesión pierde la conexión, reutiliza la sesión en memoria. Una
+  respuesta explícita sin sesión o con 401 sigue impidiendo restaurar. El
+  snapshot siempre se solicita al backend con la cookie y sus permisos vigentes.
+- Los cortes de red al enviar o leer una respuesta se normalizan como
+  `ApiError` con `code: NETWORK_ERROR`, `status: 0` y el endpoint afectado.
+  No equivalen a un 401 ni disparan reenvíos automáticos de escrituras.
+- El cliente comparte la inicialización y el snapshot que ya están en curso
+  para una misma sesión. Ante un error recuperable no descarta la caché local
+  ni reintenta automáticamente: expone una acción explícita de reintento.
 - La sincronización de un espacio usa `POST /v1/spaces/:spaceId/sync` e
   incluye siempre categorías, cuentas, recurrencias y transacciones.
 - Al cerrar sesión, la aplicación vuelve al acceso autenticado, oculta la
@@ -36,6 +49,12 @@ mano. Apple Sign In no está disponible.
   `local_only`: son las creadas sin conexión y su única vía de subida.
   `GET /v1/sync/snapshot` solo sobrescribe filas locales en `synced`, así que lo
   pendiente de subir sobrevive a la restauración.
+- La identidad que firma las escrituras locales sale siempre de la sesión de
+  Better Auth. `authClient.getSession()` es una petición de red sin caché, así
+  que un corte la resuelve igual que una sesión ausente; el cliente cae
+  entonces a la sesión que `useSession()` conserva en memoria, que es la misma
+  sesión verificada y solo se vacía ante un `401`. Sin esa caída, una conexión
+  inestable convertía a una persona conectada en anónima y detenía sus subidas.
 
 Las rutas `/v1/*` requieren sesión de Better Auth con correo verificado. Las respuestas correctas
 envuelven su contenido en `data`; los errores usan `error.code` y
@@ -50,6 +69,12 @@ Iniciar sesión con un correo sin verificar es distinto: la API responde
 `403 EMAIL_NOT_VERIFIED` y **no** envía ningún código. El cliente pide uno con
 `emailOtp.sendVerificationOtp` antes de abrir la pantalla OTP, que cuenta su
 cooldown de reenvío dando por hecho que ya salió un código.
+
+Para proteger el acceso por contraseña, el servidor permite hasta 15 intentos
+fallidos consecutivos por correo. Al alcanzar ese límite bloquea el acceso por
+**cinco minutos reales** y devuelve `429 TOO_MANY_ATTEMPTS` con `lockedUntil`;
+el cliente muestra ese periodo a la persona. Un acceso correcto borra el
+contador.
 
 `DELETE /v1/me` elimina la cuenta y sus datos. El cliente debe enviar el
 cuerpo `{ confirmation: "DELETE_MY_ACCOUNT" }`; sin esa confirmación el

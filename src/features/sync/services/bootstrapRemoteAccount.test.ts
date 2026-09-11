@@ -26,11 +26,12 @@ describe('bootstrapRemoteAccount', () => {
     });
   });
 
-  it('propaga el error si el bootstrap falla tras los reintentos', async () => {
+  it('propaga el primer error sin reintentos automáticos', async () => {
     (apiClient.post as jest.Mock).mockRejectedValue(new Error('Network error'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(bootstrapRemoteAccount(0)).rejects.toThrow('Network error');
+    await expect(bootstrapRemoteAccount()).rejects.toThrow('Network error');
+    expect(apiClient.post).toHaveBeenCalledTimes(1);
   });
 
   it('comparte el bootstrap que ya está en curso', async () => {

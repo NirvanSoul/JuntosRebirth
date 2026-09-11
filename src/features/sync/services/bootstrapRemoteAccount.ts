@@ -2,45 +2,34 @@ import { apiClient } from '@/services/api/juntossApiClient';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { deviceTimeZone } from '@/utils/deviceTimeZone';
 
-const bootstrapInFlightByUserId = new Map<string, Promise<void>>();
+const bootstrapInFlightBySession = new Map<string, Promise<void>>();
 
-export async function bootstrapRemoteAccount(retries = 2): Promise<void> {
+export async function bootstrapRemoteAccount(): Promise<void> {
   // Better Auth identifica la sesión que autoriza el POST. No se comparte un
   // bootstrap entre dos cuentas que puedan alternarse en el mismo dispositivo.
   const userId = await getAuthenticatedUserId();
   // Sin una identidad confirmada no se puede saber si dos peticiones son de la
-  // misma cuenta; no compartirlas evita cruzar un cambio de sesión.
-  if (!userId) return performBootstrapRemoteAccount(retries);
-  const existing = bootstrapInFlightByUserId.get(userId);
+  // misma cuenta; se comparte una única promesa provisional. La siguiente
+  // sesión autenticada la sustituye por su clave de usuario antes de escribir
+  // datos locales.
+  const sessionKey = userId ?? '__unresolved-session__';
+  const existing = bootstrapInFlightBySession.get(sessionKey);
   if (existing) return existing;
 
   let task: Promise<void>;
-  task = performBootstrapRemoteAccount(retries).finally(() => {
-    if (bootstrapInFlightByUserId.get(userId) === task) {
-      bootstrapInFlightByUserId.delete(userId);
+  task = performBootstrapRemoteAccount().finally(() => {
+    if (bootstrapInFlightBySession.get(sessionKey) === task) {
+      bootstrapInFlightBySession.delete(sessionKey);
     }
   });
-  bootstrapInFlightByUserId.set(userId, task);
+  bootstrapInFlightBySession.set(sessionKey, task);
   return task;
 }
 
-async function performBootstrapRemoteAccount(retries: number): Promise<void> {
+async function performBootstrapRemoteAccount(): Promise<void> {
   const timezone = deviceTimeZone();
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    try {
-      // El contrato remoto usa `timezone` (IANA); `timeZone` se rechaza como
-      // un campo desconocido con 400 y deja a la cuenta sin inicializar.
-      await apiClient.post('/v1/bootstrap', { timezone });
-      return;
-    } catch (error) {
-      if (attempt === retries) {
-        console.error('[bootstrap] Error al inicializar cuenta remota:', error);
-        throw error;
-      } else {
-        await new Promise((resolve) =>
-          setTimeout(resolve, 1000 * (attempt + 1)),
-        );
-      }
-    }
-  }
+  // El contrato remoto usa `timezone` (IANA); `timeZone` se rechaza como un
+  // campo desconocido con 400 y deja a la cuenta sin inicializar. No se
+  // reintenta aquí: una persona elige "Reintentar" desde el estado de sync.
+  await apiClient.post('/v1/bootstrap', { timezone });
 }

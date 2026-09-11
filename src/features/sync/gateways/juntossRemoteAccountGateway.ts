@@ -89,6 +89,8 @@ export type RemoteAccountTransaction = {
 };
 
 export type RemoteAccountSnapshot = {
+  /** Contexto personal activo en el servidor; cambia al cambiar de país. */
+  activeFinancialContextId: string | null;
   spaces: readonly RemoteAccountSpace[];
   categories: readonly RemoteAccountCategory[];
   moneyAccounts: readonly RemoteAccountMoneyAccount[];
@@ -180,6 +182,7 @@ function exchangeSnapshot(value: unknown): TransactionExchangeSnapshot | null {
 }
 
 type RawSnapshot = {
+  activeFinancialContextId?: unknown;
   spaces: Record<string, unknown>[];
   categories: Record<string, unknown>[];
   moneyAccounts: Record<string, unknown>[];
@@ -195,6 +198,7 @@ export async function fetchRemoteAccountSnapshot(): Promise<RemoteAccountSnapsho
   const snapshot = response.data;
 
   return {
+    activeFinancialContextId: optionalString(snapshot.activeFinancialContextId),
     spaces: snapshot.spaces.map((space) => {
       const type = space.type;
       if (type !== 'personal' && type !== 'couple' && type !== 'other') {

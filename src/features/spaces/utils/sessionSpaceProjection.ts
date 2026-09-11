@@ -1,4 +1,7 @@
-import { personalSpace, type SpacesState } from '@/features/spaces/types';
+import {
+  resolvePersonalSpaceId,
+  type SpacesState,
+} from '@/features/spaces/types';
 
 /**
  * Conserva la caché autenticada sin exponer espacios compartidos sin sesión.
@@ -17,7 +20,7 @@ export function projectSpacesForSession(
     (space) => space.id === current.activeSpaceId,
   )
     ? current.activeSpaceId
-    : personalSpace.id;
+    : resolvePersonalSpaceId(spaces);
 
   return { activeSpaceId, spaces };
 }

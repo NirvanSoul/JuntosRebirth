@@ -1,3 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  saveCountryChangeNotice,
+  loadCountryChangeNotice,
+} from '@/features/spaces/repositories/countryChangeNoticeRepository';
 import { fireEvent, waitFor } from '@testing-library/react-native';
 
 import {
@@ -21,6 +26,10 @@ jest.mock('@/components/overlays/AppModal/AppModal', () => ({
 jest.mock('@/features/spaces/gateways/juntossInvitationGateway', () => ({
   ...jest.requireActual('@/features/spaces/gateways/juntossInvitationGateway'),
   createJuntossInvitationGateway: jest.fn(),
+}));
+
+jest.mock('@/features/auth/hooks/useAuthSession', () => ({
+  useAuthSession: () => ({ userId: 'invite-user', isReady: true }),
 }));
 
 const coupleSpace: Space = {
@@ -47,7 +56,67 @@ function renderInvitation(createInvitation = jest.fn()) {
 }
 
 describe('InvitePartnerScreen', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    await AsyncStorage.clear();
+  });
+
+  it('explica la salida al abrir el espacio y permite invitar a otra persona', async () => {
+    await saveCountryChangeNotice('invite-user', {
+      previousCountryName: 'España',
+    });
+    const onCreate = jest.fn().mockResolvedValue(coupleSpace);
+    const screen = await renderWithTheme(
+      <InvitePartnerScreen
+        coupleSpace={null}
+        onClose={jest.fn()}
+        onCreateCoupleSpaceInvitation={onCreate}
+        visible
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByText(/configura de nuevo España/)).toBeTruthy(),
+    );
+    expect(screen.getByText(/mismo país configurado/)).toBeTruthy();
+    expect(screen.getByText(/tu país actual/)).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Invitar a otra persona'));
+    expect(onCreate).not.toHaveBeenCalled();
+    await fireEvent.changeText(
+      screen.getByTestId('invite-partner-email'),
+      'pareja@example.com',
+    );
+    await fireEvent.press(screen.getByTestId('invite-partner-send-email'));
+    await waitFor(() =>
+      expect(onCreate).toHaveBeenCalledWith('pareja@example.com'),
+    );
+  });
+
+  it('no muestra detalles de otra cuenta', async () => {
+    await saveCountryChangeNotice('other-user', {
+      previousCountryName: 'España',
+    });
+    const screen = await renderWithTheme(
+      <InvitePartnerScreen
+        coupleSpace={null}
+        onClose={jest.fn()}
+        onCreateCoupleSpaceInvitation={jest.fn()}
+        visible
+      />,
+    );
+    expect(screen.getByLabelText('Crear espacio de pareja')).toBeTruthy();
+    expect(screen.queryByText(/configura de nuevo España/)).toBeNull();
+  });
+
+  it('retira el aviso cuando ya existe un espacio', async () => {
+    await saveCountryChangeNotice('invite-user', {
+      previousCountryName: 'España',
+    });
+    const screen = await renderInvitation();
+    await waitFor(async () =>
+      expect(await loadCountryChangeNotice('invite-user')).toBeNull(),
+    );
+    expect(screen.queryByText(/configura de nuevo España/)).toBeNull();
+  });
 
   it('ofrece únicamente el envío dirigido por correo', async () => {
     const screen = await renderInvitation();

@@ -30,6 +30,15 @@ const uploadableStatuses = (includeLocalOnly: boolean) =>
 const markableStatuses = "('local_only', 'pending', 'failed', 'syncing')";
 const inFlightBySpaceId = new Map<string, Promise<CoupleSpaceSyncResult>>();
 
+function emptySyncResult(): CoupleSpaceSyncResult {
+  return {
+    categoryCount: 0,
+    moneyAccountCount: 0,
+    recurringSeriesCount: 0,
+    transactionCount: 0,
+  };
+}
+
 function serializeRow(row: SyncRow): Record<string, unknown> {
   const { updated_at: updatedAt, ...rest } = row;
   return {
@@ -69,10 +78,14 @@ async function syncSpaceData(input: {
   spaceId: string;
   includeLocalOnly?: boolean;
 }): Promise<CoupleSpaceSyncResult> {
+  // La sesión puede desaparecer entre una interacción local y esta subida en
+  // segundo plano. No hay nada que publicar sin un propietario remoto y no se
+  // debe convertir esa retirada normal en un rechazo sin manejar.
+  const userId = await getAuthenticatedUserId();
+  if (!userId) return emptySyncResult();
+
   const database = await getLocalDatabase();
   const installationId = await getOrCreateInstallationId(database);
-  const userId = await getAuthenticatedUserId();
-  if (!userId) throw new Error('Debes iniciar sesión antes de sincronizar');
   const remoteSpaceId =
     (await findRemoteIdForLocalEntity({
       executor: database,
@@ -165,12 +178,7 @@ async function syncSpaceData(input: {
     recurringSeries.length === 0 &&
     transactions.length === 0
   ) {
-    return {
-      categoryCount: 0,
-      moneyAccountCount: 0,
-      recurringSeriesCount: 0,
-      transactionCount: 0,
-    };
+    return emptySyncResult();
   }
 
   const remoteResult = await syncCoupleSpaceRemotely({
@@ -240,10 +248,13 @@ export function syncSpaceDataForCurrentSession(input: {
   const previous = inFlightBySpaceId.get(input.spaceId) ?? Promise.resolve();
   const next = previous.catch(() => undefined).then(() => syncSpaceData(input));
   inFlightBySpaceId.set(input.spaceId, next);
-  void next.finally(() => {
+  const clearInFlight = () => {
     if (inFlightBySpaceId.get(input.spaceId) === next) {
       inFlightBySpaceId.delete(input.spaceId);
     }
-  });
+  };
+  // `finally` propaga el rechazo y, al ignorar la promesa que devuelve, crea
+  // una segunda excepción no capturada. Ambas ramas solo limpian el bloqueo.
+  void next.then(clearInFlight, clearInFlight);
   return next;
 }

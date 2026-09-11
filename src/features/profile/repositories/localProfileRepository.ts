@@ -1,6 +1,16 @@
 import type { LocalProfile } from '@/features/profile/types';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 
+const countrySubscribers = new Set<(countryCode: string) => void>();
+
+/** Notifica a la interfaz cuando la caché de país se actualiza tras restaurar sesión. */
+export function subscribeToLocalProfileCountry(
+  subscriber: (countryCode: string) => void,
+): () => void {
+  countrySubscribers.add(subscriber);
+  return () => countrySubscribers.delete(subscriber);
+}
+
 type LocalProfileRow = {
   avatar_path: string | null;
   avatar_updated_at: string | null;
@@ -220,5 +230,11 @@ export async function saveLocalProfileCountry(
        country_code = excluded.country_code`,
     countryCode.trim().toUpperCase(),
   );
-  return getLocalProfile();
+  const profile = await getLocalProfile();
+  if (profile.countryCode) {
+    countrySubscribers.forEach((subscriber) =>
+      subscriber(profile.countryCode!),
+    );
+  }
+  return profile;
 }

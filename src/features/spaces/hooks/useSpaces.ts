@@ -11,6 +11,7 @@ import {
 import {
   initialSpacesState,
   personalSpace,
+  resolvePersonalSpaceId,
   type Space,
   type SpacesState,
 } from '@/features/spaces/types';
@@ -41,6 +42,7 @@ type SpacesController = {
   leaveCoupleSpace: () => Promise<void>;
   error: string | null;
   isReady: boolean;
+  reloadSpaces: () => Promise<void>;
   refreshCoupleSpace: () => Promise<void>;
   selectSpace: (spaceId: string) => Promise<void>;
   spaces: readonly Space[];
@@ -137,7 +139,7 @@ function mergeRemoteCoupleSpace(
   );
   const nextActiveSpaceId =
     current.activeSpaceId === localCoupleSpace.id
-      ? personalSpace.id
+      ? resolvePersonalSpaceId(nextSpaces)
       : current.activeSpaceId;
 
   return { activeSpaceId: nextActiveSpaceId, spaces: nextSpaces };
@@ -217,6 +219,12 @@ export function useSpaces(): SpacesController {
     setState(merged);
   }, [userId]);
 
+  const reloadSpaces = useCallback(async (): Promise<void> => {
+    const stored = await loadSpaces();
+    setState(stored);
+    setError(null);
+  }, []);
+
   useEffect(() => {
     if (!isReady || !isAuthReady) return;
     // `refreshCoupleSpace` solo actualiza estado tras un `await` de red; el
@@ -234,7 +242,9 @@ export function useSpaces(): SpacesController {
     () =>
       sessionSpacesState.spaces.find(
         (space) => space.id === sessionSpacesState.activeSpaceId,
-      ) ?? personalSpace,
+      ) ??
+      sessionSpacesState.spaces.find((space) => space.type === 'personal') ??
+      personalSpace,
     [sessionSpacesState],
   );
 
@@ -403,7 +413,7 @@ export function useSpaces(): SpacesController {
     );
     const nextActiveSpaceId =
       state.activeSpaceId === coupleSpaceEntry.id
-        ? personalSpace.id
+        ? resolvePersonalSpaceId(nextSpaces)
         : state.activeSpaceId;
     const nextState: SpacesState = {
       activeSpaceId: nextActiveSpaceId,
@@ -429,6 +439,7 @@ export function useSpaces(): SpacesController {
     leaveCoupleSpace,
     error,
     isReady,
+    reloadSpaces,
     refreshCoupleSpace,
     selectSpace,
     spaces: sessionSpacesState.spaces,

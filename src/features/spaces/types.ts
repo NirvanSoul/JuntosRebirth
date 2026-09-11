@@ -35,6 +35,17 @@ export const personalSpace: Space = {
 };
 
 /**
+ * Id del espacio personal de un catálogo. Cada contexto financiero por país
+ * tiene el suyo con su UUID remoto, así que el id fijo de `personalSpace` solo
+ * cubre a una instalación que todavía no ha restaurado ningún catálogo.
+ */
+export function resolvePersonalSpaceId(spaces: readonly Space[]): string {
+  return (
+    spaces.find((space) => space.type === 'personal')?.id ?? personalSpace.id
+  );
+}
+
+/**
  * Una cuenta nueva arranca solo con el espacio Personal. Un espacio
  * `type: 'couple'` real solo existe tras crearlo o aceptarlo de verdad vía
  * `useSpaces`/`juntossInvitationGateway` — nunca como valor de fábrica, para

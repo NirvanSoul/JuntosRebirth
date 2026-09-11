@@ -11,7 +11,7 @@ import type { Space } from '@/features/spaces/types';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { fetchRemoteAccountSnapshot } from '@/features/sync/gateways/juntossRemoteAccountGateway';
 import { fetchRemoteImportReviews } from '@/features/import/gateways/juntossImportReviewGateway';
-import { authClient } from '@/lib/auth-client';
+import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { restoreRemoteImportReviews } from '@/features/sync/services/restoreRemoteImportReviews';
 
 export type RestoredRemoteAccount = {
@@ -20,7 +20,10 @@ export type RestoredRemoteAccount = {
   localSpaceIdByRemoteId: ReadonlyMap<string, string>;
 };
 
-let restoreQueue: Promise<void> = Promise.resolve();
+const restoreInFlightByUserId = new Map<
+  string,
+  Promise<RestoredRemoteAccount>
+>();
 
 export async function restoreRemoteAccount(input: {
   userId: string;
@@ -38,9 +41,11 @@ export async function restoreRemoteAccount(input: {
       entityType: 'space',
       remoteId: remoteSpace.remoteId,
     });
-    const localId =
-      linked ??
-      (remoteSpace.type === 'personal' ? 'personal' : remoteSpace.remoteId);
+    // Un contexto personal por país tiene un espacio remoto distinto. Reusar
+    // el id local fijo `personal` mezclaría, por ejemplo, España y Venezuela.
+    // Las cuentas previas conservan su enlace histórico hacia `personal`; los
+    // contextos nuevos usan su UUID remoto como id local.
+    const localId = linked ?? remoteSpace.remoteId;
     await linkRemoteEntity({
       executor: database,
       userId: input.userId,
@@ -57,16 +62,16 @@ export async function restoreRemoteAccount(input: {
     });
   }
 
-  const remoteIds = new Set(remoteSpaces.map((space) => space.id));
-  const localOnlySpaces = stored.spaces.filter(
-    (space) => !remoteIds.has(space.id),
-  );
-  const spaces = [...localOnlySpaces, ...remoteSpaces];
+  // El servidor filtra este snapshot al país activo. No se conservan aquí
+  // espacios ausentes: podrían pertenecer al contexto financiero anterior y
+  // volver a exponer sus categorías, cuentas o movimientos en la interfaz.
+  const spaces = remoteSpaces;
+  const personalSpace = spaces.find((space) => space.type === 'personal');
   const activeSpaceId = spaces.some(
     (space) => space.id === stored.activeSpaceId,
   )
     ? stored.activeSpaceId
-    : spaces[0]?.id;
+    : (personalSpace?.id ?? spaces[0]?.id);
   if (!activeSpaceId)
     throw new Error('La cuenta remota no tiene espacios activos');
   await saveSpaces({ spaces, activeSpaceId });
@@ -326,28 +331,30 @@ export async function restoreRemoteAccount(input: {
 }
 
 export async function restoreRemoteAccountForCurrentSession(): Promise<RestoredRemoteAccount> {
-  const { data } = await authClient.getSession();
-  const userId = data?.user?.id;
+  const userId = await getAuthenticatedUserId();
   if (!userId) {
     throw new Error('Debes iniciar sesión antes de restaurar tus datos');
   }
 
-  const task = restoreQueue
-    .catch(() => undefined)
-    .then(async () => {
-      const snapshot = await fetchRemoteAccountSnapshot();
-      const restored = await restoreRemoteAccount({ userId, snapshot });
-      // La API ya filtra las revisiones por usuario, así que no hace falta pasarle
-      // los espacios.
-      await restoreRemoteImportReviews({
-        reviews: await fetchRemoteImportReviews(),
-        restored,
-      });
-      return restored;
+  const existing = restoreInFlightByUserId.get(userId);
+  if (existing) return existing;
+
+  let task: Promise<RestoredRemoteAccount>;
+  task = (async () => {
+    const snapshot = await fetchRemoteAccountSnapshot();
+    const restored = await restoreRemoteAccount({ userId, snapshot });
+    // La API ya filtra las revisiones por usuario, así que no hace falta pasarle
+    // los espacios.
+    await restoreRemoteImportReviews({
+      reviews: await fetchRemoteImportReviews(),
+      restored,
     });
-  restoreQueue = task.then(
-    () => undefined,
-    () => undefined,
-  );
+    return restored;
+  })().finally(() => {
+    if (restoreInFlightByUserId.get(userId) === task) {
+      restoreInFlightByUserId.delete(userId);
+    }
+  });
+  restoreInFlightByUserId.set(userId, task);
   return task;
 }

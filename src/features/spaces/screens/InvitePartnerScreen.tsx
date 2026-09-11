@@ -12,6 +12,7 @@ import {
   CreateInvitationError,
   createJuntossInvitationGateway,
 } from '@/features/spaces/gateways/juntossInvitationGateway';
+import { useCountryChangeNotice } from '@/features/spaces/hooks/useCountryChangeNotice';
 import type { Space } from '@/features/spaces/types';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { spacing } from '@/theme/spacing';
@@ -60,6 +61,13 @@ export function InvitePartnerScreen({
     setPhase({ kind: 'idle' });
   }
 
+  const countryChangeNotice = useCountryChangeNotice(
+    visible,
+    coupleSpace !== null,
+  );
+  const createLabel = countryChangeNotice
+    ? 'Invitar a otra persona'
+    : 'Crear espacio de pareja';
   const isBusy = phase.kind === 'sending-invitation';
 
   const handleClose = () => {
@@ -127,7 +135,9 @@ export function InvitePartnerScreen({
                 ? 'Escribe el correo asociado a la cuenta de tu pareja.'
                 : phase.kind !== 'idle'
                   ? 'Escribe el correo asociado a la cuenta de tu pareja.'
-                  : 'Crea un espacio para compartir movimientos con tu pareja.'}
+                  : countryChangeNotice
+                    ? 'Has salido de tu espacio compartido.'
+                    : 'Crea un espacio para compartir movimientos con tu pareja.'}
             </Text>
           </View>
           <ModalCloseButton onPress={handleClose} />
@@ -135,21 +145,31 @@ export function InvitePartnerScreen({
 
         {!coupleSpace && phase.kind === 'idle' ? (
           <View style={styles.creationContent}>
-            <Image
-              accessible={false}
-              resizeMode="contain"
-              source={require('../../../../assets/Onboarding/Happy_Couple.png')}
-              style={styles.coupleIllustration}
-              testID="invite-partner-couple-illustration"
-            />
+            {countryChangeNotice ? (
+              <Text tone="secondary" variant="body">
+                Saliste automáticamente al cambiar de país: ambos deben tener el
+                mismo país configurado. Para volver al espacio anterior,
+                configura de nuevo {countryChangeNotice.previousCountryName} y
+                pide una nueva invitación a la persona que sigue dentro.
+              </Text>
+            ) : (
+              <Image
+                accessible={false}
+                resizeMode="contain"
+                source={require('../../../../assets/Onboarding/Happy_Couple.png')}
+                style={styles.coupleIllustration}
+                testID="invite-partner-couple-illustration"
+              />
+            )}
             <Text tone="secondary" variant="body">
-              El espacio se activará cuando la otra persona acepte la invitación
-              dentro de Juntoss.
+              {countryChangeNotice
+                ? 'También puedes crear un nuevo espacio con alguien que tenga configurado tu país actual.'
+                : 'El espacio se activará cuando la otra persona acepte la invitación dentro de Juntoss.'}
             </Text>
             <ModalPrimaryAction
-              accessibilityLabel="Crear espacio de pareja"
+              accessibilityLabel={createLabel}
               disabled={isBusy}
-              label="Crear espacio de pareja"
+              label={createLabel}
               onPress={handleContinueToEmail}
               testID="invite-partner-create-space"
               variant="cta"
