@@ -1,4 +1,4 @@
-import { useState, type PropsWithChildren, type ReactNode } from 'react';
+import type { PropsWithChildren, ReactNode } from 'react';
 import {
   Image,
   type ImageSourcePropType,
@@ -14,7 +14,6 @@ import { Screen } from '@/components/layout/Screen/Screen';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { OnboardingProgressIndicator } from '@/features/onboarding/components/OnboardingProgressIndicator';
-import { useOnboardingFlow } from '@/features/onboarding/context/OnboardingFlowContext';
 import {
   estimateRevealDuration,
   OnboardingRevealText,
@@ -53,8 +52,17 @@ type OnboardingScreenLayoutProps = PropsWithChildren<{
   actionDisabled?: boolean;
   /** Acción circular colocada junto a Atrás, normalmente el FAB del onboarding. */
   footerAccessory?: ReactNode;
+  /**
+   * Acción secundaria a ancho completo colocada justo encima de la fila de
+   * botones, para una lámina que ofrece dos caminos (por ejemplo, iniciar
+   * sesión además de crear cuenta). Se pasa como nodo para que la pantalla
+   * elija su variante, pero debe construirse con `ModalPrimaryAction` para
+   * conservar la altura de acción del resto del onboarding.
+   */
+  secondaryAction?: ReactNode;
   onAction?: () => void;
   onBack?: () => void;
+  onSkip?: () => void;
   currentStep: number;
   /** Imagen opcional mostrada entre el progreso y el título, a tamaño estándar. */
   illustrationSource?: ImageSourcePropType;
@@ -109,7 +117,9 @@ export function OnboardingScreenLayout({
   footerAccessory,
   onAction,
   onBack,
+  onSkip,
   currentStep,
+  secondaryAction,
   subtitle,
   testID,
   title,
@@ -117,28 +127,13 @@ export function OnboardingScreenLayout({
   const density = useLayoutDensity();
   const { width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReduceMotionPreference();
-  const onboardingFlow = useOnboardingFlow();
-  const [skipError, setSkipError] = useState<string | null>(null);
-  const [isSkipping, setSkipping] = useState(false);
   const subtitleDelay =
     estimateRevealDuration() + motion.onboardingTextRevealBlockPause;
   const layoutTransition = getDisclosureLayoutTransition();
   const raiseActions = isCompact && compactRaisesActions;
-  const canSkip = currentStep >= 3 && onboardingFlow !== null;
+  const canSkip = currentStep >= 3 && onSkip !== undefined;
 
-  const handleSkip = async () => {
-    if (!onboardingFlow || isSkipping) return;
-
-    setSkipping(true);
-    setSkipError(null);
-    try {
-      await onboardingFlow.completeOnboarding();
-    } catch (error) {
-      console.error('[onboarding] No se pudo omitir el onboarding', error);
-      setSkipError('No pudimos omitir el onboarding. Inténtalo de nuevo.');
-      setSkipping(false);
-    }
-  };
+  const handleSkip = () => onSkip?.();
 
   const illustrationStyle = (() => {
     if (illustrationFullBleed) {
@@ -192,23 +187,18 @@ export function OnboardingScreenLayout({
             <Pressable
               accessibilityLabel="Omitir onboarding"
               accessibilityRole="button"
-              disabled={isSkipping}
+              disabled={false}
               hitSlop={spacing.sm}
               onPress={() => void handleSkip()}
               style={styles.skipAction}
               testID={testID ? `${testID}-skip` : undefined}
             >
               <Text tone="secondary" variant="label" weight="medium">
-                {isSkipping ? 'Omitiendo…' : 'Omitir'}
+                Omitir
               </Text>
             </Pressable>
           ) : null}
         </View>
-        {skipError ? (
-          <Text tone="expense" variant="footnote">
-            {skipError}
-          </Text>
-        ) : null}
         <Animated.View
           layout={layoutTransition}
           style={isCompact ? styles.headerCompact : styles.header}
@@ -260,30 +250,33 @@ export function OnboardingScreenLayout({
         >
           {children}
         </Animated.View>
-        <Animated.View layout={layoutTransition} style={styles.actions}>
-          {onBack ? (
-            <ModalCloseButton
-              onPress={onBack}
-              showBackground
-              size={layout.floatingActionSize}
-              testID={testID ? `${testID}-back` : undefined}
-              variant="back"
-            />
-          ) : null}
-          {actionLabel && onAction ? (
-            <ModalPrimaryAction
-              accessibilityLabel={actionLabel}
-              disabled={actionDisabled}
-              label={actionLabel}
-              onPress={onAction}
-              style={styles.primaryAction}
-              testID={testID ? `${testID}-action` : undefined}
-              variant="cta"
-            />
-          ) : null}
-          {footerAccessory ? (
-            <View style={styles.footerAccessory}>{footerAccessory}</View>
-          ) : null}
+        <Animated.View layout={layoutTransition} style={styles.actionStack}>
+          {secondaryAction}
+          <View style={styles.actions}>
+            {onBack ? (
+              <ModalCloseButton
+                onPress={onBack}
+                showBackground
+                size={layout.floatingActionSize}
+                testID={testID ? `${testID}-back` : undefined}
+                variant="back"
+              />
+            ) : null}
+            {actionLabel && onAction ? (
+              <ModalPrimaryAction
+                accessibilityLabel={actionLabel}
+                disabled={actionDisabled}
+                label={actionLabel}
+                onPress={onAction}
+                style={styles.primaryAction}
+                testID={testID ? `${testID}-action` : undefined}
+                variant="cta"
+              />
+            ) : null}
+            {footerAccessory ? (
+              <View style={styles.footerAccessory}>{footerAccessory}</View>
+            ) : null}
+          </View>
         </Animated.View>
       </Pressable>
     </Screen>
@@ -319,6 +312,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
+  actionStack: { gap: spacing.md },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   footerAccessory: { marginLeft: 'auto' },
   primaryAction: { flex: 1 },

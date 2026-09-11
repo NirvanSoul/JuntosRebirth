@@ -6,6 +6,7 @@ import Animated from 'react-native-reanimated';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { StepProgressBar } from '@/components/ui/StepProgressBar/StepProgressBar';
+import { OnboardingScreenLayout } from '@/features/onboarding/components/OnboardingScreenLayout';
 import { Text } from '@/components/ui/Text/Text';
 import { ForgotPasswordScreen } from '@/features/auth/screens/ForgotPasswordScreen';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
@@ -18,6 +19,7 @@ import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
 import { loadPendingEmailVerification } from '@/features/auth/services/pendingEmailVerification';
 import { spacing } from '@/theme/spacing';
+import type { ColorTokens } from '@/theme/types';
 import { getDisclosureEntering } from '@/theme/transitions';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
@@ -42,8 +44,16 @@ const stepTitles: Record<AccessStep['screen'], string> = {
   reset: 'Nueva contraseña',
 };
 
+/** Ancho ÷ alto real de `10_loginicon.png`, para el tamaño estándar de lámina. */
+const entryIllustrationAspectRatio = 1206 / 1218;
+
 /** Host único a pantalla completa para los flujos de autenticación. */
-export function AccessScreen() {
+type AccessScreenProps = {
+  /** Se invoca al autenticar desde el último paso de onboarding. */
+  onAuthenticated?: () => Promise<void>;
+};
+
+export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
   const styles = useThemedStyles(createStyles);
   const { session } = useBetterAuthSession();
   const pendingVerificationEmail =
@@ -112,6 +122,43 @@ export function AccessScreen() {
     }
   };
 
+  const handleAuthenticated = () => {
+    if (!onAuthenticated) return;
+    void onAuthenticated().catch((error: unknown) => {
+      console.error('[access] No se pudo completar el onboarding', error);
+    });
+  };
+
+  // La entrada es la décima lámina del onboarding: se dibuja con la misma
+  // estructura que las nueve anteriores (progreso, ilustración a tamaño
+  // estándar, titular revelado y acción principal al pie) en vez de repetir
+  // aquí sus medidas. El resto de pasos conserva el andamiaje con scroll,
+  // porque son formularios que conviven con el teclado.
+  if (step.screen === 'entry') {
+    return (
+      <OnboardingScreenLayout
+        actionLabel="Crear cuenta"
+        currentStep={10}
+        illustrationAspectRatio={entryIllustrationAspectRatio}
+        illustrationSource={require('../../../../assets/Onboarding/10_loginicon.png')}
+        onAction={() => setStep({ screen: 'signup', step: 1 })}
+        secondaryAction={
+          <ModalPrimaryAction
+            accessibilityLabel="Iniciar sesión"
+            label="Iniciar sesión"
+            onPress={() => setStep({ screen: 'login' })}
+            style={styles.onboardingLoginAction}
+            testID="onboarding-login-open-login"
+            variant="surface"
+          />
+        }
+        subtitle="Inicia sesión fácilmente o crea una cuenta, para empezar a mejorar tus finanzas."
+        testID="onboarding-login"
+        title={'Empecemos esto\nJuntos.'}
+      />
+    );
+  }
+
   return (
     <SafeAreaView
       edges={['top', 'right', 'bottom', 'left']}
@@ -126,22 +173,22 @@ export function AccessScreen() {
         <View
           style={[
             styles.header,
-            step.screen === 'signup' ? styles.signupHeader : null,
+            step.screen === 'signup' || step.screen === 'login'
+              ? styles.inlineHeader
+              : null,
           ]}
         >
-          {step.screen !== 'entry' ? (
-            step.screen === 'signup' ? (
-              <ModalCloseButton onPress={goBack} variant="back" />
-            ) : (
-              <ModalPrimaryAction
-                accessibilityLabel="Volver"
-                label="Atrás"
-                onPress={goBack}
-                style={styles.backAction}
-                variant="surface"
-              />
-            )
-          ) : null}
+          {step.screen === 'signup' || step.screen === 'login' ? (
+            <ModalCloseButton onPress={goBack} variant="back" />
+          ) : (
+            <ModalPrimaryAction
+              accessibilityLabel="Volver"
+              label="Atrás"
+              onPress={goBack}
+              style={styles.backAction}
+              variant="surface"
+            />
+          )}
           <Text accessibilityRole="header" variant="title">
             {stepTitles[step.screen]}
           </Text>
@@ -158,44 +205,20 @@ export function AccessScreen() {
         ) : null}
 
         <Animated.View entering={getDisclosureEntering()} key={step.screen}>
-          {step.screen === 'entry' ? (
-            <View style={styles.entryActions}>
-              <Text tone="secondary" variant="body">
-                Crea una cuenta para proteger y sincronizar tus datos entre
-                dispositivos.
-              </Text>
-              <ModalPrimaryAction
-                accessibilityLabel="Crear cuenta"
-                label="Crear cuenta"
-                onPress={() => setStep({ screen: 'signup', step: 1 })}
-                testID="access-open-signup"
-                variant="cta"
-              />
-              <ModalPrimaryAction
-                accessibilityLabel="Ya tengo cuenta"
-                label="Ya tengo cuenta"
-                onPress={() => setStep({ screen: 'login' })}
-                testID="access-open-login"
-                variant="surface"
-              />
-            </View>
-          ) : null}
-
           {step.screen === 'login' ? (
             <LoginScreen
-              onCancel={goBack}
               onEmailVerificationRequired={(email) =>
                 setStep({ screen: 'verify-signup', email })
               }
               onNavigateToForgotPassword={() => setStep({ screen: 'forgot' })}
               onNavigateToSignUp={() => setStep({ screen: 'signup', step: 1 })}
-              onSuccess={() => undefined}
+              onSuccess={handleAuthenticated}
             />
           ) : null}
 
           {step.screen === 'signup' ? (
             <SignUpScreen
-              onGoogleSuccess={() => undefined}
+              onGoogleSuccess={handleAuthenticated}
               onNavigateToLogin={() => setStep({ screen: 'login' })}
               onStepChange={(nextStep) =>
                 setStep({ screen: 'signup', step: nextStep })
@@ -211,7 +234,7 @@ export function AccessScreen() {
             <VerifyCodeScreen
               email={step.email}
               onCancel={goBack}
-              onSuccess={() => undefined}
+              onSuccess={handleAuthenticated}
               purpose="signup"
             />
           ) : null}
@@ -251,7 +274,7 @@ export function AccessScreen() {
   );
 }
 
-function createStyles(colors: { background: string }) {
+function createStyles(colors: ColorTokens) {
   return StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
     scrollContent: {
@@ -262,12 +285,12 @@ function createStyles(colors: { background: string }) {
       paddingBottom: spacing.huge,
     },
     header: { gap: spacing.lg },
-    signupHeader: {
+    inlineHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
     },
     backAction: { alignSelf: 'flex-start' },
-    entryActions: { gap: spacing.lg },
+    onboardingLoginAction: { backgroundColor: colors.keypad, borderWidth: 0 },
   });
 }

@@ -13,6 +13,7 @@ export function WelcomeScreen({ navigation }: Props) {
       actionLabel="Continuar"
       onAction={() => navigation.navigate('CalendarPreview')}
       onBack={() => navigation.goBack()}
+      onSkip={() => navigation.navigate('OnboardingLogin')}
       currentStep={3}
       illustrationAspectRatio={walletIllustrationAspectRatio}
       illustrationSource={require('../../../../assets/Onboarding/3_Menos_dudas.png')}

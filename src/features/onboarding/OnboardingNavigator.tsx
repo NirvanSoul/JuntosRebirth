@@ -9,6 +9,7 @@ import { CreateFirstCategoryScreen } from '@/features/onboarding/screens/CreateF
 import { JuntosScreen } from '@/features/onboarding/screens/JuntosScreen';
 import { NameScreen } from '@/features/onboarding/screens/NameScreen';
 import { ReadyToExploreScreen } from '@/features/onboarding/screens/ReadyToExploreScreen';
+import { OnboardingLoginScreen } from '@/features/onboarding/screens/OnboardingLoginScreen';
 import { WelcomeScreen } from '@/features/onboarding/screens/WelcomeScreen';
 import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { preloadOnboardingIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
@@ -23,6 +24,7 @@ export type OnboardingStackParamList = {
   AddFirstIncome: undefined;
   AddFirstExpense: undefined;
   ReadyToExplore: undefined;
+  OnboardingLogin: undefined;
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
@@ -77,9 +79,10 @@ export function OnboardingNavigator({ onComplete }: OnboardingNavigatorProps) {
           component={AddFirstExpenseScreen}
           name="AddFirstExpense"
         />
-        <Stack.Screen name="ReadyToExplore">
+        <Stack.Screen component={ReadyToExploreScreen} name="ReadyToExplore" />
+        <Stack.Screen name="OnboardingLogin">
           {(props) => (
-            <ReadyToExploreScreen {...props} onComplete={onComplete} />
+            <OnboardingLoginScreen {...props} onComplete={onComplete} />
           )}
         </Stack.Screen>
       </Stack.Navigator>

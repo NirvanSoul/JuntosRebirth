@@ -167,6 +167,7 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
           />
         }
         onBack={() => navigation.goBack()}
+        onSkip={() => navigation.navigate('OnboardingLogin')}
         currentStep={6}
         illustrationAspectRatio={categoryIllustrationAspectRatio}
         illustrationSource={require('../../../../assets/Onboarding/6_Crea_tu_categoria.png')}

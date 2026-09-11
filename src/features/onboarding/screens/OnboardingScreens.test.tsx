@@ -4,7 +4,6 @@ import { Keyboard } from 'react-native';
 import { CountryScreen } from '@/features/onboarding/screens/CountryScreen';
 import { NameScreen } from '@/features/onboarding/screens/NameScreen';
 import { WelcomeScreen } from '@/features/onboarding/screens/WelcomeScreen';
-import { ReadyToExploreScreen } from '@/features/onboarding/screens/ReadyToExploreScreen';
 import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
 import { renderWithTheme } from '@/test/renderWithTheme';
@@ -30,7 +29,7 @@ describe('pantallas de onboarding', () => {
     mockUpdateProfileCountry.mockResolvedValue(undefined);
   });
 
-  it('permite omitir desde la bienvenida, después de guardar nombre y país', async () => {
+  it('lleva al paso de acceso al omitir desde la bienvenida', async () => {
     const screen = await renderWithTheme(
       <OnboardingFlowContext.Provider value={{ completeOnboarding }}>
         <WelcomeScreen navigation={navigation} route={route} />
@@ -39,54 +38,7 @@ describe('pantallas de onboarding', () => {
 
     fireEvent.press(screen.getByTestId('onboarding-welcome-skip'));
 
-    await waitFor(() => {
-      expect(completeOnboarding).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it('explica cómo reintentar si no puede omitir', async () => {
-    completeOnboarding.mockRejectedValueOnce(new Error('sin espacio'));
-    const consoleError = jest.spyOn(console, 'error').mockImplementation();
-    const screen = await renderWithTheme(
-      <OnboardingFlowContext.Provider value={{ completeOnboarding }}>
-        <WelcomeScreen navigation={navigation} route={route} />
-      </OnboardingFlowContext.Provider>,
-    );
-
-    fireEvent.press(screen.getByTestId('onboarding-welcome-skip'));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(
-          'No pudimos omitir el onboarding. Inténtalo de nuevo.',
-        ),
-      ).toBeTruthy();
-    });
-    consoleError.mockRestore();
-  });
-
-  it('explica cómo reintentar si no puede completar el flujo', async () => {
-    const screen = await renderWithTheme(
-      <ReadyToExploreScreen
-        navigation={navigation}
-        onComplete={async () => {
-          throw new Error('sin espacio');
-        }}
-        route={route}
-      />,
-    );
-
-    const consoleError = jest.spyOn(console, 'error').mockImplementation();
-    fireEvent.press(screen.getByTestId('onboarding-ready-action'));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(
-          'No pudimos completar el onboarding. Inténtalo de nuevo.',
-        ),
-      ).toBeTruthy();
-    });
-    consoleError.mockRestore();
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('OnboardingLogin');
   });
 
   it('cierra el teclado al tocar fuera del campo de nombre', async () => {

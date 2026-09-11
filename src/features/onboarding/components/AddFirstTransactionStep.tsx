@@ -37,6 +37,7 @@ type AddFirstTransactionStepProps = {
   illustrationScale?: number;
   illustrationSource?: ImageSourcePropType;
   onBack: () => void;
+  onSkip?: () => void;
   onSaved: () => void;
   spaceId: string;
   spaceName: string;
@@ -57,6 +58,7 @@ export function AddFirstTransactionStep({
   illustrationScale,
   illustrationSource,
   onBack,
+  onSkip,
   onSaved,
   spaceId,
   spaceName,
@@ -179,6 +181,7 @@ export function AddFirstTransactionStep({
           />
         }
         onBack={onBack}
+        onSkip={onSkip}
         currentStep={currentStep}
         illustrationAspectRatio={illustrationAspectRatio}
         illustrationScale={illustrationScale}

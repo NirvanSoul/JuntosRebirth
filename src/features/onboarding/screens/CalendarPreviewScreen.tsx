@@ -16,6 +16,7 @@ export function CalendarPreviewScreen({ navigation }: Props) {
       actionLabel="Continuar"
       onAction={() => navigation.navigate('Juntos')}
       onBack={() => navigation.goBack()}
+      onSkip={() => navigation.navigate('OnboardingLogin')}
       currentStep={4}
       illustrationAspectRatio={calendarIllustrationAspectRatio}
       illustrationSource={require('../../../../assets/Onboarding/4_Tu_mes.png')}

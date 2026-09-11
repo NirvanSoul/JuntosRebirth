@@ -189,11 +189,17 @@ describe('SignUpScreen', () => {
     expect(nameField.props.value).toBe('Ana');
   });
 
-  it('en el primer paso ofrece ir a iniciar sesión en vez de un botón de atrás', async () => {
+  it('en el primer paso ofrece un enlace pequeño para iniciar sesión', async () => {
     const onNavigateToLogin = jest.fn();
     await renderWizard(onNavigateToLogin);
 
     expect(screen.queryByTestId('signup-back')).toBeNull();
+    expect(
+      screen.queryByText(/Crea una cuenta para proteger y sincronizar/i),
+    ).toBeNull();
+    expect(
+      screen.getByText('¿Ya tienes cuenta? Inicia sesión').parent?.props.style,
+    ).toEqual(expect.objectContaining({ alignItems: 'center' }));
     await fireEvent.press(screen.getByTestId('signup-navigate-login'));
 
     expect(onNavigateToLogin).toHaveBeenCalled();

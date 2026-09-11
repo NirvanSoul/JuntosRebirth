@@ -416,6 +416,20 @@ Permitir:
 5. Acción de inicio de sesión.
 6. Microtexto opcional sobre la verificación de correo.
 
+## Estructura
+
+La entrada de acceso es la décima lámina del onboarding y se dibuja con
+`OnboardingScreenLayout`, igual que las nueve anteriores: no declara medidas
+propias de ilustración, tipografía ni botones. De ahí toma el indicador de
+progreso (paso 10 de 10), la ilustración `10_loginicon.png` a tamaño estándar,
+el titular y el subtítulo con la misma revelación, y la altura de acción del
+resto del flujo. `Iniciar sesión` ocupa la ranura de acción secundaria, justo
+encima de `Crear cuenta`, que es la acción principal al pie.
+
+Los pasos siguientes (crear cuenta, inicio de sesión, OTP, recuperación) sí
+conservan su propio andamiaje con scroll, porque son formularios que conviven
+con el teclado.
+
 ## Opciones de título
 
 1. **Empieza con juntoss**

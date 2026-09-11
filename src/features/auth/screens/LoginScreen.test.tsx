@@ -40,9 +40,7 @@ describe('LoginScreen — Google', () => {
     } as never);
     jest.mocked(listRemoteSpaces).mockResolvedValue([]);
 
-    const view = await renderWithTheme(
-      <LoginScreen onCancel={jest.fn()} onSuccess={onSuccess} />,
-    );
+    const view = await renderWithTheme(<LoginScreen onSuccess={onSuccess} />);
 
     await fireEvent.press(screen.getByTestId('login-google'));
     expect(authClient.signIn.social).toHaveBeenCalledWith({
@@ -54,7 +52,7 @@ describe('LoginScreen — Google', () => {
 
     await act(async () => {
       session = { user: { id: 'user-1' } };
-      view.rerender(<LoginScreen onCancel={jest.fn()} onSuccess={onSuccess} />);
+      view.rerender(<LoginScreen onSuccess={onSuccess} />);
     });
 
     await waitFor(() => expect(listRemoteSpaces).toHaveBeenCalledTimes(1));
@@ -67,9 +65,7 @@ describe('LoginScreen — Google', () => {
       error: null,
     } as never);
 
-    await renderWithTheme(
-      <LoginScreen onCancel={jest.fn()} onSuccess={jest.fn()} />,
-    );
+    await renderWithTheme(<LoginScreen onSuccess={jest.fn()} />);
 
     await fireEvent.press(screen.getByTestId('login-google'));
 
@@ -78,6 +74,31 @@ describe('LoginScreen — Google', () => {
     ).toBeTruthy();
     expect(screen.getByTestId('login-google').props.accessibilityState).toEqual(
       expect.objectContaining({ disabled: false }),
+    );
+  });
+
+  it('centra el enlace gris de recuperación entre Google y el registro', async () => {
+    const screen = await renderWithTheme(
+      <LoginScreen
+        onNavigateToForgotPassword={jest.fn()}
+        onNavigateToSignUp={jest.fn()}
+        onSuccess={jest.fn()}
+      />,
+    );
+
+    const forgot = screen.getByText('¿Olvidaste tu contraseña?');
+    const signUp = screen.getByText('¿No tienes cuenta? Crear una');
+    expect(forgot.parent?.props.style).toEqual(
+      expect.objectContaining({ alignItems: 'center' }),
+    );
+    expect(forgot.props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ color: expect.any(String) }),
+      ]),
+    );
+    expect(screen.queryByText('Cancelar')).toBeNull();
+    expect(forgot.parent?.parent?.children.indexOf(forgot.parent)).toBeLessThan(
+      signUp.parent?.parent?.children.indexOf(signUp.parent) ?? Infinity,
     );
   });
 });

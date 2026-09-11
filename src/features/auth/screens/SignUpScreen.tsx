@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
@@ -21,6 +21,7 @@ import { spacing } from '@/theme/spacing';
 import { getDisclosureEntering } from '@/theme/transitions';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
+import { layout } from '@/theme/layout';
 
 export const signUpTotalSteps = 4;
 
@@ -281,15 +282,18 @@ export function SignUpScreen({
 
       {isFirstStep ? (
         onNavigateToLogin ? (
-          <ModalPrimaryAction
+          <Pressable
             accessibilityLabel="Ya tengo una cuenta, iniciar sesión"
+            accessibilityRole="button"
             disabled={isSubmitting}
-            label="¿Ya tienes cuenta? Inicia sesión"
             onPress={onNavigateToLogin}
-            style={[styles.secondaryAction, { backgroundColor: colors.keypad }]}
+            style={styles.loginLink}
             testID="signup-navigate-login"
-            variant="surface"
-          />
+          >
+            <Text tone="secondary" variant="footnote">
+              ¿Ya tienes cuenta? Inicia sesión
+            </Text>
+          </Pressable>
         ) : null
       ) : (
         <ModalPrimaryAction
@@ -302,12 +306,6 @@ export function SignUpScreen({
           variant="surface"
         />
       )}
-
-      <Text align="center" tone="secondary" variant="footnote">
-        {
-          'Crea una cuenta para proteger y sincronizar\ntus datos entre dispositivos.'
-        }
-      </Text>
     </View>
   );
 }
@@ -316,5 +314,10 @@ function createStyles() {
   return StyleSheet.create({
     container: { gap: spacing.lg },
     secondaryAction: { borderWidth: 0 },
+    loginLink: {
+      minHeight: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
   });
 }

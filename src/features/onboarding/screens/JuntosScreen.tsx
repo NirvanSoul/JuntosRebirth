@@ -13,6 +13,7 @@ export function JuntosScreen({ navigation }: Props) {
       actionLabel="Continuar"
       onAction={() => navigation.navigate('CreateFirstCategory')}
       onBack={() => navigation.goBack()}
+      onSkip={() => navigation.navigate('OnboardingLogin')}
       currentStep={5}
       illustrationAspectRatio={puzzleIllustrationAspectRatio}
       illustrationFullBleed

@@ -21,6 +21,7 @@ export function AddFirstExpenseScreen({ navigation }: Props) {
       illustrationScale={1.2}
       illustrationSource={require('../../../../assets/Onboarding/8_Gastos.png')}
       onBack={() => navigation.goBack()}
+      onSkip={() => navigation.navigate('OnboardingLogin')}
       onSaved={() => navigation.navigate('ReadyToExplore')}
       spaceId={activeSpace.id}
       spaceName={activeSpace.name}

@@ -64,12 +64,32 @@ describe('AccessScreen', () => {
     expect(screen.queryByTestId('access-continue-guest')).toBeNull();
   });
 
-  it('abre el paso de crear cuenta', async () => {
+  it('abre el paso de crear cuenta desde la única entrada de acceso', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('access-open-signup'));
+    fireEvent.press(screen.getByTestId('onboarding-login-action'));
 
     expect(screen.getByText('Crear cuenta')).toBeTruthy();
+  });
+
+  it('muestra la misma entrada final después de cerrar sesión', async () => {
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    expect(screen.getByTestId('onboarding-login-illustration')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-progress-segment-10')).toBeTruthy();
+    expect(screen.getByText('Empecemos esto\nJuntos.')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('onboarding-login-action'));
+    expect(screen.getByText('Crear cuenta')).toBeTruthy();
+  });
+
+  it('muestra una flecha junto al título al abrir iniciar sesión', async () => {
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    fireEvent.press(screen.getByTestId('onboarding-login-open-login'));
+
+    await waitFor(() => expect(screen.getByLabelText('Volver')).toBeTruthy());
+    expect(screen.queryByText('Atrás')).toBeNull();
   });
 
   it('retoma la verificación cuando Better Auth creó una sesión sin verificar', async () => {
@@ -85,7 +105,7 @@ describe('AccessScreen', () => {
   it('pasa al OTP al terminar el último paso de crear cuenta', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('access-open-signup'));
+    fireEvent.press(screen.getByTestId('onboarding-login-action'));
     fireEvent.press(await screen.findByTestId('signup-complete'));
 
     expect(await screen.findByTestId('verify-signup-email')).toHaveTextContent(

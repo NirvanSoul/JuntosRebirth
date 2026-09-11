@@ -17,6 +17,7 @@ const onboardingIllustrations = [
   require('../../../../assets/Onboarding/7_Bien.png'),
   require('../../../../assets/Onboarding/8_Gastos.png'),
   require('../../../../assets/Onboarding/9_Abrazo.png'),
+  require('../../../../assets/Onboarding/10_loginicon.png'),
 ];
 
 /**

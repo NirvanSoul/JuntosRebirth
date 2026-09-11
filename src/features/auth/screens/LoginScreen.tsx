@@ -13,7 +13,6 @@ import { spacing } from '@/theme/spacing';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type LoginScreenProps = {
-  onCancel: () => void;
   onNavigateToForgotPassword?: () => void;
   onNavigateToSignUp?: () => void;
   onEmailVerificationRequired?: (email: string) => void;
@@ -31,7 +30,6 @@ type LoginState =
   | { step: 'error'; message: string };
 
 export function LoginScreen({
-  onCancel,
   onNavigateToForgotPassword,
   onNavigateToSignUp,
   onEmailVerificationRequired,
@@ -109,19 +107,6 @@ export function LoginScreen({
         value={password}
       />
 
-      {onNavigateToForgotPassword ? (
-        <Pressable
-          accessibilityRole="button"
-          disabled={isSubmitting}
-          onPress={onNavigateToForgotPassword}
-          style={styles.linkButtonEnd}
-        >
-          <Text tone="brand" variant="footnote">
-            ¿Olvidaste tu contraseña?
-          </Text>
-        </Pressable>
-      ) : null}
-
       {state.step === 'error' ? (
         <Text tone="expense" variant="footnote">
           {state.message}
@@ -144,6 +129,19 @@ export function LoginScreen({
         testID="login-google"
       />
 
+      {onNavigateToForgotPassword ? (
+        <Pressable
+          accessibilityRole="button"
+          disabled={isSubmitting}
+          onPress={onNavigateToForgotPassword}
+          style={styles.linkButton}
+        >
+          <Text tone="muted" variant="footnote">
+            ¿Olvidaste tu contraseña?
+          </Text>
+        </Pressable>
+      ) : null}
+
       {onNavigateToSignUp ? (
         <Pressable
           accessibilityRole="button"
@@ -156,17 +154,6 @@ export function LoginScreen({
           </Text>
         </Pressable>
       ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={isSubmitting}
-        onPress={onCancel}
-        style={styles.linkButton}
-      >
-        <Text tone="muted" variant="footnote">
-          Cancelar
-        </Text>
-      </Pressable>
     </View>
   );
 }
@@ -177,11 +164,6 @@ function createStyles() {
     linkButton: {
       minHeight: layout.minTouchTarget,
       alignItems: 'center',
-      justifyContent: 'center',
-    },
-    linkButtonEnd: {
-      minHeight: layout.minTouchTarget,
-      alignItems: 'flex-end',
       justifyContent: 'center',
     },
     actionsRow: {
