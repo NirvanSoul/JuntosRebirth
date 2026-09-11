@@ -7,6 +7,11 @@ import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import { InvitationPushRegistration } from '@/lib/notifications/InvitationPushRegistration';
 import { registerCurrentDeviceForInvitationPush } from '@/lib/notifications/invitationPushNotifications';
 
+jest.mock('expo', () => ({
+  ...jest.requireActual('expo'),
+  isRunningInExpoGo: jest.fn(() => false),
+}));
+
 jest.mock('@/features/auth/hooks/useAuthSession');
 jest.mock('@/hooks/useAppForeground', () => ({ useAppForeground: jest.fn() }));
 jest.mock('@/lib/notifications/invitationPushNotifications', () => ({

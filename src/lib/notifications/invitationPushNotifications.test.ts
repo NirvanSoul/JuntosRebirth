@@ -1,9 +1,15 @@
 import * as Notifications from 'expo-notifications';
+import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
 import { registerCurrentDeviceForInvitationPush } from '@/lib/notifications/invitationPushNotifications';
 import { storeInvitationPushToken } from '@/lib/notifications/invitationPushTokenStore';
 import { apiClient } from '@/services/api/juntossApiClient';
+
+jest.mock('expo', () => ({
+  ...jest.requireActual('expo'),
+  isRunningInExpoGo: jest.fn(() => false),
+}));
 
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { HIGH: 4 },
@@ -25,6 +31,15 @@ const mockedNotifications = jest.mocked(Notifications);
 
 describe('invitationPushNotifications', () => {
   beforeEach(() => jest.clearAllMocks());
+
+  it('omite el registro push remoto en Expo Go', async () => {
+    jest.mocked(isRunningInExpoGo).mockReturnValueOnce(true);
+
+    await expect(registerCurrentDeviceForInvitationPush(false)).resolves.toBe(
+      'unsupported',
+    );
+    expect(mockedNotifications.getPermissionsAsync).not.toHaveBeenCalled();
+  });
 
   it('registra el token Expo cuando el permiso ya está concedido', async () => {
     mockedNotifications.getPermissionsAsync.mockResolvedValue({

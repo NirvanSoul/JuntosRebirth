@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import * as Notifications from 'expo-notifications';
 import { Linking, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
@@ -10,6 +9,10 @@ import {
   SettingsSection,
 } from '@/components/layout/SettingsList/SettingsList';
 import { Text } from '@/components/ui/Text/Text';
+import {
+  getNotificationModule,
+  isNotificationModuleAvailable,
+} from '@/lib/notifications/notificationRuntime';
 import { categoryColors } from '@/theme/categoryColors';
 import { spacing } from '@/theme/spacing';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -19,7 +22,8 @@ type PermissionsScreenProps = {
   visible: boolean;
 };
 
-type NotificationPermissionStatus = 'granted' | 'denied' | 'undetermined';
+type NotificationPermissionStatus =
+  'granted' | 'denied' | 'undetermined' | 'unavailable';
 
 export function PermissionsScreen({
   onClose,
@@ -39,14 +43,18 @@ export function PermissionsScreen({
     }),
   );
   const [status, setStatus] = useState<NotificationPermissionStatus | null>(
-    null,
+    () => (isNotificationModuleAvailable() ? null : 'unavailable'),
   );
 
   useEffect(() => {
     if (!visible) return;
 
+    if (!isNotificationModuleAvailable()) return;
+
     let cancelled = false;
-    void Notifications.getPermissionsAsync().then((result) => {
+    const notifications = getNotificationModule();
+    if (!notifications) return;
+    void notifications.getPermissionsAsync().then((result) => {
       if (cancelled) return;
       setStatus(
         result.granted
@@ -68,7 +76,9 @@ export function PermissionsScreen({
         ? 'No concedido'
         : status === 'undetermined'
           ? 'No solicitado todavía'
-          : undefined;
+          : status === 'unavailable'
+            ? 'No disponible en Expo Go'
+            : undefined;
 
   return (
     <AppModal

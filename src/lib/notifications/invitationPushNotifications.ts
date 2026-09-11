@@ -1,6 +1,6 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { getNotificationModule } from '@/lib/notifications/notificationRuntime';
 import { storeInvitationPushToken } from '@/lib/notifications/invitationPushTokenStore';
 import { apiClient } from '@/services/api/juntossApiClient';
 
@@ -11,8 +11,10 @@ export type InvitationPushRegistrationResult =
 
 async function ensureInvitationChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(invitationChannelId, {
-    importance: Notifications.AndroidImportance.HIGH,
+  const notifications = getNotificationModule();
+  if (!notifications) return;
+  await notifications.setNotificationChannelAsync(invitationChannelId, {
+    importance: notifications.AndroidImportance.HIGH,
     name: 'Invitaciones de pareja',
     vibrationPattern: [0, 250, 250, 250],
   });
@@ -25,15 +27,17 @@ export async function registerCurrentDeviceForInvitationPush(
   if (Platform.OS === 'web') return 'unsupported';
 
   await ensureInvitationChannel();
-  let permission = await Notifications.getPermissionsAsync();
+  const notifications = getNotificationModule();
+  if (!notifications) return 'unsupported';
+  let permission = await notifications.getPermissionsAsync();
   if (!permission.granted && requestPermission && permission.canAskAgain) {
-    permission = await Notifications.requestPermissionsAsync({
+    permission = await notifications.requestPermissionsAsync({
       ios: { allowAlert: true, allowBadge: false, allowSound: true },
     });
   }
   if (!permission.granted) return 'permission-denied';
 
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
+  const token = (await notifications.getExpoPushTokenAsync()).data;
   try {
     await apiClient.post('/v1/me/push-tokens', {
       expoPushToken: token,

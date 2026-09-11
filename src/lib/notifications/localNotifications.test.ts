@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import { isRunningInExpoGo } from 'expo';
 
 import {
   cancelLocalNotification,
@@ -7,6 +8,11 @@ import {
   requestNotificationPermission,
   scheduleLocalNotification,
 } from '@/lib/notifications/localNotifications';
+
+jest.mock('expo', () => ({
+  ...jest.requireActual('expo'),
+  isRunningInExpoGo: jest.fn(() => false),
+}));
 
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { HIGH: 4 },
@@ -27,11 +33,18 @@ describe('localNotifications', () => {
     jest.clearAllMocks();
   });
 
-  it('registra el manejador de notificaciones una sola vez', () => {
-    ensureNotificationHandlerRegistered();
-    ensureNotificationHandlerRegistered();
+  it('registra el manejador de notificaciones una sola vez', async () => {
+    await ensureNotificationHandlerRegistered();
+    await ensureNotificationHandlerRegistered();
 
     expect(mockedNotifications.setNotificationHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('no carga notificaciones en Expo Go', async () => {
+    jest.mocked(isRunningInExpoGo).mockReturnValueOnce(true);
+
+    await expect(requestNotificationPermission()).resolves.toBe(false);
+    expect(mockedNotifications.getPermissionsAsync).not.toHaveBeenCalled();
   });
 
   it('no vuelve a pedir permiso si ya está concedido', async () => {

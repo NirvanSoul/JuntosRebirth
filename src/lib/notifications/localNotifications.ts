@@ -1,5 +1,6 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+
+import { getNotificationModule } from '@/lib/notifications/notificationRuntime';
 
 const androidReminderChannelId = 'transaction-reminders';
 const androidDailyEngagementChannelId = 'daily-engagement';
@@ -9,11 +10,13 @@ let isAndroidReminderChannelEnsured = false;
 let isAndroidDailyEngagementChannelEnsured = false;
 
 /** Controla cómo se presenta una notificación mientras la app está en primer plano. */
-export function ensureNotificationHandlerRegistered(): void {
+export async function ensureNotificationHandlerRegistered(): Promise<void> {
   if (isHandlerRegistered) return;
-  isHandlerRegistered = true;
+  const notifications = getNotificationModule();
+  if (!notifications) return;
 
-  Notifications.setNotificationHandler({
+  isHandlerRegistered = true;
+  notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldPlaySound: true,
       shouldSetBadge: false,
@@ -23,27 +26,31 @@ export function ensureNotificationHandlerRegistered(): void {
   });
 }
 
-async function ensureAndroidReminderChannel(): Promise<void> {
+async function ensureAndroidReminderChannel(
+  notifications: NonNullable<ReturnType<typeof getNotificationModule>>,
+): Promise<void> {
   if (Platform.OS !== 'android' || isAndroidReminderChannelEnsured) return;
   isAndroidReminderChannelEnsured = true;
 
-  await Notifications.setNotificationChannelAsync(androidReminderChannelId, {
-    importance: Notifications.AndroidImportance.HIGH,
+  await notifications.setNotificationChannelAsync(androidReminderChannelId, {
+    importance: notifications.AndroidImportance.HIGH,
     name: 'Recordatorios de movimientos',
     vibrationPattern: [0, 250, 250, 250],
   });
 }
 
-async function ensureAndroidDailyEngagementChannel(): Promise<void> {
+async function ensureAndroidDailyEngagementChannel(
+  notifications: NonNullable<ReturnType<typeof getNotificationModule>>,
+): Promise<void> {
   if (Platform.OS !== 'android' || isAndroidDailyEngagementChannelEnsured) {
     return;
   }
   isAndroidDailyEngagementChannelEnsured = true;
 
-  await Notifications.setNotificationChannelAsync(
+  await notifications.setNotificationChannelAsync(
     androidDailyEngagementChannelId,
     {
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: notifications.AndroidImportance.DEFAULT,
       name: 'Recordatorio diario',
       vibrationPattern: [0, 250, 250, 250],
     },
@@ -52,11 +59,13 @@ async function ensureAndroidDailyEngagementChannel(): Promise<void> {
 
 /** Solicita permiso de notificaciones si aún no fue concedido. */
 export async function requestNotificationPermission(): Promise<boolean> {
-  const current = await Notifications.getPermissionsAsync();
+  const notifications = getNotificationModule();
+  if (!notifications) return false;
+  const current = await notifications.getPermissionsAsync();
   if (current.granted) return true;
   if (!current.canAskAgain) return false;
 
-  const requested = await Notifications.requestPermissionsAsync({
+  const requested = await notifications.requestPermissionsAsync({
     ios: { allowAlert: true, allowBadge: false, allowSound: true },
   });
   return requested.granted;
@@ -81,23 +90,27 @@ export async function scheduleLocalNotification({
   date,
   title,
 }: ScheduleLocalNotificationInput): Promise<string> {
+  const notifications = getNotificationModule();
+  if (!notifications) {
+    throw new Error('Las notificaciones no están disponibles en Expo Go');
+  }
   const channelId =
     channel === 'dailyEngagement'
       ? androidDailyEngagementChannelId
       : androidReminderChannelId;
 
   if (channel === 'dailyEngagement') {
-    await ensureAndroidDailyEngagementChannel();
+    await ensureAndroidDailyEngagementChannel(notifications);
   } else {
-    await ensureAndroidReminderChannel();
+    await ensureAndroidReminderChannel(notifications);
   }
 
-  return Notifications.scheduleNotificationAsync({
+  return notifications.scheduleNotificationAsync({
     content: { body, data, title },
     trigger: {
       channelId: Platform.OS === 'android' ? channelId : undefined,
       date,
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      type: notifications.SchedulableTriggerInputTypes.DATE,
     },
   });
 }
@@ -115,7 +128,9 @@ export type ScheduledLocalNotification = {
 export async function listScheduledLocalNotifications(): Promise<
   readonly ScheduledLocalNotification[]
 > {
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const notifications = getNotificationModule();
+  if (!notifications) return [];
+  const scheduled = await notifications.getAllScheduledNotificationsAsync();
 
   return scheduled.map((notification) => ({
     data: notification.content.data ?? {},
@@ -126,7 +141,9 @@ export async function listScheduledLocalNotifications(): Promise<
 
 /** Cancela una notificación programada. No falla si ya no existe. */
 export async function cancelLocalNotification(id: string): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(id).catch(
-    () => undefined,
-  );
+  const notifications = getNotificationModule();
+  if (!notifications) return;
+  await notifications
+    .cancelScheduledNotificationAsync(id)
+    .catch(() => undefined);
 }

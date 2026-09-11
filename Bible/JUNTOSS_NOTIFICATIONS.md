@@ -11,6 +11,14 @@ La aplicación utiliza cuatro tipos de notificaciones:
 3. **Recordatorios diarios generados por la aplicación para fomentar el registro de movimientos.**
 4. **Avisos push de invitaciones a un espacio de pareja.**
 
+### Compatibilidad con Expo Go
+
+En Android, Expo Go no admite notificaciones push remotas desde SDK 53. Para
+que el entorno de desarrollo siga siendo utilizable, Juntoss no carga el
+módulo de notificaciones cuando se ejecuta dentro de Expo Go: no programa
+recordatorios ni registra tokens de invitación. Estas funciones se habilitan
+en una development build o en la aplicación distribuida.
+
 Las notificaciones deben sentirse humanas, claras y útiles. No deben parecer mensajes publicitarios ni recordatorios mecánicos.
 
 ---
