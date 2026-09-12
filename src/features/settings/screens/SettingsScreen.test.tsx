@@ -167,7 +167,13 @@ describe('SettingsScreen', () => {
     ).toBe(0.45);
     expect(
       StyleSheet.flatten(screen.getByTestId('settings-header').props.style),
-    ).toMatchObject({ justifyContent: 'flex-start' });
+    ).toMatchObject({
+      backgroundColor: colors.background,
+      justifyContent: 'flex-start',
+    });
+    expect(
+      screen.getByTestId('settings-screen').props.stickyHeaderIndices,
+    ).toEqual([0]);
     expect(
       StyleSheet.flatten(screen.getByTestId('settings-back-icon').props.style)
         .color,

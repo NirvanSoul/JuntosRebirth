@@ -300,6 +300,7 @@ export function SettingsScreen({
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[0]}
         testID="settings-screen"
       >
         <View style={styles.header} testID="settings-header">
@@ -640,6 +641,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       alignItems: 'center',
       justifyContent: 'flex-start',
       gap: spacing.sm,
+      backgroundColor: colors.background,
       marginBottom: spacing.xl,
       marginTop: spacing.sm,
     },
