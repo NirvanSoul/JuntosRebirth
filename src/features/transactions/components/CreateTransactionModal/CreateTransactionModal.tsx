@@ -648,6 +648,7 @@ export function CreateTransactionModal({
                       : 'transaction-currency-flag'
                   }
                   variant="subheading"
+                  weight="regular"
                 >
                   {shouldUseVenezuelaCurrencySelector
                     ? currency === 'VES'

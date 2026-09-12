@@ -53,7 +53,7 @@ describe('QuickCreateMenu', () => {
       StyleSheet.flatten(screen.getByLabelText('Crear ingreso').props.style),
     ).toMatchObject({
       ...shadows.subtle,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.modalBackground,
     });
     expect(screen.getByTestId('quick-create-close-button')).toBeTruthy();
 

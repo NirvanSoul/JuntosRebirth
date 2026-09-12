@@ -170,12 +170,11 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: radii.md,
       borderColor: colors.border,
       borderWidth: 1,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.modalBackground,
       padding: spacing.md,
     },
     actionLight: {
       ...shadows.subtle,
-      backgroundColor: colors.surface,
     },
     actionDisabled: {
       opacity: 0.3,
