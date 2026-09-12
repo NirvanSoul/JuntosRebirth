@@ -233,7 +233,7 @@ El acceso a la aplicación requiere una cuenta con correo verificado.
 
 - Diez pantallas en total; la última reutiliza el flujo real de Acceso.
 - El onboarding es la primera pantalla de una instalación nueva y se marca
-  como completado al autenticar una cuenta.
+  como completado al llegar a Acceso, aunque la autenticación ocurra después.
 - Tras cerrar sesión, no se repite: el usuario vuelve directamente a Acceso.
 - Solo después de guardar nombre y país (desde la tercera pantalla), se puede
   omitir desde la esquina superior derecha y pasar a la última lámina de Acceso.

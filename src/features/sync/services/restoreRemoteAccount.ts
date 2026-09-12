@@ -13,6 +13,7 @@ import {
   type RemoteChangesCursor,
   writeRemoteChangesCursor,
 } from '@/features/sync/repositories/localSyncCursorRepository';
+import { loadRemoteEntityLinks } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
 import { updateSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import type { Space } from '@/features/spaces/types';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
@@ -46,12 +47,40 @@ type InFlightRestore = {
 const restoreInFlightByUserId = new Map<string, InFlightRestore>();
 
 const CURSOR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const provisionalPersonalSpaceId = 'personal';
+
+async function hasLocalOnlyPersonalTransactions(
+  database: Awaited<ReturnType<typeof getLocalDatabase>>,
+): Promise<boolean> {
+  const row = await database.getFirstAsync<{ id: string }>(
+    `SELECT id FROM transactions
+      WHERE space_id = ? AND sync_status = 'local_only'
+      LIMIT 1`,
+    provisionalPersonalSpaceId,
+  );
+  return row !== null && row !== undefined;
+}
 
 export async function restoreRemoteAccount(input: {
   userId: string;
   snapshot: RemoteAccountSnapshot;
 }): Promise<RestoredRemoteAccount> {
   const database = await getLocalDatabase();
+  const personalRemoteId = input.snapshot.spaces.find(
+    (space) => space.type === 'personal',
+  )?.remoteId;
+  const existingSpaceLinks = await loadRemoteEntityLinks({
+    executor: database,
+    userId: input.userId,
+    entityType: 'space',
+  });
+  // Los importes introducidos antes de iniciar sesión pertenecen al espacio
+  // provisional `personal`. En la primera restauración, enlazar ese espacio
+  // con su UUID remoto evita que queden fuera de la subida posterior.
+  const shouldKeepProvisionalPersonalSpace =
+    existingSpaceLinks.size === 0 &&
+    personalRemoteId !== undefined &&
+    (await hasLocalOnlyPersonalTransactions(database));
   const localSpaceIdByRemoteId = new Map<string, string>();
   const remoteSpaces: Space[] = [];
 
@@ -59,6 +88,13 @@ export async function restoreRemoteAccount(input: {
     executor: database,
     userId: input.userId,
     entityType: 'space',
+    existingLinks: existingSpaceLinks,
+    localIdForUnlinkedRemote: (remoteId, existingLinks) =>
+      shouldKeepProvisionalPersonalSpace &&
+      existingLinks.size === 0 &&
+      remoteId === personalRemoteId
+        ? provisionalPersonalSpaceId
+        : remoteId,
   });
   for (const remoteSpace of input.snapshot.spaces) {
     const localId = (await linkSpace(remoteSpace.remoteId))!;

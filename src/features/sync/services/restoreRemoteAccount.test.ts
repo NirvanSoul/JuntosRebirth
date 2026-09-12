@@ -353,6 +353,55 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     ]);
   });
 
+  it('enlaza el espacio personal provisional al remoto si conserva movimientos del onboarding', async () => {
+    const database = {
+      getAllAsync: jest.fn().mockResolvedValue([]),
+      getFirstAsync: jest.fn().mockResolvedValue({ id: 'onboarding-income' }),
+      runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      withExclusiveTransactionAsync: jest
+        .fn()
+        .mockImplementation(
+          async (callback: (tx: SQLiteDatabase) => Promise<void>) =>
+            callback(database),
+        ),
+    } as unknown as SQLiteDatabase;
+    mockGetLocalDatabase.mockResolvedValue(database);
+
+    const restored = await restoreRemoteAccount({
+      userId: 'test-user-id',
+      snapshot: {
+        serverTime: '2026-03-30T10:00:00.000Z',
+        activeFinancialContextId: null,
+        spaces: [
+          {
+            remoteId: 'personal-remote',
+            name: 'Personal',
+            type: 'personal',
+            currency: 'EUR',
+            activatedAt: null,
+          },
+        ],
+        categories: [],
+        moneyAccounts: [],
+        recurringSeries: [],
+        transactions: [],
+      },
+    });
+
+    expect(restored.localSpaceIdByRemoteId.get('personal-remote')).toBe(
+      'personal',
+    );
+    expect(database.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO remote_entity_links'),
+      'test-user-id',
+      'space',
+      'personal-remote',
+      'personal',
+      expect.any(String),
+      expect.any(String),
+    );
+  });
+
   it('marca como pendiente el espacio juntos que el snapshot trae sin activar', async () => {
     const database = {
       getAllAsync: jest.fn().mockResolvedValue([]),

@@ -3,6 +3,7 @@ import { Keyboard } from 'react-native';
 
 import { CountryScreen } from '@/features/onboarding/screens/CountryScreen';
 import { NameScreen } from '@/features/onboarding/screens/NameScreen';
+import { OnboardingLoginScreen } from '@/features/onboarding/screens/OnboardingLoginScreen';
 import { WelcomeScreen } from '@/features/onboarding/screens/WelcomeScreen';
 import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
@@ -14,6 +15,9 @@ jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
 
 jest.mock('@/features/profile/services/updateProfileCountry', () => ({
   updateProfileCountry: jest.fn(),
+}));
+jest.mock('@/features/access/screens/AccessScreen', () => ({
+  AccessScreen: () => null,
 }));
 
 const mockUpdateProfileCountry = updateProfileCountry as jest.Mock;
@@ -39,6 +43,18 @@ describe('pantallas de onboarding', () => {
     fireEvent.press(screen.getByTestId('onboarding-welcome-skip'));
 
     expect(mockNavigation.navigate).toHaveBeenCalledWith('OnboardingLogin');
+  });
+
+  it('guarda el checkpoint al llegar al acceso, antes de autenticarse', async () => {
+    await renderWithTheme(
+      <OnboardingLoginScreen
+        navigation={navigation}
+        onComplete={completeOnboarding}
+        route={route}
+      />,
+    );
+
+    await waitFor(() => expect(completeOnboarding).toHaveBeenCalledTimes(1));
   });
 
   it('cierra el teclado al tocar fuera del campo de nombre', async () => {

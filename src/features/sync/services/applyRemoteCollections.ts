@@ -15,16 +15,39 @@ export async function createLinkResolver(input: {
   executor: LocalSqlExecutor;
   userId: string;
   entityType: RemoteEntityType;
+  /** Permite conservar un id local preexistente en la primera restauración. */
+  localIdForUnlinkedRemote?: (
+    remoteId: string,
+    existingLinks: ReadonlyMap<string, string>,
+  ) => string;
+  existingLinks?: ReadonlyMap<string, string>;
   resolveOnly?: boolean;
 }): Promise<(remoteId: string) => Promise<string | null>> {
-  const links = await loadRemoteEntityLinks(input);
+  const {
+    entityType,
+    existingLinks,
+    executor,
+    localIdForUnlinkedRemote,
+    resolveOnly,
+    userId,
+  } = input;
+  const links = existingLinks
+    ? new Map(existingLinks)
+    : await loadRemoteEntityLinks({ executor, entityType, userId });
   return async (remoteId) => {
     const existing = links.get(remoteId);
-    if (input.resolveOnly) {
+    if (resolveOnly) {
       return existing ?? null;
     }
-    const localId = existing ?? remoteId;
-    await upsertRemoteEntityLink({ ...input, remoteId, localId });
+    const localId =
+      existing ?? localIdForUnlinkedRemote?.(remoteId, links) ?? remoteId;
+    await upsertRemoteEntityLink({
+      executor,
+      userId,
+      entityType,
+      remoteId,
+      localId,
+    });
     return localId;
   };
 }
