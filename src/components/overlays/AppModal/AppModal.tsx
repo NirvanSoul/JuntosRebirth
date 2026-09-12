@@ -21,8 +21,8 @@ type AppModalProps = PropsWithChildren<{
   visible: boolean;
   onClose: () => void;
   variant?: 'compact' | 'catalog' | 'expanded';
-  /** Permite forzar el fondo oscuro propio de los modales estándar (`colors.modalBackground`). */
-  backgroundVariant?: 'surface' | 'modal';
+  /** Superficie de la hoja; por defecto conserva el fondo estándar de modal. */
+  backgroundVariant?: 'surface' | 'modal' | 'background';
   /** Permite que un scroll interno ocupe el inset y lo añada al final de su contenido. */
   extendContentIntoBottomInset?: boolean;
   /** Altura natural del contenido, sin handle ni padding inferior del modal. */
@@ -206,8 +206,8 @@ export function AppModal({
       backdropComponent={renderBackdrop}
       backgroundStyle={[
         themedStyles.background,
-        (isExpanded || isCatalog || backgroundVariant === 'modal') &&
-          themedStyles.expandedBackground,
+        backgroundVariant === 'surface' && themedStyles.surfaceBackground,
+        backgroundVariant === 'background' && themedStyles.appBackground,
       ]}
       containerComponent={ModalLayer}
       enableDynamicSizing={!hasFixedHeight}
@@ -259,9 +259,8 @@ function createThemedStyles(colors: ColorTokens) {
       backgroundColor: colors.modalBackground,
       borderRadius: radii.lg,
     },
-    expandedBackground: {
-      backgroundColor: colors.modalBackground,
-    },
+    surfaceBackground: { backgroundColor: colors.surface },
+    appBackground: { backgroundColor: colors.background },
     handle: {
       width: 42,
       height: 5,

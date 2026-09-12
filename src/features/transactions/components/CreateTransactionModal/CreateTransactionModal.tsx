@@ -535,6 +535,7 @@ export function CreateTransactionModal({
   return (
     <>
       <AppModal
+        backgroundVariant="background"
         onClose={onClose}
         testID="create-transaction-modal"
         variant="expanded"

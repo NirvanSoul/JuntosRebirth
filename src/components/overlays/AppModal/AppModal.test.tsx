@@ -1,10 +1,11 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { type ReactNode, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ThemeProvider } from '@/theme/ThemeProvider';
+import { colors } from '@/theme/colors';
 
 let latestOnDismiss: (() => void) | null = null;
 let mockLatestPresent = jest.fn();
@@ -15,7 +16,15 @@ jest.mock('@gorhom/bottom-sheet', () => {
 
   const BottomSheetModal = React.forwardRef(
     (
-      { children, onDismiss }: { children?: ReactNode; onDismiss?: () => void },
+      {
+        backgroundStyle,
+        children,
+        onDismiss,
+      }: {
+        backgroundStyle?: object;
+        children?: ReactNode;
+        onDismiss?: () => void;
+      },
       ref: React.ForwardedRef<{ present: () => void; dismiss: () => void }>,
     ) => {
       React.useEffect(() => {
@@ -25,7 +34,11 @@ jest.mock('@gorhom/bottom-sheet', () => {
         present: mockLatestPresent,
         dismiss: jest.fn(),
       }));
-      return <View>{children}</View>;
+      return (
+        <View style={backgroundStyle} testID="bottom-sheet">
+          {children}
+        </View>
+      );
     },
   );
   BottomSheetModal.displayName = 'BottomSheetModalMock';
@@ -42,9 +55,11 @@ jest.mock('@gorhom/bottom-sheet', () => {
 jest.mock('expo-blur', () => ({ BlurView: () => null }));
 
 function Harness({
+  backgroundVariant,
   initialVisible = true,
   onCloseSpy,
 }: {
+  backgroundVariant?: 'surface' | 'modal' | 'background';
   initialVisible?: boolean;
   onCloseSpy: () => void;
 }) {
@@ -65,7 +80,11 @@ function Harness({
         <View>
           <Pressable onPress={close} testID="close" />
           <Pressable onPress={() => setVisible(true)} testID="reopen" />
-          <AppModal onClose={close} visible={visible}>
+          <AppModal
+            backgroundVariant={backgroundVariant}
+            onClose={close}
+            visible={visible}
+          >
             <Text>Contenido</Text>
           </AppModal>
         </View>
@@ -90,6 +109,17 @@ describe('AppModal', () => {
     await fireEvent.press(screen.getByTestId('reopen'));
 
     expect(mockLatestPresent).toHaveBeenCalledTimes(1);
+  });
+
+  it('puede usar el fondo de la aplicación para formularios que mantienen controles claros', async () => {
+    const screen = await render(
+      <Harness backgroundVariant="background" onCloseSpy={jest.fn()} />,
+    );
+
+    expect(
+      StyleSheet.flatten(screen.getByTestId('bottom-sheet').props.style)
+        .backgroundColor,
+    ).toBe(colors.background);
   });
 
   it('no queda cerrado si se reabre antes de que termine la animación de cierre previa', async () => {
