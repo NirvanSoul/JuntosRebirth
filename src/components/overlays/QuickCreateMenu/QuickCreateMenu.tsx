@@ -168,8 +168,6 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       alignItems: 'center',
       gap: spacing.md,
       borderRadius: radii.md,
-      borderColor: colors.border,
-      borderWidth: 1,
       backgroundColor: colors.modalBackground,
       padding: spacing.md,
     },
