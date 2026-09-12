@@ -54,7 +54,15 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
 
   // La apariencia guardada se lee de AsyncStorage en paralelo con las fuentes;
   // esperarla evita pintar el fondo claro un instante a quien fijó el oscuro.
-  if (!fontsReady || !isThemeReady || !isAuthReady || !isOnboardingReady) {
+  if (
+    !fontsReady ||
+    !isThemeReady ||
+    // Sin onboarding completado, la sesión no decide el destino: mostrar el
+    // flujo evita que un refresco tras el alta desmonte el formulario OTP.
+    // Una vez completado, se conserva el bloqueo de sesión del arranque.
+    (hasCompletedOnboarding && !isAuthReady) ||
+    !isOnboardingReady
+  ) {
     return (
       <View style={styles.root} testID="root-navigator-backdrop">
         <LoadingState />

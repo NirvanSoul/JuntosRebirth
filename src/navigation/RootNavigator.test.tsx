@@ -214,6 +214,20 @@ describe('RootNavigator', () => {
     expect(screen.queryByText('pestañas')).toBeNull();
   });
 
+  it('conserva el onboarding mientras Better Auth refresca la sesión tras el alta', async () => {
+    mockOnboardingCompleted = false;
+    mockSession = null;
+
+    const screen = await renderWithTheme(<RootNavigator />);
+    expect(await screen.findByText('onboarding')).toBeTruthy();
+
+    mockAuthReady = false;
+    await screen.rerender(<RootNavigator />);
+
+    expect(screen.getByText('onboarding')).toBeTruthy();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+  });
+
   it('usa el fondo claro cuando la apariencia es clara', async () => {
     const screen = await renderWithTheme(<RootNavigator />, {
       appearance: 'light',

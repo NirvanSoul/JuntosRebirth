@@ -106,8 +106,11 @@ No contiene lógica específica de movimientos, categorías o espacios.
 
 El arranque monta `RootNavigator` mientras Expo carga las fuentes: la lectura
 de sesión, de la apariencia guardada y de la marca de onboarding empieza en
-paralelo. La navegación sigue bloqueada hasta completar esas cuatro
-condiciones y conserva la exigencia de correo verificado. La sesión cuenta
+paralelo. La navegación espera esas condiciones cuando el onboarding ya está
+completado; en una instalación nueva muestra el onboarding tan pronto como
+este y la apariencia están listos, porque la sesión no decide ese destino.
+Así, un refresco de sesión durante el alta no desmonta el formulario OTP. La
+navegación conserva la exigencia de correo verificado. La sesión cuenta
 como lista en cuanto el cliente Expo de Better Auth la hidrata desde
 SecureStore, sin esperar a que `/get-session` responda: es la misma sesión
 verificada de la visita anterior y, si el servidor la niega, la navegación
