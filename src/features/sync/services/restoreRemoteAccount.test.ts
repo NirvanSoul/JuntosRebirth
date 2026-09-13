@@ -465,6 +465,83 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     });
   });
 
+  it('conserva Juntos seleccionado si SQLite falla durante la restauración', async () => {
+    const storedSpaces: SpacesState = {
+      activeSpaceId: 'couple',
+      spaces: [
+        {
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+        },
+        {
+          id: 'couple',
+          name: 'Juntos',
+          type: 'couple',
+          currency: 'EUR',
+        },
+      ],
+    };
+    mockLoadSpaces.mockResolvedValue(storedSpaces);
+
+    const database = {
+      getAllAsync: jest.fn(
+        async (_sql: string, _userId: string, entityType: string) =>
+          entityType === 'space'
+            ? [
+                { remote_id: 'personal-remote', local_id: 'personal' },
+                { remote_id: 'couple-remote', local_id: 'couple' },
+              ]
+            : [],
+      ),
+      getFirstAsync: jest.fn().mockResolvedValue(null),
+      runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      withExclusiveTransactionAsync: jest
+        .fn()
+        .mockRejectedValue(
+          new Error(
+            'UNIQUE constraint failed: transactions.recurrence_series_id, transactions.occurred_on',
+          ),
+        ),
+    } as unknown as SQLiteDatabase;
+    mockGetLocalDatabase.mockResolvedValue(database);
+
+    await expect(
+      restoreRemoteAccount({
+        userId: 'test-user-id',
+        snapshot: {
+          serverTime: '2026-09-12T10:00:00.000Z',
+          activeFinancialContextId: null,
+          spaces: [
+            {
+              remoteId: 'personal-remote',
+              name: 'Personal',
+              type: 'personal',
+              currency: 'EUR',
+              activatedAt: '2026-08-01T00:00:00.000Z',
+            },
+            {
+              remoteId: 'couple-remote',
+              name: 'Juntos',
+              type: 'couple',
+              currency: 'EUR',
+              activatedAt: '2026-08-01T00:00:00.000Z',
+            },
+          ],
+          categories: [],
+          moneyAccounts: [],
+          recurringSeries: [],
+          transactions: [],
+        },
+      }),
+    ).rejects.toThrow('UNIQUE constraint failed');
+
+    expect(updateSpaces).not.toHaveBeenCalled();
+    expect(mockSaveSpaces).not.toHaveBeenCalled();
+    expect(await loadSpaces()).toEqual(storedSpaces);
+  });
+
   it('pide el snapshot y las revisiones de importación a la vez', async () => {
     const order: string[] = [];
     let resolveSnapshot: ((value: object) => void) | undefined;
@@ -632,6 +709,9 @@ describe('restoreRemoteAccount (delta sync y cursor)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(new Date('2026-09-11T12:30:00.000Z').getTime());
     mockLoadSpaces.mockResolvedValue({
       spaces: [
         {
@@ -668,6 +748,10 @@ describe('restoreRemoteAccount (delta sync y cursor)', () => {
         ),
     } as unknown as SQLiteDatabase;
     mockGetLocalDatabase.mockResolvedValue(database);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('full guarda el cursor si el snapshot incluye serverTime', async () => {

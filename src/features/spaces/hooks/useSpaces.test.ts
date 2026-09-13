@@ -141,6 +141,45 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     expect(result.current.activeSpace.id).toBe(personalSpace.id);
   });
 
+  it('selecciona Juntos desde el catálogo guardado aunque el estado en memoria sea anterior', async () => {
+    mockAuthSession(fakeSession);
+    const coupleSpace: Space = {
+      id: 'space-remote',
+      name: 'Juntos',
+      type: 'couple',
+      currency: 'EUR',
+    };
+    jest
+      .mocked(loadSpaces)
+      .mockResolvedValueOnce({
+        activeSpaceId: personalSpace.id,
+        spaces: [personalSpace],
+      })
+      .mockResolvedValue({
+        activeSpaceId: personalSpace.id,
+        spaces: [personalSpace, coupleSpace],
+      });
+    // Mantiene en vuelo la comprobación remota para reproducir que el snapshot
+    // ya actualizó el repositorio mientras el hook conserva una copia anterior.
+    jest.mocked(listRemoteSpaces).mockReturnValue(new Promise(() => undefined));
+
+    const { result } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+    expect(result.current.spaces).toEqual([personalSpace]);
+
+    await act(async () => {
+      await result.current.selectSpace(coupleSpace.id);
+    });
+
+    expect(result.current.activeSpace.id).toBe(coupleSpace.id);
+    expect(result.current.spaces).toEqual([personalSpace, coupleSpace]);
+    expect(saveSpaces).toHaveBeenLastCalledWith({
+      activeSpaceId: coupleSpace.id,
+      spaces: [personalSpace, coupleSpace],
+    });
+    expect(updateSpaces).toHaveBeenLastCalledWith(expect.any(Function));
+  });
+
   it('fusiona un espacio de pareja remoto nuevo en el catálogo local y lo persiste', async () => {
     mockAuthSession(fakeSession);
     jest.mocked(loadSpaces).mockResolvedValue({

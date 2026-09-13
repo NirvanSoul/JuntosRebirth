@@ -117,13 +117,6 @@ export async function restoreRemoteAccount(input: {
     throw new Error('La cuenta remota no tiene espacios activos');
   }
 
-  await updateSpaces((stored) => ({
-    spaces,
-    activeSpaceId: spaces.some((space) => space.id === stored.activeSpaceId)
-      ? stored.activeSpaceId
-      : fallbackActiveSpaceId,
-  }));
-
   const currencyBySpaceRemoteId = new Map(
     input.snapshot.spaces.map((space) => [space.remoteId, space.currency]),
   );
@@ -139,6 +132,15 @@ export async function restoreRemoteAccount(input: {
     });
     localCategoryIdByRemoteId = result.localCategoryIdByRemoteId;
   });
+
+  // El selector solo se confirma tras terminar la restauración financiera.
+  // Si SQLite rechaza el snapshot, conserva el catálogo y estado anterior.
+  await updateSpaces((stored) => ({
+    spaces,
+    activeSpaceId: spaces.some((space) => space.id === stored.activeSpaceId)
+      ? stored.activeSpaceId
+      : fallbackActiveSpaceId,
+  }));
 
   if (input.snapshot.serverTime) {
     const spaceRemoteIds = input.snapshot.spaces.map((s) => s.remoteId).sort();

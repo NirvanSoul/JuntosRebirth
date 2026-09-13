@@ -32,8 +32,8 @@ type SpaceSideMenuProps = {
   storageError?: string | null;
 };
 
-const spaceRowHeight = 64;
-const spaceIconSize = 36;
+const spaceRowHeight = 64,
+  spaceIconSize = 36;
 
 export function SpaceSideMenu({
   activeSpaceId,
@@ -51,19 +51,22 @@ export function SpaceSideMenu({
   const [isSaving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
-
   const hasCoupleSpace = spaces.some((space) => space.type === 'couple');
+  const orderedSpaces = [...spaces].sort((first, second) => {
+    const order = { personal: 0, couple: 1, other: 2 };
+    return order[first.type] - order[second.type];
+  });
 
   const cancelCreation = () => {
     setCreating(false);
     setName('');
     setError(null);
   };
+  const showSelectionError = () =>
+    setError('No pudimos cambiar de espacio. Inténtalo de nuevo.');
 
   const submitSpace = async () => {
-    if (isSaving) {
-      return;
-    }
+    if (isSaving) return;
 
     setSaving(true);
     setError(null);
@@ -82,14 +85,9 @@ export function SpaceSideMenu({
     }
   };
 
-  const selectSpace = async (spaceId: string) => {
+  const selectSpace = (spaceId: string) => {
     setError(null);
-    try {
-      await onSelectSpace(spaceId);
-      onClose();
-    } catch {
-      setError('No pudimos cambiar de espacio. Inténtalo de nuevo.');
-    }
+    return onSelectSpace(spaceId).then(onClose).catch(showSelectionError);
   };
 
   return (
@@ -188,7 +186,7 @@ export function SpaceSideMenu({
             <Text tone="secondary" variant="footnote">
               Elige dónde quieres organizar tus movimientos.
             </Text>
-            {spaces.map((space) => {
+            {orderedSpaces.map((space) => {
               const isActive = space.id === activeSpaceId;
 
               return (

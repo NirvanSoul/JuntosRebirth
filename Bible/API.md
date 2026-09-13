@@ -79,7 +79,11 @@ mano. Apple Sign In no está disponible.
   toda fusión con datos remotos parte de lo guardado en ese instante
   (`updateSpaces`), no de una copia en memoria: así la comprobación del
   espacio de pareja y la restauración del snapshot, que arrancan a la vez,
-  no se pisan.
+  no se pisan. La restauración completa solo reemplaza ese catálogo después de
+  que la transacción SQLite con categorías, cuentas, recurrencias y movimientos
+  haya terminado correctamente; si SQLite rechaza el snapshot, conserva tanto
+  el catálogo como el espacio activo anteriores y deja que el flujo global
+  muestre el error recuperable con su acción de reintento.
 
 Las rutas `/v1/*` requieren sesión de Better Auth con correo verificado. Las respuestas correctas
 envuelven su contenido en `data`; los errores usan `error.code` y

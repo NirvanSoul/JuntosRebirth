@@ -300,25 +300,32 @@ export function useSpaces(): SpacesController {
     [state],
   );
 
-  const selectSpace = useCallback(
-    async (spaceId: string): Promise<void> => {
-      if (!state.spaces.some((space) => space.id === spaceId)) {
-        throw new Error('El espacio seleccionado no existe.');
-      }
+  const selectSpace = useCallback(async (spaceId: string): Promise<void> => {
+    let nextState: SpacesState;
+    try {
+      nextState = await updateSpaces((stored) => {
+        if (!stored.spaces.some((space) => space.id === spaceId)) {
+          throw new Error('El espacio seleccionado no existe.');
+        }
 
-      const nextState = { ...state, activeSpaceId: spaceId };
-      try {
-        await saveSpaces(nextState);
-      } catch {
-        const message = 'No pudimos guardar el cambio. Inténtalo de nuevo.';
-        setError(message);
-        throw new Error(message);
+        return stored.activeSpaceId === spaceId
+          ? stored
+          : { ...stored, activeSpaceId: spaceId };
+      });
+    } catch (caught) {
+      if (
+        caught instanceof Error &&
+        caught.message === 'El espacio seleccionado no existe.'
+      ) {
+        throw caught;
       }
-      setState(nextState);
-      setError(null);
-    },
-    [state],
-  );
+      const message = 'No pudimos guardar el cambio. Inténtalo de nuevo.';
+      setError(message);
+      throw new Error(message);
+    }
+    setState(nextState);
+    setError(null);
+  }, []);
 
   const createCoupleSpaceInvitation = useCallback(
     async (inviteeEmail: string, rawName?: string): Promise<Space> => {

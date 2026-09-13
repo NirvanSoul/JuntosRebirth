@@ -61,6 +61,25 @@ describe('SpaceSideMenu', () => {
     expect(props.onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('mantiene Personal primero y Juntos después aunque cambie el orden recibido', async () => {
+    const { screen } = await renderMenu({
+      activeSpaceId: 'juntos',
+      spaces: [spaces[1]!, spaces[2]!, spaces[0]!],
+    });
+
+    const rows = screen.getAllByRole('radio');
+    expect(rows.map((row) => row.props.accessibilityLabel)).toEqual([
+      'Seleccionar espacio Personal',
+      'Seleccionar espacio Juntos',
+      'Seleccionar espacio Casa',
+    ]);
+    expect(rows.map((row) => row.props.accessibilityState?.checked)).toEqual([
+      false,
+      true,
+      false,
+    ]);
+  });
+
   it('no muestra el botón de crear nuevo espacio (pendiente de habilitar)', async () => {
     const { screen } = await renderMenu();
 
