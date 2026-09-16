@@ -8,10 +8,13 @@ import {
 import { getAvatar } from '@/services/api/avatar';
 
 const memberAvatarsDirectoryName = 'avatars/members';
+const pendingMemberAvatarWrites = new Map<string, Promise<boolean>>();
 
 function getMemberAvatarsDirectory(): Directory {
   const directory = new Directory(Paths.document, memberAvatarsDirectoryName);
-  if (!directory.exists) directory.create({ intermediates: true });
+  if (!directory.exists) {
+    directory.create({ intermediates: true, idempotent: true });
+  }
   return directory;
 }
 
@@ -56,16 +59,15 @@ export async function cacheMemberAvatars(spaceId: string): Promise<void> {
     expectedFileNames.add(fileName);
 
     const destination = new File(directory, fileName);
-    if (destination.exists) continue;
 
     try {
-      const bytes = await getAvatar(profile.userId, profile.avatarUpdatedAt);
-      // `null` es «todavía no tiene foto», no un fallo: no se escribe nada y no
-      // se registra ruido en la consola.
-      if (!bytes) continue;
+      const cached = await ensureMemberAvatarCached(
+        destination,
+        profile.userId,
+        profile.avatarUpdatedAt,
+      );
+      if (!cached) continue;
 
-      destination.create();
-      destination.write(bytes);
       await saveSpaceMemberAvatarCache(
         spaceId,
         profile.userId,
@@ -80,6 +82,41 @@ export async function cacheMemberAvatars(spaceId: string): Promise<void> {
   }
 
   removeStaleAvatars(directory, expectedFileNames);
+}
+
+async function ensureMemberAvatarCached(
+  destination: File,
+  userId: string,
+  avatarUpdatedAt: string,
+): Promise<boolean> {
+  if (destination.exists) return true;
+
+  const pendingWrite = pendingMemberAvatarWrites.get(destination.uri);
+  if (pendingWrite) return pendingWrite;
+
+  const write = (async () => {
+    const bytes = await getAvatar(userId, avatarUpdatedAt);
+    // `null` es «todavía no tiene foto», no un fallo: no se escribe nada y no
+    // se registra ruido en la consola.
+    if (!bytes) return false;
+
+    // Puede haber aparecido mientras se descargaba, por ejemplo si otra tarea
+    // nativa terminó de escribir la misma versión del avatar.
+    if (destination.exists) return true;
+
+    destination.create();
+    destination.write(bytes);
+    return true;
+  })();
+
+  pendingMemberAvatarWrites.set(destination.uri, write);
+  try {
+    return await write;
+  } finally {
+    if (pendingMemberAvatarWrites.get(destination.uri) === write) {
+      pendingMemberAvatarWrites.delete(destination.uri);
+    }
+  }
 }
 
 /**

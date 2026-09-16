@@ -34,7 +34,12 @@ jest.mock('expo-file-system', () => {
     get exists() {
       return mockExistingFileNames.has(this.name);
     }
-    create() {}
+    create(options?: { overwrite?: boolean }) {
+      if (this.exists && !options?.overwrite) {
+        throw new Error(`File '${this.uri}' already exists`);
+      }
+      mockExistingFileNames.add(this.name);
+    }
     write() {
       mockWrittenFileNames.push(this.name);
     }
@@ -94,6 +99,32 @@ describe('cacheMemberAvatars', () => {
 
     // Sin esta comprobación, cada sincronización redescargaría la misma foto.
     expect(mockGetAvatar).not.toHaveBeenCalled();
+  });
+
+  it('tolera dos sincronizaciones simultáneas del mismo avatar', async () => {
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    try {
+      await Promise.all([
+        cacheMemberAvatars('space-1'),
+        cacheMemberAvatars('space-1'),
+      ]);
+
+      expect(consoleError).not.toHaveBeenCalled();
+      expect(mockWrittenFileNames).toEqual([
+        'uuid-beto__20260817100000000.jpg',
+      ]);
+      expect(mockSaveSpaceMemberAvatarCache).toHaveBeenCalledTimes(2);
+      expect(mockSaveSpaceMemberAvatarCache).toHaveBeenCalledWith(
+        'space-1',
+        'uuid-beto',
+        'file:///documents/avatars/members/uuid-beto__20260817100000000.jpg',
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it('redescarga cuando la otra persona cambia de foto', async () => {
