@@ -510,6 +510,31 @@ describe('migrateLocalDatabase', () => {
     expect(transaction.execAsync).not.toHaveBeenCalled();
   });
 
+  it('marca los nombres existentes como sincronizados al migrar desde la versión 30', async () => {
+    const transaction = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async (statement: string) =>
+        statement === 'PRAGMA user_version'
+          ? { user_version: 30 }
+          : { name: 'existing_table' },
+      ),
+      getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
+    };
+    const database = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ user_version: 30 })),
+      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    const migration = (transaction.execAsync as jest.Mock).mock.calls
+      .map(([statement]) => statement)
+      .join('\n');
+    expect(migration).toContain('ADD COLUMN display_name_sync_status');
+    expect(migration).toContain("DEFAULT 'synced'");
+  });
+
   it('no reconstruye los movimientos si la tabla de series ya existe', async () => {
     // Un dispositivo cuyo `user_version` quedó por detrás del esquema real
     // debe autorepararse, no fallar con «table ... already exists».
@@ -619,6 +644,7 @@ describe('migrateLocalDatabase', () => {
         { name: 'avatar_path' },
         { name: 'avatar_updated_at' },
         { name: 'display_name' },
+        { name: 'display_name_sync_status' },
       ]),
       withExclusiveTransactionAsync: jest.fn(),
     } as unknown as SQLiteDatabase;
@@ -642,6 +668,7 @@ describe('migrateLocalDatabase', () => {
         { name: 'avatar_path' },
         { name: 'avatar_updated_at' },
         { name: 'display_name' },
+        { name: 'display_name_sync_status' },
         { name: 'country_code' },
       ]),
       withExclusiveTransactionAsync: jest.fn(),
@@ -651,6 +678,59 @@ describe('migrateLocalDatabase', () => {
 
     expect(execAsync).not.toHaveBeenCalledWith(
       'ALTER TABLE local_profile ADD COLUMN country_code TEXT',
+    );
+  });
+
+  it('repara local_profile.display_name_sync_status si el dispositivo quedó en la versión actual sin esa columna', async () => {
+    const execAsync = jest.fn(async () => undefined);
+    const database = {
+      execAsync,
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+      getAllAsync: jest.fn(async () => [
+        { name: 'singleton_id' },
+        { name: 'avatar_path' },
+        { name: 'avatar_updated_at' },
+        { name: 'display_name' },
+        { name: 'country_code' },
+      ]),
+      withExclusiveTransactionAsync: jest.fn(),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    expect(execAsync).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'ALTER TABLE local_profile ADD COLUMN display_name_sync_status',
+      ),
+    );
+  });
+
+  it('no repite el ALTER si local_profile.display_name_sync_status ya existe en la versión actual', async () => {
+    const execAsync = jest.fn(async () => undefined);
+    const database = {
+      execAsync,
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+      getAllAsync: jest.fn(async () => [
+        { name: 'singleton_id' },
+        { name: 'avatar_path' },
+        { name: 'avatar_updated_at' },
+        { name: 'display_name' },
+        { name: 'display_name_sync_status' },
+        { name: 'country_code' },
+      ]),
+      withExclusiveTransactionAsync: jest.fn(),
+    } as unknown as SQLiteDatabase;
+
+    await migrateLocalDatabase(database);
+
+    expect(execAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining(
+        'ALTER TABLE local_profile ADD COLUMN display_name_sync_status',
+      ),
     );
   });
 

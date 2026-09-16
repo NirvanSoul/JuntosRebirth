@@ -20,10 +20,12 @@ mano. Apple Sign In no está disponible.
 
 - Tras registro con OTP válido o inicio de sesión: `POST /v1/bootstrap` con `{ timezone }`,
   una zona IANA como `Europe/Madrid`.
-- El estado de cuenta se lee con `GET /v1/me`. Si `data.profile.countryCode`
-  está presente, el cliente lo guarda en `local_profile` antes de restaurar el
-  snapshot para que las capacidades monetarias estén disponibles desde el
-  primer render.
+- El estado de cuenta se lee con `GET /v1/me`. `data.profile` incluye el nombre
+  y la metadata vigente del avatar (`avatarPath` y `avatarUpdatedAt`), además
+  del país. El cliente los restaura en `local_profile` al iniciar sesión y en
+  cada refresco periódico, también cuando solo existe el espacio personal. Una
+  edición local pendiente tiene prioridad hasta que se publica; después, el
+  perfil remoto vuelve a ser la fuente canónica para todos los dispositivos.
 - La restauración remota inicial usa `GET /v1/sync/snapshot`. Las revisiones de
   importación (`GET /v1/sync/import-reviews`) se piden a la vez que el snapshot;
   se escriben después, sobre los espacios ya restaurados. Al restaurar, los
@@ -32,6 +34,12 @@ mano. Apple Sign In no está disponible.
   Tras la inicialización o al haber cursor previo guardado en `local_sync_cursor`,
   los refrescos periódicos usan `GET /v1/sync/changes?since=...` para descargar
   únicamente las modificaciones incrementales sin transferir colecciones completas.
+- El mismo refresco periódico actualiza el censo de los espacios compartidos
+  mediante `GET /v1/spaces/:spaceId/members`. Los cambios de nombre y de foto
+  actualizan la caché local y se publican a la interfaz activa sin remontar la
+  navegación; las fotos solo se descargan cuando cambia `avatarUpdatedAt`. Un
+  nombre propio cuya publicación falla queda pendiente y se reintenta en ese
+  mismo ciclo de refresco.
 - La restauración resuelve la identidad con `getAuthenticatedUserId`: si la
   consulta de sesión pierde la conexión, reutiliza la sesión en memoria. Una
   respuesta explícita sin sesión o con 401 sigue impidiendo restaurar. El
@@ -83,7 +91,14 @@ mano. Apple Sign In no está disponible.
   que la transacción SQLite con categorías, cuentas, recurrencias y movimientos
   haya terminado correctamente; si SQLite rechaza el snapshot, conserva tanto
   el catálogo como el espacio activo anteriores y deja que el flujo global
-  muestre el error recuperable con su acción de reintento.
+  muestre el error recuperable con su acción de reintento. El repositorio
+  publica cada escritura confirmada al contexto activo, incluso cuando la
+  inicia la sincronización fuera del selector. Si una versión anterior dejó un
+  `activeSpaceId` que ya no pertenece al catálogo, la lectura cae al espacio
+  personal y persiste esa reparación antes de admitir nuevas selecciones. Las
+  acciones que esperan una respuesta remota fusionan su resultado sobre el
+  catálogo persistido más reciente; nunca vuelven a guardar la copia capturada
+  antes de esa espera.
 
 Las rutas `/v1/*` requieren sesión de Better Auth con correo verificado. Las respuestas correctas
 envuelven su contenido en `data`; los errores usan `error.code` y
@@ -122,6 +137,22 @@ Crear un espacio compartido son dos peticiones, no una transacción:
 falla, el espacio ya existe y el servidor solo admite un espacio de pareja
 activo por persona, así que el cliente reutiliza el que quedó esperando pareja
 en lugar de crear otro, que sería rechazado con `COUPLE_SPACE_LIMIT`.
+La regla se aplica a toda membresía activa, tanto de quien creó el espacio como
+de quien entró mediante invitación. PostgreSQL la serializa por usuario y la
+comprueba dentro de la escritura de membresía; por eso dos creaciones o
+aceptaciones simultáneas tampoco pueden producir dos espacios. El cliente hace
+una comprobación previa solo para dar respuesta inmediata, pero no es la
+autoridad de esta regla.
+
+La persona propietaria puede cancelar una invitación aún pendiente con
+`DELETE /v1/spaces/:spaceId/invitations/:invitationId`. Esta operación la
+revoca y conserva el espacio en espera, para poder enviar una nueva invitación;
+no debe usar `POST /v1/spaces/:spaceId/members/leave`, que exige transferir la
+propiedad cuando el espacio ya tiene propietario.
+
+La persona invitada puede rechazar o cancelar una invitación entrante pendiente
+mediante `POST /v1/invitations/:invitationId/reject`. Esta operación notifica
+en el backend a la persona que emitió la invitación.
 
 Ambas peticiones envían la zona IANA del dispositivo, igual que
 `POST /v1/bootstrap`.

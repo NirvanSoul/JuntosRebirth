@@ -22,7 +22,11 @@ const pendingSpace: Space = {
 };
 
 function mockOutgoingInvitation(
-  invitation: { inviteeEmail: string | null; expiresAt: string } | null,
+  invitation: {
+    id: string;
+    inviteeEmail: string | null;
+    expiresAt: string;
+  } | null,
 ) {
   jest.mocked(createJuntossInvitationGateway).mockReturnValue({
     getOutgoingInvitation: jest.fn().mockResolvedValue(invitation),
@@ -33,7 +37,7 @@ async function renderScreen(
   overrides: Partial<ComponentProps<typeof AwaitingPartnerScreen>> = {},
 ) {
   const props = {
-    onCancelSpace: jest.fn(async () => undefined),
+    onCancelInvitation: jest.fn(async () => undefined),
     onChangeInvitation: jest.fn(),
     onRefresh: jest.fn(async () => undefined),
     space: pendingSpace,
@@ -65,6 +69,7 @@ describe('AwaitingPartnerScreen', () => {
 
   it('nombra a quien fue invitado y le pide que abra su app de Juntos', async () => {
     mockOutgoingInvitation({
+      id: 'invitation-1',
       inviteeEmail: 'pareja@ejemplo.com',
       expiresAt: new Date(Date.now() + 5 * 86_400_000).toISOString(),
     });
@@ -95,6 +100,7 @@ describe('AwaitingPartnerScreen', () => {
 
   it('cae a una redacción sin correo cuando la invitación se compartió por enlace', async () => {
     mockOutgoingInvitation({
+      id: 'invitation-1',
       inviteeEmail: null,
       expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
     });
@@ -116,15 +122,17 @@ describe('AwaitingPartnerScreen', () => {
     await waitFor(() => expect(props.onRefresh).toHaveBeenCalledTimes(1));
   });
 
-  it('pide confirmación antes de descartar el espacio pendiente', async () => {
+  it('delega la cancelación confirmada para abrir el flujo de crear espacio', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { props, screen } = await renderScreen();
 
     fireEvent.press(screen.getByTestId('awaiting-partner-cancel'));
 
-    expect(props.onCancelSpace).not.toHaveBeenCalled();
+    expect(props.onCancelInvitation).not.toHaveBeenCalled();
     const [, , buttons] = alertSpy.mock.calls[0] ?? [];
     buttons?.find((button) => button.style === 'destructive')?.onPress?.();
-    expect(props.onCancelSpace).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(props.onCancelInvitation).toHaveBeenCalledTimes(1),
+    );
   });
 });

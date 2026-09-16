@@ -35,16 +35,17 @@ describe('useSharedDataPolling', () => {
   });
 
   it('calcula correctamente el backoff exponencial acotado al máximo', () => {
-    expect(calculatePollingDelay(0)).toBe(15_000);
-    expect(calculatePollingDelay(1)).toBe(30_000);
-    expect(calculatePollingDelay(2)).toBe(60_000);
-    expect(calculatePollingDelay(3)).toBe(120_000);
-    expect(calculatePollingDelay(4)).toBe(240_000);
-    expect(calculatePollingDelay(5)).toBe(sharedDataMaxBackoffMs);
+    expect(calculatePollingDelay(0)).toBe(2_000);
+    expect(calculatePollingDelay(1)).toBe(4_000);
+    expect(calculatePollingDelay(2)).toBe(8_000);
+    expect(calculatePollingDelay(3)).toBe(16_000);
+    expect(calculatePollingDelay(4)).toBe(32_000);
+    expect(calculatePollingDelay(5)).toBe(64_000);
+    expect(calculatePollingDelay(8)).toBe(sharedDataMaxBackoffMs);
     expect(calculatePollingDelay(10)).toBe(sharedDataMaxBackoffMs);
   });
 
-  it('espera 15s tras activarse antes del primer tick', async () => {
+  it('espera 2s tras activarse antes del primer tick', async () => {
     const onPoll = jest.fn().mockResolvedValue(undefined);
 
     await renderHook(() => useSharedDataPolling({ enabled: true, onPoll }));
@@ -70,20 +71,20 @@ describe('useSharedDataPolling', () => {
 
     await renderHook(() => useSharedDataPolling({ enabled: true, onPoll }));
 
-    // Primer tick en 15s (falla 1)
-    await jest.advanceTimersByTimeAsync(15_000);
+    // Primer tick en 2s (falla 1)
+    await jest.advanceTimersByTimeAsync(2_000);
     expect(onPoll).toHaveBeenCalledTimes(1);
 
-    // Siguiente tick en 30s (falla 2)
-    await jest.advanceTimersByTimeAsync(30_000);
+    // Siguiente tick en 4s (falla 2)
+    await jest.advanceTimersByTimeAsync(4_000);
     expect(onPoll).toHaveBeenCalledTimes(2);
 
-    // Siguiente tick en 60s (éxito)
-    await jest.advanceTimersByTimeAsync(60_000);
+    // Siguiente tick en 8s (éxito)
+    await jest.advanceTimersByTimeAsync(8_000);
     expect(onPoll).toHaveBeenCalledTimes(3);
 
-    // Tras éxito vuelve a cadencia normal de 15s
-    await jest.advanceTimersByTimeAsync(15_000);
+    // Tras éxito vuelve a cadencia normal de 2s
+    await jest.advanceTimersByTimeAsync(2_000);
     expect(onPoll).toHaveBeenCalledTimes(4);
   });
 
@@ -92,8 +93,8 @@ describe('useSharedDataPolling', () => {
 
     await renderHook(() => useSharedDataPolling({ enabled: true, onPoll }));
 
-    // Avanza 10s y pasa a background
-    jest.advanceTimersByTime(10_000);
+    // Avanza menos de un intervalo y pasa a background
+    jest.advanceTimersByTime(1_000);
     appStateListener?.('background');
 
     // Pasan 30s en background sin polls
@@ -104,8 +105,8 @@ describe('useSharedDataPolling', () => {
     await appStateListener?.('active');
     expect(onPoll).toHaveBeenCalledTimes(1);
 
-    // Y luego continúa a 15s
-    await jest.advanceTimersByTimeAsync(15_000);
+    // Y luego continúa a 2s
+    await jest.advanceTimersByTimeAsync(2_000);
     expect(onPoll).toHaveBeenCalledTimes(2);
   });
 

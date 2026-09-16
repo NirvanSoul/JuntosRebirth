@@ -11,9 +11,9 @@ export function JuntosScreen({ navigation }: Props) {
   return (
     <OnboardingScreenLayout
       actionLabel="Continuar"
-      onAction={() => navigation.navigate('CreateFirstCategory')}
+      onAction={() => navigation.navigate('NotificationsPermission')}
       onBack={() => navigation.goBack()}
-      onSkip={() => navigation.navigate('OnboardingLogin')}
+      onSkip={() => navigation.navigate('NotificationsPermission')}
       currentStep={5}
       illustrationAspectRatio={puzzleIllustrationAspectRatio}
       illustrationFullBleed

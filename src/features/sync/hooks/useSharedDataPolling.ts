@@ -3,7 +3,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { useNetworkAvailability } from '@/hooks/useNetworkAvailability';
 
 /** Cadencia con la que se sincronizan los cambios compartidos mientras la app está activa. */
-export const sharedDataRefreshIntervalMs = 15_000;
+export const sharedDataRefreshIntervalMs = 2_000;
 /** Techo máximo de retroceso exponencial ante fallos repetidos (5 minutos). */
 export const sharedDataMaxBackoffMs = 5 * 60 * 1000;
 
@@ -20,8 +20,8 @@ export function calculatePollingDelay(failureCount: number): number {
 /**
  * Cadencia de polling periódico para datos compartidos.
  *
- * - Cadencia de 15 segundos con retroceso exponencial ante errores (hasta 5 min).
- * - El primer tick tras activarse espera un intervalo completo (15 s) para
+ * - Cadencia de 2 segundos con retroceso exponencial ante errores (hasta 5 min).
+ * - El primer tick tras activarse espera un intervalo completo (2 s) para
  *   evitar competir con la carga inicial.
  * - Pausa cuando AppState !== 'active' o cuando no hay red (offline).
  * - Al volver a estar activo o recuperar red, ejecuta un tick inmediato y
@@ -155,7 +155,7 @@ export function useSharedDataPolling(input: SharedDataPollingInput): void {
     }
   }, [clearTimer, enabled, executePoll, isOffline]);
 
-  // Manejo de habilitación: el primer tick espera un intervalo completo (15s)
+  // Manejo de habilitación: el primer tick espera un intervalo completo (2s)
   useEffect(() => {
     const justEnabled = !wasEnabledRef.current && enabled;
     wasEnabledRef.current = enabled;

@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { isRunningInExpoGo } from 'expo';
+import { Platform } from 'react-native';
 
 import {
   cancelLocalNotification,
@@ -71,6 +72,38 @@ describe('localNotifications', () => {
 
     expect(granted).toBe(true);
     expect(mockedNotifications.requestPermissionsAsync).toHaveBeenCalled();
+  });
+
+  it('crea el canal de Android antes de solicitar el permiso', async () => {
+    const originalPlatform = Platform.OS;
+    Platform.OS = 'android';
+    mockedNotifications.getPermissionsAsync.mockResolvedValue({
+      canAskAgain: true,
+      granted: false,
+    } as Notifications.NotificationPermissionsStatus);
+    mockedNotifications.requestPermissionsAsync.mockResolvedValue({
+      granted: true,
+    } as Notifications.NotificationPermissionsStatus);
+
+    try {
+      await requestNotificationPermission();
+
+      expect(
+        mockedNotifications.setNotificationChannelAsync,
+      ).toHaveBeenCalledWith(
+        'transaction-reminders',
+        expect.objectContaining({ name: 'Recordatorios de movimientos' }),
+      );
+      expect(
+        mockedNotifications.setNotificationChannelAsync.mock
+          .invocationCallOrder[0]!,
+      ).toBeLessThan(
+        mockedNotifications.requestPermissionsAsync.mock
+          .invocationCallOrder[0]!,
+      );
+    } finally {
+      Platform.OS = originalPlatform;
+    }
   });
 
   it('no pide permiso de nuevo si el usuario ya lo rechazó de forma permanente', async () => {

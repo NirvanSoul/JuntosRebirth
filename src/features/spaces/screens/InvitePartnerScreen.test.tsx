@@ -1,8 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  saveCountryChangeNotice,
-  loadCountryChangeNotice,
-} from '@/features/spaces/repositories/countryChangeNoticeRepository';
 import { fireEvent, waitFor } from '@testing-library/react-native';
 
 import {
@@ -13,23 +9,21 @@ import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScre
 import type { Space } from '@/features/spaces/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
-jest.mock('@/components/overlays/AppModal/AppModal', () => ({
-  AppModal: ({
-    children,
-    visible,
-  }: {
-    children: React.ReactNode;
-    visible: boolean;
-  }) => (visible ? children : null),
-}));
-
 jest.mock('@/features/spaces/gateways/juntossInvitationGateway', () => ({
   ...jest.requireActual('@/features/spaces/gateways/juntossInvitationGateway'),
   createJuntossInvitationGateway: jest.fn(),
 }));
 
+const mockTestSession = {
+  user: { id: 'invite-user', email: 'yo@example.com' },
+};
+
 jest.mock('@/features/auth/hooks/useAuthSession', () => ({
-  useAuthSession: () => ({ userId: 'invite-user', isReady: true }),
+  useAuthSession: () => ({
+    userId: 'invite-user',
+    isReady: true,
+    session: mockTestSession,
+  }),
 }));
 
 const coupleSpace: Space = {
@@ -48,9 +42,8 @@ function renderInvitation(createInvitation = jest.fn()) {
   return renderWithTheme(
     <InvitePartnerScreen
       coupleSpace={coupleSpace}
-      onClose={jest.fn()}
+      onFinished={jest.fn()}
       onCreateCoupleSpaceInvitation={jest.fn()}
-      visible
     />,
   );
 }
@@ -61,26 +54,19 @@ describe('InvitePartnerScreen', () => {
     await AsyncStorage.clear();
   });
 
-  it('explica la salida al abrir el espacio y permite invitar a otra persona', async () => {
-    await saveCountryChangeNotice('invite-user', {
-      previousCountryName: 'España',
-    });
+  it('abre directamente el formulario para enviar una invitación', async () => {
     const onCreate = jest.fn().mockResolvedValue(coupleSpace);
     const screen = await renderWithTheme(
       <InvitePartnerScreen
         coupleSpace={null}
-        onClose={jest.fn()}
+        onFinished={jest.fn()}
         onCreateCoupleSpaceInvitation={onCreate}
-        visible
       />,
     );
-    await waitFor(() =>
-      expect(screen.getByText(/configura de nuevo España/)).toBeTruthy(),
-    );
-    expect(screen.getByText(/mismo país configurado/)).toBeTruthy();
-    expect(screen.getByText(/tu país actual/)).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Invitar a otra persona'));
-    expect(onCreate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Correo de tu pareja')).toBeTruthy();
+    expect(
+      screen.getByTestId('invite-partner-couple-illustration'),
+    ).toBeTruthy();
     await fireEvent.changeText(
       screen.getByTestId('invite-partner-email'),
       'pareja@example.com',
@@ -91,31 +77,16 @@ describe('InvitePartnerScreen', () => {
     );
   });
 
-  it('no muestra detalles de otra cuenta', async () => {
-    await saveCountryChangeNotice('other-user', {
-      previousCountryName: 'España',
-    });
+  it('no muestra un paso previo antes del formulario', async () => {
     const screen = await renderWithTheme(
       <InvitePartnerScreen
         coupleSpace={null}
-        onClose={jest.fn()}
+        onFinished={jest.fn()}
         onCreateCoupleSpaceInvitation={jest.fn()}
-        visible
       />,
     );
-    expect(screen.getByLabelText('Crear espacio de pareja')).toBeTruthy();
-    expect(screen.queryByText(/configura de nuevo España/)).toBeNull();
-  });
-
-  it('retira el aviso cuando ya existe un espacio', async () => {
-    await saveCountryChangeNotice('invite-user', {
-      previousCountryName: 'España',
-    });
-    const screen = await renderInvitation();
-    await waitFor(async () =>
-      expect(await loadCountryChangeNotice('invite-user')).toBeNull(),
-    );
-    expect(screen.queryByText(/configura de nuevo España/)).toBeNull();
+    expect(screen.getByLabelText('Correo de tu pareja')).toBeTruthy();
+    expect(screen.queryByText('Organiza lo que comparten')).toBeNull();
   });
 
   it('ofrece únicamente el envío dirigido por correo', async () => {
@@ -127,27 +98,6 @@ describe('InvitePartnerScreen', () => {
     expect(screen.queryByText(/copiar enlace/i)).toBeNull();
   });
 
-  it('cerrar el paso de correo no crea un espacio ni una espera fantasma', async () => {
-    const onClose = jest.fn();
-    const onCreateCoupleSpaceInvitation = jest.fn();
-    const screen = await renderWithTheme(
-      <InvitePartnerScreen
-        coupleSpace={null}
-        onClose={onClose}
-        onCreateCoupleSpaceInvitation={onCreateCoupleSpaceInvitation}
-        visible
-      />,
-    );
-
-    await fireEvent.press(screen.getByTestId('invite-partner-create-space'));
-    expect(screen.getByLabelText('Correo de tu pareja')).toBeTruthy();
-
-    await fireEvent.press(screen.getByLabelText('Cerrar'));
-
-    expect(onCreateCoupleSpaceInvitation).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
   it('crea el espacio y la primera invitación en una sola confirmación', async () => {
     const onCreateCoupleSpaceInvitation = jest.fn().mockResolvedValue({
       ...coupleSpace,
@@ -156,13 +106,11 @@ describe('InvitePartnerScreen', () => {
     const screen = await renderWithTheme(
       <InvitePartnerScreen
         coupleSpace={null}
-        onClose={jest.fn()}
+        onFinished={jest.fn()}
         onCreateCoupleSpaceInvitation={onCreateCoupleSpaceInvitation}
-        visible
       />,
     );
 
-    await fireEvent.press(screen.getByTestId('invite-partner-create-space'));
     await fireEvent.changeText(
       screen.getByTestId('invite-partner-email'),
       ' pareja@example.com ',
@@ -197,6 +145,7 @@ describe('InvitePartnerScreen', () => {
       ),
     );
     expect(await screen.findByText('¡Invitación enviada!')).toBeTruthy();
+    expect(screen.getByTestId('invite-partner-success-icon')).toBeTruthy();
     expect(screen.getByText(/notificaciones activadas/i)).toBeTruthy();
   });
 
@@ -221,5 +170,91 @@ describe('InvitePartnerScreen', () => {
     expect(
       screen.getByText(/descargue la app y cree una cuenta/i),
     ).toBeTruthy();
+  });
+
+  it('permite cancelar el flujo desde el formulario por correo', async () => {
+    const onCancel = jest.fn();
+    const screen = await renderWithTheme(
+      <InvitePartnerScreen
+        coupleSpace={null}
+        onCancel={onCancel}
+        onFinished={jest.fn()}
+        onCreateCoupleSpaceInvitation={jest.fn()}
+      />,
+    );
+
+    const cancelButton = screen.getByLabelText('Cancelar');
+    await fireEvent.press(cancelButton);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('permite cancelar cuando el correo no tiene cuenta', async () => {
+    const onCancel = jest.fn();
+    const createInvitation = jest
+      .fn()
+      .mockRejectedValue(
+        new CreateInvitationError(
+          'invitee_not_registered',
+          'Ese correo aún no tiene una cuenta.',
+        ),
+      );
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue({
+      createInvitation,
+    } as unknown as ReturnType<typeof createJuntossInvitationGateway>);
+
+    const screen = await renderWithTheme(
+      <InvitePartnerScreen
+        coupleSpace={coupleSpace}
+        onCancel={onCancel}
+        onFinished={jest.fn()}
+        onCreateCoupleSpaceInvitation={jest.fn()}
+      />,
+    );
+
+    await fireEvent.changeText(
+      screen.getByTestId('invite-partner-email'),
+      'nueva@example.com',
+    );
+    await fireEvent.press(screen.getByTestId('invite-partner-send-email'));
+
+    expect(await screen.findByText('No encontramos esa cuenta')).toBeTruthy();
+    const cancelButton = screen.getByLabelText('Cancelar');
+    await fireEvent.press(cancelButton);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('muestra la tarjeta de invitación pendiente y permite aceptarla', async () => {
+    const onAcceptPendingInvitation = jest.fn(async () => undefined);
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue({
+      getCurrentUserPendingInvitation: jest.fn().mockResolvedValue({
+        invitationId: 'inv-456',
+        inviterDisplayName: 'Carlos',
+        spaceName: 'Juntoss',
+      }),
+      acceptCurrentUserInvitation: jest
+        .fn()
+        .mockResolvedValue({ spaceId: 'space-carlos', spaceName: 'Juntoss' }),
+    } as unknown as ReturnType<typeof createJuntossInvitationGateway>);
+
+    const screen = await renderWithTheme(
+      <InvitePartnerScreen
+        coupleSpace={null}
+        onAcceptPendingInvitation={onAcceptPendingInvitation}
+        onFinished={jest.fn()}
+        onCreateCoupleSpaceInvitation={jest.fn()}
+        onOpenCountrySettings={jest.fn()}
+      />,
+    );
+
+    expect(
+      await screen.findByText('Carlos te invitó a un espacio juntos'),
+    ).toBeTruthy();
+
+    const acceptButton = await screen.findByLabelText('Aceptar invitación');
+    await fireEvent.press(acceptButton);
+
+    await waitFor(() => {
+      expect(onAcceptPendingInvitation).toHaveBeenCalledWith('space-carlos');
+    });
   });
 });

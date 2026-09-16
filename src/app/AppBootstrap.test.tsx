@@ -1,4 +1,5 @@
 import { AppBootstrap } from '@/app/AppBootstrap';
+import { preloadAppIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
 const mockUseSession = jest.fn();
@@ -13,6 +14,9 @@ jest.mock('@/lib/notifications/localNotifications', () => ({
 jest.mock('@/lib/notifications/InvitationPushRegistration', () => ({
   InvitationPushRegistration: () => null,
 }));
+jest.mock('@/features/onboarding/utils/preloadOnboardingIllustrations', () => ({
+  preloadAppIllustrations: jest.fn(),
+}));
 jest.mock('@/navigation/RootNavigator', () => ({
   RootNavigator: ({ fontsReady }: { fontsReady: boolean }) => {
     mockUseSession(fontsReady);
@@ -24,6 +28,7 @@ it('monta el navegador para restaurar la sesión mientras cargan las fuentes', a
   mockFontsLoaded = false;
   const screen = await renderWithTheme(<AppBootstrap />);
   expect(mockUseSession).toHaveBeenCalledWith(false);
+  expect(preloadAppIllustrations).toHaveBeenCalledTimes(1);
 
   mockFontsLoaded = true;
   await screen.rerender(<AppBootstrap />);

@@ -185,7 +185,7 @@ export function OnboardingScreenLayout({
           <OnboardingProgressIndicator currentStep={currentStep} />
           {canSkip ? (
             <Pressable
-              accessibilityLabel="Omitir onboarding"
+              accessibilityLabel="Omitir pantallas informativas"
               accessibilityRole="button"
               disabled={false}
               hitSlop={spacing.sm}

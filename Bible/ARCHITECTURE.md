@@ -129,8 +129,13 @@ desplazamiento corto, desfase acotado). Todo se hace con Reanimated y respeta
 el movimiento reducido del sistema. El contenido se monta solo cuando está
 listo; la animación no controla la disponibilidad de datos ni impone una
 espera mínima.
-Las ilustraciones del onboarding se precargan solo al montar ese flujo, en
-segundo plano; su primera pantalla no depende de completar toda la precarga.
+Las ilustraciones principales de onboarding, acceso e invitaciones se
+precargan en segundo plano desde `AppBootstrap`, mediante una promesa compartida
+e idempotente que alimenta Expo Asset y, para URLs servidas por Metro o remotas,
+la caché nativa de `Image`. El montaje del onboarding vuelve a invocar la misma
+promesa como guarda local, sin duplicar trabajo. La interfaz no espera a que
+termine la precarga; `10_loginicon.png` forma parte explícita del lote para que
+normalmente esté disponible antes de llegar a Acceso.
 
 La apertura de la cuenta es local-first (`useSessionStartup`, en
 `features/sync/hooks/`): `initializeAuthenticatedSession` decide primero si la
@@ -140,7 +145,7 @@ principal pinta entonces la caché tal cual. El bootstrap, el snapshot y la
 subida de cambios pendientes siguen en segundo plano en su orden habitual, y
 al terminar el estado se vuelve a leer de SQLite. Solo cuando la caché era de
 otra cuenta se espera al snapshot. El refresco periódico (`useSharedDataPolling`) arranca
-después de esa inicialización y espera un intervalo completo (15 s) con peticiones
+después de esa inicialización y espera un intervalo completo (2 s) con peticiones
 delta (`GET /v1/sync/changes`): repetir la descarga que acaba de terminar sería
 trabajo duplicado. Aplica retroceso exponencial ante fallos sucesivos (hasta 5 min)
 y se pausa cuando la aplicación pasa a segundo plano o pierde conexión, ejecutando

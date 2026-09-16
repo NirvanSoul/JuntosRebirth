@@ -2,11 +2,14 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import {
   clearLocalProfileAvatar,
+  getPendingLocalDisplayName,
   getLocalProfile,
+  restoreRemoteProfileDisplayName,
   saveLocalProfileAvatar,
   saveLocalProfileCountry,
   saveLocalProfileDisplayName,
   saveOwnRemoteAvatar,
+  subscribeToLocalProfile,
 } from '@/features/profile/repositories/localProfileRepository';
 
 const mockGetLocalDatabase = jest.fn<Promise<SQLiteDatabase>, []>();
@@ -139,6 +142,53 @@ describe('localProfileRepository', () => {
       displayName: 'Farruel',
       countryCode: null,
     });
+  });
+
+  it('publica el perfil guardado para actualizar la interfaz al instante', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      avatar_path: null,
+      avatar_updated_at: null,
+      avatar_remote_path: null,
+      avatar_remote_updated_at: null,
+      display_name: 'Beatriz',
+      country_code: null,
+    });
+    const subscriber = jest.fn();
+    const unsubscribe = subscribeToLocalProfile(subscriber);
+
+    await saveLocalProfileDisplayName('Beatriz');
+
+    expect(subscriber).toHaveBeenCalledWith(
+      expect.objectContaining({ displayName: 'Beatriz' }),
+    );
+    unsubscribe();
+  });
+
+  it('reconoce un nombre pendiente para reintentarlo después de reiniciar', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      display_name: 'Beatriz',
+      display_name_sync_status: 'failed',
+    });
+
+    await expect(getPendingLocalDisplayName()).resolves.toBe('Beatriz');
+  });
+
+  it('restaura el nombre remoto solo cuando no hay una edición local pendiente', async () => {
+    getFirstAsync.mockResolvedValueOnce({
+      avatar_path: null,
+      avatar_updated_at: null,
+      avatar_remote_path: null,
+      avatar_remote_updated_at: null,
+      display_name: 'Nombre remoto',
+      country_code: null,
+    });
+
+    await restoreRemoteProfileDisplayName('Nombre remoto');
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("NOT IN ('pending', 'failed')"),
+      'Nombre remoto',
+    );
   });
 
   it('guarda el país local en mayúsculas y lo devuelve junto al resto del perfil', async () => {

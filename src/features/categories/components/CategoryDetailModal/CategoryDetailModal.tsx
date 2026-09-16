@@ -193,7 +193,7 @@ export function CategoryDetailModal({
         : undefined,
     [authorFilteredTransactions, category, selectedCurrency],
   );
-  const exchangeRatesState = useExchangeRates();
+  const exchangeRatesState = useExchangeRates({ enabled: visible });
   const apiRates =
     exchangeRatesState.status === 'success' ||
     exchangeRatesState.status === 'stale'

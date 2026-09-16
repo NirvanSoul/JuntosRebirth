@@ -68,4 +68,28 @@ describe('TransactionSummaryBadges', () => {
 
     expect(getByTestId('badges-balance-comparison')).toBeTruthy();
   });
+
+  it('formatea los tres importes en la moneda seleccionada', async () => {
+    const { getByLabelText, queryByLabelText } = await renderWithTheme(
+      <TransactionSummaryBadges
+        accessibilityContext="de los movimientos filtrados"
+        balanceMinor={750}
+        currency="USD"
+        expenseMinor={1250}
+        incomeMinor={2000}
+        testIDPrefix="badges"
+      />,
+    );
+
+    expect(
+      getByLabelText(/Ingresos de los movimientos filtrados:.*20/),
+    ).toBeTruthy();
+    expect(
+      getByLabelText(/Gastos de los movimientos filtrados:.*12,50/),
+    ).toBeTruthy();
+    expect(
+      getByLabelText(/Balance de los movimientos filtrados:.*7,50/),
+    ).toBeTruthy();
+    expect(queryByLabelText(/€$/)).toBeNull();
+  });
 });

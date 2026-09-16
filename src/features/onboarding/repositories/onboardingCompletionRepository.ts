@@ -13,6 +13,10 @@ export async function saveOnboardingCompletion(): Promise<void> {
   await AsyncStorage.setItem(onboardingCompletionStorageKey, 'true');
 }
 
+export async function resetOnboardingCompletion(): Promise<void> {
+  await AsyncStorage.removeItem(onboardingCompletionStorageKey);
+}
+
 export const onboardingCompletionStorage = {
   key: onboardingCompletionStorageKey,
 };

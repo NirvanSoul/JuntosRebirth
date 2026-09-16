@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/Text/Text';
 import { PeriodComparisonIndicator } from '@/features/transactions/components/PeriodComparisonIndicator/PeriodComparisonIndicator';
@@ -13,6 +14,7 @@ import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { iconSize } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
+import { getStartupEntering } from '@/theme/transitions';
 import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -20,6 +22,7 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type ComparisonPlacement = 'amount' | 'title';
 
 type TransactionSummaryBadgesProps = {
+  animateEntrance?: boolean;
   accessibilityContext: string;
   balanceComparison?: PeriodComparisonResult;
   balanceMinor?: number;
@@ -41,6 +44,7 @@ type TransactionSummaryBadgesProps = {
 };
 
 type MetricBadgeProps = {
+  entranceIndex?: number;
   accessibilityLabel: string;
   amount: string;
   bordered: boolean;
@@ -54,6 +58,7 @@ type MetricBadgeProps = {
 };
 
 function MetricBadge({
+  entranceIndex,
   accessibilityLabel,
   amount,
   bordered,
@@ -75,57 +80,86 @@ function MetricBadge({
       ? 'arrow-up'
       : 'arrow-down';
 
+  // `Pressable` recibe el estilo como función; un componente animado no la
+  // resolvería, así que la entrada anima el contenedor.
   return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole={onPress ? 'button' : undefined}
-      accessible
-      disabled={!onPress}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.badge,
-        compact ? styles.compactBadge : null,
-        bordered ? styles.borderedBadge : null,
-        pressed ? styles.pressed : null,
-      ]}
-      testID={`${testIDPrefix}-${icon}-badge`}
+    <Animated.View
+      entering={
+        entranceIndex === undefined
+          ? undefined
+          : getStartupEntering(entranceIndex)
+      }
+      style={styles.badgeSlot}
     >
-      <View
-        style={[
-          styles.icon,
-          compact ? styles.compactIcon : null,
-          isBalance
-            ? styles.balanceIcon
-            : isIncome
-              ? styles.incomeIcon
-              : styles.expenseIcon,
+      <Pressable
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessible
+        disabled={!onPress}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.badge,
+          compact ? styles.compactBadge : null,
+          bordered ? styles.borderedBadge : null,
+          pressed ? styles.pressed : null,
         ]}
-        testID={`${testIDPrefix}-${icon}-icon-background`}
+        testID={`${testIDPrefix}-${icon}-badge`}
       >
         <View
-          style={isBalance ? null : styles.diagonalArrow}
-          testID={`${testIDPrefix}-${icon}-icon`}
+          style={[
+            styles.icon,
+            compact ? styles.compactIcon : null,
+            isBalance
+              ? styles.balanceIcon
+              : isIncome
+                ? styles.incomeIcon
+                : styles.expenseIcon,
+          ]}
+          testID={`${testIDPrefix}-${icon}-icon-background`}
         >
-          <Ionicons
-            color={colors.onBrand}
-            name={iconName}
-            size={iconSize.xs}
-            testID={`${testIDPrefix}-${icon}-glyph`}
-          />
-        </View>
-      </View>
-      <View style={styles.metricText}>
-        <View style={styles.labelRow}>
-          <Text
-            numberOfLines={1}
-            testID={`${testIDPrefix}-${icon}-label`}
-            tone="secondary"
-            variant="footnote"
-            weight="regular"
+          <View
+            style={isBalance ? null : styles.diagonalArrow}
+            testID={`${testIDPrefix}-${icon}-icon`}
           >
-            {label}
+            <Ionicons
+              color={colors.onBrand}
+              name={iconName}
+              size={iconSize.xs}
+              testID={`${testIDPrefix}-${icon}-glyph`}
+            />
+          </View>
+        </View>
+        <View style={styles.metricText}>
+          <View style={styles.labelRow}>
+            <Text
+              numberOfLines={1}
+              testID={`${testIDPrefix}-${icon}-label`}
+              tone="secondary"
+              variant="footnote"
+              weight="regular"
+            >
+              {label}
+            </Text>
+            {comparison && comparisonPlacement === 'title' ? (
+              <PeriodComparisonIndicator
+                comparison={comparison}
+                compact
+                testID={`${testIDPrefix}-${icon}-comparison`}
+                tone={icon}
+              />
+            ) : null}
+          </View>
+          <Text
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+            numberOfLines={1}
+            testID={`${testIDPrefix}-${icon}-amount`}
+            variant={compact ? 'footnote' : 'bodyStrong'}
+            weight="semibold"
+          >
+            {amount}
           </Text>
-          {comparison && comparisonPlacement === 'title' ? (
+          {comparison && comparisonPlacement === 'amount' ? (
             <PeriodComparisonIndicator
               comparison={comparison}
               compact
@@ -134,30 +168,13 @@ function MetricBadge({
             />
           ) : null}
         </View>
-        <Text
-          adjustsFontSizeToFit
-          minimumFontScale={0.72}
-          numberOfLines={1}
-          testID={`${testIDPrefix}-${icon}-amount`}
-          variant={compact ? 'footnote' : 'bodyStrong'}
-          weight="semibold"
-        >
-          {amount}
-        </Text>
-        {comparison && comparisonPlacement === 'amount' ? (
-          <PeriodComparisonIndicator
-            comparison={comparison}
-            compact
-            testID={`${testIDPrefix}-${icon}-comparison`}
-            tone={icon}
-          />
-        ) : null}
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 export function TransactionSummaryBadges({
+  animateEntrance = false,
   accessibilityContext,
   balanceComparison,
   balanceMinor,
@@ -208,6 +225,7 @@ export function TransactionSummaryBadges({
           compact={compact}
           comparison={incomeComparison}
           comparisonPlacement={comparisonPlacement}
+          entranceIndex={animateEntrance ? 1 : undefined}
           icon="income"
           label="Ingresos"
           onPress={onIncomePress}
@@ -220,6 +238,7 @@ export function TransactionSummaryBadges({
           compact={compact}
           comparison={expenseComparison}
           comparisonPlacement={comparisonPlacement}
+          entranceIndex={animateEntrance ? 2 : undefined}
           icon="expense"
           label="Gastos"
           onPress={onExpensePress}
@@ -233,6 +252,7 @@ export function TransactionSummaryBadges({
             compact={compact}
             comparison={balanceComparison}
             comparisonPlacement={comparisonPlacement}
+            entranceIndex={animateEntrance ? 3 : undefined}
             icon="balance"
             label="Balance"
             onPress={onBalancePress}
@@ -255,9 +275,12 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       justifyContent: 'center',
       gap: spacing.sm,
     },
+    badgeSlot: {
+      minWidth: 0,
+      flex: 1,
+    },
     badge: {
       ...shadows.subtle,
-      minWidth: 0,
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',

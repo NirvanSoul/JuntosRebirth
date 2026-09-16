@@ -1,4 +1,5 @@
 import {
+  Easing,
   FadeInDown,
   LinearTransition,
   ReduceMotion,
@@ -37,5 +38,20 @@ export function getDisclosureLayoutTransition() {
     .damping(motion.disclosureSpring.damping)
     .mass(motion.disclosureSpring.mass)
     .stiffness(motion.disclosureSpring.stiffness)
+    .reduceMotion(ReduceMotion.System);
+}
+
+/** Entrada por elemento, con recorrido corto y desfase acotado. */
+export function getStartupEntering(index = 0) {
+  return FadeInDown.duration(motion.startupRevealDuration)
+    .withInitialValues({ translateY: motion.startupRevealTravel })
+    .delay(
+      motion.loadingCompletionDuration +
+        getDisclosureStaggerDelay(index, {
+          interval: motion.startupRevealStagger,
+          maxDelay: motion.startupRevealMaxDelay,
+        }),
+    )
+    .easing(Easing.out(Easing.cubic))
     .reduceMotion(ReduceMotion.System);
 }

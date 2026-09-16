@@ -13,11 +13,15 @@ import type { SessionTransaction } from '@/features/transactions/types';
 import { motion } from '@/theme/motion';
 import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
-import { getDisclosureLayoutTransition } from '@/theme/transitions';
+import {
+  getStartupEntering,
+  getDisclosureLayoutTransition,
+} from '@/theme/transitions';
 import type { ColorTokens } from '@/theme/types';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type TransactionPreviewListProps = {
+  animateEntrance?: boolean;
   categories: readonly Category[];
   groupingTransactions?: readonly SessionTransaction[];
   limit?: number;
@@ -87,6 +91,7 @@ export function groupTransactionsForPreview(
 }
 
 export function TransactionPreviewList({
+  animateEntrance = false,
   categories,
   groupingTransactions,
   limit,
@@ -133,7 +138,7 @@ export function TransactionPreviewList({
       style={styles.list}
       testID={testID}
     >
-      {groups.map((group) => {
+      {groups.map((group, index) => {
         const [primary, ...children] = group.transactions;
         if (!primary) return null;
 
@@ -149,6 +154,9 @@ export function TransactionPreviewList({
         return (
           <Animated.View
             key={group.id}
+            entering={
+              animateEntrance ? getStartupEntering(index + 5) : undefined
+            }
             layout={getDisclosureLayoutTransition()}
             testID={isCustomFolder ? 'transaction-preview-group' : undefined}
           >

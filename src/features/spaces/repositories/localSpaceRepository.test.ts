@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
+  getSpacesCatalogueRevision,
   loadSpaces,
   localSpaceStorage,
   saveSpaces,
+  subscribeToSpaces,
   updateSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
 import { initialSpacesState, type SpacesState } from '@/features/spaces/types';
@@ -196,7 +198,7 @@ describe('localSpaceRepository', () => {
     );
   });
 
-  it('rechaza un catálogo guardado cuyo espacio activo no existe', async () => {
+  it('repara un catálogo guardado cuyo espacio activo ya no existe', async () => {
     await AsyncStorage.setItem(
       localSpaceStorage.key,
       JSON.stringify({
@@ -206,9 +208,50 @@ describe('localSpaceRepository', () => {
       }),
     );
 
-    await expect(loadSpaces()).rejects.toThrow(
-      'El catálogo de espacios guardado no es válido',
+    await expect(loadSpaces()).resolves.toEqual(initialSpacesState);
+    await expect(
+      AsyncStorage.getItem(localSpaceStorage.key).then((raw) =>
+        JSON.parse(raw!),
+      ),
+    ).resolves.toEqual({ version: 2, ...initialSpacesState });
+  });
+
+  it('notifica cada catálogo persistido a quienes mantienen el contexto activo', async () => {
+    const listener = jest.fn();
+    const unsubscribe = subscribeToSpaces(listener);
+
+    await saveSpaces(initialSpacesState);
+    unsubscribe();
+    await saveSpaces({
+      activeSpaceId: 'space-home',
+      spaces: [
+        ...initialSpacesState.spaces,
+        {
+          id: 'space-home',
+          name: 'Casa',
+          type: 'other',
+          currency: 'EUR',
+        },
+      ],
+    });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(initialSpacesState);
+  });
+
+  it('no cambia el contexto activo si AsyncStorage rechaza la escritura', async () => {
+    const listener = jest.fn();
+    const unsubscribe = subscribeToSpaces(listener);
+    jest
+      .mocked(AsyncStorage.setItem)
+      .mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(saveSpaces(initialSpacesState)).rejects.toThrow(
+      'storage unavailable',
     );
+    unsubscribe();
+
+    expect(listener).not.toHaveBeenCalled();
   });
 
   describe('updateSpaces', () => {
@@ -293,6 +336,47 @@ describe('localSpaceRepository', () => {
 
       expect(result).toEqual(initialSpacesState);
       expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+    });
+
+    it('una selección no invalida una lectura remota del mismo catálogo', async () => {
+      await saveSpaces({
+        activeSpaceId: 'personal',
+        spaces: [...initialSpacesState.spaces, couple],
+      });
+      const revision = getSpacesCatalogueRevision();
+
+      await updateSpaces((stored) => ({
+        ...stored,
+        activeSpaceId: 'couple-1',
+      }));
+
+      expect(getSpacesCatalogueRevision()).toBe(revision);
+    });
+
+    it('ignora una respuesta remota si el catálogo cambió mientras esperaba', async () => {
+      await saveSpaces(initialSpacesState);
+      const staleRevision = getSpacesCatalogueRevision();
+      await updateSpaces((stored) => ({
+        ...stored,
+        spaces: [...stored.spaces, couple],
+      }));
+
+      const result = await updateSpaces(
+        (stored) => ({
+          activeSpaceId: 'personal',
+          spaces: stored.spaces.filter((space) => space.type !== 'couple'),
+        }),
+        { ifCatalogueRevision: staleRevision },
+      );
+
+      expect(result.spaces.map((space) => space.id)).toEqual([
+        'personal',
+        'couple-1',
+      ]);
+      expect((await loadSpaces()).spaces.map((space) => space.id)).toEqual([
+        'personal',
+        'couple-1',
+      ]);
     });
   });
 });

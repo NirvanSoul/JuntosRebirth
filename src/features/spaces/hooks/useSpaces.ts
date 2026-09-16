@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import { createJuntossInvitationGateway } from '@/features/spaces/gateways/juntossInvitationGateway';
-import { listRemoteSpaces } from '@/services/api/spaces';
+import { useCancelPendingCoupleInvitation } from '@/features/spaces/hooks/useCancelPendingCoupleInvitation';
 import {
   createSpaceId,
+  getSpacesCatalogueRevision,
   loadSpaces,
-  saveSpaces,
+  subscribeToSpaces,
   updateSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
 import {
@@ -18,6 +19,11 @@ import {
 } from '@/features/spaces/types';
 import { projectSpacesForSession } from '@/features/spaces/utils/sessionSpaceProjection';
 import {
+  fetchRemoteCoupleSpace,
+  RemoteSpaceIntegrityError,
+  remoteSpaceIntegrityErrorMessage,
+} from '@/features/spaces/utils/remoteCoupleSpace';
+import {
   defaultCurrencyCode,
   isCurrencyCode,
 } from '@/lib/currency/currencyCatalog';
@@ -26,15 +32,9 @@ import { loadCurrencyPreferences } from '@/state/appPreferences/currencyPreferen
 const maxSpaceNameLength = 40;
 const defaultCoupleSpaceName = 'Juntos';
 
-export class RemoteSpaceIntegrityError extends Error {
-  override readonly name = 'RemoteSpaceIntegrityError';
-}
-
-export const remoteSpaceIntegrityErrorMessage =
-  'No pudimos comprobar tu espacio de pareja por un error de integridad.';
-
 type SpacesController = {
   activeSpace: Space;
+  cancelPendingCoupleInvitation: () => Promise<void>;
   createCoupleSpaceInvitation: (
     inviteeEmail: string,
     name?: string,
@@ -48,44 +48,6 @@ type SpacesController = {
   selectSpace: (spaceId: string) => Promise<void>;
   spaces: readonly Space[];
 };
-
-/**
- * Lee el espacio de pareja activo del usuario directamente sobre `spaces`
- * (sin RPC dedicado: RLS ya restringe la fila a membresías activas). Como
- * mucho hay uno, por el índice único de "un espacio juntos por usuario"
- * aplicado en el servidor.
- */
-async function fetchRemoteCoupleSpace(): Promise<Space | null> {
-  const data = (await listRemoteSpaces()).find(
-    (space) => space.type === 'couple',
-  );
-  if (!data) return null;
-
-  const rawId = data.id;
-  const rawName = data.name;
-  const rawCurrency = data.currency;
-
-  if (
-    typeof rawId !== 'string' ||
-    rawId.trim().length === 0 ||
-    typeof rawName !== 'string' ||
-    rawName.trim().length === 0 ||
-    typeof rawCurrency !== 'string' ||
-    !isCurrencyCode(rawCurrency)
-  ) {
-    throw new RemoteSpaceIntegrityError(
-      `Datos de espacio de pareja remoto inválidos (id: ${String(rawId)}, name: ${String(rawName)}, currency: ${String(rawCurrency)})`,
-    );
-  }
-
-  return {
-    id: rawId,
-    name: rawName,
-    type: 'couple',
-    currency: rawCurrency,
-    isAwaitingPartner: data.activatedAt === null,
-  };
-}
 
 /**
  * Fusiona el espacio de pareja remoto (o su ausencia) con el catálogo local.
@@ -153,6 +115,14 @@ export function useSpaces(): SpacesController {
   const { isReady: isAuthReady, session } = useAuthSession();
   const userId = session?.user.id ?? null;
 
+  useEffect(
+    () =>
+      subscribeToSpaces((stored) => {
+        setState(stored);
+      }),
+    [],
+  );
+
   useEffect(() => {
     let isMounted = true;
 
@@ -181,6 +151,7 @@ export function useSpaces(): SpacesController {
   const refreshCoupleSpace = useCallback(async (): Promise<void> => {
     if (!userId) return;
 
+    const catalogueRevision = getSpacesCatalogueRevision();
     let remoteSpace: Space | null;
     try {
       remoteSpace = await fetchRemoteCoupleSpace();
@@ -206,15 +177,14 @@ export function useSpaces(): SpacesController {
 
     // Se fusiona sobre lo guardado, no sobre el estado en memoria: el snapshot
     // puede haber reescrito el catálogo mientras esta petición estaba en vuelo.
-    let merged: SpacesState;
     try {
-      merged = await updateSpaces((stored) =>
-        mergeRemoteCoupleSpace(stored, remoteSpace),
+      await updateSpaces(
+        (stored) => mergeRemoteCoupleSpace(stored, remoteSpace),
+        { ifCatalogueRevision: catalogueRevision },
       );
     } catch {
       return; // El catálogo local sigue siendo válido; se reintentará.
     }
-    setState(merged);
   }, [userId]);
 
   const reloadSpaces = useCallback(async (): Promise<void> => {
@@ -280,19 +250,31 @@ export function useSpaces(): SpacesController {
         type: 'other',
         currency: spaceCurrency,
       };
-      const nextState: SpacesState = {
-        activeSpaceId: space.id,
-        spaces: [...state.spaces, space],
-      };
-
       try {
-        await saveSpaces(nextState);
-      } catch {
-        const message = 'No pudimos guardar el espacio. Inténtalo de nuevo.';
+        await updateSpaces((stored) => {
+          if (
+            stored.spaces.some(
+              (entry) =>
+                entry.name.toLocaleLowerCase('es-ES') ===
+                name.toLocaleLowerCase('es-ES'),
+            )
+          ) {
+            throw new Error('Ya existe un espacio con ese nombre.');
+          }
+          return {
+            activeSpaceId: space.id,
+            spaces: [...stored.spaces, space],
+          };
+        });
+      } catch (caught) {
+        const message =
+          caught instanceof Error &&
+          caught.message === 'Ya existe un espacio con ese nombre.'
+            ? caught.message
+            : 'No pudimos guardar el espacio. Inténtalo de nuevo.';
         setError(message);
         throw new Error(message);
       }
-      setState(nextState);
       setError(null);
 
       return space;
@@ -301,9 +283,8 @@ export function useSpaces(): SpacesController {
   );
 
   const selectSpace = useCallback(async (spaceId: string): Promise<void> => {
-    let nextState: SpacesState;
     try {
-      nextState = await updateSpaces((stored) => {
+      await updateSpaces((stored) => {
         if (!stored.spaces.some((space) => space.id === spaceId)) {
           throw new Error('El espacio seleccionado no existe.');
         }
@@ -323,7 +304,6 @@ export function useSpaces(): SpacesController {
       setError(message);
       throw new Error(message);
     }
-    setState(nextState);
     setError(null);
   }, []);
 
@@ -358,8 +338,8 @@ export function useSpaces(): SpacesController {
         throw caught instanceof Error ? caught : new Error(message);
       }
 
-      // El RPC crea el espacio y su invitación en una sola transacción. Solo
-      // después de recibir ambos identificadores se expone la espera en la UI.
+      // Aunque son dos peticiones remotas, solo después de recibir ambos
+      // identificadores se expone la espera en la UI.
       const newSpace: Space = {
         id: spaceId,
         name,
@@ -367,28 +347,25 @@ export function useSpaces(): SpacesController {
         currency: spaceCurrency,
         isAwaitingPartner: true,
       };
-      const nextState: SpacesState = {
-        activeSpaceId: newSpace.id,
-        spaces: [
-          ...state.spaces.filter((space) => space.type !== 'couple'),
-          newSpace,
-        ],
-      };
-
       try {
-        await saveSpaces(nextState);
+        await updateSpaces((stored) => ({
+          activeSpaceId: newSpace.id,
+          spaces: [
+            ...stored.spaces.filter((space) => space.type !== 'couple'),
+            newSpace,
+          ],
+        }));
       } catch {
         const message =
           'La invitación se envió, pero no pudimos actualizar tus espacios locales. Cierra y vuelve a abrir Juntos.';
         setError(message);
         throw new Error(message);
       }
-      setState(nextState);
       setError(null);
 
       return newSpace;
     },
-    [session, state],
+    [session],
   );
 
   const leaveCoupleSpace = useCallback(async (): Promise<void> => {
@@ -413,32 +390,39 @@ export function useSpaces(): SpacesController {
       throw new Error(message);
     }
 
-    const nextSpaces = state.spaces.filter(
-      (space) => space.id !== coupleSpaceEntry.id,
-    );
-    const nextActiveSpaceId =
-      state.activeSpaceId === coupleSpaceEntry.id
-        ? resolvePersonalSpaceId(nextSpaces)
-        : state.activeSpaceId;
-    const nextState: SpacesState = {
-      activeSpaceId: nextActiveSpaceId,
-      spaces: nextSpaces,
-    };
-
     try {
-      await saveSpaces(nextState);
+      await updateSpaces((stored) => {
+        const nextSpaces = stored.spaces.filter(
+          (space) => space.id !== coupleSpaceEntry.id,
+        );
+        if (nextSpaces.length === stored.spaces.length) return stored;
+        return {
+          activeSpaceId:
+            stored.activeSpaceId === coupleSpaceEntry.id
+              ? resolvePersonalSpaceId(nextSpaces)
+              : stored.activeSpaceId,
+          spaces: nextSpaces,
+        };
+      });
     } catch {
       const message =
         'Saliste del espacio, pero no pudimos actualizar tus espacios locales. Cierra y vuelve a abrir Juntos.';
       setError(message);
       throw new Error(message);
     }
-    setState(nextState);
     setError(null);
   }, [session, state]);
 
+  const cancelPendingCoupleInvitation = useCancelPendingCoupleInvitation({
+    hasSession: session !== null,
+    setError,
+    setState,
+    state,
+  });
+
   return {
     activeSpace,
+    cancelPendingCoupleInvitation,
     createCoupleSpaceInvitation,
     createSpace,
     leaveCoupleSpace,

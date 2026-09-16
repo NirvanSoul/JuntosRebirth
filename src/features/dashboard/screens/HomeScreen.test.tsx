@@ -122,9 +122,9 @@ describe('HomeScreen', () => {
         .marginTop,
     ).toBe(spacing.none);
     expect(screen.getAllByText(/^0\s*€$/)).toHaveLength(3);
-    expect(screen.getByText('Aún no hay categorías')).toBeTruthy();
-    expect(screen.getByText('Aún no hay movimientos')).toBeTruthy();
-    expect(screen.getByText('Aún no hay cuentas')).toBeTruthy();
+    expect(screen.getByText('Crea una categoría')).toBeTruthy();
+    expect(screen.getByText('Crea un movimiento')).toBeTruthy();
+    expect(screen.getByText('Crea una cuenta')).toBeTruthy();
     expect(
       StyleSheet.flatten(
         screen.getByTestId('home-empty-accounts-icon').props.style,
@@ -171,11 +171,8 @@ describe('HomeScreen', () => {
       ),
     ).toMatchObject({ borderWidth: 1, borderColor: colors.border });
     expect(
-      StyleSheet.flatten(
-        screen.getByText('Crea una categoría para organizar tus movimientos.')
-          .props.style,
-      ).marginTop,
-    ).toBe(spacing.xxs);
+      screen.queryByText('Crea una categoría para organizar tus movimientos.'),
+    ).toBeNull();
   });
 
   it('muestra el balance, los totales del mes y la actividad recibida', async () => {

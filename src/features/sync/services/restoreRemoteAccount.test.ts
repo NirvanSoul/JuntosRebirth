@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type { SpacesState } from '@/features/spaces/types';
 
 import {
+  getSpacesCatalogueRevision,
   loadSpaces,
   saveSpaces,
   updateSpaces,
@@ -18,6 +19,7 @@ import {
   readRemoteChangesCursor,
   writeRemoteChangesCursor,
 } from '@/features/sync/repositories/localSyncCursorRepository';
+import { ApiError } from '@/services/api/client';
 
 import {
   restoreRemoteAccount,
@@ -29,6 +31,7 @@ jest.mock('@/lib/storage/localDatabase', () => ({
 }));
 
 jest.mock('@/features/spaces/repositories/localSpaceRepository', () => ({
+  getSpacesCatalogueRevision: jest.fn(() => 0),
   loadSpaces: jest.fn(),
   saveSpaces: jest.fn(),
   updateSpaces: jest.fn(),
@@ -57,6 +60,8 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
   const mockGetLocalDatabase = getLocalDatabase as unknown as jest.Mock;
   const mockLoadSpaces = loadSpaces as unknown as jest.Mock;
   const mockSaveSpaces = saveSpaces as unknown as jest.Mock;
+  const mockGetSpacesCatalogueRevision =
+    getSpacesCatalogueRevision as unknown as jest.Mock;
   const mockGetSession = authClient.getSession as jest.Mock;
   const mockFetchSnapshot = fetchRemoteAccountSnapshot as jest.Mock;
   const mockFetchImportReviews = fetchRemoteImportReviews as jest.Mock;
@@ -542,6 +547,82 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
     expect(await loadSpaces()).toEqual(storedSpaces);
   });
 
+  it('no aplica un snapshot si el catálogo cambió durante la restauración', async () => {
+    const newerSpaces: SpacesState = {
+      activeSpaceId: 'couple-new',
+      spaces: [
+        {
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+        },
+        {
+          id: 'couple-new',
+          name: 'Juntos',
+          type: 'couple',
+          currency: 'EUR',
+        },
+      ],
+    };
+    mockLoadSpaces.mockResolvedValue(newerSpaces);
+    let catalogueRevision = 7;
+    mockGetSpacesCatalogueRevision.mockImplementation(() => catalogueRevision);
+    (updateSpaces as unknown as jest.Mock).mockImplementationOnce(
+      async (
+        mutate: (stored: SpacesState) => SpacesState,
+        options?: { ifCatalogueRevision?: number },
+      ) => {
+        const stored = (await loadSpaces()) as SpacesState;
+        if (options?.ifCatalogueRevision !== catalogueRevision) return stored;
+        const next = mutate(stored);
+        await saveSpaces(next);
+        return next;
+      },
+    );
+    const database = {
+      getAllAsync: jest.fn().mockResolvedValue([]),
+      getFirstAsync: jest.fn().mockResolvedValue(null),
+      runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      withExclusiveTransactionAsync: jest
+        .fn()
+        .mockImplementation(
+          async (callback: (tx: SQLiteDatabase) => Promise<void>) => {
+            await callback(database);
+            catalogueRevision = 8;
+          },
+        ),
+    } as unknown as SQLiteDatabase;
+    mockGetLocalDatabase.mockResolvedValue(database);
+
+    await restoreRemoteAccount({
+      userId: 'test-user-id',
+      snapshot: {
+        serverTime: null,
+        activeFinancialContextId: null,
+        spaces: [
+          {
+            remoteId: 'personal',
+            name: 'Personal',
+            type: 'personal',
+            currency: 'EUR',
+            activatedAt: '2026-08-01T00:00:00.000Z',
+          },
+        ],
+        categories: [],
+        moneyAccounts: [],
+        recurringSeries: [],
+        transactions: [],
+      },
+    });
+
+    expect(updateSpaces).toHaveBeenCalledWith(expect.any(Function), {
+      ifCatalogueRevision: 7,
+    });
+    expect(mockSaveSpaces).not.toHaveBeenCalled();
+    expect(await loadSpaces()).toEqual(newerSpaces);
+  });
+
   it('pide el snapshot y las revisiones de importación a la vez', async () => {
     const order: string[] = [];
     let resolveSnapshot: ((value: object) => void) | undefined;
@@ -817,6 +898,28 @@ describe('restoreRemoteAccount (delta sync y cursor)', () => {
     expect(mockFetchSnapshot).toHaveBeenCalled();
     expect(mockFetchChanges).not.toHaveBeenCalled();
     expect(result.outcome.mode).toBe('full');
+  });
+
+  it('no convierte un corte de red del delta en un snapshot completo', async () => {
+    mockReadCursor.mockResolvedValue({
+      serverTime: '2026-09-11T11:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaceRemoteIds: ['space-1'],
+    });
+    mockFetchChanges.mockRejectedValue(
+      new ApiError({
+        status: 0,
+        code: 'NETWORK_ERROR',
+        message: 'Se interrumpió la conexión.',
+      }),
+    );
+
+    await expect(
+      restoreRemoteAccountForCurrentSession({ mode: 'delta' }),
+    ).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+
+    expect(mockFetchSnapshot).not.toHaveBeenCalled();
+    expect(mockFetchImportReviews).not.toHaveBeenCalled();
   });
 
   it('delta con contexto financiero o espacios distintos realiza restore full', async () => {

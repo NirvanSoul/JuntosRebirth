@@ -8,6 +8,7 @@ import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
 import { OnboardingNavigator } from '@/features/onboarding/OnboardingNavigator';
+import { OnboardingRestartContext } from '@/features/onboarding/context/OnboardingRestartContext';
 import { useOnboardingCompletion } from '@/features/onboarding/hooks/useOnboardingCompletion';
 import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
@@ -23,6 +24,8 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     complete: completeOnboarding,
     hasCompleted: hasCompletedOnboarding,
     isReady: isOnboardingReady,
+    reset: resetOnboarding,
+    setHasCompleted: setOnboardingCompleted,
   } = useOnboardingCompletion();
 
   useEffect(() => {
@@ -30,6 +33,14 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
       markStartup('session_ready');
     }
   }, [isAuthReady]);
+
+  const hasVerifiedSession = session?.user.emailVerified === true;
+
+  useEffect(() => {
+    if (hasVerifiedSession && !hasCompletedOnboarding) {
+      setOnboardingCompleted(true);
+    }
+  }, [hasCompletedOnboarding, hasVerifiedSession, setOnboardingCompleted]);
 
   const navigationTheme = useMemo(
     () => ({
@@ -70,13 +81,10 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     );
   }
 
-  // Una sesión provisional de registro no concede acceso. El valor estricto
-  // evita que una respuesta incompleta del proveedor abra datos locales.
-  const hasVerifiedSession = session?.user.emailVerified === true;
-  const content = !hasCompletedOnboarding ? (
-    <OnboardingNavigator onComplete={completeOnboarding} />
-  ) : hasVerifiedSession ? (
+  const content = hasVerifiedSession ? (
     <MainTabsNavigator />
+  ) : !hasCompletedOnboarding ? (
+    <OnboardingNavigator onComplete={completeOnboarding} />
   ) : (
     <AccessScreen />
   );
@@ -89,13 +97,15 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     <View style={styles.root} testID="root-navigator-backdrop">
       {/* Mientras `linking` resuelve la URL inicial no hay hijos montados; la
           misma barra ocupa ese hueco para que su avance continúe sin reinicio. */}
-      <NavigationContainer
-        fallback={<LoadingState />}
-        linking={linking}
-        theme={navigationTheme}
-      >
-        {content}
-      </NavigationContainer>
+      <OnboardingRestartContext.Provider value={resetOnboarding}>
+        <NavigationContainer
+          fallback={<LoadingState />}
+          linking={linking}
+          theme={navigationTheme}
+        >
+          {content}
+        </NavigationContainer>
+      </OnboardingRestartContext.Provider>
     </View>
   );
 }

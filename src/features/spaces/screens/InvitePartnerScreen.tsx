@@ -1,290 +1,288 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, View } from 'react-native';
 
-import { AppModal } from '@/components/overlays/AppModal/AppModal';
-import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
 import { isValidEmail } from '@/features/auth/utils/authValidation';
+import { HomeEntrance } from '@/features/dashboard/components/HomeEntrance';
 import {
   CreateInvitationError,
   createJuntossInvitationGateway,
 } from '@/features/spaces/gateways/juntossInvitationGateway';
-import { useCountryChangeNotice } from '@/features/spaces/hooks/useCountryChangeNotice';
 import type { Space } from '@/features/spaces/types';
-import { useDepsChanged } from '@/hooks/useDepsChanged';
+import { PendingInvitationBanner } from '@/features/spaces/components/PendingInvitationBanner';
 import { spacing } from '@/theme/spacing';
-import { useThemedStyles } from '@/theme/useThemedStyles';
+import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
+import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type InvitePartnerScreenProps = {
   coupleSpace: Space | null;
-  onClose: () => void;
+  onAcceptPendingInvitation?: (spaceId?: string) => Promise<void>;
+  onCancel?: () => void;
+  onFinished: () => void;
   onCreateCoupleSpaceInvitation: (
     inviteeEmail: string,
     name?: string,
   ) => Promise<Space>;
-  visible: boolean;
+  onOpenCountrySettings?: () => void;
 };
 
-type Phase =
-  | { kind: 'idle' }
-  | { kind: 'entering-email' }
-  | { kind: 'sending-invitation' }
-  | { kind: 'invitation-created' }
-  | { kind: 'invitee-not-registered' }
-  | { kind: 'error'; message: string };
+type Phase = 'email' | 'sending' | 'sent' | 'invitee-not-registered' | 'error';
 
 /**
- * Anfitrión de "crear espacio de pareja e invitar", siguiendo el mismo
- * patrón de `AppModal` a pantalla completa que `DataRightsScreen`. Cubre dos
- * casos según si `coupleSpace` ya existe: crear el espacio o dirigir una
- * invitación al correo de una cuenta existente. No genera enlaces manuales.
+ * Flujo a pantalla completa para crear el espacio de pareja y enviar la
+ * invitación. La creación remota no empieza hasta confirmar el correo.
  */
 export function InvitePartnerScreen({
   coupleSpace,
-  onClose,
+  onAcceptPendingInvitation,
+  onCancel,
+  onFinished,
   onCreateCoupleSpaceInvitation,
-  visible,
+  onOpenCountrySettings,
 }: InvitePartnerScreenProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  const [error, setError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>('email');
+  const isBusy = phase === 'sending';
+  const isEmailStep =
+    phase === 'email' || phase === 'sending' || phase === 'error';
 
-  if (useDepsChanged([visible]) && visible) {
-    setEmail('');
-    setEmailError(null);
-    setPhase({ kind: 'idle' });
-  }
-
-  const countryChangeNotice = useCountryChangeNotice(
-    visible,
-    coupleSpace !== null,
-  );
-  const createLabel = countryChangeNotice
-    ? 'Invitar a otra persona'
-    : 'Crear espacio de pareja';
-  const isBusy = phase.kind === 'sending-invitation';
-
-  const handleClose = () => {
-    setPhase({ kind: 'idle' });
-    onClose();
-  };
-
-  const handleContinueToEmail = () => {
-    // Todavía no se crea nada en la API. Cerrar desde el siguiente paso no
-    // puede dejar un espacio pendiente sin una invitación confirmada.
-    setPhase({ kind: 'entering-email' });
-  };
-
-  const handleCreateInAppInvitation = async () => {
+  const sendInvitation = async () => {
     const trimmedEmail = email.trim();
     if (!isValidEmail(trimmedEmail)) {
       setEmailError('Ingresa un correo válido.');
       return;
     }
+
     setEmailError(null);
-    setPhase({ kind: 'sending-invitation' });
+    setError(null);
+    setPhase('sending');
     try {
       if (coupleSpace) {
-        const gateway = createJuntossInvitationGateway();
-        await gateway.createInvitation(coupleSpace.id, trimmedEmail);
+        await createJuntossInvitationGateway().createInvitation(
+          coupleSpace.id,
+          trimmedEmail,
+        );
       } else {
         await onCreateCoupleSpaceInvitation(trimmedEmail);
       }
-      setPhase({ kind: 'invitation-created' });
+      setPhase('sent');
     } catch (caught) {
       if (
         caught instanceof CreateInvitationError &&
         caught.code === 'invitee_not_registered'
       ) {
-        setPhase({ kind: 'invitee-not-registered' });
+        setPhase('invitee-not-registered');
         return;
       }
-      setPhase({
-        kind: 'error',
-        message:
-          caught instanceof Error
-            ? caught.message
-            : 'No pudimos crear la invitación.',
-      });
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'No pudimos crear la invitación.',
+      );
+      setPhase('error');
     }
   };
 
   return (
-    <AppModal
-      containsScrollable
-      onClose={handleClose}
-      stackBehavior="push"
-      testID="invite-partner-screen"
-      variant="expanded"
-      visible={visible}
+    <ScrollView
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      style={styles.screen}
     >
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text accessibilityRole="header" variant="heading">
-              Espacio de pareja
-            </Text>
-            <Text tone="secondary" variant="label">
-              {coupleSpace
-                ? 'Escribe el correo asociado a la cuenta de tu pareja.'
-                : phase.kind !== 'idle'
-                  ? 'Escribe el correo asociado a la cuenta de tu pareja.'
-                  : countryChangeNotice
-                    ? 'Has salido de tu espacio compartido.'
-                    : 'Crea un espacio para compartir movimientos con tu pareja.'}
-            </Text>
-          </View>
-          <ModalCloseButton onPress={handleClose} />
-        </View>
-
-        {!coupleSpace && phase.kind === 'idle' ? (
-          <View style={styles.creationContent}>
-            {countryChangeNotice ? (
-              <Text tone="secondary" variant="body">
-                Saliste automáticamente al cambiar de país: ambos deben tener el
-                mismo país configurado. Para volver al espacio anterior,
-                configura de nuevo {countryChangeNotice.previousCountryName} y
-                pide una nueva invitación a la persona que sigue dentro.
-              </Text>
-            ) : (
-              <Image
-                accessible={false}
-                resizeMode="contain"
-                source={require('../../../../assets/Onboarding/Happy_Couple.png')}
-                style={styles.coupleIllustration}
-                testID="invite-partner-couple-illustration"
+      {isEmailStep ? (
+        <View style={styles.stage}>
+          <HomeEntrance key="email-stage">
+            {onAcceptPendingInvitation && onOpenCountrySettings ? (
+              <PendingInvitationBanner
+                onAccepted={onAcceptPendingInvitation}
+                onOpenCountrySettings={onOpenCountrySettings}
               />
-            )}
-            <Text tone="secondary" variant="body">
-              {countryChangeNotice
-                ? 'También puedes crear un nuevo espacio con alguien que tenga configurado tu país actual.'
-                : 'El espacio se activará cuando la otra persona acepte la invitación dentro de Juntoss.'}
-            </Text>
-            <ModalPrimaryAction
-              accessibilityLabel={createLabel}
-              disabled={isBusy}
-              label={createLabel}
-              onPress={handleContinueToEmail}
-              testID="invite-partner-create-space"
-              variant="cta"
+            ) : null}
+            <Image
+              accessible={false}
+              resizeMode="contain"
+              source={require('../../../../assets/Onboarding/Happy_Couple.png')}
+              style={styles.coupleIllustration}
+              testID="invite-partner-couple-illustration"
             />
-          </View>
-        ) : phase.kind !== 'invitation-created' &&
-          phase.kind !== 'invitee-not-registered' ? (
-          <View style={styles.body}>
-            <View style={styles.field}>
-              <AuthTextField
-                autoComplete="email"
-                editable={!isBusy}
-                error={emailError}
-                keyboardType="email-address"
-                label="Correo de tu pareja"
-                onChangeText={setEmail}
-                placeholder="tucorreo@ejemplo.com"
-                testID="invite-partner-email"
-                value={email}
-              />
+            <View style={styles.copy}>
+              <Text variant="title">¿A quién quieres invitar?</Text>
+              <Text tone="secondary" variant="body">
+                Escribe el correo asociado a su cuenta de Juntoss.
+              </Text>
+            </View>
+            <AuthTextField
+              autoComplete="email"
+              accessibilityLabel="Correo de tu pareja"
+              editable={!isBusy}
+              error={emailError}
+              keyboardType="email-address"
+              onChangeText={setEmail}
+              placeholder="tucorreo@ejemplo.com"
+              testID="invite-partner-email"
+              value={email}
+            />
+            {error ? (
+              <Text tone="expense" variant="footnote">
+                {error}
+              </Text>
+            ) : null}
+            {onCancel ? (
+              <View style={styles.actionsRow}>
+                <ModalPrimaryAction
+                  accessibilityLabel="Cancelar"
+                  disabled={isBusy}
+                  label="Cancelar"
+                  onPress={onCancel}
+                  style={styles.actionButton}
+                  variant="surface"
+                />
+                <ModalPrimaryAction
+                  accessibilityLabel="Enviar invitación por correo"
+                  disabled={isBusy}
+                  label={isBusy ? 'Enviando…' : 'Enviar invitación'}
+                  onPress={() => void sendInvitation()}
+                  style={styles.actionButton}
+                  testID="invite-partner-send-email"
+                  variant="cta"
+                />
+              </View>
+            ) : (
               <ModalPrimaryAction
                 accessibilityLabel="Enviar invitación por correo"
                 disabled={isBusy}
-                label={
-                  phase.kind === 'sending-invitation'
-                    ? 'Enviando…'
-                    : 'Enviar invitación'
-                }
-                onPress={() => void handleCreateInAppInvitation()}
+                label={isBusy ? 'Enviando…' : 'Enviar invitación'}
+                onPress={() => void sendInvitation()}
                 testID="invite-partner-send-email"
                 variant="cta"
               />
-            </View>
-          </View>
-        ) : null}
+            )}
+          </HomeEntrance>
+        </View>
+      ) : null}
 
-        {phase.kind === 'error' ? (
-          <Text tone="expense" variant="footnote">
-            {phase.message}
-          </Text>
-        ) : null}
-        {phase.kind === 'invitation-created' ? (
-          <View style={styles.feedbackPanel}>
-            <Ionicons
-              accessibilityElementsHidden
-              color={colors.income}
-              importantForAccessibility="no-hide-descendants"
-              name="checkmark-circle"
-              size={48}
-              style={styles.feedbackIcon}
+      {phase === 'sent' ? (
+        <View style={styles.stage}>
+          <HomeEntrance key="sent-stage">
+            <Image
+              accessible={false}
+              resizeMode="contain"
+              source={require('../../../../assets/Approve icon.png')}
+              style={styles.successIcon}
+              testID="invite-partner-success-icon"
             />
-            <Text align="center" accessibilityRole="header" variant="heading">
-              ¡Invitación enviada!
-            </Text>
-            <Text align="center" tone="secondary" variant="body">
-              La invitación ya está dentro de Juntoss. También recibirá un aviso
-              si tiene las notificaciones activadas.
-            </Text>
+            <View style={styles.copy}>
+              <Text align="center" variant="title">
+                ¡Invitación enviada!
+              </Text>
+              <Text align="center" tone="secondary" variant="body">
+                La invitación ya está dentro de Juntoss. También recibirá un
+                aviso si tiene las notificaciones activadas.
+              </Text>
+            </View>
             <ModalPrimaryAction
-              accessibilityLabel="Aceptar"
-              label="Aceptar"
-              onPress={handleClose}
+              accessibilityLabel="Ver espacio Juntos"
+              label="Ver espacio Juntos"
+              onPress={onFinished}
               variant="cta"
             />
-          </View>
-        ) : null}
-        {phase.kind === 'invitee-not-registered' ? (
-          <View style={styles.feedbackPanel}>
+          </HomeEntrance>
+        </View>
+      ) : null}
+
+      {phase === 'invitee-not-registered' ? (
+        <View style={styles.stage}>
+          <HomeEntrance key="not-registered-stage">
             <Ionicons
-              accessibilityElementsHidden
               color={colors.expense}
-              importantForAccessibility="no-hide-descendants"
               name="alert-circle"
-              size={48}
+              size={64}
               style={styles.feedbackIcon}
             />
-            <Text align="center" accessibilityRole="header" variant="heading">
-              No encontramos esa cuenta
-            </Text>
-            <Text align="center" tone="secondary" variant="body">
-              Revisa que esté bien escrito. Si esa persona todavía no usa
-              Juntoss, pídele que descargue la app y cree una cuenta con ese
-              correo antes de volver a intentarlo.
-            </Text>
-            <ModalPrimaryAction
-              accessibilityLabel="Aceptar"
-              label="Aceptar"
-              onPress={() => setPhase({ kind: 'idle' })}
-              variant="cta"
-            />
-          </View>
-        ) : null}
-      </View>
-    </AppModal>
+            <View style={styles.copy}>
+              <Text align="center" variant="title">
+                No encontramos esa cuenta
+              </Text>
+              <Text align="center" tone="secondary" variant="body">
+                Revisa el correo. Si esa persona todavía no usa Juntoss, pídele
+                que descargue la app y cree una cuenta antes de volver a
+                intentarlo.
+              </Text>
+            </View>
+            {onCancel ? (
+              <View style={styles.actionsRow}>
+                <ModalPrimaryAction
+                  accessibilityLabel="Cancelar"
+                  label="Cancelar"
+                  onPress={onCancel}
+                  style={styles.actionButton}
+                  variant="surface"
+                />
+                <ModalPrimaryAction
+                  accessibilityLabel="Corregir correo"
+                  label="Corregir correo"
+                  onPress={() => setPhase('email')}
+                  style={styles.actionButton}
+                  variant="cta"
+                />
+              </View>
+            ) : (
+              <ModalPrimaryAction
+                accessibilityLabel="Corregir correo"
+                label="Corregir correo"
+                onPress={() => setPhase('email')}
+                variant="cta"
+              />
+            )}
+          </HomeEntrance>
+        </View>
+      ) : null}
+    </ScrollView>
   );
 }
 
-function createStyles() {
+function createStyles(colors: ColorTokens) {
   return StyleSheet.create({
-    container: { flex: 1, gap: spacing.lg },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: spacing.md,
+    screen: { flex: 1, backgroundColor: colors.background },
+    content: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingBottom: spacing.xxl,
+      paddingHorizontal: spacing.xl,
+      paddingTop: 112,
     },
-    headerText: { flex: 1, gap: spacing.xs },
+    stage: {
+      alignSelf: 'center',
+      gap: spacing.lg,
+      maxWidth: 520,
+      width: '100%',
+    },
     coupleIllustration: {
       alignSelf: 'center',
-      height: 220,
-      width: 220,
+      height: 192,
+      width: 224,
     },
-    creationContent: { gap: spacing.md },
-    body: { gap: spacing.md },
-    field: { gap: spacing.md },
-    feedbackPanel: { gap: spacing.lg, paddingVertical: spacing.xxl },
+    copy: { gap: spacing.md },
     feedbackIcon: { alignSelf: 'center' },
+    successIcon: {
+      alignSelf: 'center',
+      height: 64,
+      width: 64,
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    actionButton: {
+      flex: 1,
+    },
   });
 }

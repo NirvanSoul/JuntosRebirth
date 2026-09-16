@@ -22,6 +22,8 @@ const spacesStorageKey = '@juntoss/spaces/v1';
  * pareja". Todas las escrituras pasan por aquí, en orden.
  */
 let writeQueue: Promise<unknown> = Promise.resolve();
+let catalogueRevision = 0;
+const spacesListeners = new Set<(state: SpacesState) => void>();
 
 function enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
   const run = writeQueue.then(task, task);
@@ -102,6 +104,25 @@ async function resolveSeedCurrency(): Promise<CurrencyCode> {
     : defaultCurrencyCode;
 }
 
+function resolveStoredActiveSpaceId(
+  spaces: readonly Space[],
+  candidate: unknown,
+): string {
+  if (
+    typeof candidate === 'string' &&
+    spaces.some((space) => space.id === candidate)
+  ) {
+    return candidate;
+  }
+
+  const fallback =
+    spaces.find((space) => space.type === 'personal') ?? spaces[0];
+  if (!fallback) {
+    throw new Error('El catálogo de espacios guardado no es válido');
+  }
+  return fallback.id;
+}
+
 /** Lectura sin cola: la usan la cola misma y `loadSpaces`. */
 async function readSpaces(): Promise<SpacesState> {
   const stored = await AsyncStorage.getItem(spacesStorageKey);
@@ -112,7 +133,7 @@ async function readSpaces(): Promise<SpacesState> {
       activeSpaceId: personalSpace.id,
       spaces: [{ ...personalSpace, currency: seedCurrency }],
     };
-    await writeSpaces(initialState);
+    await writeSpaces(initialState, false);
     return initialState;
   }
 
@@ -129,16 +150,22 @@ async function readSpaces(): Promise<SpacesState> {
     if (
       !Array.isArray(candidate.spaces) ||
       !candidate.spaces.every(isSpace) ||
-      typeof candidate.activeSpaceId !== 'string' ||
-      !candidate.spaces.some((space) => space.id === candidate.activeSpaceId)
+      candidate.spaces.length === 0
     ) {
       throw new Error('El catálogo de espacios guardado no es válido');
     }
 
-    return {
-      activeSpaceId: candidate.activeSpaceId,
+    const state: SpacesState = {
+      activeSpaceId: resolveStoredActiveSpaceId(
+        candidate.spaces,
+        candidate.activeSpaceId,
+      ),
       spaces: candidate.spaces,
     };
+    if (state.activeSpaceId !== candidate.activeSpaceId) {
+      await writeSpaces(state, false);
+    }
+    return state;
   }
 
   // Payload v1 histórico: consulta preferencias para la semilla y persiste versión 2
@@ -147,8 +174,7 @@ async function readSpaces(): Promise<SpacesState> {
     if (
       !Array.isArray(candidate.spaces) ||
       !candidate.spaces.every(isLegacyV1Space) ||
-      typeof candidate.activeSpaceId !== 'string' ||
-      !candidate.spaces.some((space) => space.id === candidate.activeSpaceId)
+      candidate.spaces.length === 0
     ) {
       throw new Error('El catálogo de espacios guardado no es válido');
     }
@@ -173,17 +199,23 @@ async function readSpaces(): Promise<SpacesState> {
     });
 
     const migratedState: SpacesState = {
-      activeSpaceId: candidate.activeSpaceId,
+      activeSpaceId: resolveStoredActiveSpaceId(
+        migratedSpaces,
+        candidate.activeSpaceId,
+      ),
       spaces: migratedSpaces,
     };
-    await writeSpaces(migratedState);
+    await writeSpaces(migratedState, false);
     return migratedState;
   }
 
   throw new Error('El catálogo de espacios guardado no es válido');
 }
 
-async function writeSpaces(state: SpacesState): Promise<void> {
+async function writeSpaces(
+  state: SpacesState,
+  catalogueChanged = true,
+): Promise<void> {
   const stored: StoredSpacesState = {
     version: 2,
     activeSpaceId: state.activeSpaceId,
@@ -191,6 +223,14 @@ async function writeSpaces(state: SpacesState): Promise<void> {
   };
 
   await AsyncStorage.setItem(spacesStorageKey, JSON.stringify(stored));
+  if (catalogueChanged) catalogueRevision += 1;
+  for (const listener of spacesListeners) {
+    try {
+      listener(state);
+    } catch (error) {
+      console.error('[spaces] No se pudo publicar el catálogo local:', error);
+    }
+  }
 }
 
 export function loadSpaces(): Promise<SpacesState> {
@@ -203,6 +243,18 @@ export function saveSpaces(state: SpacesState): Promise<void> {
   return enqueueWrite(() => writeSpaces(state));
 }
 
+export function getSpacesCatalogueRevision(): number {
+  return catalogueRevision;
+}
+
+type UpdateSpacesOptions = {
+  /**
+   * Omite una respuesta remota si el catálogo cambió desde que empezó su
+   * petición. Cambiar únicamente la selección activa no invalida la respuesta.
+   */
+  ifCatalogueRevision?: number;
+};
+
 /**
  * Lee, transforma y guarda el catálogo como una sola operación de la cola.
  * Quien fusiona datos remotos debe partir de lo guardado en ese instante, no
@@ -211,13 +263,33 @@ export function saveSpaces(state: SpacesState): Promise<void> {
  */
 export function updateSpaces(
   mutate: (stored: SpacesState) => SpacesState,
+  options: UpdateSpacesOptions = {},
 ): Promise<SpacesState> {
   return enqueueWrite(async () => {
     const stored = await readSpaces();
+    if (
+      options.ifCatalogueRevision !== undefined &&
+      options.ifCatalogueRevision !== catalogueRevision
+    ) {
+      return stored;
+    }
     const next = mutate(stored);
-    if (next !== stored) await writeSpaces(next);
+    if (next !== stored) {
+      await writeSpaces(next, next.spaces !== stored.spaces);
+    }
     return next;
   });
+}
+
+/**
+ * Mantiene sincronizadas las copias en memoria con cualquier escritura del
+ * catálogo, incluida una restauración iniciada fuera de `useSpaces`.
+ */
+export function subscribeToSpaces(
+  listener: (state: SpacesState) => void,
+): () => void {
+  spacesListeners.add(listener);
+  return () => spacesListeners.delete(listener);
 }
 
 export function createSpaceId(): string {

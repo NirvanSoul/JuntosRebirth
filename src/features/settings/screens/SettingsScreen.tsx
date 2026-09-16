@@ -4,12 +4,10 @@ import { Alarm } from 'phosphor-react-native/src/icons/Alarm';
 import { ChartLineUp } from 'phosphor-react-native/src/icons/ChartLineUp';
 import { Coins } from 'phosphor-react-native/src/icons/Coins';
 import { DeviceMobile } from 'phosphor-react-native/src/icons/DeviceMobile';
-import { EnvelopeSimple } from 'phosphor-react-native/src/icons/EnvelopeSimple';
 import { FileText } from 'phosphor-react-native/src/icons/FileText';
 import { Key } from 'phosphor-react-native/src/icons/Key';
 import { MapPin } from 'phosphor-react-native/src/icons/MapPin';
 import { MoonStars } from 'phosphor-react-native/src/icons/MoonStars';
-import { ShieldCheck } from 'phosphor-react-native/src/icons/ShieldCheck';
 import { SlidersHorizontal } from 'phosphor-react-native/src/icons/SlidersHorizontal';
 import { Trash } from 'phosphor-react-native/src/icons/Trash';
 import { useEffect, useRef, useState } from 'react';
@@ -27,6 +25,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -49,12 +48,15 @@ import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScree
 import { PermissionsScreen } from '@/features/legal/screens/PermissionsScreen';
 import { PrivacyChoicesScreen } from '@/features/legal/screens/PrivacyChoicesScreen';
 import { PrivacyLegalScreen } from '@/features/legal/screens/PrivacyLegalScreen';
+import { useOnboardingRestart } from '@/features/onboarding/context/OnboardingRestartContext';
 import { CountryPreferencesModal } from '@/features/settings/components/CountryPreferencesModal/CountryPreferencesModal';
 import { CountryChangeBlockedModal } from '@/features/settings/components/CountryPreferencesModal/CountryChangeBlockedModal';
 import { CountryChangeSharedSpaceWarningModal } from '@/features/settings/components/CountryPreferencesModal/CountryChangeSharedSpaceWarningModal';
+import { SettingsHelpSection } from '@/features/settings/components/SettingsHelpSection/SettingsHelpSection';
 import { saveCountryChangeNotice } from '@/features/spaces/repositories/countryChangeNoticeRepository';
 import { ProfileHeader } from '@/features/settings/components/ProfileHeader/ProfileHeader';
 import { CurrencyPreferencesModal } from '@/features/settings/components/CurrencyPreferencesModal/CurrencyPreferencesModal';
+import { useSettingsBackSwipe } from '@/features/settings/hooks/useSettingsBackSwipe';
 import { useProfileCountry } from '@/features/profile/hooks/useProfileCountry';
 import type { Space } from '@/features/spaces/types';
 import { NotificationRulesModal } from '@/features/transactions/components/NotificationRulesModal/NotificationRulesModal';
@@ -125,6 +127,7 @@ export function SettingsScreen({
   const { colors, isDark, setAppearance, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const { session } = useAuthSession();
+  const resetOnboarding = useOnboardingRestart();
   const {
     countryCode,
     error: countryError,
@@ -172,6 +175,7 @@ export function SettingsScreen({
   )
     ? 'Activadas'
     : 'Desactivadas';
+  const backSwipeGesture = useSettingsBackSwipe(onBack);
 
   useEffect(() => {
     if (coupleSpaceExit.step !== 'confirming') {
@@ -254,7 +258,7 @@ export function SettingsScreen({
     ]);
   };
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (afterSignOut?: () => Promise<void>) => {
     if (isSigningOut) return;
     setSigningOut(true);
     try {
@@ -267,6 +271,7 @@ export function SettingsScreen({
           );
         },
       );
+      await afterSignOut?.();
     } catch {
       Alert.alert(
         'No pudimos cerrar sesión',
@@ -297,234 +302,234 @@ export function SettingsScreen({
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[0]}
-        testID="settings-screen"
-      >
-        <View style={styles.header} testID="settings-header">
-          <Pressable
-            accessibilityLabel="Volver"
-            accessibilityRole="button"
-            hitSlop={spacing.sm}
-            onPress={onBack}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed ? styles.rowPressed : null,
-            ]}
-          >
-            <Ionicons
-              color={colors.textPrimary}
-              name="arrow-back"
-              size={iconSize.md}
-              style={styles.backGlyphEmphasized}
-              testID="settings-back-icon"
-            />
-          </Pressable>
-          <Text
-            accessibilityRole="header"
-            testID="settings-title"
-            variant="heading"
-          >
-            Ajustes
-          </Text>
-        </View>
-
-        <ProfileHeader />
-
-        <SettingsSection
-          emphasizeIcon={false}
-          icon="person-circle-outline"
-          title="Cuenta"
-        >
-          <SettingsRow
-            icon="log-out-outline"
-            iconBackgroundColor={categoryColors.blue}
-            label="Cerrar sesión"
-            onPress={handleAccountRowPress}
-            value={session?.user.email ?? undefined}
-          />
-        </SettingsSection>
-
-        <SettingsSection
-          emphasizeIcon={false}
-          icon="options-outline"
-          title="Preferencias"
-        >
-          <SettingsRow
-            iconComponent={Coins}
-            iconBackgroundColor={categoryColors.green}
-            label="Moneda"
-            onPress={
-              isVenezuela ? undefined : () => setCurrencyModalVisible(true)
-            }
-            value={currencyValueLabel}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            iconComponent={MapPin}
-            iconBackgroundColor={categoryColors.blue}
-            label="País"
-            onPress={() => setCountryModalVisible(true)}
-            value={countryValueLabel}
-          />
-          <SettingsDivider />
-          <SettingsToggleRow
-            description="Compara con el mes anterior"
-            enabled={showHomeComparisonIndicators}
-            iconComponent={ChartLineUp}
-            iconBackgroundColor={categoryColors.green}
-            label="Comparación en Inicio"
-            onToggle={onToggleHomeComparisonIndicators}
-            testID="home-comparison-toggle"
-          />
-          <SettingsDivider />
-          <SettingsRow
-            icon="language-outline"
-            iconBackgroundColor={categoryColors.blue}
-            label="Idioma"
-            onPress={showPendingNotice}
-            pending
-            value="Español"
-          />
-          <SettingsDivider />
-          <SettingsToggleRow
-            description="Usa una interfaz oscura"
-            enabled={isDark}
-            iconComponent={MoonStars}
-            iconBackgroundColor={categoryColors.blue}
-            label="Modo oscuro"
-            onToggle={(enabled) => {
-              void setAppearance(enabled ? 'dark' : 'light');
-            }}
-            testID="dark-mode-toggle"
-          />
-        </SettingsSection>
-
-        <SettingsSection icon="notifications-outline" title="Notificaciones">
-          <SettingsRow
-            iconComponent={Alarm}
-            iconBackgroundColor={categoryColors.pink}
-            label="Recordatorios y alertas"
-            onPress={() => setNotificationRulesModalVisible(true)}
-            value={notificationRulesValueLabel}
-          />
-        </SettingsSection>
-
-        <SettingsSection icon="lock-closed-outline" title="Datos y privacidad">
-          <SettingsRow
-            iconComponent={DeviceMobile}
-            iconBackgroundColor={categoryColors.violet}
-            label="Estado de los datos"
-            onPress={() => setDataRightsVisible(true)}
-            value="Guardados en este dispositivo"
-          />
-          <SettingsDivider />
-          <SettingsRow
-            iconComponent={FileText}
-            iconBackgroundColor={categoryColors.violet}
-            label="Cómo usamos tus datos"
-            onPress={() => setDataUsageDocVisible(true)}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            iconComponent={SlidersHorizontal}
-            iconBackgroundColor={categoryColors.green}
-            label="Preferencias de privacidad"
-            onPress={() => setPrivacyChoicesVisible(true)}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            iconComponent={Key}
-            iconBackgroundColor={categoryColors.blue}
-            label="Permisos de la aplicación"
-            onPress={() => setPermissionsVisible(true)}
-          />
-        </SettingsSection>
-
-        {activeSpaceType === 'couple' ? (
-          <SettingsSection icon="people-outline" title="Espacio de pareja">
-            <SettingsRow
-              destructive
-              iconComponent={Trash}
-              iconBackgroundColor={categoryColors.red}
-              label="Salir del espacio de pareja"
-              onPress={() => setCoupleSpaceExit({ step: 'confirming' })}
-            />
-          </SettingsSection>
-        ) : null}
-
-        {activeSpaceType === 'couple' &&
-        coupleSpaceExit.step === 'confirming' ? (
-          <View style={styles.warningCard}>
-            <Text tone="expense" variant="bodyStrong" weight="semibold">
-              Saldrás de este espacio
+      <GestureDetector gesture={backSwipeGesture}>
+        <View style={styles.screenContent}>
+          <View style={styles.header} testID="settings-header">
+            <Pressable
+              accessibilityLabel="Volver"
+              accessibilityRole="button"
+              hitSlop={spacing.sm}
+              onPress={onBack}
+              style={({ pressed }) => [
+                styles.backButton,
+                pressed ? styles.rowPressed : null,
+              ]}
+            >
+              <Ionicons
+                color={colors.textPrimary}
+                name="arrow-back"
+                size={iconSize.md}
+                style={styles.backGlyphEmphasized}
+                testID="settings-back-icon"
+              />
+            </Pressable>
+            <Text
+              accessibilityRole="header"
+              testID="settings-title"
+              variant="heading"
+            >
+              Ajustes
             </Text>
-            <Text tone="secondary" variant="label">
-              Dejarás de tener acceso a sus movimientos y categorías. Si ambas
-              personas salen, el espacio se eliminará automáticamente.
-            </Text>
-            <View style={styles.progressTrack}>
-              <Animated.View
-                style={[styles.progressFill, coupleSpaceExitProgressStyle]}
-              />
-            </View>
-            <View style={styles.actionsRow}>
-              <ModalPrimaryAction
-                accessibilityLabel="Cancelar salida del espacio de pareja"
-                label="Cancelar"
-                onPress={() => setCoupleSpaceExit({ step: 'idle' })}
-                style={styles.actionButton}
-                variant="surface"
-              />
-              <ModalPrimaryAction
-                accessibilityLabel={
-                  coupleSpaceExitSecondsRemaining > 0
-                    ? `Espera ${coupleSpaceExitSecondsRemaining} segundos para confirmar la salida`
-                    : 'Confirmar salida del espacio de pareja'
-                }
-                disabled={coupleSpaceExitSecondsRemaining > 0}
-                label={
-                  coupleSpaceExitSecondsRemaining > 0
-                    ? `Espera (${coupleSpaceExitSecondsRemaining})`
-                    : 'Sí, salir'
-                }
-                onPress={handleConfirmLeaveCoupleSpace}
-                style={[styles.actionButton, styles.destructiveButton]}
-                testID="confirm-couple-space-exit"
-                variant="cta"
-              />
-            </View>
           </View>
-        ) : null}
 
-        {activeSpaceType === 'couple' && coupleSpaceExit.step === 'error' ? (
-          <Text tone="expense" variant="footnote">
-            {coupleSpaceExit.message}
-          </Text>
-        ) : null}
+          <ScrollView
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            testID="settings-screen"
+          >
+            <ProfileHeader />
 
-        <SettingsSection icon="help-circle-outline" title="Ayuda">
-          <SettingsRow
-            iconComponent={EnvelopeSimple}
-            iconBackgroundColor={categoryColors.brown}
-            label="Contactar con el desarrollador"
-            onPress={handleContactDeveloper}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            iconComponent={ShieldCheck}
-            iconBackgroundColor={categoryColors.violet}
-            label="Política de privacidad"
-            onPress={() => setPrivacyModalVisible(true)}
-          />
-        </SettingsSection>
+            <SettingsSection
+              emphasizeIcon={false}
+              icon="person-circle-outline"
+              title="Cuenta"
+            >
+              <SettingsRow
+                icon="log-out-outline"
+                iconBackgroundColor={categoryColors.blue}
+                label="Cerrar sesión"
+                onPress={handleAccountRowPress}
+                value={session?.user.email ?? undefined}
+              />
+            </SettingsSection>
 
-        <Text align="center" tone="muted" variant="caption">
-          juntoss 0.1.0
-        </Text>
-      </ScrollView>
+            <SettingsSection
+              emphasizeIcon={false}
+              icon="options-outline"
+              title="Preferencias"
+            >
+              <SettingsRow
+                iconComponent={Coins}
+                iconBackgroundColor={categoryColors.green}
+                label="Moneda"
+                onPress={
+                  isVenezuela ? undefined : () => setCurrencyModalVisible(true)
+                }
+                value={currencyValueLabel}
+              />
+              <SettingsDivider />
+              <SettingsRow
+                iconComponent={MapPin}
+                iconBackgroundColor={categoryColors.blue}
+                label="País"
+                onPress={() => setCountryModalVisible(true)}
+                value={countryValueLabel}
+              />
+              <SettingsDivider />
+              <SettingsToggleRow
+                description="Compara con el mes anterior"
+                enabled={showHomeComparisonIndicators}
+                iconComponent={ChartLineUp}
+                iconBackgroundColor={categoryColors.green}
+                label="Comparación en Inicio"
+                onToggle={onToggleHomeComparisonIndicators}
+                testID="home-comparison-toggle"
+              />
+              <SettingsDivider />
+              <SettingsRow
+                icon="language-outline"
+                iconBackgroundColor={categoryColors.blue}
+                label="Idioma"
+                onPress={showPendingNotice}
+                pending
+                value="Español"
+              />
+              <SettingsDivider />
+              <SettingsToggleRow
+                description="Usa una interfaz oscura"
+                enabled={isDark}
+                iconComponent={MoonStars}
+                iconBackgroundColor={categoryColors.blue}
+                label="Modo oscuro"
+                onToggle={(enabled) => {
+                  void setAppearance(enabled ? 'dark' : 'light');
+                }}
+                testID="dark-mode-toggle"
+              />
+            </SettingsSection>
+
+            <SettingsSection
+              icon="notifications-outline"
+              title="Notificaciones"
+            >
+              <SettingsRow
+                iconComponent={Alarm}
+                iconBackgroundColor={categoryColors.pink}
+                label="Recordatorios y alertas"
+                onPress={() => setNotificationRulesModalVisible(true)}
+                value={notificationRulesValueLabel}
+              />
+            </SettingsSection>
+
+            <SettingsSection
+              icon="lock-closed-outline"
+              title="Datos y privacidad"
+            >
+              <SettingsRow
+                iconComponent={DeviceMobile}
+                iconBackgroundColor={categoryColors.violet}
+                label="Estado de los datos"
+                onPress={() => setDataRightsVisible(true)}
+                value="Guardados en este dispositivo"
+              />
+              <SettingsDivider />
+              <SettingsRow
+                iconComponent={FileText}
+                iconBackgroundColor={categoryColors.violet}
+                label="Cómo usamos tus datos"
+                onPress={() => setDataUsageDocVisible(true)}
+              />
+              <SettingsDivider />
+              <SettingsRow
+                iconComponent={SlidersHorizontal}
+                iconBackgroundColor={categoryColors.green}
+                label="Preferencias de privacidad"
+                onPress={() => setPrivacyChoicesVisible(true)}
+              />
+              <SettingsDivider />
+              <SettingsRow
+                iconComponent={Key}
+                iconBackgroundColor={categoryColors.blue}
+                label="Permisos de la aplicación"
+                onPress={() => setPermissionsVisible(true)}
+              />
+            </SettingsSection>
+
+            {activeSpaceType === 'couple' ? (
+              <SettingsSection icon="people-outline" title="Espacio de pareja">
+                <SettingsRow
+                  destructive
+                  iconComponent={Trash}
+                  iconBackgroundColor={categoryColors.red}
+                  label="Salir del espacio de pareja"
+                  onPress={() => setCoupleSpaceExit({ step: 'confirming' })}
+                />
+              </SettingsSection>
+            ) : null}
+
+            {activeSpaceType === 'couple' &&
+            coupleSpaceExit.step === 'confirming' ? (
+              <View style={styles.warningCard}>
+                <Text tone="expense" variant="bodyStrong" weight="semibold">
+                  Saldrás de este espacio
+                </Text>
+                <Text tone="secondary" variant="label">
+                  Dejarás de tener acceso a sus movimientos y categorías. Si
+                  ambas personas salen, el espacio se eliminará automáticamente.
+                </Text>
+                <View style={styles.progressTrack}>
+                  <Animated.View
+                    style={[styles.progressFill, coupleSpaceExitProgressStyle]}
+                  />
+                </View>
+                <View style={styles.actionsRow}>
+                  <ModalPrimaryAction
+                    accessibilityLabel="Cancelar salida del espacio de pareja"
+                    label="Cancelar"
+                    onPress={() => setCoupleSpaceExit({ step: 'idle' })}
+                    style={styles.actionButton}
+                    variant="surface"
+                  />
+                  <ModalPrimaryAction
+                    accessibilityLabel={
+                      coupleSpaceExitSecondsRemaining > 0
+                        ? `Espera ${coupleSpaceExitSecondsRemaining} segundos para confirmar la salida`
+                        : 'Confirmar salida del espacio de pareja'
+                    }
+                    disabled={coupleSpaceExitSecondsRemaining > 0}
+                    label={
+                      coupleSpaceExitSecondsRemaining > 0
+                        ? `Espera (${coupleSpaceExitSecondsRemaining})`
+                        : 'Sí, salir'
+                    }
+                    onPress={handleConfirmLeaveCoupleSpace}
+                    style={[styles.actionButton, styles.destructiveButton]}
+                    testID="confirm-couple-space-exit"
+                    variant="cta"
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            {activeSpaceType === 'couple' &&
+            coupleSpaceExit.step === 'error' ? (
+              <Text tone="expense" variant="footnote">
+                {coupleSpaceExit.message}
+              </Text>
+            ) : null}
+
+            <SettingsHelpSection
+              onContactDeveloper={handleContactDeveloper}
+              onOpenPrivacy={() => setPrivacyModalVisible(true)}
+              onRestartOnboarding={() => void handleSignOut(resetOnboarding)}
+            />
+
+            <Text align="center" tone="muted" variant="caption">
+              juntoss 0.1.0
+            </Text>
+          </ScrollView>
+        </View>
+      </GestureDetector>
 
       <CurrencyPreferencesModal
         onClose={() => setCurrencyModalVisible(false)}
@@ -631,6 +636,9 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       flex: 1,
       backgroundColor: colors.background,
     },
+    screenContent: {
+      flex: 1,
+    },
     content: {
       paddingHorizontal: spacing.xl,
       paddingBottom: spacing.huge,
@@ -642,6 +650,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       justifyContent: 'flex-start',
       gap: spacing.sm,
       backgroundColor: colors.background,
+      paddingHorizontal: spacing.xl,
       marginBottom: spacing.xl,
       marginTop: spacing.sm,
     },

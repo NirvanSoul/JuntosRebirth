@@ -7,14 +7,19 @@ import { renderWithTheme } from '@/test/renderWithTheme';
 import { colors } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
 
-jest.mock('@/components/overlays/AppModal/AppModal', () => ({
-  AppModal: ({
+const mockAppModal = jest.fn(
+  ({
     children,
     visible,
   }: {
+    backgroundVariant?: string;
     children: React.ReactNode;
     visible: boolean;
   }) => (visible ? children : null),
+);
+
+jest.mock('@/components/overlays/AppModal/AppModal', () => ({
+  AppModal: (props: Parameters<typeof mockAppModal>[0]) => mockAppModal(props),
 }));
 
 describe('QuickCreateMenu', () => {
@@ -22,6 +27,13 @@ describe('QuickCreateMenu', () => {
     const onSelect = jest.fn();
     const screen = await renderWithTheme(
       <QuickCreateMenu onClose={jest.fn()} onSelect={onSelect} visible />,
+    );
+
+    expect(mockAppModal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backgroundVariant: 'background',
+        visible: true,
+      }),
     );
 
     expect(await screen.findByLabelText('Crear ingreso')).toBeTruthy();

@@ -11,6 +11,7 @@ import { applyLocalProfileMigrations } from '@/lib/storage/localDatabaseProfileM
 import {
   ensureLocalProfileCountryCodeColumn,
   ensureLocalProfileDisplayNameColumn,
+  ensureLocalProfileDisplayNameSyncStatusColumn,
   ensureTransactionExchangeRateColumns,
 } from '@/lib/storage/localDatabaseSchemaRepair';
 
@@ -20,7 +21,7 @@ import {
  * versión, de modo que la escalera es acumulativa y ningún bloque se
  * reejecuta.
  */
-export const localDatabaseVersion = 30;
+export const localDatabaseVersion = 31;
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -51,6 +52,7 @@ export async function migrateLocalDatabase(
       await applyMoneyAccountMigrations(transaction, currentVersion);
     });
     await ensureLocalProfileDisplayNameColumn(database);
+    await ensureLocalProfileDisplayNameSyncStatusColumn(database);
     await ensureLocalProfileCountryCodeColumn(database);
     await ensureTransactionExchangeRateColumns(database);
     return;

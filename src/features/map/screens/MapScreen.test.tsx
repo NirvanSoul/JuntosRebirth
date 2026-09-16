@@ -324,12 +324,12 @@ describe('MapScreen', () => {
     await fireEvent.press(toggle);
     expect(await screen.findByTestId('map-calendar-scroll')).toBeTruthy();
     expect(await screen.findByTestId('map-calendar-view-monthly')).toBeTruthy();
-    expect(screen.getByLabelText('Vista Mensual')).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'Mapa' })).toBeTruthy();
     expect(
-      screen.getByText(
+      screen.queryByText(
         'Mira tus movimientos de forma mensual o semanal, toca un día para ver los detalles.',
       ),
-    ).toBeTruthy();
+    ).toBeNull();
 
     await fireEvent.press(screen.getByLabelText('Vista Mensual'));
     expect(screen.getByTestId('map-weekly-calendar')).toBeTruthy();

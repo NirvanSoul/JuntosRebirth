@@ -1,5 +1,5 @@
 import { File } from 'expo-file-system';
-import * as XLSX from 'xlsx';
+import type { WorkBook } from 'xlsx';
 
 import { findHeaderRowIndex } from '@/features/import/normalization/findHeaderRowIndex';
 import type { ParsedSheet } from '@/features/import/types';
@@ -29,7 +29,11 @@ export async function parseSpreadsheetFile(
     throw new SpreadsheetParseError('No pudimos leer el archivo seleccionado.');
   }
 
-  let workbook: XLSX.WorkBook;
+  // SheetJS pesa; Metro lo evalúa solo la primera vez que se importa un archivo.
+  // `import()` no está disponible en Jest sin módulos ESM, así que se usa `require`.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const XLSX: typeof import('xlsx') = require('xlsx');
+  let workbook: WorkBook;
   try {
     workbook = XLSX.read(base64, { type: 'base64' });
   } catch {

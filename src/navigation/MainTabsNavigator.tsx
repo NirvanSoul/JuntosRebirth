@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
@@ -11,6 +11,7 @@ import { AppTabBar } from '@/components/navigation/AppTabBar/AppTabBar';
 import { NoticeToast } from '@/components/overlays/NoticeToast/NoticeToast';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { ActivityTabContent } from '@/navigation/components/ActivityTabContent';
+import { HomeTabContent } from '@/navigation/components/HomeTabContent';
 import {
   getHomeCurrencyButtonLabel,
   resolveHomeCurrencies,
@@ -47,26 +48,23 @@ import {
   validateCategoryName,
 } from '@/features/categories/utils/categoryCatalog';
 import { HomeCurrencyPickerModal } from '@/features/dashboard/components/HomeCurrencyPickerModal/HomeCurrencyPickerModal';
-import { HomeScreen } from '@/features/dashboard/screens/HomeScreen';
 import { ImportScreen } from '@/features/import/screens/ImportScreen';
 import {
   MapScreen,
   type MapScreenHandle,
 } from '@/features/map/screens/MapScreen';
-import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
+import { SettingsDrawerContent } from '@/navigation/components/SettingsDrawerContent';
 import { useLocalDisplayName } from '@/features/profile/hooks/useLocalDisplayName';
 import { useSpaceMemberAvatars } from '@/features/profile/hooks/useSpaceMemberAvatars';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
 import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
-import { PendingInvitationBanner } from '@/features/spaces/components/PendingInvitationBanner';
+import { useCancelPendingInvitationAction } from '@/features/spaces/hooks/useCancelPendingInvitationAction';
 import { useSpaceCurrencies } from '@/features/spaces/hooks/useSpaceCurrencies';
 import { useCopyToSpace } from '@/features/spaces/hooks/useCopyToSpace';
 import { useCoupleSpacePublisher } from '@/features/spaces/hooks/useCoupleSpacePublisher';
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
 import { AcceptInvitationScreen } from '@/features/spaces/screens/AcceptInvitationScreen';
-import { AwaitingPartnerScreen } from '@/features/spaces/screens/AwaitingPartnerScreen';
-import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScreen';
 import { isAwaitingPartnerSpace } from '@/features/spaces/types';
 import { useFinanceSync } from '@/features/sync/hooks/useFinanceSync';
 import { SyncIssueToast } from '@/features/sync/components/SyncIssueToast';
@@ -75,6 +73,7 @@ import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPrefer
 import { useActivitySectionsPreference } from '@/state/appPreferences/useActivitySectionsPreference';
 import { useHomeComparisonIndicatorsPreference } from '@/state/appPreferences/useHomeComparisonIndicatorsPreference';
 import { useHomeCurrencySelection } from '@/state/appPreferences/useHomeCurrencySelection';
+import { useSaveErrorAlert } from '@/navigation/useSaveErrorAlert';
 import { CreateTransactionModal } from '@/features/transactions/components/CreateTransactionModal/CreateTransactionModal';
 import { TransactionDetailModal } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal';
 import type {
@@ -133,6 +132,7 @@ export function MainTabsNavigator() {
   const { colors } = useTheme();
   const {
     activeSpace,
+    cancelPendingCoupleInvitation,
     createCoupleSpaceInvitation,
     createSpace,
     leaveCoupleSpace,
@@ -164,9 +164,15 @@ export function MainTabsNavigator() {
 
   const [isInvitePartnerVisible, setInvitePartnerVisible] = useState(false);
   const coupleSpace = spaces.find((space) => space.type === 'couple') ?? null;
-  // Un espacio pendiente pausa sus datos compartidos hasta que la pareja acepte.
   const isAwaitingPartner = isAwaitingPartnerSpace(activeSpace);
+  const areSpaceActionsBlocked = isAwaitingPartner || isInvitePartnerVisible;
   const spaceMemberAvatarUris = useSpaceMemberAvatars(activeSpace);
+  const headerSpaceName = isInvitePartnerVisible
+    ? (coupleSpace?.name ?? 'Juntos')
+    : activeSpaceName;
+  const headerMemberAvatarUris = isInvitePartnerVisible
+    ? undefined
+    : spaceMemberAvatarUris;
   const {
     activeCurrencies,
     preferences: currencyPreferences,
@@ -186,8 +192,6 @@ export function MainTabsNavigator() {
   const [activeMainTab, setActiveMainTab] = useState<
     'Home' | 'Activity' | 'Map'
   >('Home');
-  // Se incrementan en cada foco de su pestaña para reiniciar la animación de
-  // revelado del arco de balance y del donut de categorías.
   const [homeChartResetKey, setHomeChartResetKey] = useState(0);
   const [activityChartResetKey, setActivityChartResetKey] = useState(0);
   const [isHomeCurrencyPickerVisible, setHomeCurrencyPickerVisible] =
@@ -444,12 +448,7 @@ export function MainTabsNavigator() {
     if (session) void refreshSharedCoupleData(undefined, { mode: 'delta' });
   });
 
-  const showSaveError = useCallback(() => {
-    Alert.alert(
-      'No pudimos guardar el cambio',
-      'Tus datos anteriores siguen intactos. Inténtalo de nuevo.',
-    );
-  }, []);
+  const showSaveError = useSaveErrorAlert();
 
   const handleHomeCurrencyPress = useHomeCurrencyPress({
     currencies: homeCurrencies,
@@ -459,24 +458,9 @@ export function MainTabsNavigator() {
     setSelectedCurrency: setSelectedHomeCurrency,
   });
 
-  const handleInvitePartner = useCallback(() => {
-    setInvitePartnerVisible(true);
-  }, []);
-
-  /** Al cancelar el espacio pendiente, el servidor lo elimina sin miembros. */
-  const handleCancelPendingCoupleSpace =
-    useCallback(async (): Promise<void> => {
-      try {
-        await leaveCoupleSpace();
-      } catch (caught) {
-        Alert.alert(
-          'No pudimos cancelar el espacio',
-          caught instanceof Error
-            ? caught.message
-            : 'Inténtalo de nuevo en un momento.',
-        );
-      }
-    }, [leaveCoupleSpace]);
+  const onCancel = useCancelPendingInvitationAction(
+    cancelPendingCoupleInvitation,
+  );
 
   const handleCreateAction = (action: CreateActionType) => {
     setCreateMenuVisible(false);
@@ -840,20 +824,51 @@ export function MainTabsNavigator() {
       .catch(showSaveError);
   };
 
+  const handleAcceptPendingInvitation = useCallback(
+    async (acceptedSpaceId?: string) => {
+      setInvitePartnerVisible(false);
+      await refreshCoupleSpaceAndData();
+      setActiveMainTab('Home');
+      if (acceptedSpaceId)
+        await selectSpace(acceptedSpaceId).catch(() => undefined);
+    },
+    [refreshCoupleSpaceAndData, selectSpace],
+  );
+
   const content = (
     <SpaceMembershipProvider space={activeSpace}>
       <Drawer.Navigator
         drawerContent={({ navigation }) => (
           <SpaceSideMenu
-            activeSpaceId={activeSpace.id}
+            activeSpaceId={isInvitePartnerVisible ? '' : activeSpace.id}
+            isInvitePartnerActive={isInvitePartnerVisible}
             onClose={() => navigation.closeDrawer()}
             onCreateSpace={createSpace}
             onInvitePartner={() => {
               navigation.closeDrawer();
-              handleInvitePartner();
+              setActiveMainTab('Home');
+              setActivitySummaryPinned(false);
+              setCreateMenuVisible(false);
+              setFloatingCreateButtonVisible(true);
+              setInvitePartnerVisible(true);
+              navigation.navigate('Main', { screen: 'Home' });
             }}
             onOpenSettings={() => navigation.navigate('Settings')}
-            onSelectSpace={selectSpace}
+            onSelectSpace={async (spaceId) => {
+              setInvitePartnerVisible(false);
+              const targetSpace = displayedSpaces.find((s) => s.id === spaceId);
+              if (
+                targetSpace?.type === 'couple' ||
+                spaceId === coupleSpace?.id
+              ) {
+                setActiveMainTab('Home');
+                setActivitySummaryPinned(false);
+                setCreateMenuVisible(false);
+                setFloatingCreateButtonVisible(true);
+                navigation.navigate('Main', { screen: 'Home' });
+              }
+              await selectSpace(spaceId);
+            }}
             spaces={displayedSpaces}
             storageError={spacesError}
           />
@@ -883,23 +898,29 @@ export function MainTabsNavigator() {
                       )
                     : undefined
                 }
-                memberAvatarUris={spaceMemberAvatarUris}
+                memberAvatarUris={headerMemberAvatarUris}
                 onCurrencyPress={handleHomeCurrencyPress}
                 onSpacePress={() => navigation.openDrawer()}
-                spaceName={activeSpaceName}
+                spaceName={headerSpaceName}
                 visible={
                   activeMainTab !== 'Activity' || !isActivitySummaryPinned
                 }
               />
               <Tabs.Navigator
                 initialRouteName="Home"
-                key={isAwaitingPartner ? 'couple-pending' : 'space-ready'}
+                key={
+                  isInvitePartnerVisible
+                    ? 'partner-invite'
+                    : isAwaitingPartner
+                      ? 'couple-pending'
+                      : 'space-ready'
+                }
                 screenOptions={{ headerShown: false, animation: 'fade' }}
                 tabBar={(props) => (
                   <AppTabBar
                     {...props}
                     disabledRoutes={
-                      isAwaitingPartner ? ['Activity', 'Map'] : undefined
+                      areSpaceActionsBlocked ? ['Activity', 'Map'] : undefined
                     }
                   />
                 )}
@@ -913,77 +934,59 @@ export function MainTabsNavigator() {
                   }}
                   name="Home"
                 >
-                  {({ navigation }) =>
-                    isAwaitingPartner ? (
-                      <AwaitingPartnerScreen
-                        onCancelSpace={handleCancelPendingCoupleSpace}
-                        onChangeInvitation={handleInvitePartner}
-                        onRefresh={refreshCoupleSpaceAndData}
-                        space={activeSpace}
-                      />
-                    ) : (
-                      <HomeScreen
-                        categories={activeSpaceCategories}
-                        currency={effectiveHomeCurrency}
-                        focusResetKey={homeChartResetKey}
-                        moneyAccounts={
-                          moneyAccountsController.activeSpaceMoneyAccounts
-                        }
-                        onCreateCategory={() => handleCreateAction('category')}
-                        onCreateExpense={() => handleCreateAction('expense')}
-                        onCreateIncome={() => handleCreateAction('income')}
-                        onCreateMoneyAccount={
-                          moneyAccountsController.openCreation
-                        }
-                        onCreateMovement={() => handleCreateAction('expense')}
-                        onOpenCategoryDetail={(categoryId) =>
-                          setDetailRequest({
-                            categoryId,
-                            displayCurrency: effectiveHomeCurrency,
-                          })
-                        }
-                        onOpenMoneyAccountDetail={
-                          moneyAccountsController.openDetail
-                        }
-                        onOpenTransactionDetail={setDetailTransactionId}
-                        onScrollDirectionChange={handleScrollDirectionChange}
-                        onViewAccounts={() => {
-                          activityRequestId.current += 1;
-                          navigation.navigate('Activity', {
-                            requestId: activityRequestId.current,
-                            section: 'accounts',
-                          });
-                        }}
-                        onViewCategories={() => {
-                          activityRequestId.current += 1;
-                          navigation.navigate('Activity', {
-                            requestId: activityRequestId.current,
-                            section: 'categories',
-                          });
-                        }}
-                        onViewMovements={() => {
-                          activityRequestId.current += 1;
-                          navigation.navigate('Activity', {
-                            requestId: activityRequestId.current,
-                            section: 'movements',
-                          });
-                        }}
-                        showComparisonIndicators={showHomeComparisonIndicators}
-                        spaceCurrency={activeSpace.currency}
-                        topContent={
-                          activeSpace.type !== 'couple' ? (
-                            <PendingInvitationBanner
-                              onAccepted={refreshCoupleSpaceAndData}
-                              onOpenCountrySettings={() =>
-                                navigation.navigate('Settings')
-                              }
-                            />
-                          ) : null
-                        }
-                        transactions={activeSpaceTransactions}
-                      />
-                    )
-                  }
+                  {({ navigation }) => (
+                    <HomeTabContent
+                      activeSpace={activeSpace}
+                      activeSpaceCategories={activeSpaceCategories}
+                      activeSpaceTransactions={activeSpaceTransactions}
+                      coupleSpace={coupleSpace}
+                      createCoupleSpaceInvitation={createCoupleSpaceInvitation}
+                      effectiveHomeCurrency={effectiveHomeCurrency}
+                      focusResetKey={homeChartResetKey}
+                      handleCreateAction={handleCreateAction}
+                      handleScrollDirectionChange={handleScrollDirectionChange}
+                      isAwaitingPartner={isAwaitingPartner}
+                      isInvitePartnerVisible={isInvitePartnerVisible}
+                      moneyAccounts={
+                        moneyAccountsController.activeSpaceMoneyAccounts
+                      }
+                      navigateToActivitySection={(section) => {
+                        activityRequestId.current += 1;
+                        navigation.navigate('Activity', {
+                          requestId: activityRequestId.current,
+                          section,
+                        });
+                      }}
+                      onCancelInvitation={onCancel}
+                      onDismissInvitePartner={() =>
+                        setInvitePartnerVisible(false)
+                      }
+                      onOpenCategoryDetail={(categoryId) =>
+                        setDetailRequest({
+                          categoryId,
+                          displayCurrency: effectiveHomeCurrency,
+                        })
+                      }
+                      onOpenCountrySettings={() =>
+                        navigation.navigate('Settings')
+                      }
+                      onOpenCreateMoneyAccount={
+                        moneyAccountsController.openCreation
+                      }
+                      onOpenMoneyAccountDetail={
+                        moneyAccountsController.openDetail
+                      }
+                      onOpenTransactionDetail={setDetailTransactionId}
+                      onAcceptPendingInvitation={handleAcceptPendingInvitation}
+                      onRefreshCoupleSpaceAndData={refreshCoupleSpaceAndData}
+                      onRequestInvitePartner={() =>
+                        setInvitePartnerVisible(true)
+                      }
+                      showHomeComparisonIndicators={
+                        showHomeComparisonIndicators
+                      }
+                    />
+                  )}
                 </Tabs.Screen>
                 <Tabs.Screen
                   listeners={{
@@ -1062,13 +1065,15 @@ export function MainTabsNavigator() {
 
               <FloatingCreateButton
                 bottom={insets.bottom + layout.floatingActionTabOffset}
-                onPress={() => setCreateMenuVisible(!isAwaitingPartner)}
-                visible={isFloatingCreateButtonVisible && !isAwaitingPartner}
+                onPress={() => setCreateMenuVisible(!areSpaceActionsBlocked)}
+                visible={
+                  isFloatingCreateButtonVisible && !areSpaceActionsBlocked
+                }
               />
               <QuickCreateMenu
                 onClose={() => setCreateMenuVisible(false)}
                 onSelect={handleCreateAction}
-                visible={isCreateMenuVisible && !isAwaitingPartner}
+                visible={isCreateMenuVisible && !areSpaceActionsBlocked}
               />
               <CreateTransactionModal
                 activeSpaceId={activeSpace.id}
@@ -1257,9 +1262,9 @@ export function MainTabsNavigator() {
             </View>
           )}
         </Drawer.Screen>
-        <Drawer.Screen name="Settings">
+        <Drawer.Screen name="Settings" options={{ swipeEnabled: false }}>
           {({ navigation }) => (
-            <SettingsScreen
+            <SettingsDrawerContent
               activeSpaceId={activeSpace.id}
               activeSpaceType={activeSpace.type}
               currencyPreferences={currencyPreferences}
@@ -1267,7 +1272,7 @@ export function MainTabsNavigator() {
                 coupleSpace !== null && !coupleSpace.isAwaitingPartner
               }
               notificationRules={activeSpaceNotificationRules}
-              onBack={() => navigation.navigate('Main')}
+              onBack={() => navigation.navigate('Main', { screen: 'Home' })}
               onLeaveCoupleSpace={async () => {
                 await leaveCoupleSpace();
                 navigation.navigate('Main');
@@ -1295,12 +1300,6 @@ export function MainTabsNavigator() {
           )}
         </Drawer.Screen>
       </Drawer.Navigator>
-      <InvitePartnerScreen
-        coupleSpace={coupleSpace}
-        onClose={() => setInvitePartnerVisible(false)}
-        onCreateCoupleSpaceInvitation={createCoupleSpaceInvitation}
-        visible={isInvitePartnerVisible}
-      />
     </SpaceMembershipProvider>
   );
 

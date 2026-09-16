@@ -4,6 +4,7 @@ import {
   markAvatarUploadResult,
   saveDownloadedOwnAvatar,
   saveOwnRemoteAvatar,
+  restoreRemoteProfileWithoutAvatar,
 } from '@/features/profile/repositories/localProfileRepository';
 import {
   readAvatarBytes,
@@ -69,12 +70,18 @@ export async function restoreOwnAvatar(remote: {
   avatarUpdatedAt: string | null;
   userId: string;
 }): Promise<boolean> {
-  if (!remote.avatarPath || !remote.avatarUpdatedAt) return false;
-
   try {
     const { localPath, syncStatus, remoteUpdatedAt } =
       await getLocalAvatarUpload();
     if (syncStatus === 'pending' || syncStatus === 'failed') return false;
+
+    if (!remote.avatarPath && !remote.avatarUpdatedAt) {
+      if (!localPath && !remoteUpdatedAt) return false;
+      await restoreRemoteProfileWithoutAvatar();
+      return true;
+    }
+    if (!remote.avatarPath || !remote.avatarUpdatedAt) return false;
+
     // Nada que hacer si la copia local ya corresponde a ese sello.
     if (localPath && remoteUpdatedAt === remote.avatarUpdatedAt) return false;
 

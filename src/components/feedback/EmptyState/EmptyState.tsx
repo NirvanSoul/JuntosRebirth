@@ -14,7 +14,7 @@ const emptyIconSize = 56;
 
 export type EmptyStateProps = {
   accessibilityLabel?: string;
-  description: string;
+  description?: string;
   icon: ComponentProps<typeof Ionicons>['name'];
   iconBackgroundColor: string;
   onPress?: () => void;
@@ -50,9 +50,11 @@ export function EmptyState({
         <Text variant="bodyStrong" weight="semibold">
           {title}
         </Text>
-        <Text style={styles.description} tone="secondary" variant="footnote">
-          {description}
-        </Text>
+        {description ? (
+          <Text style={styles.description} tone="secondary" variant="footnote">
+            {description}
+          </Text>
+        ) : null}
       </View>
       {onPress ? (
         <Ionicons

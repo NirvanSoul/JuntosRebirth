@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
+import {
+  getLocalProfile,
+  subscribeToLocalProfile,
+} from '@/features/profile/repositories/localProfileRepository';
 import { useAppForeground } from '@/hooks/useAppForeground';
 
 /**
@@ -18,6 +21,9 @@ export function useLocalDisplayName(): string | null {
 
   useEffect(() => {
     load();
+    return subscribeToLocalProfile((profile) => {
+      setDisplayName(profile.displayName);
+    });
   }, [load]);
   useAppForeground(load);
 

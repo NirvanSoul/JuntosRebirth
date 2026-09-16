@@ -1,4 +1,8 @@
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
+import {
+  getPendingLocalDisplayName,
+  markDisplayNameSyncResult,
+} from '@/features/profile/repositories/localProfileRepository';
 import { apiClient } from '@/services/api/juntossApiClient';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 
@@ -13,6 +17,9 @@ import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemote
 export async function syncOwnDisplayName(
   displayName: string,
 ): Promise<boolean> {
+  const trimmed = displayName.trim();
+  if (!trimmed) return false;
+
   const userId = await getAuthenticatedUserId();
   if (!userId) return false;
 
@@ -23,10 +30,18 @@ export async function syncOwnDisplayName(
     await bootstrapRemoteAccount();
     // El perfil que se actualiza es el de la sesión: la API no acepta un
     // identificador de usuario en el cuerpo.
-    await apiClient.patch('/v1/me/profile', { displayName });
+    await apiClient.patch('/v1/me/profile', { displayName: trimmed });
+    await markDisplayNameSyncResult(trimmed, 'synced');
     return true;
   } catch (error) {
     console.error('[profiles] no se pudo publicar el nombre', { error });
+    await markDisplayNameSyncResult(trimmed, 'failed');
     return false;
   }
+}
+
+/** Reintenta únicamente cuando una publicación anterior quedó pendiente. */
+export async function retryPendingDisplayNameSync(): Promise<boolean> {
+  const pendingDisplayName = await getPendingLocalDisplayName();
+  return pendingDisplayName ? syncOwnDisplayName(pendingDisplayName) : false;
 }

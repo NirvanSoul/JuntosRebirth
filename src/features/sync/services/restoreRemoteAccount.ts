@@ -14,12 +14,16 @@ import {
   writeRemoteChangesCursor,
 } from '@/features/sync/repositories/localSyncCursorRepository';
 import { loadRemoteEntityLinks } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
-import { updateSpaces } from '@/features/spaces/repositories/localSpaceRepository';
+import {
+  getSpacesCatalogueRevision,
+  updateSpaces,
+} from '@/features/spaces/repositories/localSpaceRepository';
 import type { Space } from '@/features/spaces/types';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { fetchRemoteImportReviews } from '@/features/import/gateways/juntossImportReviewGateway';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { restoreRemoteImportReviews } from '@/features/sync/services/restoreRemoteImportReviews';
+import { ApiError } from '@/services/api/client';
 
 export { applyRemoteCollections };
 
@@ -49,6 +53,25 @@ const restoreInFlightByUserId = new Map<string, InFlightRestore>();
 const CURSOR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const provisionalPersonalSpaceId = 'personal';
 
+/**
+ * Un snapshot completo solo recupera incoherencias de catálogo o de datos.
+ * Repetirlo cuando el transporte acaba de cortarse duplica tráfico y hace más
+ * probable que el siguiente request falle también. Esos errores los debe
+ * reintentar el polling con backoff conservando el cursor actual.
+ */
+function shouldRetryDeltaWithoutFullRestore(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+
+  return (
+    error.code === 'NETWORK_ERROR' ||
+    error.status === 401 ||
+    error.status === 408 ||
+    error.status === 425 ||
+    error.status === 429 ||
+    error.status >= 500
+  );
+}
+
 async function hasLocalOnlyPersonalTransactions(
   database: Awaited<ReturnType<typeof getLocalDatabase>>,
 ): Promise<boolean> {
@@ -64,7 +87,10 @@ async function hasLocalOnlyPersonalTransactions(
 export async function restoreRemoteAccount(input: {
   userId: string;
   snapshot: RemoteAccountSnapshot;
+  expectedSpacesCatalogueRevision?: number;
 }): Promise<RestoredRemoteAccount> {
+  const catalogueRevision =
+    input.expectedSpacesCatalogueRevision ?? getSpacesCatalogueRevision();
   const database = await getLocalDatabase();
   const personalRemoteId = input.snapshot.spaces.find(
     (space) => space.type === 'personal',
@@ -135,12 +161,15 @@ export async function restoreRemoteAccount(input: {
 
   // El selector solo se confirma tras terminar la restauración financiera.
   // Si SQLite rechaza el snapshot, conserva el catálogo y estado anterior.
-  await updateSpaces((stored) => ({
-    spaces,
-    activeSpaceId: spaces.some((space) => space.id === stored.activeSpaceId)
-      ? stored.activeSpaceId
-      : fallbackActiveSpaceId,
-  }));
+  await updateSpaces(
+    (stored) => ({
+      spaces,
+      activeSpaceId: spaces.some((space) => space.id === stored.activeSpaceId)
+        ? stored.activeSpaceId
+        : fallbackActiveSpaceId,
+    }),
+    { ifCatalogueRevision: catalogueRevision },
+  );
 
   if (input.snapshot.serverTime) {
     const spaceRemoteIds = input.snapshot.spaces.map((s) => s.remoteId).sort();
@@ -168,7 +197,10 @@ export async function applyRemoteChanges(input: {
   userId: string;
   changes: RemoteAccountChanges;
   cursor: RemoteChangesCursor;
+  expectedSpacesCatalogueRevision?: number;
 }): Promise<ApplyRemoteChangesResult> {
+  const catalogueRevision =
+    input.expectedSpacesCatalogueRevision ?? getSpacesCatalogueRevision();
   const database = await getLocalDatabase();
 
   // 1. Contexto financiero distinto → requiere restauración completa
@@ -221,30 +253,33 @@ export async function applyRemoteChanges(input: {
   const spaces = remoteSpaces;
   let catalogueChanged = false;
 
-  await updateSpaces((stored) => {
-    catalogueChanged =
-      spaces.length !== stored.spaces.length ||
-      spaces.some((incoming) => {
-        const matching = stored.spaces.find((s) => s.id === incoming.id);
-        if (!matching) return true;
-        return (
-          matching.name !== incoming.name ||
-          matching.currency !== incoming.currency ||
-          matching.isAwaitingPartner !== incoming.isAwaitingPartner
-        );
-      });
+  await updateSpaces(
+    (stored) => {
+      catalogueChanged =
+        spaces.length !== stored.spaces.length ||
+        spaces.some((incoming) => {
+          const matching = stored.spaces.find((s) => s.id === incoming.id);
+          if (!matching) return true;
+          return (
+            matching.name !== incoming.name ||
+            matching.currency !== incoming.currency ||
+            matching.isAwaitingPartner !== incoming.isAwaitingPartner
+          );
+        });
 
-    if (!catalogueChanged) return stored;
+      if (!catalogueChanged) return stored;
 
-    const personalSpace = spaces.find((space) => space.type === 'personal');
-    const fallbackActiveSpaceId = personalSpace?.id ?? spaces[0]?.id;
-    return {
-      spaces,
-      activeSpaceId: spaces.some((space) => space.id === stored.activeSpaceId)
-        ? stored.activeSpaceId
-        : (fallbackActiveSpaceId ?? stored.activeSpaceId),
-    };
-  });
+      const personalSpace = spaces.find((space) => space.type === 'personal');
+      const fallbackActiveSpaceId = personalSpace?.id ?? spaces[0]?.id;
+      return {
+        spaces,
+        activeSpaceId: spaces.some((space) => space.id === stored.activeSpaceId)
+          ? stored.activeSpaceId
+          : (fallbackActiveSpaceId ?? stored.activeSpaceId),
+      };
+    },
+    { ifCatalogueRevision: catalogueRevision },
+  );
 
   const currencyBySpaceRemoteId = new Map(
     input.changes.spaces.map((space) => [space.remoteId, space.currency]),
@@ -333,12 +368,21 @@ export async function restoreRemoteAccountForCurrentSession(options?: {
       const cursor = await readRemoteChangesCursor(database, userId);
       if (cursor) {
         try {
+          const catalogueRevision = getSpacesCatalogueRevision();
           const changes = await fetchRemoteAccountChanges(cursor.serverTime);
-          const result = await applyRemoteChanges({ userId, changes, cursor });
+          const result = await applyRemoteChanges({
+            userId,
+            changes,
+            cursor,
+            expectedSpacesCatalogueRevision: catalogueRevision,
+          });
           if (!result.needsFullRestore) {
             return result;
           }
         } catch (error) {
+          if (shouldRetryDeltaWithoutFullRestore(error)) {
+            throw error;
+          }
           console.error(
             '[sync] Delta falló, recurriendo a full restore:',
             error,
@@ -348,11 +392,16 @@ export async function restoreRemoteAccountForCurrentSession(options?: {
     }
 
     // Full restore
+    const catalogueRevision = getSpacesCatalogueRevision();
     const [snapshot, reviews] = await Promise.all([
       fetchRemoteAccountSnapshot(),
       fetchRemoteImportReviews(),
     ]);
-    const restored = await restoreRemoteAccount({ userId, snapshot });
+    const restored = await restoreRemoteAccount({
+      userId,
+      snapshot,
+      expectedSpacesCatalogueRevision: catalogueRevision,
+    });
     await restoreRemoteImportReviews({ reviews, restored });
     const receivedRows =
       snapshot.categories.length +

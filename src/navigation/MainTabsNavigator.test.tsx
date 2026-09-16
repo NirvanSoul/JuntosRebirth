@@ -8,6 +8,10 @@ import {
   within,
 } from '@testing-library/react-native';
 import { Alert, StyleSheet } from 'react-native';
+import {
+  fireGestureHandler,
+  getByGestureTestId,
+} from 'react-native-gesture-handler/jest-utils';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
@@ -35,6 +39,12 @@ const mockSyncCoupleSpaceData = jest.fn(
   async (_options?: { spaceId: string }) => undefined,
 );
 const mockRestoreRemoteAccount = jest.fn(async () => undefined);
+let mockPendingInvitation: {
+  invitationId: string;
+  inviterDisplayName: string;
+  spaceName: string;
+} | null = null;
+const mockAcceptCurrentUserInvitation = jest.fn();
 
 function dateInCurrentMonth(day: number): string {
   const now = new Date();
@@ -45,6 +55,16 @@ function dateInCurrentMonth(day: number): string {
 
 jest.mock('@/features/profile/services/syncOwnAvatar', () => ({
   syncOwnAvatar: jest.fn(async () => false),
+}));
+jest.mock('@/features/profile/services/syncOwnDisplayName', () => ({
+  retryPendingDisplayNameSync: jest.fn(async () => false),
+  syncOwnDisplayName: jest.fn(async () => true),
+}));
+jest.mock('@/features/profile/services/restoreOwnProfile', () => ({
+  restoreOwnProfile: jest.fn(async () => null),
+}));
+jest.mock('@/features/profile/services/syncSpaceMemberProfiles', () => ({
+  syncSpaceMemberProfiles: jest.fn(async () => true),
 }));
 
 jest.mock('@/features/spaces/hooks/useSpaces', () => ({
@@ -58,8 +78,11 @@ jest.mock('@/features/spaces/gateways/juntossInvitationGateway', () => {
   return {
     ...actual,
     createJuntossInvitationGateway: () => ({
-      getCurrentUserPendingInvitation: jest.fn(async () => null),
+      getCurrentUserPendingInvitation: jest.fn(
+        async () => mockPendingInvitation,
+      ),
       getOutgoingInvitation: jest.fn(async () => null),
+      acceptCurrentUserInvitation: mockAcceptCurrentUserInvitation,
     }),
   };
 });
@@ -159,6 +182,7 @@ jest.mock(
     listSpaceMemberProfiles: jest.fn(async () => []),
     replaceSpaceMemberProfiles: jest.fn(async () => {}),
     saveSpaceMemberAvatarCache: jest.fn(async () => {}),
+    subscribeToSpaceMemberProfiles: jest.fn(() => () => undefined),
   }),
 );
 
@@ -174,6 +198,7 @@ jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
     avatarUri: null,
     displayName: null,
   })),
+  subscribeToLocalProfile: jest.fn(() => () => undefined),
   subscribeToLocalProfileCountry: jest.fn(() => () => undefined),
 }));
 
@@ -220,6 +245,10 @@ describe('MainTabsNavigator', () => {
     await AsyncStorage.removeItem('@juntoss/activity-sections/v1');
     mockCountryCode = 'ES';
     mockSession = null;
+    mockPendingInvitation = null;
+    mockAcceptCurrentUserInvitation.mockReset();
+    mockRestoreRemoteAccount.mockReset();
+    mockRestoreRemoteAccount.mockResolvedValue(undefined);
     mockUseSpaces.mockReturnValue({
       activeSpace: {
         currency: 'EUR',
@@ -294,6 +323,293 @@ describe('MainTabsNavigator', () => {
     expect(screen.queryByLabelText('Crear gasto')).toBeNull();
   });
 
+  it('bloquea el botón flotante mientras se completa el formulario de invitación', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+    expect(
+      screen.getByRole('tab', { name: 'Actividad' }).props.accessibilityState,
+    ).toMatchObject({ selected: true });
+
+    await fireEvent.press(screen.getByLabelText('Espacio Personal'));
+    const invitePartner = screen.getByLabelText('Espacio de pareja', {
+      includeHiddenElements: true,
+    });
+    await fireEvent.press(invitePartner);
+
+    expect(await screen.findByTestId('invite-partner-email')).toBeTruthy();
+    expect(
+      screen.getByRole('tab', { name: 'Inicio' }).props.accessibilityState,
+    ).toMatchObject({ selected: true });
+    expect(screen.getByRole('tab', { name: 'Actividad' })).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ disabled: true }),
+    );
+    expect(screen.getByRole('tab', { name: 'Mapa' })).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ disabled: true }),
+    );
+    expect(
+      screen.getByTestId('floating-create-button-container', {
+        includeHiddenElements: true,
+      }).props.pointerEvents,
+    ).toBe('none');
+    expect(screen.getByLabelText('Espacio Juntos')).toBeTruthy();
+  });
+
+  it('permite cancelar la invitación y regresar al espacio personal', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByLabelText('Espacio Personal'));
+    const invitePartner = screen.getByLabelText('Espacio de pareja', {
+      includeHiddenElements: true,
+    });
+    await fireEvent.press(invitePartner);
+
+    expect(await screen.findByTestId('invite-partner-email')).toBeTruthy();
+    expect(screen.getByLabelText('Espacio Juntos')).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Cancelar'));
+
+    expect(screen.queryByTestId('invite-partner-email')).toBeNull();
+    expect(screen.getByLabelText('Espacio Personal')).toBeTruthy();
+  });
+
+  it('permite volver al espacio personal desde el selector mientras se invita a la pareja', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByLabelText('Espacio Personal'));
+    const invitePartner = screen.getByLabelText('Espacio de pareja', {
+      includeHiddenElements: true,
+    });
+    await fireEvent.press(invitePartner);
+
+    expect(await screen.findByTestId('invite-partner-email')).toBeTruthy();
+
+    // El selector en cabecera muestra Juntos
+    await fireEvent.press(screen.getByLabelText('Espacio Juntos'));
+
+    // Seleccionamos Personal en el menú lateral
+    const selectPersonal = screen.getByLabelText(
+      'Seleccionar espacio Personal',
+      {
+        includeHiddenElements: true,
+      },
+    );
+    await fireEvent.press(selectPersonal);
+
+    // Debe salir de la pantalla de invitación y volver al espacio Personal
+    expect(screen.queryByTestId('invite-partner-email')).toBeNull();
+    expect(screen.getByLabelText('Espacio Personal')).toBeTruthy();
+  });
+
+  it('navega a Inicio y muestra la pantalla de invitar si se pulsa espacio de pareja desde Actividad', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+    expect(
+      screen.getByRole('tab', { name: 'Actividad' }).props.accessibilityState,
+    ).toMatchObject({ selected: true });
+
+    await fireEvent.press(screen.getByLabelText('Espacio Personal'));
+    const invitePartner = screen.getByLabelText('Espacio de pareja', {
+      includeHiddenElements: true,
+    });
+    await fireEvent.press(invitePartner);
+
+    expect(await screen.findByTestId('invite-partner-email')).toBeTruthy();
+    expect(screen.getByLabelText('Espacio Juntos')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Actividad' })).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ disabled: true }),
+    );
+  });
+
+  it('redirige automáticamente al espacio de pareja al aceptar una invitación pendiente', async () => {
+    mockSession = {
+      access_token: 'valid-token',
+      user: { id: 'invitee-user-1', email: 'yo@example.com' },
+    };
+    mockPendingInvitation = {
+      invitationId: 'inv-global-1',
+      inviterDisplayName: 'Lucía',
+      spaceName: 'Juntos',
+    };
+    mockAcceptCurrentUserInvitation.mockResolvedValue({
+      spaceId: 'couple-space-id',
+      spaceName: 'Juntos',
+    });
+
+    const mockSelectSpace = jest.fn(async () => undefined);
+    mockUseSpaces.mockReturnValue({
+      activeSpace: {
+        currency: 'EUR',
+        id: 'personal-space-id',
+        name: 'Personal',
+        type: 'personal',
+      },
+      cancelPendingCoupleInvitation: jest.fn(),
+      createCoupleSpaceInvitation: jest.fn(),
+      createSpace: jest.fn(),
+      error: null,
+      isReady: true,
+      leaveCoupleSpace: jest.fn(),
+      refreshCoupleSpace: jest.fn(async () => undefined),
+      reloadSpaces: jest.fn(async () => undefined),
+      selectSpace: mockSelectSpace,
+      spaces: [
+        {
+          currency: 'EUR',
+          id: 'personal-space-id',
+          name: 'Personal',
+          type: 'personal',
+        },
+      ],
+    });
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(
+      await screen.findByText('Lucía te invitó a un espacio juntos'),
+    ).toBeTruthy();
+
+    const acceptButton = await screen.findByLabelText('Aceptar invitación');
+    fireEvent.press(acceptButton);
+
+    await waitFor(() => {
+      expect(mockAcceptCurrentUserInvitation).toHaveBeenCalledWith(
+        'inv-global-1',
+      );
+      expect(mockSelectSpace).toHaveBeenCalledWith('couple-space-id');
+    });
+  });
+
+  it('navega a Inicio al seleccionar un espacio de pareja creado desde Actividad', async () => {
+    const selectSpaceMock = jest.fn();
+    mockUseSpaces.mockReturnValue({
+      activeSpace: {
+        currency: 'EUR',
+        id: 'personal',
+        name: 'Personal',
+        type: 'personal',
+      },
+      createSpace: jest.fn(),
+      error: null,
+      isReady: true,
+      selectSpace: selectSpaceMock,
+      spaces: [
+        {
+          currency: 'EUR',
+          id: 'personal',
+          name: 'Personal',
+          type: 'personal',
+        },
+        {
+          currency: 'EUR',
+          id: 'couple-space',
+          name: 'Juntos',
+          type: 'couple',
+        },
+      ],
+    });
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
+    expect(
+      screen.getByRole('tab', { name: 'Actividad' }).props.accessibilityState,
+    ).toMatchObject({ selected: true });
+
+    await fireEvent.press(screen.getByLabelText('Espacio Personal'));
+    const coupleRow = screen.getByLabelText('Seleccionar espacio Juntos', {
+      includeHiddenElements: true,
+    });
+    await fireEvent.press(coupleRow);
+
+    expect(selectSpaceMock).toHaveBeenCalledWith('couple-space');
+    expect(
+      screen.getByRole('tab', { name: 'Inicio' }).props.accessibilityState,
+    ).toMatchObject({ selected: true });
+  });
+
   it('mantiene fijo el selector de espacio al cambiar de pantalla', async () => {
     const screen = await render(
       <SafeAreaProvider
@@ -349,6 +665,7 @@ describe('MainTabsNavigator', () => {
       StyleSheet.flatten(screen.getByTestId('app-tab-bar').props.style),
     ).toMatchObject(shadows.mainMenu);
 
+    await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
     await fireEvent.press(screen.getByLabelText('Espacio Personal'));
     expect(
       await screen.findByText('Espacios', { includeHiddenElements: true }),
@@ -361,7 +678,14 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(settings);
     expect(await screen.findByTestId('settings-screen')).toBeTruthy();
     expect(screen.getByText('Datos y privacidad')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Volver'));
+    await act(async () => {
+      fireGestureHandler(getByGestureTestId('settings-back-swipe'));
+    });
+
+    expect(
+      (await screen.findByRole('tab', { name: 'Inicio' })).props
+        .accessibilityState,
+    ).toMatchObject({ selected: true });
 
     await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
 

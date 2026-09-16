@@ -28,6 +28,7 @@ jest.mock(
       { userId: 'uuid-ana', displayName: 'Ana' },
       { userId: 'uuid-beto', displayName: 'Beto' },
     ]),
+    subscribeToSpaceMemberProfiles: jest.fn(() => () => undefined),
   }),
 );
 

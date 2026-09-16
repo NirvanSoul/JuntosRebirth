@@ -86,8 +86,35 @@ jest.mock('@/lib/auth-client', () => {
   };
 });
 
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(async () => true),
+    signIn: jest.fn(async () => ({
+      data: {
+        idToken: 'mock-google-id-token',
+        user: { email: 'user@example.com', name: 'Test User' },
+      },
+    })),
+    signOut: jest.fn(async () => null),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+    SIGN_IN_REQUIRED: 'SIGN_IN_REQUIRED',
+  },
+}));
+
 // El módulo nativo de red no existe en Jest: por defecto el dispositivo está
 // conectado y nadie escucha cambios. Quien pruebe la desconexión lo sustituye.
+jest.mock('expo-web-browser', () => ({
+  coolDownAsync: jest.fn(async () => ({})),
+  maybeCompleteAuthSession: jest.fn(),
+  openAuthSessionAsync: jest.fn(),
+  warmUpAsync: jest.fn(async () => ({})),
+}));
+
 jest.mock('expo-network', () => ({
   addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
   getNetworkStateAsync: jest.fn(async () => ({

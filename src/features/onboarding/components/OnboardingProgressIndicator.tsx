@@ -23,7 +23,7 @@ type OnboardingProgressIndicatorProps = {
 export function OnboardingProgressIndicator({
   currentStep,
   testID = 'onboarding-progress',
-  totalSteps = 10,
+  totalSteps = 11,
 }: OnboardingProgressIndicatorProps) {
   const styles = useThemedStyles(createStyles);
   const visibleCurrentStep = Math.max(1, Math.min(currentStep, totalSteps));

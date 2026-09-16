@@ -30,13 +30,13 @@ async function ensureAndroidReminderChannel(
   notifications: NonNullable<ReturnType<typeof getNotificationModule>>,
 ): Promise<void> {
   if (Platform.OS !== 'android' || isAndroidReminderChannelEnsured) return;
-  isAndroidReminderChannelEnsured = true;
 
   await notifications.setNotificationChannelAsync(androidReminderChannelId, {
     importance: notifications.AndroidImportance.HIGH,
     name: 'Recordatorios de movimientos',
     vibrationPattern: [0, 250, 250, 250],
   });
+  isAndroidReminderChannelEnsured = true;
 }
 
 async function ensureAndroidDailyEngagementChannel(
@@ -45,8 +45,6 @@ async function ensureAndroidDailyEngagementChannel(
   if (Platform.OS !== 'android' || isAndroidDailyEngagementChannelEnsured) {
     return;
   }
-  isAndroidDailyEngagementChannelEnsured = true;
-
   await notifications.setNotificationChannelAsync(
     androidDailyEngagementChannelId,
     {
@@ -55,12 +53,18 @@ async function ensureAndroidDailyEngagementChannel(
       vibrationPattern: [0, 250, 250, 250],
     },
   );
+  isAndroidDailyEngagementChannelEnsured = true;
 }
 
 /** Solicita permiso de notificaciones si aún no fue concedido. */
 export async function requestNotificationPermission(): Promise<boolean> {
   const notifications = getNotificationModule();
   if (!notifications) return false;
+
+  // Android 13+ no muestra el diálogo de permiso hasta que existe al menos
+  // un canal. Prepararlo aquí hace que la solicitud del onboarding sea real,
+  // antes de que haya un recordatorio que programar.
+  await ensureAndroidReminderChannel(notifications);
   const current = await notifications.getPermissionsAsync();
   if (current.granted) return true;
   if (!current.canAskAgain) return false;

@@ -20,6 +20,7 @@ export type CurrentUserInvitation = {
   spaceName: string;
 };
 export type OutgoingInvitation = {
+  id: string;
   inviteeEmail: string | null;
   expiresAt: string;
 };
@@ -44,7 +45,11 @@ export class AcceptInvitationError extends Error {
 }
 export class CreateInvitationError extends Error {
   constructor(
-    readonly code: 'invitee_not_registered' | 'unknown',
+    readonly code:
+      | 'already_in_couple_space'
+      | 'invitee_already_in_couple_space'
+      | 'invitee_not_registered'
+      | 'unknown',
     message: string,
   ) {
     super(message);
@@ -62,9 +67,11 @@ export type InvitationGateway = {
   ): Promise<{ id: string; expiresAt: string }>;
   getCurrentUserPendingInvitation(): Promise<CurrentUserInvitation | null>;
   getOutgoingInvitation(spaceId: string): Promise<OutgoingInvitation | null>;
+  revokeInvitation(spaceId: string, invitationId: string): Promise<void>;
   acceptCurrentUserInvitation(
     invitationId: string,
   ): Promise<{ spaceId: string; spaceName: string }>;
+  rejectCurrentUserInvitation?(invitationId: string): Promise<void>;
   getInvitationPreview(token: string): Promise<InvitationPreview>;
   acceptInvitation(
     token: string,
@@ -85,6 +92,7 @@ function toAcceptInvitationError(caught: unknown): never {
 
   const codeByApiCode: Partial<Record<string, AcceptInvitationErrorCode>> = {
     ALREADY_IN_COUPLE_SPACE: 'already_in_couple_space',
+    COUPLE_SPACE_LIMIT: 'already_in_couple_space',
     INVITATION_ALREADY_USED: 'invitation_already_used',
     INVITATION_EXPIRED: 'invitation_expired',
     INVITATION_NOT_FOUND: 'invitation_not_found',
@@ -100,55 +108,89 @@ function toAcceptInvitationError(caught: unknown): never {
   );
 }
 
-/** El espacio de pareja que este usuario creó y sigue sin aceptar nadie. */
+/**
+ * Devuelve el único espacio pendiente reutilizable. Cualquier otra membresía
+ * de pareja significa que esta cuenta ya ocupó su único espacio permitido.
+ */
 async function findOwnCoupleSpaceAwaitingPartner(): Promise<string | null> {
   const spaces = await listRemoteSpaces();
-  const awaitingPartner = spaces.find(
-    (space) =>
-      space.type === 'couple' &&
-      space.role === 'owner' &&
-      space.activatedAt === null,
+  const coupleSpaces = spaces.filter((space) => space.type === 'couple');
+  if (coupleSpaces.length === 0) return null;
+
+  const [current] = coupleSpaces;
+  if (
+    coupleSpaces.length === 1 &&
+    current?.role === 'owner' &&
+    current.activatedAt === null
+  ) {
+    return current.id;
+  }
+
+  throw new CreateInvitationError(
+    'already_in_couple_space',
+    'Ya perteneces a un espacio de pareja. No puedes crear otro.',
   );
-  return awaitingPartner?.id ?? null;
 }
 
 async function createCoupleSpace(
   name: string,
   currency: string,
 ): Promise<string> {
-  const space = await apiClient.post<{ data: { space: { id: string } } }>(
-    '/v1/spaces',
-    {
-      name,
-      type: 'couple',
-      currency,
-      // La misma zona que manda `POST /v1/bootstrap`. Con `UTC` fijo, todo
-      // cálculo por día del espacio compartido se desplazaba.
-      timezone: deviceTimeZone(),
-    },
-  );
-  return space.data.space.id;
+  try {
+    const space = await apiClient.post<{ data: { space: { id: string } } }>(
+      '/v1/spaces',
+      {
+        name,
+        type: 'couple',
+        currency,
+        // La misma zona que manda `POST /v1/bootstrap`. Con `UTC` fijo, todo
+        // cálculo por día del espacio compartido se desplazaba.
+        timezone: deviceTimeZone(),
+      },
+    );
+    return space.data.space.id;
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.code === 'COUPLE_SPACE_LIMIT') {
+      throw new CreateInvitationError(
+        'already_in_couple_space',
+        'Ya perteneces a un espacio de pareja. No puedes crear otro.',
+      );
+    }
+    throw caught;
+  }
+}
+
+function rethrowInvitationCreationError(caught: unknown): never {
+  if (caught instanceof ApiError && caught.code === 'COUPLE_SPACE_LIMIT') {
+    throw new CreateInvitationError(
+      'invitee_already_in_couple_space',
+      'Esa persona ya pertenece a un espacio de pareja.',
+    );
+  }
+  throw caught;
 }
 
 export function createJuntossInvitationGateway(): InvitationGateway {
   return {
     async createCoupleSpaceInvitation(name, currency, inviteeEmail) {
       // Crear el espacio y crear su invitación son dos peticiones, no una
-      // transacción. Si la segunda falla, el espacio ya existe y el servidor
-      // solo admite un espacio de pareja activo por persona: el siguiente
-      // intento moría con `COUPLE_SPACE_LIMIT` sin salida. Reutilizar el que
-      // quedó esperando pareja hace que reintentar funcione. Su nombre y
-      // moneda son los del primer intento; el snapshot remoto es la autoridad
-      // y los devuelve en la siguiente restauración.
+      // transacción. Si la segunda falla, se reutiliza el espacio propio que
+      // quedó esperando pareja. Cualquier otra membresía `couple` bloquea la
+      // operación antes de intentar crear un segundo espacio.
       const spaceId =
         (await findOwnCoupleSpaceAwaitingPartner()) ??
         (await createCoupleSpace(name, currency));
-      const invitation = await apiClient.post<{
+      let invitation: {
         data: { invitation: { id: string; expiresAt: string } };
-      }>(`/v1/spaces/${spaceId}/invitations`, {
-        email: inviteeEmail,
-        role: 'member',
-      });
+      };
+      try {
+        invitation = await apiClient.post(`/v1/spaces/${spaceId}/invitations`, {
+          email: inviteeEmail,
+          role: 'member',
+        });
+      } catch (caught) {
+        rethrowInvitationCreationError(caught);
+      }
       return {
         spaceId,
         invitationId: invitation.data.invitation.id,
@@ -156,13 +198,17 @@ export function createJuntossInvitationGateway(): InvitationGateway {
       };
     },
     async createInvitation(spaceId, inviteeEmail) {
-      const response = await apiClient.post<{
-        data: { invitation: { id: string; expiresAt: string } };
-      }>(`/v1/spaces/${spaceId}/invitations`, {
-        email: inviteeEmail,
-        role: 'member',
-      });
-      return response.data.invitation;
+      try {
+        const response = await apiClient.post<{
+          data: { invitation: { id: string; expiresAt: string } };
+        }>(`/v1/spaces/${spaceId}/invitations`, {
+          email: inviteeEmail,
+          role: 'member',
+        });
+        return response.data.invitation;
+      } catch (caught) {
+        rethrowInvitationCreationError(caught);
+      }
     },
     async getCurrentUserPendingInvitation(): Promise<CurrentUserInvitation | null> {
       const response = await apiClient.get<{
@@ -180,15 +226,29 @@ export function createJuntossInvitationGateway(): InvitationGateway {
     async getOutgoingInvitation(spaceId): Promise<OutgoingInvitation | null> {
       const response = await apiClient.get<{
         data: {
-          invitations: { email: string; expiresAt: string; status: string }[];
+          invitations: {
+            id: string;
+            email: string;
+            expiresAt: string;
+            status: string;
+          }[];
         };
       }>(`/v1/spaces/${spaceId}/invitations`);
       const invitation = response.data.invitations.find(
         (item) => item.status === 'pending',
       );
       return invitation
-        ? { inviteeEmail: invitation.email, expiresAt: invitation.expiresAt }
+        ? {
+            id: invitation.id,
+            inviteeEmail: invitation.email,
+            expiresAt: invitation.expiresAt,
+          }
         : null;
+    },
+    async revokeInvitation(spaceId, invitationId) {
+      await apiClient.delete(
+        `/v1/spaces/${spaceId}/invitations/${invitationId}`,
+      );
     },
     async acceptCurrentUserInvitation(invitationId) {
       let response: { data: { spaceId: string } };
@@ -205,6 +265,9 @@ export function createJuntossInvitationGateway(): InvitationGateway {
       );
       if (!space) throw new Error('No pudimos recuperar el espacio aceptado.');
       return { spaceId: space.id, spaceName: space.name };
+    },
+    async rejectCurrentUserInvitation(invitationId) {
+      await apiClient.post(`/v1/invitations/${invitationId}/reject`, {});
     },
     async getInvitationPreview(token): Promise<InvitationPreview> {
       const response = await apiClient.get<{

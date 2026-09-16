@@ -1,11 +1,14 @@
 import { ScrollView, StyleSheet } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { MoneyAccountCard } from '@/features/accounts/components/MoneyAccountCard/MoneyAccountCard';
 import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
 import { spacing } from '@/theme/spacing';
+import { getStartupEntering } from '@/theme/transitions';
 
 type MoneyAccountCarouselProps = {
+  animateEntrance?: boolean;
   accounts: readonly MoneyAccountSummary[];
   bordered?: boolean;
   /**
@@ -19,6 +22,7 @@ type MoneyAccountCarouselProps = {
 };
 
 export function MoneyAccountCarousel({
+  animateEntrance = false,
   accounts,
   bordered = false,
   gutter = 0,
@@ -34,13 +38,17 @@ export function MoneyAccountCarousel({
       style={[styles.carousel, { marginHorizontal: -gutter }]}
       testID={testID}
     >
-      {accounts.map((account) => (
-        <MoneyAccountCard
-          account={account}
-          bordered={bordered}
+      {accounts.map((account, index) => (
+        <Animated.View
           key={account.id}
-          onPress={() => onOpenMoneyAccountDetail?.(account.id)}
-        />
+          entering={animateEntrance ? getStartupEntering(index + 4) : undefined}
+        >
+          <MoneyAccountCard
+            account={account}
+            bordered={bordered}
+            onPress={() => onOpenMoneyAccountDetail?.(account.id)}
+          />
+        </Animated.View>
       ))}
       {onCreateMoneyAccount ? (
         <CreatePreviewBadge

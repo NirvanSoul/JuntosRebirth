@@ -1,12 +1,16 @@
-import { fireEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { Keyboard } from 'react-native';
 
 import { CountryScreen } from '@/features/onboarding/screens/CountryScreen';
+import { CalendarPreviewScreen } from '@/features/onboarding/screens/CalendarPreviewScreen';
+import { JuntosScreen } from '@/features/onboarding/screens/JuntosScreen';
 import { NameScreen } from '@/features/onboarding/screens/NameScreen';
+import { NotificationsPermissionScreen } from '@/features/onboarding/screens/NotificationsPermissionScreen';
 import { OnboardingLoginScreen } from '@/features/onboarding/screens/OnboardingLoginScreen';
 import { WelcomeScreen } from '@/features/onboarding/screens/WelcomeScreen';
 import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
+import { requestNotificationPermission } from '@/lib/notifications/localNotifications';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
@@ -19,8 +23,13 @@ jest.mock('@/features/profile/services/updateProfileCountry', () => ({
 jest.mock('@/features/access/screens/AccessScreen', () => ({
   AccessScreen: () => null,
 }));
+jest.mock('@/lib/notifications/localNotifications', () => ({
+  requestNotificationPermission: jest.fn(),
+}));
 
 const mockUpdateProfileCountry = updateProfileCountry as jest.Mock;
+const mockRequestNotificationPermission =
+  requestNotificationPermission as jest.Mock;
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
 const navigation = mockNavigation as never;
@@ -31,9 +40,10 @@ describe('pantallas de onboarding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdateProfileCountry.mockResolvedValue(undefined);
+    mockRequestNotificationPermission.mockResolvedValue(true);
   });
 
-  it('lleva al paso de acceso al omitir desde la bienvenida', async () => {
+  it('omite la bienvenida y lleva a la pregunta de notificaciones', async () => {
     const screen = await renderWithTheme(
       <OnboardingFlowContext.Provider value={{ completeOnboarding }}>
         <WelcomeScreen navigation={navigation} route={route} />
@@ -41,8 +51,61 @@ describe('pantallas de onboarding', () => {
     );
 
     fireEvent.press(screen.getByTestId('onboarding-welcome-skip'));
+    expect(mockNavigation.navigate).toHaveBeenLastCalledWith(
+      'NotificationsPermission',
+    );
+  });
 
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('OnboardingLogin');
+  it('omite la lámina del calendario y lleva a la pregunta de notificaciones', async () => {
+    const screen = await renderWithTheme(
+      <CalendarPreviewScreen navigation={navigation} route={route} />,
+    );
+
+    fireEvent.press(screen.getByTestId('onboarding-calendar-skip'));
+    expect(mockNavigation.navigate).toHaveBeenLastCalledWith(
+      'NotificationsPermission',
+    );
+  });
+
+  it('omite la lámina compartida y lleva a la pregunta de notificaciones', async () => {
+    const screen = await renderWithTheme(
+      <JuntosScreen navigation={navigation} route={route} />,
+    );
+
+    fireEvent.press(screen.getByTestId('onboarding-juntos-skip'));
+
+    expect(mockNavigation.navigate).toHaveBeenLastCalledWith(
+      'NotificationsPermission',
+    );
+  });
+
+  it('solicita el permiso en la nueva lámina y continúa aunque el sistema lo deniegue', async () => {
+    mockRequestNotificationPermission.mockResolvedValue(false);
+    const screen = await renderWithTheme(
+      <NotificationsPermissionScreen navigation={navigation} route={route} />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-notifications-action'));
+    });
+
+    await waitFor(() => {
+      expect(mockRequestNotificationPermission).toHaveBeenCalledTimes(1);
+      expect(mockNavigation.navigate).toHaveBeenCalledWith(
+        'CreateFirstCategory',
+      );
+    });
+  });
+
+  it('permite continuar sin solicitar notificaciones', async () => {
+    const screen = await renderWithTheme(
+      <NotificationsPermissionScreen navigation={navigation} route={route} />,
+    );
+
+    fireEvent.press(screen.getByTestId('onboarding-notifications-not-now'));
+
+    expect(mockRequestNotificationPermission).not.toHaveBeenCalled();
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('CreateFirstCategory');
   });
 
   it('guarda el checkpoint al llegar al acceso, antes de autenticarse', async () => {
@@ -72,13 +135,13 @@ describe('pantallas de onboarding', () => {
     dismissKeyboard.mockRestore();
   });
 
-  it('muestra el primer paso con la ilustración y los cinco segmentos', async () => {
+  it('muestra el primer paso con la ilustración y los once segmentos', async () => {
     const screen = await renderWithTheme(
       <NameScreen navigation={navigation} route={route} />,
     );
 
     expect(screen.getByTestId('onboarding-name-illustration')).toBeTruthy();
-    expect(screen.getByTestId('onboarding-progress-segment-5')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-progress-segment-11')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-name-back')).toBeNull();
   });
 
@@ -146,7 +209,9 @@ describe('pantallas de onboarding', () => {
       expect(screen.getByTestId('onboarding-country-selected')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByTestId('onboarding-country-action'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-country-action'));
+    });
 
     await waitFor(() => {
       expect(mockNavigation.navigate).toHaveBeenCalledWith('Welcome');

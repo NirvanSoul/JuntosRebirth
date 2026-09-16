@@ -9,6 +9,8 @@ import { useTheme } from '@/theme/useTheme';
 import { LoadingProgressProvider } from '@/components/feedback/LoadingState/LoadingProgressProvider';
 import { fontAssets } from '@/theme/fonts';
 import { markStartup } from '@/lib/diagnostics/startupTrace';
+import { preloadAppIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
+import { warmUpAuthSession } from '@/features/auth/services/googleAuth';
 
 function AppStatusBar() {
   const { isDark } = useTheme();
@@ -21,6 +23,8 @@ export function AppBootstrap() {
 
   useEffect(() => {
     void ensureNotificationHandlerRegistered();
+    void preloadAppIllustrations();
+    warmUpAuthSession();
   }, []);
 
   useEffect(() => {

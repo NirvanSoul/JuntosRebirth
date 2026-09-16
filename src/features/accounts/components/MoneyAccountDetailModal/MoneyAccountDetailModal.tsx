@@ -121,7 +121,7 @@ export function MoneyAccountDetailModal({
     [hasHistoricalValuation, selectedCurrencyTransactions],
   );
 
-  const exchangeRatesState = useExchangeRates();
+  const exchangeRatesState = useExchangeRates({ enabled: visible });
   const apiRates =
     exchangeRatesState.status === 'success' ||
     exchangeRatesState.status === 'stale'

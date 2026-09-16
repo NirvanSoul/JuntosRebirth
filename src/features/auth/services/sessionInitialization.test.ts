@@ -1,7 +1,9 @@
 import { prepareLocalCacheForSession } from '@/features/auth/services/prepareLocalCacheForSession';
 import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
-import { syncOwnCountry } from '@/features/profile/services/syncOwnCountry';
 import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
+import { syncOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
+import { syncOwnCountry } from '@/features/profile/services/syncOwnCountry';
+import { retryPendingDisplayNameSync } from '@/features/profile/services/syncOwnDisplayName';
 import { loadSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
@@ -11,7 +13,9 @@ import { initializeAuthenticatedSession } from '@/features/auth/services/session
 jest.mock('@/features/spaces/repositories/localSpaceRepository');
 jest.mock('@/features/auth/services/prepareLocalCacheForSession');
 jest.mock('@/features/profile/repositories/localProfileRepository');
+jest.mock('@/features/profile/services/syncOwnAvatar');
 jest.mock('@/features/profile/services/syncOwnCountry');
+jest.mock('@/features/profile/services/syncOwnDisplayName');
 jest.mock('@/features/profile/services/restoreOwnProfile');
 jest.mock('@/features/sync/services/bootstrapRemoteAccount');
 jest.mock('@/features/sync/services/restoreRemoteAccount');
@@ -30,6 +34,8 @@ describe('initializeAuthenticatedSession', () => {
     (getLocalProfile as jest.Mock).mockResolvedValue({ countryCode: null });
     (bootstrapRemoteAccount as jest.Mock).mockResolvedValue(undefined);
     (restoreOwnProfile as jest.Mock).mockResolvedValue(null);
+    (syncOwnAvatar as jest.Mock).mockResolvedValue(false);
+    (retryPendingDisplayNameSync as jest.Mock).mockResolvedValue(false);
     (syncSpaceDataForCurrentSession as jest.Mock).mockResolvedValue({
       categoryCount: 0,
       moneyAccountCount: 0,
@@ -47,6 +53,8 @@ describe('initializeAuthenticatedSession', () => {
     expect(prepareLocalCacheForSession).toHaveBeenCalledTimes(1);
     expect(bootstrapRemoteAccount).toHaveBeenCalled();
     expect(restoreOwnProfile).toHaveBeenCalled();
+    expect(retryPendingDisplayNameSync).toHaveBeenCalled();
+    expect(syncOwnAvatar).toHaveBeenCalled();
     expect(syncSpaceDataForCurrentSession).toHaveBeenCalledWith({
       spaceId: 'personal',
       includeLocalOnly: true,

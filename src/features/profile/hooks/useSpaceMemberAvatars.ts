@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
-import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
-import { listSpaceMemberProfiles } from '@/features/profile/repositories/localSpaceMemberProfileRepository';
+import {
+  getLocalProfile,
+  subscribeToLocalProfile,
+} from '@/features/profile/repositories/localProfileRepository';
+import {
+  listSpaceMemberProfiles,
+  subscribeToSpaceMemberProfiles,
+} from '@/features/profile/repositories/localSpaceMemberProfileRepository';
 import type { Space } from '@/features/spaces/types';
 import { useAppForeground } from '@/hooks/useAppForeground';
 
@@ -66,6 +72,25 @@ export function useSpaceMemberAvatars(
   // propio cleanup (isMounted); no es un simple derivado de render.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => loadAvatars(), [loadAvatars]);
+  useEffect(
+    () =>
+      subscribeToLocalProfile((profile) => {
+        setOwnAvatarUri(profile.avatarUri);
+      }),
+    [],
+  );
+  useEffect(() => {
+    if (!isCouple) return undefined;
+    let cancelPendingLoad: () => void = () => undefined;
+    const unsubscribe = subscribeToSpaceMemberProfiles(spaceId, () => {
+      cancelPendingLoad();
+      cancelPendingLoad = loadAvatars();
+    });
+    return () => {
+      cancelPendingLoad();
+      unsubscribe();
+    };
+  }, [isCouple, loadAvatars, spaceId]);
   useAppForeground(loadAvatars);
 
   return useMemo(

@@ -159,4 +159,23 @@ describe('SpaceSideMenu', () => {
       StyleSheet.flatten(screen.getByText('Ajustes').props.style).color,
     ).toBe(colors.textPrimary);
   });
+
+  it('resalta Espacio de pareja y desmarca el espacio personal cuando isInvitePartnerActive es true', async () => {
+    const { screen } = await renderMenu({
+      activeSpaceId: 'personal',
+      isInvitePartnerActive: true,
+      spaces: [
+        { id: 'personal', name: 'Personal', type: 'personal', currency: 'EUR' },
+      ],
+    });
+
+    const personalRow = screen.getByLabelText('Seleccionar espacio Personal');
+    expect(personalRow.props.accessibilityState?.checked).toBe(false);
+
+    const coupleButton = screen.getByLabelText('Espacio de pareja');
+    expect(coupleButton.props.accessibilityState?.selected).toBe(true);
+    expect(StyleSheet.flatten(coupleButton.props.style).borderColor).toBe(
+      colors.cta,
+    );
+  });
 });

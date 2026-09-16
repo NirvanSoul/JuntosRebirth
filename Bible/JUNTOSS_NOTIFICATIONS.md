@@ -19,6 +19,17 @@ módulo de notificaciones cuando se ejecuta dentro de Expo Go: no programa
 recordatorios ni registra tokens de invitación. Estas funciones se habilitan
 en una development build o en la aplicación distribuida.
 
+### Permiso durante el onboarding
+
+Antes de crear las primeras categorías, el onboarding explica que las
+notificaciones se usan para los recordatorios que active el usuario y para las
+invitaciones a espacios. La acción principal solicita el permiso nativo; la
+acción `Ahora no` continúa sin solicitarlo. Una denegación, un error del sistema
+o la indisponibilidad del módulo en Expo Go no bloquean el resto del onboarding.
+La solicitud reutiliza el servicio central de notificaciones y no programa
+ningún aviso por sí misma. En Android prepara primero el canal de recordatorios,
+requisito para que Android 13 o posterior pueda mostrar el diálogo de permiso.
+
 Las notificaciones deben sentirse humanas, claras y útiles. No deben parecer mensajes publicitarios ni recordatorios mecánicos.
 
 ---

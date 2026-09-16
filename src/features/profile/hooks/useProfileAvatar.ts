@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
+import {
+  getLocalProfile,
+  subscribeToLocalProfile,
+} from '@/features/profile/repositories/localProfileRepository';
 import {
   getAvatarErrorCopy,
   type AvatarErrorCopy,
@@ -49,8 +52,12 @@ export function useProfileAvatar(): ProfileAvatarState {
     void getLocalProfile().then((profile) => {
       if (isMountedRef.current) setAvatarUri(profile.avatarUri);
     });
+    const unsubscribe = subscribeToLocalProfile((profile) => {
+      if (isMountedRef.current) setAvatarUri(profile.avatarUri);
+    });
     return () => {
       isMountedRef.current = false;
+      unsubscribe();
     };
   }, []);
 

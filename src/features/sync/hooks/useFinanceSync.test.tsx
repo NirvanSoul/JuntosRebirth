@@ -3,6 +3,10 @@ import { useFinanceSync } from './useFinanceSync';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
 import { listLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
 import type { BetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
+import { syncSpaceMemberProfiles } from '@/features/profile/services/syncSpaceMemberProfiles';
+import { retryPendingDisplayNameSync } from '@/features/profile/services/syncOwnDisplayName';
+import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
+import { syncOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 
 jest.mock('@/features/sync/services/restoreRemoteAccount', () => ({
   restoreRemoteAccountForCurrentSession: jest.fn(),
@@ -25,6 +29,18 @@ jest.mock(
 );
 jest.mock('@/features/sync/services/syncCoupleSpaceData', () => ({
   syncSpaceDataForCurrentSession: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('@/features/profile/services/syncSpaceMemberProfiles', () => ({
+  syncSpaceMemberProfiles: jest.fn().mockResolvedValue(true),
+}));
+jest.mock('@/features/profile/services/syncOwnDisplayName', () => ({
+  retryPendingDisplayNameSync: jest.fn().mockResolvedValue(false),
+}));
+jest.mock('@/features/profile/services/restoreOwnProfile', () => ({
+  restoreOwnProfile: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('@/features/profile/services/syncOwnAvatar', () => ({
+  syncOwnAvatar: jest.fn().mockResolvedValue(false),
 }));
 jest.mock('@/features/transactions/services/notificationRuleService', () => ({
   reconcileNotificationRules: jest.fn().mockResolvedValue(undefined),
@@ -58,7 +74,10 @@ describe('useFinanceSync', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
+
+  afterEach(() => jest.restoreAllMocks());
 
   it('delta con 0 filas recibidas no recarga finanzas locales', async () => {
     mockRestore.mockResolvedValue({
@@ -132,6 +151,30 @@ describe('useFinanceSync', () => {
     expect(mockSetTransactions).not.toHaveBeenCalled();
   });
 
+  it('propaga un fallo del polling para que se aplique backoff', async () => {
+    const failure = new Error('network failed');
+    mockRestore.mockRejectedValue(failure);
+    const { result } = await renderHook(() =>
+      useFinanceSync({
+        refreshCoupleSpace: jest.fn(),
+        reloadCurrencyPreferences: jest.fn(),
+        reloadSpaces: mockReloadSpaces,
+        session,
+        setCategories: mockSetCategories,
+        setMoneyAccounts: mockSetMoneyAccounts,
+        setTransactions: mockSetTransactions,
+        spaces: [],
+      }),
+    );
+
+    await expect(
+      result.current.refreshSharedCoupleData(undefined, {
+        mode: 'delta',
+        propagateFailure: true,
+      }),
+    ).rejects.toBe(failure);
+  });
+
   it('modo full siempre recarga finanzas locales aunque receivedRows sea 0', async () => {
     mockRestore.mockResolvedValue({
       spaces: [],
@@ -164,5 +207,47 @@ describe('useFinanceSync', () => {
     expect(mockRestore).toHaveBeenCalledWith({ mode: 'full' });
     expect(listLocalTransactions).toHaveBeenCalledTimes(1);
     expect(mockSetTransactions).toHaveBeenCalledTimes(1);
+  });
+
+  it('refresca el nombre y la foto de los miembros del espacio compartido', async () => {
+    mockRestore.mockResolvedValue({
+      spaces: [],
+      localCategoryIdByRemoteId: new Map(),
+      localSpaceIdByRemoteId: new Map(),
+      outcome: {
+        mode: 'delta',
+        receivedRows: 0,
+        catalogueChanged: false,
+      },
+    });
+    const coupleSpace = {
+      id: 'couple-1',
+      name: 'Juntos',
+      type: 'couple' as const,
+      currency: 'EUR' as const,
+    };
+    const { result } = await renderHook(() =>
+      useFinanceSync({
+        refreshCoupleSpace: jest.fn(),
+        reloadCurrencyPreferences: jest.fn(),
+        reloadSpaces: mockReloadSpaces,
+        session,
+        setCategories: mockSetCategories,
+        setMoneyAccounts: mockSetMoneyAccounts,
+        setTransactions: mockSetTransactions,
+        spaces: [coupleSpace],
+      }),
+    );
+
+    await act(async () => {
+      await result.current.refreshSharedCoupleData(undefined, {
+        mode: 'delta',
+      });
+    });
+
+    expect(syncSpaceMemberProfiles).toHaveBeenCalledWith('couple-1');
+    expect(retryPendingDisplayNameSync).toHaveBeenCalled();
+    expect(syncOwnAvatar).toHaveBeenCalled();
+    expect(restoreOwnProfile).toHaveBeenCalled();
   });
 });

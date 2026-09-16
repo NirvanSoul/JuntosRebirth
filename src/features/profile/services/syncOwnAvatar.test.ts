@@ -10,6 +10,7 @@ const mockGetLocalAvatarUpload = jest.fn();
 const mockMarkAvatarUploadResult = jest.fn();
 const mockSaveOwnRemoteAvatar = jest.fn();
 const mockSaveDownloadedOwnAvatar = jest.fn();
+const mockRestoreRemoteProfileWithoutAvatar = jest.fn();
 const mockReadAvatarBytes = jest.fn(
   async (_uri: string) => new Uint8Array([1, 2, 3]),
 );
@@ -34,6 +35,8 @@ jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
   saveOwnRemoteAvatar: (...args: unknown[]) => mockSaveOwnRemoteAvatar(...args),
   saveDownloadedOwnAvatar: (...args: unknown[]) =>
     mockSaveDownloadedOwnAvatar(...args),
+  restoreRemoteProfileWithoutAvatar: () =>
+    mockRestoreRemoteProfileWithoutAvatar(),
 }));
 
 jest.mock('@/features/profile/services/avatarImageService', () => ({
@@ -200,5 +203,22 @@ describe('restoreOwnAvatar', () => {
       }),
     ).resolves.toBe(false);
     expect(mockGetAvatar).not.toHaveBeenCalled();
+  });
+
+  it('elimina la copia sincronizada cuando otro dispositivo borra la foto', async () => {
+    mockGetLocalAvatarUpload.mockResolvedValue({
+      localPath: 'file:///avatar.jpg',
+      syncStatus: 'synced',
+      remoteUpdatedAt: uploaded.avatarUpdatedAt,
+    });
+
+    await expect(
+      restoreOwnAvatar({
+        userId: 'uuid-ana',
+        avatarPath: null,
+        avatarUpdatedAt: null,
+      }),
+    ).resolves.toBe(true);
+    expect(mockRestoreRemoteProfileWithoutAvatar).toHaveBeenCalled();
   });
 });

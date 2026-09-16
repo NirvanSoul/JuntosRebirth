@@ -28,21 +28,22 @@ Pantalla 2 → País y moneda principal
 Pantalla 3 → Promesa principal
 Pantalla 4 → Diferenciador visual
 Pantalla 5 → Uso personal y compartido
-Pantalla 6 → Crear al menos tres categorías
-Pantalla 7 → Añadir el primer ingreso
-Pantalla 8 → Añadir el primer gasto
-Pantalla 9 → Cierre: listo para explorar
-Pantalla de acceso → Crear cuenta o iniciar sesión
+Pantalla 6 → Activar notificaciones o continuar sin ellas
+Pantalla 7 → Crear al menos tres categorías
+Pantalla 8 → Añadir el primer ingreso
+Pantalla 9 → Añadir el primer gasto
+Pantalla 10 → Cierre: listo para explorar
+Pantalla 11 (acceso) → Crear cuenta o iniciar sesión
 Inicio → Primer movimiento y estado vacío guiado
 ```
 
 Recomendación:
 
-- 8 láminas, además de la captura inicial de nombre (ampliado desde el
-  límite original de 4 por decisiones explícitas de producto sucesivas: las
-  últimas cuatro cierran el onboarding con acciones reales dentro de la app
-  —crear una categoría, registrar un ingreso y un gasto— en vez de solo
-  mensaje).
+- 9 láminas, además de la captura inicial de nombre (ampliado desde el límite
+  original de 4 por decisiones explícitas de producto sucesivas: se explica
+  el permiso de notificaciones y las últimas cuatro cierran el onboarding con
+  acciones reales dentro de la app —crear categorías, registrar un ingreso y
+  un gasto— en vez de solo mensaje).
 - No ampliar más allá sin una decisión explícita de producto.
 - Una idea principal por pantalla.
 
@@ -248,7 +249,36 @@ Cambia de espacio cuando quieras y consulta únicamente la información correspo
 
 ---
 
-# 6.1 Pantalla 6 — Crear las primeras categorías
+# 6.1 Pantalla 6 — Permiso de notificaciones
+
+## Objetivo
+
+Explicar el beneficio antes de mostrar el diálogo nativo y dejar que la persona
+continúe sin conceder el permiso.
+
+## Concepto visual
+
+Ilustración `5.5_Notificaciones.png`, seguida de encabezado, subtítulo y dos
+acciones. El permiso sirve para los recordatorios que la persona active y para
+los avisos de invitación a espacios; esta lámina no programa avisos por sí sola.
+
+## Título y subtítulo
+
+**¿Quieres activar las notificaciones?**
+Recibe recordatorios que activas y avisos cuando alguien te invite a un espacio.
+Puedes cambiarlo después en Ajustes.
+
+## Acciones
+
+- **Activar notificaciones** solicita el permiso nativo y después continúa.
+- **Ahora no** continúa sin solicitarlo.
+
+Conceder, denegar o no poder solicitar el permiso —incluido Expo Go— nunca
+bloquea el paso a las primeras categorías.
+
+---
+
+# 6.2 Pantalla 7 — Crear las primeras categorías
 
 ## Objetivo
 
@@ -284,20 +314,20 @@ El usuario debe crear al menos tres categorías, de plantilla o personalizadas.
 Cuando abre el selector de plantillas desde el onboarding, el botón Guardar
 permanece deshabilitado hasta seleccionar tres categorías; esta restricción no
 se aplica al selector usado fuera del onboarding. Solo al alcanzar ese mínimo
-se completa el paso y continúa el flujo hacia la Pantalla 7 (añadir el primer
+se completa el paso y continúa el flujo hacia la Pantalla 8 (añadir el primer
 ingreso).
 
 ---
 
-# 6.2 Pantalla 7 — Añadir el primer ingreso
+# 6.3 Pantalla 8 — Añadir el primer ingreso
 
 ## Objetivo
 
-Continuar la acción real iniciada en la Pantalla 6: con al menos tres categorías ya creadas, registrar el primer movimiento del espacio.
+Continuar la acción real iniciada en la Pantalla 7: con al menos tres categorías ya creadas, registrar el primer movimiento del espacio.
 
 ## Concepto visual
 
-Ilustración `7 Bien.png`, igual estructura que la Pantalla 6.
+Ilustración `7 Bien.png`, igual estructura que la Pantalla 7.
 
 ## Título y subtítulo
 
@@ -307,11 +337,11 @@ Registra el primer dinero que entra a tu espacio personal.
 
 ## Botón principal
 
-**Añadir ingreso**. Abre el mismo `CreateTransactionModal` que usa el resto de la aplicación para crear un movimiento, con dos diferencias exclusivas de este paso del onboarding: el selector de tipo (gasto/ingreso) no aparece —se muestra una insignia fija «Ingreso»— y el botón de guardar se tiñe de verde (`colors.income`) en vez de tomar el color de la categoría elegida. El resto del formulario —importe, calculadora, categoría (con acceso al mismo `CategoryPickerModal`/`CreateCategoryModal` de la Pantalla 6), fecha, recurrencia— es idéntico al de la app ya autenticada. Guardar el movimiento completa el paso y continúa hacia la Pantalla 8.
+**Añadir ingreso**. Abre el mismo `CreateTransactionModal` que usa el resto de la aplicación para crear un movimiento, con dos diferencias exclusivas de este paso del onboarding: el selector de tipo (gasto/ingreso) no aparece —se muestra una insignia fija «Ingreso»— y el botón de guardar se tiñe de verde (`colors.income`) en vez de tomar el color de la categoría elegida. El resto del formulario —importe, calculadora, categoría (con acceso al mismo `CategoryPickerModal`/`CreateCategoryModal` de la Pantalla 7), fecha, recurrencia— es idéntico al de la app ya autenticada. Guardar el movimiento completa el paso y continúa hacia la Pantalla 9.
 
 ---
 
-# 6.3 Pantalla 8 — Añadir el primer gasto
+# 6.4 Pantalla 9 — Añadir el primer gasto
 
 ## Objetivo
 
@@ -319,7 +349,7 @@ Cerrar el par ingreso/gasto para que el usuario vea de inmediato cómo se calcul
 
 ## Concepto visual
 
-Ilustración `8 Gastos.png`, igual estructura que las pantallas 6 y 7, pero a mayor tamaño (`illustrationScale={1.2}` sobre el tamaño estándar) para que destaque más en esta lámina de cierre del par ingreso/gasto.
+Ilustración `8 Gastos.png`, igual estructura que las pantallas 7 y 8, pero a mayor tamaño (`illustrationScale={1.2}` sobre el tamaño estándar) para que destaque más en esta lámina de cierre del par ingreso/gasto.
 
 ## Título y subtítulo
 
@@ -330,11 +360,11 @@ Registrando tus gastos tendrás un mejor panorama de tus finanzas.
 
 ## Botón principal
 
-**Añadir gasto**. Mismo mecanismo que la Pantalla 7, con la insignia fija en «Gasto» y el botón de guardar en rojo (`colors.expense`) en vez de «Ingreso»/verde. Guardar el movimiento completa el paso y continúa hacia la Pantalla 9.
+**Añadir gasto**. Mismo mecanismo que la Pantalla 8, con la insignia fija en «Gasto» y el botón de guardar en rojo (`colors.expense`) en vez de «Ingreso»/verde. Guardar el movimiento completa el paso y continúa hacia la Pantalla 10.
 
 ---
 
-# 6.4 Pantalla 9 — Cierre: listo para explorar
+# 6.5 Pantalla 10 — Cierre: listo para explorar
 
 ## Objetivo
 
@@ -369,8 +399,9 @@ Cada pantalla debe incluir:
   posterior, incluida la lámina de bienvenida/simplicidad. Solo la primera
   pantalla (captura de nombre) no lo muestra, porque no hay nada anterior a
   donde volver.
-- Opción **Omitir** en la esquina superior derecha desde la tercera pantalla:
-  solo se habilita después de guardar nombre y país y lleva a Acceso.
+- Opción **Omitir** en la esquina superior derecha únicamente en las pantallas
+  3, 4 y 5. Desde cualquiera lleva a la Pantalla 6, para preguntar por las
+  notificaciones antes de continuar con la configuración.
 
 ## Textos recomendados
 
@@ -380,21 +411,27 @@ Pantallas 1 a 5:
 - Siguiente
 - Ver cómo funciona
 
-Pantallas 6 a 8, cada una con una acción real que reemplaza a `Continuar` y que también avanza el flujo al completarse:
+Pantalla 6:
 
-- Pantalla 6: **Crear categoría**, hasta completar al menos tres.
-- Pantalla 7: **Añadir ingreso**.
-- Pantalla 8: **Añadir gasto**.
+- **Activar notificaciones**.
+- **Ahora no**.
 
-Pantalla 9 (última, cierra el onboarding):
+Pantallas 7 a 9, cada una con una acción real que reemplaza a `Continuar` y que también avanza el flujo al completarse:
+
+- Pantalla 7: **Crear categoría**, hasta completar al menos tres.
+- Pantalla 8: **Añadir ingreso**.
+- Pantalla 9: **Añadir gasto**.
+
+Pantalla 10 (última antes de Acceso, cierra la configuración local):
 
 - **Empezar**
 
 Recomendación final:
 
 - `Continuar` en las pantallas 1 a 5.
-- La acción real correspondiente (`Crear categoría` hasta completar al menos tres / `Añadir ingreso` / `Añadir gasto`) en las pantallas 6 a 8.
-- `Empezar` en la 9.
+- La decisión de notificaciones en la pantalla 6.
+- La acción real correspondiente (`Crear categoría` hasta completar al menos tres / `Añadir ingreso` / `Añadir gasto`) en las pantallas 7 a 9.
+- `Empezar` en la 10.
 
 ---
 
@@ -418,10 +455,10 @@ Permitir:
 
 ## Estructura
 
-La entrada de acceso es la décima lámina del onboarding y se dibuja con
-`OnboardingScreenLayout`, igual que las nueve anteriores: no declara medidas
+La entrada de acceso es la undécima lámina del onboarding y se dibuja con
+`OnboardingScreenLayout`, igual que las diez anteriores: no declara medidas
 propias de ilustración, tipografía ni botones. De ahí toma el indicador de
-progreso (paso 10 de 10), la ilustración `10_loginicon.png` a tamaño estándar,
+progreso (paso 11 de 11), la ilustración `10_loginicon.png` a tamaño estándar,
 el titular y el subtítulo con la misma revelación, y la altura de acción del
 resto del flujo. `Iniciar sesión` ocupa la ranura de acción secundaria, justo
 encima de `Crear cuenta`, que es la acción principal al pie.
@@ -917,7 +954,7 @@ Microtexto:
 # 24. Checklist para agentes
 
 - [ ] Leer este documento.
-- [ ] Mantener las nueve pantallas actuales en este orden: nombre, país y moneda, bienvenida, calendario, uso compartido, al menos tres categorías, primer ingreso, primer gasto, cierre.
+- [ ] Mantener las diez pantallas previas a Acceso en este orden: nombre, país y moneda, bienvenida, calendario, uso compartido, permiso de notificaciones, al menos tres categorías, primer ingreso, primer gasto, cierre.
 - [ ] Mantener una sola idea principal por pantalla.
 - [ ] No habilitar navegación de datos antes de verificar el correo.
 - [ ] Mantener claros los mensajes de error y reenvío de OTP.

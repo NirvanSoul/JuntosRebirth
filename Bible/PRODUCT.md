@@ -205,7 +205,9 @@ Objetivo financiero individual o compartido. Su implementación completa no form
 
 ### Objetivo
 
-Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y completar el flujo con nombre, país, al menos tres categorías, primer ingreso, primer gasto, cierre y acceso.
+Explicar el valor en tres láminas (bienvenida, calendario y uso compartido),
+preguntar si se permiten las notificaciones y completar el flujo con nombre,
+país, al menos tres categorías, primer ingreso, primer gasto, cierre y acceso.
 
 ### Flujo propuesto
 
@@ -214,11 +216,12 @@ Explicar el valor en tres láminas (bienvenida, calendario y uso compartido) y c
 3. Bienvenida: simplicidad y control diario.
 4. Calendario y mapa financiero.
 5. Uso personal y compartido.
-6. Creación de al menos tres categorías.
-7. Primer ingreso.
-8. Primer gasto.
-9. Cierre y listo para explorar.
-10. Acceso: iniciar sesión o crear cuenta.
+6. Activación opcional del permiso de notificaciones.
+7. Creación de al menos tres categorías.
+8. Primer ingreso.
+9. Primer gasto.
+10. Cierre y listo para explorar.
+11. Acceso: iniciar sesión o crear cuenta.
 
 El acceso a la aplicación requiere una cuenta con correo verificado.
 
@@ -231,15 +234,20 @@ El acceso a la aplicación requiere una cuenta con correo verificado.
 
 ### Reglas
 
-- Diez pantallas en total; la última reutiliza el flujo real de Acceso.
+- Once pantallas en total; la última reutiliza el flujo real de Acceso.
 - El onboarding es la primera pantalla de una instalación nueva y se marca
   como completado al llegar a Acceso, aunque la autenticación ocurra después.
 - Tras cerrar sesión, no se repite: el usuario vuelve directamente a Acceso.
-- Solo después de guardar nombre y país (desde la tercera pantalla), se puede
-  omitir desde la esquina superior derecha y pasar a la última lámina de Acceso.
-- No pedir permisos sin explicar por qué.
+- Tras guardar nombre y país, `Omitir` aparece únicamente en las tres láminas
+  de valor (control diario, calendario y uso compartido). Desde cualquiera de
+  ellas lleva a la pregunta de notificaciones; no salta la configuración
+  restante ni el acceso.
+- La lámina de notificaciones explica que los avisos sirven para recordatorios
+  activados e invitaciones. `Activar notificaciones` solicita el permiso nativo
+  y `Ahora no` continúa sin solicitarlo. Conceder o denegar nunca bloquea el
+  paso a categorías.
 - Pedir un primer ingreso y un primer gasto al final, para dejar el espacio local con datos reales.
-- En los pasos 6, 7 y 8, enseñar la creación con el mismo botón flotante y el
+- En los pasos 7, 8 y 9, enseñar la creación con el mismo botón flotante y el
   mismo menú de opciones de la app; las acciones ajenas al paso permanecen
   visibles pero deshabilitadas.
 - La transición entre láminas usa un fundido breve y el segmento del paso que
@@ -490,12 +498,12 @@ no se muestra.
 
 Presenta los gastos e ingresos del espacio activo en un calendario continuo con
 desplazamiento vertical entre meses. El calendario ocupa todo el ancho de la
-pantalla, mientras el nombre de la sección y su explicación permanecen fijos
-arriba con el gutter habitual. Debajo de la explicación, una pestaña con el
-mismo fondo blanco que el calendario muestra el mes enfocado —su nombre en
-negrita y el año con menor énfasis— unida sin separación a la superficie del
-calendario, como una pestaña que nace de ella; se actualiza con el mes que
-domina la pantalla tanto en la vista mensual como en la semanal. Dentro de la
+pantalla, mientras el nombre de la sección permanece fijo arriba con el gutter
+habitual. Debajo del título, una pestaña con el mismo fondo blanco que el
+calendario muestra el mes enfocado —su nombre en negrita y el año con menor
+énfasis— unida sin separación a la superficie del calendario, como una pestaña
+que nace de ella; se actualiza con el mes que domina la pantalla tanto en la
+vista mensual como en la semanal. Dentro de la
 vista mensual, la fila Lun-Dom queda fija en la parte superior del calendario y
 solo los números se desplazan debajo: el nombre del mes y los días de la semana
 ya no se repiten dentro de cada bloque mensual. Los gastos se marcan en rojo y
@@ -551,9 +559,8 @@ Los números de todos los meses mantienen el mismo contraste, sin cambios de
 opacidad ligados al foco o al scroll. Las marcas quedan separadas del fondo de
 selección para conservar su legibilidad.
 
-El bloque fijo de nombre, explicación y pestaña de mes conserva además una
-separación superior amplia para no quedar cubierto por el selector flotante de
-espacio. Al
+El bloque fijo de nombre y pestaña de mes conserva además una separación
+superior amplia para no quedar cubierto por el selector flotante de espacio. Al
 alejarse seis meses o más del mes actual aparece, a la izquierda de la acción
 global de creación, el botón `Volver a hoy`: usa doble flecha hacia arriba al
 recorrer meses futuros y hacia abajo al recorrer meses antiguos. El botón se
@@ -569,7 +576,13 @@ Los espacios no ocupan una pestaña.
 ### Ajustes
 
 Se accede desde la acción inferior del menú lateral de espacios y se presenta
-como una pantalla independiente, sin ocupar una pestaña principal. Reúne:
+como una pantalla independiente, sin ocupar una pestaña principal.
+
+La flecha de la cabecera y el gesto horizontal de izquierda a derecha regresan
+a Inicio sin cambiar el espacio que estaba activo al abrir Ajustes; ese gesto no
+abre el menú lateral desde esta pantalla.
+
+Reúne:
 
 - Estado del perfil y de la cuenta.
 - Preferencias de moneda, idioma, apariencia y privacidad de importes.
@@ -856,19 +869,26 @@ Un usuario registrado puede crear un espacio, invitar a otra persona y comenzar 
 Principios:
 
 - Unirse no fusiona espacios personales.
+- Cada cuenta puede pertenecer a un único espacio de pareja activo, incluido un
+  espacio propio que todavía esté esperando a la otra persona. La API garantiza
+  este límite también ante solicitudes simultáneas.
 - La invitación se dirige exclusivamente al correo de una cuenta existente;
   la app no genera enlaces manuales para compartir.
 - Si el correo no tiene cuenta, no se crea la invitación y quien invita debe
   pedir a esa persona que descargue Juntoss y se registre con ese correo.
-- Avanzar hasta el campo de correo no crea todavía ningún espacio. El primer
-  espacio de pareja y su invitación se confirman juntos al pulsar enviar; cerrar
-  el modal antes de ese éxito conserva Personal como espacio activo y nunca
-  muestra una espera falsa.
+- Sin una invitación activa, «Espacio de pareja» muestra el formulario de
+  correo integrado en Inicio: conserva la cabecera global y las acciones
+  flotantes, no añade una flecha ni una cabecera secundaria, y presenta la
+  ilustración de la pareja. Abrir el formulario no crea todavía ningún espacio.
+  El primer espacio de pareja y su invitación se confirman juntos al pulsar
+  enviar; hasta ese éxito, Personal conserva el espacio activo y nunca muestra
+  una espera falsa.
 - Mientras la invitación confirmada no haya sido aceptada, ese espacio solo
   permite Inicio con la pantalla de espera: Actividad y Mapa permanecen
   deshabilitados y no exponen datos ni acciones del espacio pendiente.
 - La invitación guardada y visible dentro de la app es la fuente de verdad. El
   push es un aviso inmediato adicional cuando el dispositivo tiene permisos.
+- Al recibir una invitación dirigida a la sesión, se muestra un popup modal centrado con fondo difuminado en ambos espacios (personal y de pareja) con el título «[Nombre] te invitó a un espacio juntos», un icono morado sin fondo a la izquierda, una lista con 3 beneficios con checkmarks morados y líneas divisorias entre cada uno, y las acciones «Aceptar» y «Cancelar». Aceptar redirige de inmediato al espacio de pareja compartido; cancelar envía la notificación de rechazo al backend y cierra el popup.
 - Los datos personales permanecen aislados.
 - Los movimientos compartidos conservan autor.
 - Salir revoca solo el acceso de quien lo solicita.

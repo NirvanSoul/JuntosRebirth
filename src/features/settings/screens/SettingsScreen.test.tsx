@@ -3,6 +3,10 @@ import { loadCountryChangeNotice } from '@/features/spaces/repositories/countryC
 import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import { Alert, StyleSheet } from 'react-native';
+import {
+  fireGestureHandler,
+  getByGestureTestId,
+} from 'react-native-gesture-handler/jest-utils';
 
 import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
 import {
@@ -43,6 +47,7 @@ jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
     displayName: null,
     countryCode: null,
   })),
+  subscribeToLocalProfile: jest.fn(() => () => undefined),
   subscribeToLocalProfileCountry: jest.fn(() => () => undefined),
 }));
 
@@ -168,12 +173,11 @@ describe('SettingsScreen', () => {
     expect(
       StyleSheet.flatten(screen.getByTestId('settings-header').props.style),
     ).toMatchObject({
+      alignItems: 'center',
       backgroundColor: colors.background,
+      flexDirection: 'row',
       justifyContent: 'flex-start',
     });
-    expect(
-      screen.getByTestId('settings-screen').props.stickyHeaderIndices,
-    ).toEqual([0]);
     expect(
       StyleSheet.flatten(screen.getByTestId('settings-back-icon').props.style)
         .color,
@@ -230,6 +234,17 @@ describe('SettingsScreen', () => {
     const { props, screen } = await renderScreen();
 
     await fireEvent.press(screen.getByLabelText('Volver'));
+    expect(props.onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('permite volver con un gesto de izquierda a derecha', async () => {
+    const { props } = await renderScreen();
+    const backSwipe = getByGestureTestId('settings-back-swipe');
+
+    fireGestureHandler(backSwipe, [{ translationX: -100 }]);
+    expect(props.onBack).not.toHaveBeenCalled();
+
+    fireGestureHandler(backSwipe);
     expect(props.onBack).toHaveBeenCalledTimes(1);
   });
 
@@ -490,6 +505,21 @@ describe('SettingsScreen', () => {
 
     expect(alertSpy).toHaveBeenCalledWith(
       'Cerrar sesión',
+      expect.any(String),
+      expect.any(Array),
+    );
+    alertSpy.mockRestore();
+  });
+
+  it('muestra la acción temporal para reiniciar el onboarding', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+    const { screen } = await renderScreen();
+
+    expect(screen.getByText('Reiniciar onboarding')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Reiniciar onboarding'));
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Reiniciar onboarding',
       expect.any(String),
       expect.any(Array),
     );

@@ -129,8 +129,8 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
     });
   };
 
-  // La entrada es la décima lámina del onboarding: se dibuja con la misma
-  // estructura que las nueve anteriores (progreso, ilustración a tamaño
+  // La entrada es la undécima lámina del onboarding: se dibuja con la misma
+  // estructura que las diez anteriores (progreso, ilustración a tamaño
   // estándar, titular revelado y acción principal al pie) en vez de repetir
   // aquí sus medidas. El resto de pasos conserva el andamiaje con scroll,
   // porque son formularios que conviven con el teclado.
@@ -138,7 +138,7 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
     return (
       <OnboardingScreenLayout
         actionLabel="Crear cuenta"
-        currentStep={10}
+        currentStep={11}
         illustrationAspectRatio={entryIllustrationAspectRatio}
         illustrationSource={require('../../../../assets/Onboarding/10_loginicon.png')}
         onAction={() => setStep({ screen: 'signup', step: 1 })}

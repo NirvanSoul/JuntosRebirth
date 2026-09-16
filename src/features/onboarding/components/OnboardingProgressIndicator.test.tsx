@@ -10,5 +10,6 @@ describe('OnboardingProgressIndicator', () => {
     expect(screen.getByTestId('onboarding-story-segment-3-fill')).toBeTruthy();
     expect(screen.getByTestId('onboarding-story-segment-4-fill')).toBeTruthy();
     expect(screen.getByTestId('onboarding-story-segment-5-fill')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-story-segment-11-fill')).toBeTruthy();
   });
 });

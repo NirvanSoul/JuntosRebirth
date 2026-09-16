@@ -8,11 +8,16 @@ import { CountryScreen } from '@/features/onboarding/screens/CountryScreen';
 import { CreateFirstCategoryScreen } from '@/features/onboarding/screens/CreateFirstCategoryScreen';
 import { JuntosScreen } from '@/features/onboarding/screens/JuntosScreen';
 import { NameScreen } from '@/features/onboarding/screens/NameScreen';
+import { NotificationsPermissionScreen } from '@/features/onboarding/screens/NotificationsPermissionScreen';
 import { ReadyToExploreScreen } from '@/features/onboarding/screens/ReadyToExploreScreen';
 import { OnboardingLoginScreen } from '@/features/onboarding/screens/OnboardingLoginScreen';
 import { WelcomeScreen } from '@/features/onboarding/screens/WelcomeScreen';
 import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { preloadOnboardingIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
+import {
+  coolDownAuthSession,
+  warmUpAuthSession,
+} from '@/features/auth/services/googleAuth';
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
@@ -20,6 +25,7 @@ export type OnboardingStackParamList = {
   Country: undefined;
   CalendarPreview: undefined;
   Juntos: undefined;
+  NotificationsPermission: undefined;
   CreateFirstCategory: undefined;
   AddFirstIncome: undefined;
   AddFirstExpense: undefined;
@@ -36,6 +42,10 @@ type OnboardingNavigatorProps = {
 export function OnboardingNavigator({ onComplete }: OnboardingNavigatorProps) {
   useEffect(() => {
     void preloadOnboardingIllustrations();
+    warmUpAuthSession();
+    return () => {
+      coolDownAuthSession();
+    };
   }, []);
 
   return (
@@ -55,6 +65,10 @@ export function OnboardingNavigator({ onComplete }: OnboardingNavigatorProps) {
           name="CalendarPreview"
         />
         <Stack.Screen component={JuntosScreen} name="Juntos" />
+        <Stack.Screen
+          component={NotificationsPermissionScreen}
+          name="NotificationsPermission"
+        />
         <Stack.Screen
           component={CreateFirstCategoryScreen}
           name="CreateFirstCategory"

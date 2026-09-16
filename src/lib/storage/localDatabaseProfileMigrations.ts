@@ -1,6 +1,6 @@
 import type * as SQLite from 'expo-sqlite';
 
-/** Migraciones locales 17–19, 26 y 28 del perfil y de los miembros de un espacio. */
+/** Migraciones locales del perfil propio y de los miembros de un espacio. */
 export async function applyLocalProfileMigrations(
   transaction: SQLite.SQLiteDatabase,
   currentVersion: number,
@@ -72,6 +72,17 @@ export async function applyLocalProfileMigrations(
   if (currentVersion < 28) {
     await transaction.execAsync(`
       ALTER TABLE local_profile ADD COLUMN country_code TEXT;
+    `);
+  }
+
+  if (currentVersion < 31) {
+    // Distingue una edición todavía local de una copia ya confirmada por la
+    // API. Las instalaciones existentes parten como `synced`: antes de esta
+    // versión no había una prueba fiable de que quedara una escritura pendiente.
+    await transaction.execAsync(`
+      ALTER TABLE local_profile ADD COLUMN display_name_sync_status TEXT NOT NULL
+        DEFAULT 'synced'
+        CHECK (display_name_sync_status IN ('pending', 'synced', 'failed'));
     `);
   }
 }

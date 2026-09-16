@@ -4,6 +4,7 @@ import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
 import { Screen } from '@/components/layout/Screen/Screen';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
+import { HomeEntrance } from '@/features/dashboard/components/HomeEntrance';
 import {
   createJuntossInvitationGateway,
   type OutgoingInvitation,
@@ -25,7 +26,7 @@ export function getAnimatedWaitingTitle(frame: number) {
 }
 
 type AwaitingPartnerScreenProps = {
-  onCancelSpace: () => Promise<void>;
+  onCancelInvitation: () => Promise<void>;
   onChangeInvitation: () => void;
   onRefresh: () => Promise<void>;
   space: Space;
@@ -38,7 +39,7 @@ type AwaitingPartnerScreenProps = {
  * paso que falta: que la otra persona abra su app y acepte.
  */
 export function AwaitingPartnerScreen({
-  onCancelSpace,
+  onCancelInvitation,
   onChangeInvitation,
   onRefresh,
   space,
@@ -87,16 +88,24 @@ export function AwaitingPartnerScreen({
     }
   };
 
+  const confirmInvitationCancellation = async () => {
+    try {
+      await onCancelInvitation();
+    } catch {
+      // El contenedor ya muestra el error de la operación remota.
+    }
+  };
+
   const handleCancel = () => {
     Alert.alert(
-      'Cancelar espacio juntos',
-      `Se descartará "${space.name}" y la invitación dejará de ser válida. Podrás crear otro cuando quieras.`,
+      'Cancelar invitación',
+      `La invitación a “${space.name}” dejará de ser válida. Podrás enviar otra cuando quieras.`,
       [
         { style: 'cancel', text: 'Volver' },
         {
           style: 'destructive',
-          text: 'Cancelar espacio',
-          onPress: () => void onCancelSpace(),
+          text: 'Cancelar invitación',
+          onPress: () => void confirmInvitationCancellation(),
         },
       ],
     );
@@ -108,62 +117,66 @@ export function AwaitingPartnerScreen({
     <Screen testID="awaiting-partner-screen">
       <View style={styles.panel}>
         <View style={styles.waitingMessage}>
-          <Image
-            accessible={false}
-            resizeMode="contain"
-            source={require('../../../../assets/Onboarding/Waiting.png')}
-            style={styles.waitingIllustration}
-            testID="awaiting-partner-illustration"
-          />
+          <HomeEntrance>
+            <Image
+              accessible={false}
+              resizeMode="contain"
+              source={require('../../../../assets/Onboarding/Waiting.png')}
+              style={styles.waitingIllustration}
+              testID="awaiting-partner-illustration"
+            />
 
-          <View style={styles.copy}>
-            <Text
-              align="center"
-              accessibilityLabel={`${waitingTitle}...`}
-              accessibilityRole="header"
-              testID="awaiting-partner-title"
-              variant="heading"
-            >
-              {animatedTitle}
-            </Text>
-            <Text align="center" tone="secondary" variant="body">
-              {invitation?.inviteeEmail
-                ? `Pídele a ${invitation.inviteeEmail} que abra su app de Juntos: en Inicio le espera un aviso para unirse a “${space.name}”.`
-                : `Pídele a la persona que invitaste que abra su app de Juntos: en Inicio le espera un aviso para unirse a “${space.name}”.`}
-            </Text>
-          </View>
+            <View style={styles.copy}>
+              <Text
+                align="center"
+                accessibilityLabel={`${waitingTitle}...`}
+                accessibilityRole="header"
+                testID="awaiting-partner-title"
+                variant="heading"
+              >
+                {animatedTitle}
+              </Text>
+              <Text align="center" tone="secondary" variant="body">
+                {invitation?.inviteeEmail
+                  ? `Pídele a ${invitation.inviteeEmail} que abra su app de Juntos: en Inicio le espera un aviso para unirse a “${space.name}”.`
+                  : `Pídele a la persona que invitaste que abra su app de Juntos: en Inicio le espera un aviso para unirse a “${space.name}”.`}
+              </Text>
+            </View>
+          </HomeEntrance>
         </View>
 
         <View style={styles.actions}>
-          <ModalPrimaryAction
-            accessibilityLabel="Comprobar si ya aceptaron la invitación"
-            disabled={isRefreshing}
-            label={isRefreshing ? 'Comprobando…' : 'Ya aceptó, comprobar'}
-            onPress={() => void handleRefresh()}
-            testID="awaiting-partner-refresh"
-            variant="cta"
-          />
-          <ModalPrimaryAction
-            accessibilityLabel="Cambiar o reenviar la invitación"
-            label="Cambiar invitación"
-            onPress={onChangeInvitation}
-            testID="awaiting-partner-change"
-            variant="surface"
-          />
-          <Pressable
-            accessibilityLabel="Cancelar espacio juntos"
-            accessibilityRole="button"
-            onPress={handleCancel}
-            style={({ pressed }) => [
-              styles.cancelButton,
-              pressed ? styles.cancelButtonPressed : null,
-            ]}
-            testID="awaiting-partner-cancel"
-          >
-            <Text tone="secondary" variant="footnote" weight="semibold">
-              Cancelar espacio juntos
-            </Text>
-          </Pressable>
+          <HomeEntrance startIndex={2}>
+            <ModalPrimaryAction
+              accessibilityLabel="Comprobar si ya aceptaron la invitación"
+              disabled={isRefreshing}
+              label={isRefreshing ? 'Comprobando…' : 'Ya aceptó, comprobar'}
+              onPress={() => void handleRefresh()}
+              testID="awaiting-partner-refresh"
+              variant="cta"
+            />
+            <ModalPrimaryAction
+              accessibilityLabel="Cambiar o reenviar la invitación"
+              label="Cambiar invitación"
+              onPress={onChangeInvitation}
+              testID="awaiting-partner-change"
+              variant="surface"
+            />
+            <Pressable
+              accessibilityLabel="Cancelar invitación"
+              accessibilityRole="button"
+              onPress={handleCancel}
+              style={({ pressed }) => [
+                styles.cancelButton,
+                pressed ? styles.cancelButtonPressed : null,
+              ]}
+              testID="awaiting-partner-cancel"
+            >
+              <Text tone="secondary" variant="footnote" weight="semibold">
+                Cancelar invitación
+              </Text>
+            </Pressable>
+          </HomeEntrance>
         </View>
       </View>
     </Screen>

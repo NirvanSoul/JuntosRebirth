@@ -1,10 +1,15 @@
+import { act } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
 import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
+import type { SpaceMemberProfile } from '@/features/profile/types';
 import { useTransactionAuthor } from '@/features/transactions/hooks/useTransactionAuthor';
 import { formatAuthorName } from '@/features/transactions/utils/transactionAuthor';
 import type { Space } from '@/features/spaces/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
+
+let mockMemberProfiles: SpaceMemberProfile[];
+let mockMemberProfileSubscriber: (() => void) | null;
 
 jest.mock('@/features/legal/services/authenticatedUser', () => ({
   getAuthenticatedUserId: jest.fn(async () => 'uuid-ana'),
@@ -13,22 +18,15 @@ jest.mock('@/features/legal/services/authenticatedUser', () => ({
 jest.mock(
   '@/features/profile/repositories/localSpaceMemberProfileRepository',
   () => ({
-    listSpaceMemberProfiles: jest.fn(async () => [
-      {
-        userId: 'uuid-ana',
-        displayName: 'Ana',
-        avatarPath: null,
-        avatarUpdatedAt: null,
-        avatarUri: null,
+    listSpaceMemberProfiles: jest.fn(async () => mockMemberProfiles),
+    subscribeToSpaceMemberProfiles: jest.fn(
+      (_spaceId: string, subscriber: () => void) => {
+        mockMemberProfileSubscriber = subscriber;
+        return () => {
+          mockMemberProfileSubscriber = null;
+        };
       },
-      {
-        userId: 'uuid-beto',
-        displayName: 'Beto',
-        avatarPath: null,
-        avatarUpdatedAt: null,
-        avatarUri: null,
-      },
-    ]),
+    ),
   }),
 );
 
@@ -76,6 +74,28 @@ function AuthorProbe({ createdBy }: { createdBy: string }) {
 }
 
 describe('useTransactionAuthor', () => {
+  beforeEach(() => {
+    mockMemberProfiles = [
+      {
+        userId: 'uuid-ana',
+        displayName: 'Ana',
+        avatarPath: null,
+        avatarUpdatedAt: null,
+        avatarUri: null,
+        defaultCurrency: null,
+      },
+      {
+        userId: 'uuid-beto',
+        displayName: 'Beto',
+        avatarPath: null,
+        avatarUpdatedAt: null,
+        avatarUri: null,
+        defaultCurrency: null,
+      },
+    ];
+    mockMemberProfileSubscriber = null;
+  });
+
   it('nombra a la otra persona en un espacio juntos', async () => {
     const screen = await renderWithTheme(
       <SpaceMembershipProvider space={coupleSpace}>
@@ -114,5 +134,25 @@ describe('useTransactionAuthor', () => {
     );
 
     expect(await screen.findByText('Desconocido')).toBeTruthy();
+  });
+
+  it('actualiza el nombre de otro autor cuando cambia el censo local', async () => {
+    const screen = await renderWithTheme(
+      <SpaceMembershipProvider space={coupleSpace}>
+        <AuthorProbe createdBy="uuid-beto" />
+      </SpaceMembershipProvider>,
+    );
+    expect(await screen.findByText('Beto')).toBeTruthy();
+
+    mockMemberProfiles = mockMemberProfiles.map((profile) =>
+      profile.userId === 'uuid-beto'
+        ? { ...profile, displayName: 'Roberto' }
+        : profile,
+    );
+    await act(async () => {
+      mockMemberProfileSubscriber?.();
+    });
+
+    expect(await screen.findByText('Roberto')).toBeTruthy();
   });
 });

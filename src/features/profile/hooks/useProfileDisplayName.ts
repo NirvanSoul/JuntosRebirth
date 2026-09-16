@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
+import {
+  getLocalProfile,
+  subscribeToLocalProfile,
+} from '@/features/profile/repositories/localProfileRepository';
 import { updateProfileDisplayName } from '@/features/profile/services/updateProfileDisplayName';
 
 export type ProfileDisplayNameState = {
@@ -29,8 +32,12 @@ export function useProfileDisplayName(): ProfileDisplayNameState {
     void getLocalProfile().then((profile) => {
       if (isMountedRef.current) setDisplayName(profile.displayName);
     });
+    const unsubscribe = subscribeToLocalProfile((profile) => {
+      if (isMountedRef.current) setDisplayName(profile.displayName);
+    });
     return () => {
       isMountedRef.current = false;
+      unsubscribe();
     };
   }, []);
 

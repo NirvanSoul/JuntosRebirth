@@ -6,6 +6,7 @@ import type {
 } from '@/features/sync/gateways/juntossRemoteAccountGateway';
 import {
   loadRemoteEntityLinks,
+  reconcileRemoteEntityLink,
   upsertRemoteEntityLink,
   type RemoteEntityType,
 } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
@@ -312,7 +313,31 @@ export async function applyRemoteCollections(
         )) ?? null;
     }
 
-    const transactionId = (await linkTransaction(remoteTransaction.remoteId))!;
+    // `(serie, fecha)` identifica una ocurrencia mejor que su UUID de réplica.
+    // Un snapshot legado puede contener dos UUIDs para esa clave; conserva la
+    // fila local existente y enlaza el UUID remoto a ella antes del UPSERT.
+    const canonicalOccurrence = remoteTransaction.recurrenceSeriesRemoteId
+      ? await transaction.getFirstAsync<{ id: string }>(
+          `SELECT id FROM transactions
+            WHERE space_id = ? AND recurrence_series_id = ? AND occurred_on = ?
+            LIMIT 1`,
+          spaceId,
+          remoteTransaction.recurrenceSeriesRemoteId,
+          remoteTransaction.occurredOn,
+        )
+      : null;
+    const transactionId =
+      canonicalOccurrence?.id ??
+      (await linkTransaction(remoteTransaction.remoteId))!;
+    if (canonicalOccurrence) {
+      await reconcileRemoteEntityLink({
+        executor: transaction,
+        userId: input.userId,
+        entityType: 'transaction',
+        remoteId: remoteTransaction.remoteId,
+        localId: transactionId,
+      });
+    }
     await transaction.runAsync(
       `INSERT INTO transactions (
          id, space_id, category_id, money_account_id, created_by, type,

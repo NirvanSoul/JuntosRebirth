@@ -1,28 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Fragment, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text/Text';
+import { SpaceCreationView } from '@/features/spaces/components/SpaceCreationView';
 import { isAwaitingPartnerSpace, type Space } from '@/features/spaces/types';
-import { fontFamily } from '@/theme/fonts';
 import { iconSize, minTouchTarget } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens, ThemeShadows } from '@/theme/types';
-import { typography } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type SpaceSideMenuProps = {
   activeSpaceId: string;
+  isInvitePartnerActive?: boolean;
   onClose: () => void;
   onCreateSpace: (name: string) => Promise<Space>;
   onInvitePartner: () => void;
@@ -37,6 +30,7 @@ const spaceRowHeight = 64,
 
 export function SpaceSideMenu({
   activeSpaceId,
+  isInvitePartnerActive = false,
   onClose,
   onCreateSpace,
   onInvitePartner,
@@ -48,46 +42,20 @@ export function SpaceSideMenu({
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const [isCreating, setCreating] = useState(false);
-  const [isSaving, setSaving] = useState(false);
-  const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const hasCoupleSpace = spaces.some((space) => space.type === 'couple');
   const orderedSpaces = [...spaces].sort((first, second) => {
     const order = { personal: 0, couple: 1, other: 2 };
     return order[first.type] - order[second.type];
   });
-
-  const cancelCreation = () => {
-    setCreating(false);
-    setName('');
-    setError(null);
-  };
   const showSelectionError = () =>
     setError('No pudimos cambiar de espacio. Inténtalo de nuevo.');
 
-  const submitSpace = async () => {
-    if (isSaving) return;
-
-    setSaving(true);
-    setError(null);
-    try {
-      await onCreateSpace(name);
-      cancelCreation();
-      onClose();
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : 'No pudimos crear el espacio.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const selectSpace = (spaceId: string) => {
     setError(null);
-    return onSelectSpace(spaceId).then(onClose).catch(showSelectionError);
+    return Promise.resolve(onSelectSpace(spaceId))
+      .then(onClose)
+      .catch(showSelectionError);
   };
 
   return (
@@ -115,66 +83,14 @@ export function SpaceSideMenu({
       </View>
 
       {isCreating ? (
-        <View style={styles.createContent}>
-          <Text tone="secondary" variant="body">
-            Ponle un nombre que te ayude a reconocer este espacio.
-          </Text>
-          <View style={styles.field}>
-            <Text variant="label" weight="semibold">
-              Nombre
-            </Text>
-            <TextInput
-              accessibilityLabel="Nombre del nuevo espacio"
-              autoCapitalize="sentences"
-              autoCorrect={false}
-              maxLength={40}
-              onChangeText={setName}
-              placeholder="Por ejemplo, Casa"
-              placeholderTextColor={colors.textMuted}
-              returnKeyType="done"
-              style={styles.input}
-              value={name}
-            />
-            {error ? (
-              <Text tone="expense" variant="footnote">
-                {error}
-              </Text>
-            ) : null}
-          </View>
-          <View style={styles.createActions}>
-            <Pressable
-              accessibilityRole="button"
-              disabled={isSaving}
-              onPress={cancelCreation}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed ? styles.pressed : null,
-              ]}
-            >
-              <Text variant="label" weight="semibold">
-                Cancelar
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: isSaving }}
-              disabled={isSaving}
-              onPress={() => void submitSpace()}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed ? styles.primaryPressed : null,
-              ]}
-            >
-              {isSaving ? (
-                <ActivityIndicator color={colors.onBrand} />
-              ) : (
-                <Text tone="onBrand" variant="label" weight="semibold">
-                  Crear espacio
-                </Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
+        <SpaceCreationView
+          onCancel={() => setCreating(false)}
+          onSubmit={async (createdName) => {
+            await onCreateSpace(createdName);
+            setCreating(false);
+            onClose();
+          }}
+        />
       ) : (
         <>
           <ScrollView
@@ -187,7 +103,8 @@ export function SpaceSideMenu({
               Elige dónde quieres organizar tus movimientos.
             </Text>
             {orderedSpaces.map((space) => {
-              const isActive = space.id === activeSpaceId;
+              const isActive =
+                !isInvitePartnerActive && space.id === activeSpaceId;
 
               return (
                 <Fragment key={space.id}>
@@ -198,8 +115,8 @@ export function SpaceSideMenu({
                     onPress={() => void selectSpace(space.id)}
                     style={({ pressed }) => [
                       styles.spaceRow,
-                      isActive ? styles.spaceRowActive : null,
-                      pressed ? styles.pressed : null,
+                      isActive && styles.spaceRowActive,
+                      pressed && styles.pressed,
                     ]}
                   >
                     <View style={styles.spaceIcon}>
@@ -239,10 +156,12 @@ export function SpaceSideMenu({
                       accessibilityHint="Invita a tu pareja a compartir un espacio"
                       accessibilityLabel="Espacio de pareja"
                       accessibilityRole="button"
+                      accessibilityState={{ selected: isInvitePartnerActive }}
                       onPress={onInvitePartner}
                       style={({ pressed }) => [
                         styles.coupleSpaceButton,
-                        pressed ? styles.pressed : null,
+                        isInvitePartnerActive && styles.spaceRowActive,
+                        pressed && styles.pressed,
                       ]}
                     >
                       <View style={styles.spaceIcon}>
@@ -260,6 +179,13 @@ export function SpaceSideMenu({
                       >
                         Espacio de pareja
                       </Text>
+                      {isInvitePartnerActive ? (
+                        <Ionicons
+                          color={colors.cta}
+                          name="checkmark-circle"
+                          size={iconSize.md}
+                        />
+                      ) : null}
                     </Pressable>
                   ) : null}
                 </Fragment>
@@ -283,7 +209,7 @@ export function SpaceSideMenu({
               onPress={onOpenSettings}
               style={({ pressed }) => [
                 styles.settingsButton,
-                pressed ? styles.pressed : null,
+                pressed && styles.pressed,
               ]}
             >
               <Ionicons
@@ -328,51 +254,6 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     },
     pressed: {
       opacity: 0.68,
-    },
-    createContent: {
-      flex: 1,
-      gap: spacing.xl,
-    },
-    field: {
-      gap: spacing.sm,
-    },
-    input: {
-      minHeight: minTouchTarget,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-      color: colors.textPrimary,
-      fontFamily: fontFamily.light,
-      fontSize: typography.body.fontSize,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-    },
-    createActions: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-      marginTop: 'auto',
-      paddingBottom: spacing.lg,
-    },
-    secondaryButton: {
-      minHeight: minTouchTarget,
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radii.round,
-    },
-    primaryButton: {
-      minHeight: minTouchTarget,
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-      backgroundColor: colors.cta,
-    },
-    primaryPressed: {
-      backgroundColor: colors.ctaPressed,
     },
     spaceList: {
       gap: spacing.sm,

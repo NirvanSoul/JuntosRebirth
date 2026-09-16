@@ -481,6 +481,7 @@ export function ActivityScreen({
               bordered={summaryPinned}
               compact
               comparisonPeriodLabel={comparisonPeriodLabel}
+              currency={effectiveCurrency}
               expenseComparison={expenseComparison}
               expenseMinor={filteredSummary.expenseMinor}
               incomeComparison={incomeComparison}

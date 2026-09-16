@@ -36,6 +36,7 @@ jest.mock('@/features/onboarding/hooks/useOnboardingCompletion', () => ({
     complete: jest.fn(),
     hasCompleted: mockOnboardingCompleted,
     isReady: mockOnboardingReady,
+    reset: jest.fn(),
   }),
 }));
 

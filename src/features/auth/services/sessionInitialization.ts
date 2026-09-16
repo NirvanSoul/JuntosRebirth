@@ -3,8 +3,10 @@ import {
   prepareLocalCacheForSession,
 } from '@/features/auth/services/prepareLocalCacheForSession';
 import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
-import { syncOwnCountry } from '@/features/profile/services/syncOwnCountry';
 import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
+import { syncOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
+import { syncOwnCountry } from '@/features/profile/services/syncOwnCountry';
+import { retryPendingDisplayNameSync } from '@/features/profile/services/syncOwnDisplayName';
 import { loadSpaces } from '@/features/spaces/repositories/localSpaceRepository';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
@@ -74,6 +76,8 @@ async function performSessionInitialization(
 
   await bootstrapRemoteAccount();
   const remoteCountryCode = await restoreOwnProfile();
+  await retryPendingDisplayNameSync();
+  await syncOwnAvatar();
 
   // El onboarding puede haber elegido el país antes de que existiera una
   // sesión. Publícalo ahora, antes de pedir el snapshot: así el servidor crea

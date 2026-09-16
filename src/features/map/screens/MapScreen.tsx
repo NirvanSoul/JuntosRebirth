@@ -384,10 +384,6 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
             <Text accessibilityRole="header" variant="heading">
               Mapa
             </Text>
-            <Text tone="secondary" variant="body">
-              Mira tus movimientos de forma mensual o semanal, toca un día para
-              ver los detalles.
-            </Text>
             <View style={styles.controlsRow}>
               <View style={themedStyles.monthTab} testID="map-month-tab">
                 <Text variant="bodyStrong">
@@ -555,7 +551,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.none,
   },
   intro: {
-    gap: spacing.xs,
+    gap: spacing.sm,
     paddingTop: spacing.huge,
   },
   controlsRow: {
@@ -564,7 +560,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     gap: spacing.sm,
-    marginTop: spacing.sm,
   },
   viewTogglePressed: { opacity: 0.68 },
   calendarViewport: { flex: 1, position: 'relative' },

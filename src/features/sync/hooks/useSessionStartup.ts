@@ -23,7 +23,7 @@ export { sharedDataMaxBackoffMs, sharedDataRefreshIntervalMs };
 type SessionStartupInput = {
   refreshSharedCoupleData: (
     partition?: string,
-    options?: { mode?: 'full' | 'delta' },
+    options?: { mode?: 'full' | 'delta'; propagateFailure?: boolean },
   ) => Promise<void>;
   reloadLocalFinance: () => Promise<void>;
   reloadSpaces: () => Promise<void>;
@@ -176,7 +176,11 @@ export function useSessionStartup(
 
   useSharedDataPolling({
     enabled: isSessionSynced && Boolean(session),
-    onPoll: () => refreshSharedCoupleData(undefined, { mode: 'delta' }),
+    onPoll: () =>
+      refreshSharedCoupleData(undefined, {
+        mode: 'delta',
+        propagateFailure: true,
+      }),
   });
 
   return { dismissSyncIssue, isFinanceReady, retrySession, syncIssue };

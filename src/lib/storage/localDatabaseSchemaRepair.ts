@@ -50,6 +50,28 @@ export async function ensureLocalProfileCountryCodeColumn(
 }
 
 /**
+ * Misma salvaguarda que `ensureLocalProfileDisplayNameColumn`, para
+ * `local_profile.display_name_sync_status`.
+ */
+export async function ensureLocalProfileDisplayNameSyncStatusColumn(
+  database: SQLite.SQLiteDatabase,
+): Promise<void> {
+  const columns = await database.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(local_profile)',
+  );
+  const hasColumn = columns.some(
+    (column) => column.name === 'display_name_sync_status',
+  );
+  if (!hasColumn) {
+    await database.execAsync(
+      `ALTER TABLE local_profile ADD COLUMN display_name_sync_status TEXT NOT NULL
+        DEFAULT 'synced'
+        CHECK (display_name_sync_status IN ('pending', 'synced', 'failed'))`,
+    );
+  }
+}
+
+/**
  * Repara una instalación que ya llegó a la versión 29, pero cuya build
  * intermedia marcó la versión antes de añadir las columnas de tasas. Sin esta
  * comprobación la restauración remota falla al recibir un movimiento creado

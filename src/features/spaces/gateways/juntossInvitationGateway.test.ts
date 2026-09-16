@@ -4,7 +4,7 @@ import { apiClient } from '@/services/api/juntossApiClient';
 import { listRemoteSpaces } from '@/services/api/spaces';
 
 jest.mock('@/services/api/juntossApiClient', () => ({
-  apiClient: { get: jest.fn(), post: jest.fn() },
+  apiClient: { delete: jest.fn(), get: jest.fn(), post: jest.fn() },
 }));
 jest.mock('@/services/api/spaces', () => ({
   listRemoteSpaces: jest.fn(async () => []),
@@ -78,27 +78,65 @@ describe('createCoupleSpaceInvitation', () => {
     );
   });
 
-  it('no reutiliza un espacio de pareja ya activo ni uno ajeno', async () => {
+  it.each([
+    ['activo', { activatedAt: '2026-09-01T11:00:00.000Z' }],
+    ['ajeno', { role: 'member' }],
+  ])('no crea un segundo espacio cuando el actual es %s', async (_, state) => {
     jest
       .mocked(listRemoteSpaces)
       .mockResolvedValueOnce([
-        remoteSpace({ activatedAt: '2026-09-01T11:00:00.000Z' }),
-        remoteSpace({ id: 'space-2', role: 'member' }),
-        remoteSpace({ id: 'space-3', type: 'personal' }),
+        remoteSpace(state),
+        remoteSpace({ id: 'space-personal', type: 'personal' }),
       ]);
-    jest
-      .mocked(apiClient.post)
-      .mockResolvedValueOnce({ data: { space: { id: 'space-nuevo' } } })
-      .mockResolvedValueOnce(invitationResponse);
 
-    const result =
-      await createJuntossInvitationGateway().createCoupleSpaceInvitation(
+    await expect(
+      createJuntossInvitationGateway().createCoupleSpaceInvitation(
         'Juntos',
         'EUR',
         'pareja@example.test',
+      ),
+    ).rejects.toMatchObject({ code: 'already_in_couple_space' });
+
+    expect(apiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('traduce el límite devuelto al crear para cubrir dos envíos simultáneos', async () => {
+    jest.mocked(apiClient.post).mockRejectedValueOnce(
+      new ApiError({
+        status: 409,
+        code: 'COUPLE_SPACE_LIMIT',
+        message: 'You already have an active shared space.',
+      }),
+    );
+
+    await expect(
+      createJuntossInvitationGateway().createCoupleSpaceInvitation(
+        'Juntos',
+        'EUR',
+        'pareja@example.test',
+      ),
+    ).rejects.toMatchObject({ code: 'already_in_couple_space' });
+  });
+
+  it('explica cuando la persona invitada ya tiene espacio de pareja', async () => {
+    jest
+      .mocked(apiClient.post)
+      .mockResolvedValueOnce({ data: { space: { id: 'space-nuevo' } } })
+      .mockRejectedValueOnce(
+        new ApiError({
+          status: 409,
+          code: 'COUPLE_SPACE_LIMIT',
+          message: 'You already have an active shared space.',
+        }),
       );
 
-    expect(result.spaceId).toBe('space-nuevo');
+    await expect(
+      createJuntossInvitationGateway().createCoupleSpaceInvitation(
+        'Juntos',
+        'EUR',
+        'pareja@example.test',
+      ),
+    ).rejects.toMatchObject({ code: 'invitee_already_in_couple_space' });
   });
 });
 
@@ -117,5 +155,52 @@ describe('acceptInvitation', () => {
     await expect(
       createJuntossInvitationGateway().acceptInvitation('token-1'),
     ).rejects.toMatchObject({ code: 'space_country_mismatch' });
+  });
+
+  it('traduce la guarda única de pareja al aceptar', async () => {
+    jest.mocked(apiClient.post).mockRejectedValue(
+      new ApiError({
+        status: 409,
+        code: 'COUPLE_SPACE_LIMIT',
+        message: 'You already have an active shared space.',
+      }),
+    );
+
+    await expect(
+      createJuntossInvitationGateway().acceptInvitation('token-1'),
+    ).rejects.toMatchObject({ code: 'already_in_couple_space' });
+  });
+});
+
+describe('revokeInvitation', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('revoca la invitación pendiente sin usar la salida del espacio', async () => {
+    await createJuntossInvitationGateway().revokeInvitation('space-1', 'inv-1');
+
+    expect(apiClient.delete).toHaveBeenCalledWith(
+      '/v1/spaces/space-1/invitations/inv-1',
+    );
+    expect(apiClient.post).not.toHaveBeenCalledWith(
+      '/v1/spaces/space-1/members/leave',
+      {},
+    );
+  });
+});
+
+describe('rejectCurrentUserInvitation', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('llama al endpoint de rechazo con el id de invitación', async () => {
+    jest.mocked(apiClient.post).mockResolvedValueOnce({ data: {} });
+
+    await createJuntossInvitationGateway().rejectCurrentUserInvitation?.(
+      'inv-42',
+    );
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/invitations/inv-42/reject',
+      {},
+    );
   });
 });

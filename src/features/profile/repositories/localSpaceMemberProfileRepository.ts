@@ -2,6 +2,27 @@ import type { SpaceMemberProfile } from '@/features/profile/types';
 import { isCurrencyCode } from '@/lib/currency/currencyCatalog';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 
+const subscribersBySpaceId = new Map<string, Set<() => void>>();
+
+/** Avisa cuando el censo cacheado de un espacio cambia. */
+export function subscribeToSpaceMemberProfiles(
+  spaceId: string,
+  subscriber: () => void,
+): () => void {
+  const subscribers = subscribersBySpaceId.get(spaceId) ?? new Set();
+  subscribers.add(subscriber);
+  subscribersBySpaceId.set(spaceId, subscribers);
+
+  return () => {
+    subscribers.delete(subscriber);
+    if (subscribers.size === 0) subscribersBySpaceId.delete(spaceId);
+  };
+}
+
+function publishSpaceMemberProfiles(spaceId: string): void {
+  subscribersBySpaceId.get(spaceId)?.forEach((subscriber) => subscriber());
+}
+
 type SpaceMemberProfileRow = {
   user_id: string;
   display_name: string | null;
@@ -58,6 +79,7 @@ export async function saveSpaceMemberAvatarCache(
     spaceId,
     userId,
   );
+  publishSpaceMemberProfiles(spaceId);
 }
 
 /**
@@ -111,4 +133,5 @@ export async function replaceSpaceMemberProfiles(
       );
     }
   });
+  publishSpaceMemberProfiles(spaceId);
 }

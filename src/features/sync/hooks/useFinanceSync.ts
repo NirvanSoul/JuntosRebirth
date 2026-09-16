@@ -7,6 +7,10 @@ import type { BetterAuthSession } from '@/features/auth/hooks/useBetterAuthSessi
 import { endExpiredSession } from '@/features/auth/services/expiredSession';
 import { listLocalCategories } from '@/features/categories/repositories/localCategoryRepository';
 import type { Category } from '@/features/categories/types';
+import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
+import { syncOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
+import { retryPendingDisplayNameSync } from '@/features/profile/services/syncOwnDisplayName';
+import { syncSpaceMemberProfiles } from '@/features/profile/services/syncSpaceMemberProfiles';
 import { isAwaitingPartnerSpace, type Space } from '@/features/spaces/types';
 import { restoreRemoteAccountForCurrentSession } from '@/features/sync/services/restoreRemoteAccount';
 import { syncSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
@@ -31,7 +35,7 @@ type FinanceSyncController = {
   /** Sube lo pendiente y baja el snapshot remoto; sin `spaceId`, de todos. */
   refreshSharedCoupleData: (
     spaceId?: string,
-    options?: { mode?: 'full' | 'delta' },
+    options?: { mode?: 'full' | 'delta'; propagateFailure?: boolean },
   ) => Promise<void>;
   /** Comprueba el espacio de pareja antes de sincronizar sus datos. */
   refreshCoupleSpaceAndData: () => Promise<void>;
@@ -95,10 +99,39 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
     }
   }, [session, spaces]);
 
+  const refreshMemberProfiles = useCallback(
+    async (spaceId?: string): Promise<void> => {
+      await retryPendingDisplayNameSync();
+      await syncOwnAvatar();
+      try {
+        await restoreOwnProfile();
+      } catch (error) {
+        console.error(
+          '[profiles] Restauración del perfil propio falló:',
+          error,
+        );
+      }
+      const sharedSpaces = spaces.filter(
+        (space) =>
+          space.type !== 'personal' &&
+          !isAwaitingPartnerSpace(space) &&
+          (!spaceId || space.id === spaceId),
+      );
+      for (const space of sharedSpaces) {
+        try {
+          await syncSpaceMemberProfiles(space.id);
+        } catch (error) {
+          console.error('[profiles] Sincronización del censo falló:', error);
+        }
+      }
+    },
+    [spaces],
+  );
+
   const refreshSharedCoupleData = useCallback(
     async (
       spaceId?: string,
-      options?: { mode?: 'full' | 'delta' },
+      options?: { mode?: 'full' | 'delta'; propagateFailure?: boolean },
     ): Promise<void> => {
       if (!session) return;
 
@@ -125,12 +158,26 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
           await reloadLocalFinance();
         }
       } catch (error) {
-        console.error('[sync] Restauración remota falló:', error);
         // Un 401 tardío de una instancia desmontada pertenece a la sesión anterior.
         if (isMountedRef.current) void endExpiredSession(error);
+        // El polling necesita observar el rechazo para aplicar su backoff.
+        // Es un reintento previsto de fondo, no un error accionable para quien
+        // usa la app: no se ensucia la consola con cada corte transitorio.
+        if (options?.propagateFailure) throw error;
+        // Las acciones explícitas de interfaz conservan el diagnóstico actual
+        // y siguen mostrando la caché local.
+        console.error('[sync] Restauración remota falló:', error);
       }
+      await refreshMemberProfiles(spaceId);
     },
-    [reloadLocalFinance, reloadSpaces, session, syncAllUserSpaces, spaces],
+    [
+      refreshMemberProfiles,
+      reloadLocalFinance,
+      reloadSpaces,
+      session,
+      syncAllUserSpaces,
+      spaces,
+    ],
   );
 
   const refreshCoupleSpaceAndData = useCallback(async (): Promise<void> => {

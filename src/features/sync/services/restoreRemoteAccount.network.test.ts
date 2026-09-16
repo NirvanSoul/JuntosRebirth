@@ -21,6 +21,7 @@ jest.mock('./restoreRemoteImportReviews', () => ({
   restoreRemoteImportReviews: jest.fn(),
 }));
 jest.mock('@/features/spaces/repositories/localSpaceRepository', () => ({
+  getSpacesCatalogueRevision: jest.fn(() => 0),
   loadSpaces: async () => ({ spaces: [], activeSpaceId: null }),
   saveSpaces: jest.fn(),
   updateSpaces: jest.fn(async (mutate: (stored: unknown) => unknown) =>

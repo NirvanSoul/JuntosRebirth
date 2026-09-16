@@ -6,8 +6,10 @@ import { createJuntossInvitationGateway } from '@/features/spaces/gateways/junto
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
 import {
   createSpaceId,
+  getSpacesCatalogueRevision,
   loadSpaces,
   saveSpaces,
+  subscribeToSpaces,
   updateSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
 import { personalSpace, type Space } from '@/features/spaces/types';
@@ -70,6 +72,7 @@ function createGatewayStub(
     createCoupleSpaceInvitation: jest.fn(),
     createInvitation: jest.fn(),
     leaveCoupleSpace: jest.fn(),
+    revokeInvitation: jest.fn(),
     getCurrentUserPendingInvitation: jest.fn(),
     getInvitationPreview: jest.fn(),
     getOutgoingInvitation: jest.fn(),
@@ -79,15 +82,38 @@ function createGatewayStub(
 }
 
 describe('useSpaces (espacio de pareja y multidivisa)', () => {
+  let spacesListener:
+    ((state: Awaited<ReturnType<typeof loadSpaces>>) => void) | null;
+  let catalogueRevision: number;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    catalogueRevision = 0;
+    jest
+      .mocked(getSpacesCatalogueRevision)
+      .mockImplementation(() => catalogueRevision);
+    spacesListener = null;
+    jest.mocked(subscribeToSpaces).mockImplementation((listener) => {
+      spacesListener = listener;
+      return () => {
+        if (spacesListener === listener) spacesListener = null;
+      };
+    });
     jest.mocked(saveSpaces).mockResolvedValue(undefined);
     // El doble reproduce el contrato real: lee lo guardado, aplica la
     // mutación y solo escribe si cambió.
-    jest.mocked(updateSpaces).mockImplementation(async (mutate) => {
+    jest.mocked(updateSpaces).mockImplementation(async (mutate, options) => {
       const stored = await loadSpaces();
+      if (
+        options?.ifCatalogueRevision !== undefined &&
+        options.ifCatalogueRevision !== catalogueRevision
+      ) {
+        return stored;
+      }
       const next = mutate(stored);
       if (next !== stored) await saveSpaces(next);
+      if (next.spaces !== stored.spaces) catalogueRevision += 1;
+      spacesListener?.(next);
       return next;
     });
     jest.mocked(createSpaceId).mockReturnValue('space-generated');
@@ -126,7 +152,10 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
       activeSpaceId: coupleSpace.id,
       spaces: [personalSpace, coupleSpace],
     });
-    mockRemoteCoupleSpace({ data: coupleSpace, error: null });
+    mockRemoteCoupleSpace({
+      data: { ...coupleSpace, activated_at: null },
+      error: null,
+    });
 
     const { result, rerender } = await renderHook(() => useSpaces());
 
@@ -474,6 +503,48 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     });
   });
 
+  it('una comprobación remota antigua no elimina un Juntos recién creado', async () => {
+    mockAuthSession(fakeSession);
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace],
+    });
+    let resolveRemote:
+      | ((spaces: Awaited<ReturnType<typeof listRemoteSpaces>>) => void)
+      | undefined;
+    jest.mocked(listRemoteSpaces).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRemote = resolve;
+      }),
+    );
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue(
+      createGatewayStub({
+        createCoupleSpaceInvitation: jest.fn().mockResolvedValue({
+          spaceId: 'space-new-couple',
+          invitationId: 'invitation-new',
+          expiresAt: '2026-09-01T00:00:00Z',
+        }),
+      }),
+    );
+
+    const { result } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(listRemoteSpaces).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await result.current.createCoupleSpaceInvitation('pareja@example.com');
+    });
+    await act(async () => {
+      resolveRemote?.([]);
+    });
+    await waitFor(() => expect(updateSpaces).toHaveBeenCalledTimes(2));
+
+    expect(result.current.spaces.map((space) => space.id)).toEqual([
+      personalSpace.id,
+      'space-new-couple',
+    ]);
+    expect(result.current.activeSpace.id).toBe('space-new-couple');
+  });
+
   it('createSpace crea un espacio local con la moneda de preferencias', async () => {
     mockAuthSession(fakeSession);
     jest.mocked(loadCurrencyPreferences).mockResolvedValue({
@@ -498,6 +569,45 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
       type: 'other',
       currency: 'USD',
     });
+  });
+
+  it('createSpace conserva el catálogo que una restauración publicó mientras esperaba', async () => {
+    mockAuthSession(fakeSession);
+    const restoredSpace: Space = {
+      id: 'space-restored',
+      name: 'Restaurado',
+      type: 'other',
+      currency: 'EUR',
+    };
+    jest
+      .mocked(loadSpaces)
+      .mockResolvedValueOnce({
+        activeSpaceId: personalSpace.id,
+        spaces: [personalSpace],
+      })
+      .mockResolvedValue({
+        activeSpaceId: personalSpace.id,
+        spaces: [personalSpace, restoredSpace],
+      });
+    jest.mocked(listRemoteSpaces).mockReturnValue(new Promise(() => undefined));
+
+    const { result } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+
+    await act(async () => {
+      await result.current.createSpace('Viaje');
+    });
+
+    expect(result.current.spaces).toEqual([
+      personalSpace,
+      restoredSpace,
+      {
+        id: 'space-generated',
+        name: 'Viaje',
+        type: 'other',
+        currency: 'EUR',
+      },
+    ]);
   });
 
   it('persiste el espacio como VES al recibir una invitación a un espacio VES aunque el receptor tenga preferencias en EUR', async () => {
@@ -576,6 +686,16 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
         'No pudimos comprobar tu espacio de pareja por un error de integridad.',
       );
     });
+
+    await act(async () => {
+      spacesListener?.({
+        activeSpaceId: personalSpace.id,
+        spaces: [personalSpace],
+      });
+    });
+    expect(result.current.error).toBe(
+      'No pudimos comprobar tu espacio de pareja por un error de integridad.',
+    );
 
     consoleErrorSpy.mockRestore();
   });
@@ -697,6 +817,144 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     });
 
     expect(gateway.leaveCoupleSpace).toHaveBeenCalledWith('space-remote');
+    expect(result.current.spaces).toEqual([personalSpace]);
+    expect(result.current.activeSpace.id).toBe(personalSpace.id);
+  });
+
+  it('una comprobación remota antigua no repone un Juntos abandonado', async () => {
+    mockAuthSession(fakeSession);
+    const coupleSpace: Space = {
+      id: 'space-remote',
+      name: 'Juntos',
+      type: 'couple',
+      currency: 'EUR',
+    };
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: coupleSpace.id,
+      spaces: [personalSpace, coupleSpace],
+    });
+    let resolveRemote:
+      | ((spaces: Awaited<ReturnType<typeof listRemoteSpaces>>) => void)
+      | undefined;
+    jest.mocked(listRemoteSpaces).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRemote = resolve;
+      }),
+    );
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue(
+      createGatewayStub({
+        leaveCoupleSpace: jest.fn().mockResolvedValue(undefined),
+      }),
+    );
+
+    const { result } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(listRemoteSpaces).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await result.current.leaveCoupleSpace();
+    });
+    await act(async () => {
+      resolveRemote?.([
+        {
+          id: coupleSpace.id,
+          name: coupleSpace.name,
+          type: coupleSpace.type,
+          currency: coupleSpace.currency,
+          activatedAt: '2026-08-16T12:00:00.000Z',
+        },
+      ] as unknown as Awaited<ReturnType<typeof listRemoteSpaces>>);
+    });
+    await waitFor(() => expect(updateSpaces).toHaveBeenCalledTimes(2));
+
+    expect(result.current.spaces).toEqual([personalSpace]);
+    expect(result.current.activeSpace.id).toBe(personalSpace.id);
+  });
+
+  it('leaveCoupleSpace conserva espacios restaurados mientras esperaba al backend', async () => {
+    mockAuthSession(fakeSession);
+    const coupleSpace: Space = {
+      id: 'space-remote',
+      name: 'Juntos',
+      type: 'couple',
+      currency: 'EUR',
+    };
+    const restoredSpace: Space = {
+      id: 'space-restored',
+      name: 'Restaurado',
+      type: 'other',
+      currency: 'EUR',
+    };
+    jest
+      .mocked(loadSpaces)
+      .mockResolvedValueOnce({
+        activeSpaceId: coupleSpace.id,
+        spaces: [personalSpace, coupleSpace],
+      })
+      .mockResolvedValue({
+        activeSpaceId: coupleSpace.id,
+        spaces: [personalSpace, coupleSpace, restoredSpace],
+      });
+    jest.mocked(listRemoteSpaces).mockReturnValue(new Promise(() => undefined));
+    const gateway = createGatewayStub({
+      leaveCoupleSpace: jest.fn().mockResolvedValue(undefined),
+    });
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue(gateway);
+
+    const { result } = await renderHook(() => useSpaces());
+    await waitFor(() =>
+      expect(result.current.spaces).toEqual([personalSpace, coupleSpace]),
+    );
+
+    await act(async () => {
+      await result.current.leaveCoupleSpace();
+    });
+
+    expect(result.current.spaces).toEqual([personalSpace, restoredSpace]);
+    expect(result.current.activeSpace.id).toBe(personalSpace.id);
+  });
+
+  it('revoca la invitación pendiente y vuelve al espacio Personal', async () => {
+    mockAuthSession(fakeSession);
+    const coupleSpace: Space = {
+      id: 'space-remote',
+      name: 'Juntos',
+      type: 'couple',
+      currency: 'EUR',
+      isAwaitingPartner: true,
+    };
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: coupleSpace.id,
+      spaces: [personalSpace, coupleSpace],
+    });
+    mockRemoteCoupleSpace({
+      data: { ...coupleSpace, activated_at: null },
+      error: null,
+    });
+    const gateway = createGatewayStub({
+      getOutgoingInvitation: jest.fn().mockResolvedValue({
+        id: 'invitation-1',
+        inviteeEmail: 'pareja@example.test',
+        expiresAt: '2026-09-20T10:00:00.000Z',
+      }),
+      revokeInvitation: jest.fn().mockResolvedValue(undefined),
+    });
+    jest.mocked(createJuntossInvitationGateway).mockReturnValue(gateway);
+
+    const { result } = await renderHook(() => useSpaces());
+    await waitFor(() =>
+      expect(result.current.spaces).toEqual([personalSpace, coupleSpace]),
+    );
+
+    await act(async () => {
+      await result.current.cancelPendingCoupleInvitation();
+    });
+
+    expect(gateway.getOutgoingInvitation).toHaveBeenCalledWith('space-remote');
+    expect(gateway.revokeInvitation).toHaveBeenCalledWith(
+      'space-remote',
+      'invitation-1',
+    );
+    expect(gateway.leaveCoupleSpace).not.toHaveBeenCalled();
     expect(result.current.spaces).toEqual([personalSpace]);
     expect(result.current.activeSpace.id).toBe(personalSpace.id);
   });

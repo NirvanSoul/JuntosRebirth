@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
-import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
-import { listSpaceMemberProfiles } from '@/features/profile/repositories/localSpaceMemberProfileRepository';
+import {
+  getLocalProfile,
+  subscribeToLocalProfile,
+} from '@/features/profile/repositories/localProfileRepository';
+import {
+  listSpaceMemberProfiles,
+  subscribeToSpaceMemberProfiles,
+} from '@/features/profile/repositories/localSpaceMemberProfileRepository';
 import { syncOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { syncSpaceMemberProfiles } from '@/features/profile/services/syncSpaceMemberProfiles';
 import type { SpaceMemberProfile } from '@/features/profile/types';
@@ -92,6 +98,31 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
   }, [isShared, load, spaceId]);
 
   useEffect(() => refresh(), [refresh]);
+  useEffect(() => {
+    let isMounted = true;
+    const reload = () => {
+      void load()
+        .then((nextMembership) => {
+          if (isMounted) setMembership(nextMembership);
+        })
+        .catch((error) => {
+          console.error('[profiles] no se pudo releer el censo local', {
+            spaceId,
+            error,
+          });
+        });
+    };
+    const unsubscribeOwnProfile = subscribeToLocalProfile(reload);
+    const unsubscribeMemberProfiles = isShared
+      ? subscribeToSpaceMemberProfiles(spaceId, reload)
+      : () => undefined;
+
+    return () => {
+      isMounted = false;
+      unsubscribeOwnProfile();
+      unsubscribeMemberProfiles();
+    };
+  }, [isShared, load, spaceId]);
   useAppForeground(refresh);
 
   return membership;

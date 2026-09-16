@@ -13,11 +13,10 @@ export function AddFirstIncomeScreen({ navigation }: Props) {
 
   return (
     <AddFirstTransactionStep
-      currentStep={7}
+      currentStep={8}
       illustrationAspectRatio={incomeIllustrationAspectRatio}
       illustrationSource={require('../../../../assets/Onboarding/7_Bien.png')}
       onBack={() => navigation.goBack()}
-      onSkip={() => navigation.navigate('OnboardingLogin')}
       onSaved={() => navigation.navigate('AddFirstExpense')}
       spaceId={activeSpace.id}
       spaceName={activeSpace.name}

@@ -8,8 +8,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.juntoss.app",
+      "bundleIdentifier": "com.aoraestudio.juntoss",
       "infoPlist": {
+        "CFBundleDevelopmentRegion": "es",
+        "CFBundleLocalizations": ["es"],
         "UIApplicationSceneManifest": {
           "UIApplicationSupportsMultipleScenes": false,
           "UISceneConfigurations": {
@@ -56,6 +58,12 @@
         }
       ],
       "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.518884531876-sb1bhtaksbglhg780gqadvjmcl4j03n2"
+        }
+      ],
       "./plugins/withIosBuildFixes"
     ]
   }

@@ -77,6 +77,7 @@ describe('CreateFirstCategoryScreen', () => {
     expect(
       screen.queryByTestId('onboarding-create-category-action'),
     ).toBeNull();
+    expect(screen.queryByTestId('onboarding-create-category-skip')).toBeNull();
     expect(
       screen.getByLabelText('Crear ingreso').props.accessibilityState,
     ).toMatchObject({

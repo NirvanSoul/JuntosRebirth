@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
 import { Screen } from '@/components/layout/Screen/Screen';
@@ -17,6 +18,7 @@ import {
 import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
 import { summarizeCategories } from '@/features/categories/utils/categorySummary';
+import { HomeEntrance } from '@/features/dashboard/components/HomeEntrance';
 import { IncomeExpenseArc } from '@/features/dashboard/components/IncomeExpenseArc/IncomeExpenseArc';
 import { TransactionPeriodModal } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal';
 import { getPreviousPeriodTransactions } from '@/features/dashboard/utils/transactionPeriod';
@@ -38,6 +40,7 @@ import {
 import { formatCurrency } from '@/lib/currency/formatCurrency';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
+import { getStartupEntering } from '@/theme/transitions';
 import { useTheme } from '@/theme/useTheme';
 
 const recentTransactionLimit = 8;
@@ -63,6 +66,11 @@ type HomeScreenProps = {
   onViewMovements?: () => void;
   /** Cambia al reenfocar la pantalla para reiniciar el arco de balance. */
   focusResetKey?: number;
+  /**
+   * Cambia al cambiar de espacio o de moneda para que todos los bloques
+   * repitan la animación de entrada en lugar de saltar de golpe.
+   */
+  revealKey?: string;
   topContent?: ReactNode;
   /** Muestra el % de cambio de Ingresos/Gastos frente al mes anterior. */
   showComparisonIndicators?: boolean;
@@ -86,6 +94,7 @@ export function HomeScreen({
   onViewAccounts,
   onViewCategories,
   onViewMovements,
+  revealKey,
   showComparisonIndicators = false,
   spaceCurrency = defaultCurrencyCode,
   topContent,
@@ -174,154 +183,161 @@ export function HomeScreen({
         scrollRef={scrollRef}
         testID="home-screen"
       >
-        {topContent}
-        <IncomeExpenseArc
-          expenseMinor={summary.monthExpenseMinor}
-          incomeMinor={summary.monthIncomeMinor}
-          resetKey={focusResetKey}
-          testID="home-income-expense-arc"
-        >
-          <Pressable
-            accessibilityLabel={`Balance disponible: ${balance}`}
-            accessibilityRole="button"
-            onPress={() => setBalanceModalVisible(true)}
-            style={({ pressed }) => [
-              styles.balanceHero,
-              pressed ? styles.balanceHeroPressed : null,
-            ]}
-            testID="home-balance-hero"
+        <HomeEntrance revealKey={revealKey}>
+          {topContent}
+          <IncomeExpenseArc
+            expenseMinor={summary.monthExpenseMinor}
+            incomeMinor={summary.monthIncomeMinor}
+            resetKey={focusResetKey}
+            testID="home-income-expense-arc"
           >
-            <Text align="center" tone="secondary" variant="label">
-              Balance disponible
-            </Text>
-            <Text
-              adjustsFontSizeToFit
-              align="center"
-              minimumFontScale={0.6}
-              numberOfLines={1}
-              style={styles.balanceAmount}
-              testID="home-balance"
-              variant="amountHero"
+            <Pressable
+              accessibilityLabel={`Balance disponible: ${balance}`}
+              accessibilityRole="button"
+              onPress={() => setBalanceModalVisible(true)}
+              style={({ pressed }) => [
+                styles.balanceHero,
+                pressed ? styles.balanceHeroPressed : null,
+              ]}
+              testID="home-balance-hero"
             >
-              {balance}
-            </Text>
-          </Pressable>
-        </IncomeExpenseArc>
+              <Text align="center" tone="secondary" variant="label">
+                Balance disponible
+              </Text>
+              <Text
+                adjustsFontSizeToFit
+                align="center"
+                minimumFontScale={0.6}
+                numberOfLines={1}
+                style={styles.balanceAmount}
+                testID="home-balance"
+                variant="amountHero"
+              >
+                {balance}
+              </Text>
+            </Pressable>
+          </IncomeExpenseArc>
 
-        <TransactionSummaryBadges
-          accessibilityContext="de este mes"
-          comparisonPlacement="title"
-          currency={currency}
-          expenseComparison={expenseComparison}
-          expenseMinor={summary.monthExpenseMinor}
-          incomeComparison={incomeComparison}
-          incomeMinor={summary.monthIncomeMinor}
-          onExpensePress={() => setExpenseModalVisible(true)}
-          onIncomePress={() => setIncomeModalVisible(true)}
-          style={styles.monthBadges}
-          testIDPrefix="home"
-        />
-
-        <HomeSectionHeader onViewMore={onViewCategories} title="Categorías" />
-        {categorySummaries.length > 0 ? (
-          <ScrollView
-            contentContainerStyle={[
-              styles.categoryList,
-              {
-                paddingHorizontal: layout.screenGutter[density],
-                paddingVertical: spacing.md,
-              },
-            ]}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={[
-              styles.categoryScroller,
-              { marginHorizontal: -layout.screenGutter[density] },
-            ]}
-            testID="home-category-scroller"
-          >
-            {categorySummaries.map(({ id, ...category }) => (
-              <CategoryPreviewCard
-                key={id}
-                {...category}
-                budgetExpenseMinor={budgetExpenseByCategoryId.get(id) ?? 0}
-                displayCurrency={currency}
-                onPress={() => onOpenCategoryDetail?.(id)}
-                spaceCurrency={spaceCurrency}
-                variant="tile"
-              />
-            ))}
-            {onCreateCategory ? (
-              <CreatePreviewBadge
-                accessibilityLabel="Crear categoría"
-                label="Crear categoría"
-                onPress={onCreateCategory}
-                testID="home-category-create-badge"
-              />
-            ) : null}
-          </ScrollView>
-        ) : (
-          <EmptyState
-            accessibilityLabel="Crear primera categoría"
-            description="Crea una categoría para organizar tus movimientos."
-            icon="pie-chart-outline"
-            iconBackgroundColor={colors.categoryAction}
-            onPress={onCreateCategory}
-            testID="home-empty-categories"
-            title="Aún no hay categorías"
+          <TransactionSummaryBadges
+            animateEntrance
+            accessibilityContext="de este mes"
+            comparisonPlacement="title"
+            currency={currency}
+            expenseComparison={expenseComparison}
+            expenseMinor={summary.monthExpenseMinor}
+            incomeComparison={incomeComparison}
+            incomeMinor={summary.monthIncomeMinor}
+            onExpensePress={() => setExpenseModalVisible(true)}
+            onIncomePress={() => setIncomeModalVisible(true)}
+            style={styles.monthBadges}
+            testIDPrefix="home"
           />
-        )}
 
-        <HomeSectionHeader onViewMore={onViewAccounts} title="Cuentas" />
-        {moneyAccountSummaries.length > 0 ? (
-          <MoneyAccountCarousel
-            accounts={moneyAccountSummaries}
-            gutter={layout.screenGutter[density]}
-            onCreateMoneyAccount={onCreateMoneyAccount}
-            onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
-            testID="home-account-scroller"
-          />
-        ) : (
-          <EmptyState
-            accessibilityLabel="Crear primera cuenta"
-            description="Crea una cuenta para saber cuánto te queda en cada sitio."
-            icon="wallet-outline"
-            iconBackgroundColor={colors.cta}
-            onPress={onCreateMoneyAccount}
-            testID="home-empty-accounts"
-            title="Aún no hay cuentas"
-          />
-        )}
-
-        <HomeSectionHeader
-          onViewMore={onViewMovements}
-          title="Movimientos Recientes"
-        />
-        {transactionsThroughCurrentMonth.length > 0 ? (
-          <>
-            <TransactionPreviewList
-              categories={categories}
-              groupingTransactions={transactions}
-              limit={recentTransactionLimit}
-              onOpenTransactionDetail={onOpenTransactionDetail}
-              testID="home-transaction-preview-list"
-              transactions={recentTransactions}
+          <HomeSectionHeader onViewMore={onViewCategories} title="Categorías" />
+          {categorySummaries.length > 0 ? (
+            <ScrollView
+              contentContainerStyle={[
+                styles.categoryList,
+                {
+                  paddingHorizontal: layout.screenGutter[density],
+                  paddingVertical: spacing.md,
+                },
+              ]}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={[
+                styles.categoryScroller,
+                { marginHorizontal: -layout.screenGutter[density] },
+              ]}
+              testID="home-category-scroller"
+            >
+              {categorySummaries.map(({ id, ...category }, index) => (
+                <Animated.View
+                  key={id}
+                  entering={getStartupEntering(index + 3)}
+                >
+                  <CategoryPreviewCard
+                    {...category}
+                    budgetExpenseMinor={budgetExpenseByCategoryId.get(id) ?? 0}
+                    displayCurrency={currency}
+                    onPress={() => onOpenCategoryDetail?.(id)}
+                    spaceCurrency={spaceCurrency}
+                    variant="tile"
+                  />
+                </Animated.View>
+              ))}
+              {onCreateCategory ? (
+                <CreatePreviewBadge
+                  accessibilityLabel="Crear categoría"
+                  label="Crear categoría"
+                  onPress={onCreateCategory}
+                  testID="home-category-create-badge"
+                />
+              ) : null}
+            </ScrollView>
+          ) : (
+            <EmptyState
+              accessibilityLabel="Crear primera categoría"
+              icon="pie-chart-outline"
+              iconBackgroundColor={colors.categoryAction}
+              onPress={onCreateCategory}
+              testID="home-empty-categories"
+              title="Crea una categoría"
             />
-            {transactionsThroughCurrentMonth.length > recentTransactionLimit ? (
-              <HomeTransactionListFooter onPress={onViewMovements} />
-            ) : null}
-          </>
-        ) : (
-          <EmptyState
-            accessibilityLabel="Crear primer gasto"
-            description="Registra un gasto para empezar a ver tu actividad."
-            icon="swap-vertical-outline"
-            iconBackgroundColor={colors.cta}
-            onPress={onCreateExpense}
-            testID="home-empty-activity"
-            title="Aún no hay movimientos"
+          )}
+
+          <HomeSectionHeader onViewMore={onViewAccounts} title="Cuentas" />
+          {moneyAccountSummaries.length > 0 ? (
+            <MoneyAccountCarousel
+              animateEntrance
+              accounts={moneyAccountSummaries}
+              gutter={layout.screenGutter[density]}
+              onCreateMoneyAccount={onCreateMoneyAccount}
+              onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
+              testID="home-account-scroller"
+            />
+          ) : (
+            <EmptyState
+              accessibilityLabel="Crear primera cuenta"
+              icon="wallet-outline"
+              iconBackgroundColor={colors.cta}
+              onPress={onCreateMoneyAccount}
+              testID="home-empty-accounts"
+              title="Crea una cuenta"
+            />
+          )}
+
+          <HomeSectionHeader
+            onViewMore={onViewMovements}
+            title="Movimientos Recientes"
           />
-        )}
+          {transactionsThroughCurrentMonth.length > 0 ? (
+            <>
+              <TransactionPreviewList
+                animateEntrance
+                categories={categories}
+                groupingTransactions={transactions}
+                limit={recentTransactionLimit}
+                onOpenTransactionDetail={onOpenTransactionDetail}
+                testID="home-transaction-preview-list"
+                transactions={recentTransactions}
+              />
+              {transactionsThroughCurrentMonth.length >
+              recentTransactionLimit ? (
+                <HomeTransactionListFooter onPress={onViewMovements} />
+              ) : null}
+            </>
+          ) : (
+            <EmptyState
+              accessibilityLabel="Crear primer gasto"
+              icon="swap-vertical-outline"
+              iconBackgroundColor={colors.cta}
+              onPress={onCreateExpense}
+              testID="home-empty-activity"
+              title="Crea un movimiento"
+            />
+          )}
+        </HomeEntrance>
       </Screen>
       <TransactionPeriodModal
         categories={categories}

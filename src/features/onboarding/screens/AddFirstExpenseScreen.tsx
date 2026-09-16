@@ -16,12 +16,11 @@ export function AddFirstExpenseScreen({ navigation }: Props) {
 
   return (
     <AddFirstTransactionStep
-      currentStep={8}
+      currentStep={9}
       illustrationAspectRatio={expenseIllustrationAspectRatio}
       illustrationScale={1.2}
       illustrationSource={require('../../../../assets/Onboarding/8_Gastos.png')}
       onBack={() => navigation.goBack()}
-      onSkip={() => navigation.navigate('OnboardingLogin')}
       onSaved={() => navigation.navigate('ReadyToExplore')}
       spaceId={activeSpace.id}
       spaceName={activeSpace.name}

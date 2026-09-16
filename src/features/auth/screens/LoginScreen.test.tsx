@@ -1,3 +1,7 @@
+import {
+  GoogleSignin,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
@@ -44,8 +48,10 @@ describe('LoginScreen — Google', () => {
 
     await fireEvent.press(screen.getByTestId('login-google'));
     expect(authClient.signIn.social).toHaveBeenCalledWith({
-      callbackURL: 'juntoss://oauth/google',
       provider: 'google',
+      idToken: {
+        token: 'mock-google-id-token',
+      },
     });
     expect(listRemoteSpaces).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
@@ -60,10 +66,9 @@ describe('LoginScreen — Google', () => {
   });
 
   it('restablece el botón después de cancelar Google', async () => {
-    jest.mocked(authClient.signIn.social).mockResolvedValue({
-      data: null,
-      error: null,
-    } as never);
+    jest.mocked(GoogleSignin.signIn).mockRejectedValueOnce({
+      code: statusCodes.SIGN_IN_CANCELLED,
+    });
 
     await renderWithTheme(<LoginScreen onSuccess={jest.fn()} />);
 

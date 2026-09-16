@@ -2,6 +2,19 @@ import type { LocalProfile } from '@/features/profile/types';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 
 const countrySubscribers = new Set<(countryCode: string) => void>();
+const profileSubscribers = new Set<(profile: LocalProfile) => void>();
+
+/**
+ * Mantiene sincronizadas las superficies que presentan el perfil propio.
+ * SQLite sigue siendo la fuente de verdad; el evento solo evita que cada hook
+ * tenga que esperar a un remonte o a que la app vuelva a primer plano.
+ */
+export function subscribeToLocalProfile(
+  subscriber: (profile: LocalProfile) => void,
+): () => void {
+  profileSubscribers.add(subscriber);
+  return () => profileSubscribers.delete(subscriber);
+}
 
 /** Notifica a la interfaz cuando la caché de país se actualiza tras restaurar sesión. */
 export function subscribeToLocalProfileCountry(
@@ -44,6 +57,12 @@ export async function getLocalProfile(): Promise<LocalProfile> {
   return mapProfile(row ?? null);
 }
 
+async function publishLocalProfile(): Promise<LocalProfile> {
+  const profile = await getLocalProfile();
+  profileSubscribers.forEach((subscriber) => subscriber(profile));
+  return profile;
+}
+
 /**
  * Guarda la foto recién elegida y la deja marcada como pendiente de subir.
  *
@@ -67,7 +86,7 @@ export async function saveLocalProfileAvatar(
     avatarPath,
     now,
   );
-  return getLocalProfile();
+  return publishLocalProfile();
 }
 
 export type LocalAvatarUpload = {
@@ -118,6 +137,7 @@ export async function saveOwnRemoteAvatar(
     remote.avatarUpdatedAt,
     localPath,
   );
+  await publishLocalProfile();
 }
 
 /**
@@ -148,7 +168,7 @@ export async function saveDownloadedOwnAvatar(input: {
     input.avatarPath,
     input.avatarUpdatedAt,
   );
-  return getLocalProfile();
+  return publishLocalProfile();
 }
 
 /**
@@ -169,7 +189,7 @@ export async function clearLocalProfileAvatar(): Promise<LocalProfile> {
       WHERE singleton_id = 1`,
     new Date().toISOString(),
   );
-  return getLocalProfile();
+  return publishLocalProfile();
 }
 
 /**
@@ -206,13 +226,89 @@ export async function saveLocalProfileDisplayName(
 ): Promise<LocalProfile> {
   const database = await getLocalDatabase();
   await database.runAsync(
-    `INSERT INTO local_profile (singleton_id, display_name)
-     VALUES (1, ?)
+    `INSERT INTO local_profile
+       (singleton_id, display_name, display_name_sync_status)
+     VALUES (1, ?, 'pending')
      ON CONFLICT (singleton_id) DO UPDATE SET
-       display_name = excluded.display_name`,
+       display_name = excluded.display_name,
+       display_name_sync_status = 'pending'`,
     displayName.trim(),
   );
-  return getLocalProfile();
+  return publishLocalProfile();
+}
+
+/** Nombre pendiente de publicar, si la última edición todavía no llegó a la API. */
+export async function getPendingLocalDisplayName(): Promise<string | null> {
+  const database = await getLocalDatabase();
+  const row = await database.getFirstAsync<{
+    display_name: string | null;
+    display_name_sync_status: string | null;
+  }>(
+    `SELECT display_name, display_name_sync_status
+       FROM local_profile WHERE singleton_id = 1`,
+  );
+  if (
+    !row?.display_name?.trim() ||
+    (row.display_name_sync_status !== 'pending' &&
+      row.display_name_sync_status !== 'failed')
+  ) {
+    return null;
+  }
+  return row.display_name.trim();
+}
+
+/** Confirma o conserva como fallida únicamente la edición que se intentó subir. */
+export async function markDisplayNameSyncResult(
+  displayName: string,
+  status: 'synced' | 'failed',
+): Promise<void> {
+  const database = await getLocalDatabase();
+  await database.runAsync(
+    `UPDATE local_profile
+        SET display_name_sync_status = ?
+      WHERE singleton_id = 1 AND display_name = ?`,
+    status,
+    displayName.trim(),
+  );
+}
+
+/**
+ * Aplica el nombre remoto sin pisar una edición local aún pendiente.
+ * La condición vive en SQLite para que una edición concurrente no pueda
+ * colarse entre una lectura y esta escritura.
+ */
+export async function restoreRemoteProfileDisplayName(
+  displayName: string | null,
+): Promise<LocalProfile> {
+  const database = await getLocalDatabase();
+  await database.runAsync(
+    `INSERT INTO local_profile
+       (singleton_id, display_name, display_name_sync_status)
+     VALUES (1, ?, 'synced')
+     ON CONFLICT (singleton_id) DO UPDATE SET
+       display_name = excluded.display_name,
+       display_name_sync_status = 'synced'
+     WHERE local_profile.display_name_sync_status IS NULL
+        OR local_profile.display_name_sync_status NOT IN ('pending', 'failed')`,
+    displayName?.trim() || null,
+  );
+  return publishLocalProfile();
+}
+
+/** Refleja que el servidor ya no tiene avatar sin crear una subida pendiente. */
+export async function restoreRemoteProfileWithoutAvatar(): Promise<LocalProfile> {
+  const database = await getLocalDatabase();
+  await database.runAsync(
+    `UPDATE local_profile
+        SET avatar_path = NULL,
+            avatar_updated_at = NULL,
+            avatar_sync_status = 'synced',
+            avatar_remote_path = NULL,
+            avatar_remote_updated_at = NULL
+      WHERE singleton_id = 1
+        AND avatar_sync_status NOT IN ('pending', 'failed')`,
+  );
+  return publishLocalProfile();
 }
 
 /**
@@ -230,7 +326,7 @@ export async function saveLocalProfileCountry(
        country_code = excluded.country_code`,
     countryCode.trim().toUpperCase(),
   );
-  const profile = await getLocalProfile();
+  const profile = await publishLocalProfile();
   if (profile.countryCode) {
     countrySubscribers.forEach((subscriber) =>
       subscriber(profile.countryCode!),

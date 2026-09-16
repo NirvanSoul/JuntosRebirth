@@ -89,3 +89,30 @@ export async function upsertRemoteEntityLink(input: {
     now,
   );
 }
+
+/**
+ * Reasigna de forma explícita un remoto a una fila local canónica. Solo se
+ * usa al reparar una colisión de identidad funcional durante una restauración.
+ */
+export async function reconcileRemoteEntityLink(input: {
+  executor: LocalSqlExecutor;
+  userId: string;
+  entityType: RemoteEntityType;
+  remoteId: string;
+  localId: string;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  await input.executor.runAsync(
+    `INSERT INTO remote_entity_links (
+       user_id, entity_type, remote_id, local_id, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (user_id, entity_type, remote_id) DO UPDATE SET
+       local_id = excluded.local_id, updated_at = excluded.updated_at`,
+    input.userId,
+    input.entityType,
+    input.remoteId,
+    input.localId,
+    now,
+    now,
+  );
+}

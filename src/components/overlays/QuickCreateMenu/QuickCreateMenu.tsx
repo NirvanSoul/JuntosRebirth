@@ -70,7 +70,11 @@ export function QuickCreateMenu({
   const actions = createActions(colors);
 
   return (
-    <AppModal backgroundVariant="modal" onClose={onClose} visible={visible}>
+    <AppModal
+      backgroundVariant="background"
+      onClose={onClose}
+      visible={visible}
+    >
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text accessibilityRole="header" variant="subheading">

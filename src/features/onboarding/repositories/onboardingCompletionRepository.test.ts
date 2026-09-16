@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   hasCompletedOnboarding,
   onboardingCompletionStorage,
+  resetOnboardingCompletion,
   saveOnboardingCompletion,
 } from '@/features/onboarding/repositories/onboardingCompletionRepository';
 
@@ -22,5 +23,13 @@ describe('onboardingCompletionRepository', () => {
     await expect(
       AsyncStorage.getItem(onboardingCompletionStorage.key),
     ).resolves.toBe('true');
+  });
+
+  it('elimina la marca para poder iniciar el onboarding otra vez', async () => {
+    await saveOnboardingCompletion();
+
+    await resetOnboardingCompletion();
+
+    await expect(hasCompletedOnboarding()).resolves.toBe(false);
   });
 });
