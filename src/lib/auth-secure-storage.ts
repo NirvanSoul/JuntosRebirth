@@ -1,7 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { AppState, Platform } from 'react-native';
 
-const FOREGROUND_TIMEOUT_MS = 15_000;
 const KEYCHAIN_RETRY_DELAY_MS = 300;
 const MAX_ATTEMPTS = 3;
 const pending = new Map<string, Promise<unknown>>();
@@ -27,20 +26,14 @@ function isLockedKeychain(error: unknown): boolean {
 function waitForForeground(): Promise<void> {
   if (Platform.OS !== 'ios' || AppState.currentState === 'active')
     return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      subscription.remove();
-      reject(new SessionStorageUnavailableError());
-    }, FOREGROUND_TIMEOUT_MS);
+  return new Promise((resolve) => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
-      clearTimeout(timer);
       subscription.remove();
       resolve();
     });
     // Cubre una transición ocurrida mientras se registraba el listener.
     if (AppState.currentState === 'active') {
-      clearTimeout(timer);
       subscription.remove();
       resolve();
     }

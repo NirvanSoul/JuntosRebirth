@@ -82,15 +82,28 @@ describe('Better Auth secure storage lifecycle', () => {
     expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
   });
 
-  it('times out background reads and removes the lifecycle listener', async () => {
+  it('keeps background reads pending until iOS becomes active', async () => {
     AppState.currentState = 'background';
     const result = storage.getItemAsync('juntoss_cookie');
-    const check = expect(result).rejects.toMatchObject({
-      code: 'SESSION_STORAGE_UNAVAILABLE',
-    });
-    await jest.runAllTimersAsync();
-    await check;
+    let outcome = 'pending';
+    void result.then(
+      () => {
+        outcome = 'resolved';
+      },
+      () => {
+        outcome = 'rejected';
+      },
+    );
+
+    await jest.advanceTimersByTimeAsync(60_000);
+
+    expect(outcome).toBe('pending');
     expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+
+    AppState.currentState = 'active';
+    onState('active');
+
+    await expect(result).resolves.toBe('cookie');
     expect(removed).toHaveBeenCalledTimes(1);
   });
 
