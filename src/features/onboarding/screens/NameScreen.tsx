@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
 import { OnboardingScreenLayout } from '@/features/onboarding/components/OnboardingScreenLayout';
 import type { OnboardingStackParamList } from '@/features/onboarding/OnboardingNavigator';
+import { nameScreenIllustration } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
 import { saveLocalProfileDisplayName } from '@/features/profile/repositories/localProfileRepository';
 import { spacing } from '@/theme/spacing';
 
@@ -43,7 +44,7 @@ export function NameScreen({ navigation }: Props) {
       compactCopyOverlapsIllustration
       compactRaisesActions
       illustrationAspectRatio={helloIllustrationAspectRatio}
-      illustrationSource={require('../../../../assets/Onboarding/1_Hola.png')}
+      illustrationSource={nameScreenIllustration}
       isCompact={isFocused}
       subtitle="Nosotros nos llamamos Juntos, y queremos conocerte."
       testID="onboarding-name"

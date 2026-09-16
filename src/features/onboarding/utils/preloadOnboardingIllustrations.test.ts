@@ -2,7 +2,10 @@ import { Asset } from 'expo-asset';
 import { Image } from 'react-native';
 import {
   appIllustrations,
+  deferredIllustrations,
+  nameScreenIllustration,
   preloadAppIllustrations,
+  preloadNameScreenIllustration,
   preloadOnboardingIllustrations,
 } from './preloadOnboardingIllustrations';
 
@@ -15,7 +18,7 @@ describe('preloadAppIllustrations', () => {
     jest.clearAllMocks();
   });
 
-  it('precarga una sola vez y únicamente cuando se solicita', async () => {
+  it('precarga la lámina de nombre primero y el resto en orden, una sola vez', async () => {
     const prefetchSpy = jest
       .spyOn(Image, 'prefetch')
       .mockResolvedValue(true as never);
@@ -24,20 +27,35 @@ describe('preloadAppIllustrations', () => {
     } as never);
 
     expect(Asset.loadAsync).not.toHaveBeenCalled();
+
+    // La primera ilustración se resuelve por sí sola, sin esperar al resto.
+    await preloadNameScreenIllustration();
+    expect(Asset.loadAsync).toHaveBeenCalledTimes(1);
+    expect(Asset.loadAsync).toHaveBeenCalledWith(nameScreenIllustration);
+
     await Promise.all([
       preloadOnboardingIllustrations(),
       preloadAppIllustrations(),
     ]);
 
-    expect(Asset.loadAsync).toHaveBeenCalledTimes(1);
-    expect(Asset.loadAsync).toHaveBeenCalledWith(appIllustrations);
+    const loaded = (Asset.loadAsync as jest.Mock).mock.calls.map(
+      ([source]) => source,
+    );
+    expect(loaded).toEqual([nameScreenIllustration, ...deferredIllustrations]);
+    expect(appIllustrations).toEqual([
+      nameScreenIllustration,
+      ...deferredIllustrations,
+    ]);
+    expect(nameScreenIllustration).toBe(
+      require('../../../../assets/Onboarding/1_Hola.png'),
+    );
     expect(appIllustrations).toContain(
       require('../../../../assets/Onboarding/5.5_Notificaciones.png'),
     );
     expect(appIllustrations).toContain(
       require('../../../../assets/Onboarding/10_loginicon.png'),
     );
-    expect(prefetchSpy).toHaveBeenCalled();
+    expect(prefetchSpy).toHaveBeenCalledTimes(appIllustrations.length);
 
     prefetchSpy.mockRestore();
     resolveSpy.mockRestore();

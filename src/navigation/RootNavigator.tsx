@@ -9,6 +9,7 @@ import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
 import { OnboardingNavigator } from '@/features/onboarding/OnboardingNavigator';
 import { OnboardingRestartContext } from '@/features/onboarding/context/OnboardingRestartContext';
+import { useNameScreenIllustrationReady } from '@/features/onboarding/hooks/useNameScreenIllustrationReady';
 import { useOnboardingCompletion } from '@/features/onboarding/hooks/useOnboardingCompletion';
 import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
@@ -27,6 +28,7 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     reset: resetOnboarding,
     setHasCompleted: setOnboardingCompleted,
   } = useOnboardingCompletion();
+  const isNameIllustrationReady = useNameScreenIllustrationReady();
 
   useEffect(() => {
     if (isAuthReady) {
@@ -72,7 +74,10 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     // flujo evita que un refresco tras el alta desmonte el formulario OTP.
     // Una vez completado, se conserva el bloqueo de sesión del arranque.
     (hasCompletedOnboarding && !isAuthReady) ||
-    !isOnboardingReady
+    !isOnboardingReady ||
+    // La primera lámina del onboarding lleva ilustración: se abre con ella ya
+    // en caché para que no aparezca segundos después que el texto.
+    (!hasVerifiedSession && !hasCompletedOnboarding && !isNameIllustrationReady)
   ) {
     return (
       <View style={styles.root} testID="root-navigator-backdrop">

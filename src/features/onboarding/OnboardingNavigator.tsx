@@ -1,5 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { AddFirstExpenseScreen } from '@/features/onboarding/screens/AddFirstExpenseScreen';
 import { AddFirstIncomeScreen } from '@/features/onboarding/screens/AddFirstIncomeScreen';
@@ -40,6 +40,12 @@ type OnboardingNavigatorProps = {
 };
 
 export function OnboardingNavigator({ onComplete }: OnboardingNavigatorProps) {
+  const topBarSkipHistory = useRef<boolean[]>([]);
+  const flowValue = useMemo(
+    () => ({ completeOnboarding: onComplete, topBarSkipHistory }),
+    [onComplete],
+  );
+
   useEffect(() => {
     void preloadOnboardingIllustrations();
     warmUpAuthSession();
@@ -49,9 +55,12 @@ export function OnboardingNavigator({ onComplete }: OnboardingNavigatorProps) {
   }, []);
 
   return (
-    <OnboardingFlowContext.Provider value={{ completeOnboarding: onComplete }}>
+    <OnboardingFlowContext.Provider value={flowValue}>
+      {/* Sin transición de pantalla: cada bloque de la lámina entrante sube
+          por su cuenta (`OnboardingScreenLayout`) y el indicador de progreso
+          permanece fijo entre láminas. */}
       <Stack.Navigator
-        screenOptions={{ animation: 'fade', headerShown: false }}
+        screenOptions={{ animation: 'none', headerShown: false }}
       >
         <Stack.Screen
           component={NameScreen}

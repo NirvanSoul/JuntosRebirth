@@ -250,8 +250,16 @@ El acceso a la aplicación requiere una cuenta con correo verificado.
 - En los pasos 7, 8 y 9, enseñar la creación con el mismo botón flotante y el
   mismo menú de opciones de la app; las acciones ajenas al paso permanecen
   visibles pero deshabilitadas.
-- La transición entre láminas usa un fundido breve y el segmento del paso que
-  entra se rellena de izquierda a derecha, como el progreso de una story.
+- No hay transición de pantalla entre láminas: el indicador de progreso se
+  mantiene fijo y el segmento del paso que entra se rellena de izquierda a
+  derecha, como el progreso de una story, mientras ilustración, título,
+  subtítulo, contenido y botones de la lámina nueva suben escalonados desde
+  abajo con la misma entrada de Home (`getOnboardingEntering`). Pulsar la
+  acción que avanza (`Continuar`, `Ahora no`, etc.) da una respuesta háptica
+  ligera.
+- La ilustración cede alto si la lámina no cabe (imagen de borde a borde,
+  textos largos o acción secundaria), de modo que `Atrás` y el botón principal
+  ocupan siempre la misma posición al pie en todas las láminas.
 - Permitir omitir cuando corresponda.
 - No repetirlo sin acción explícita.
 

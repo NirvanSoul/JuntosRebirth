@@ -5,7 +5,8 @@ export type HapticEvent =
   | 'modalOpen'
   | 'categorySelect'
   | 'transactionSave'
-  | 'keypadPress';
+  | 'keypadPress'
+  | 'onboardingContinue';
 
 function safeTrigger(action: () => Promise<void>): void {
   action().catch(() => {});
@@ -31,6 +32,9 @@ export function triggerHaptic(event: HapticEvent): void {
       return;
     case 'keypadPress':
       safeTrigger(() => Haptics.selectionAsync());
+      return;
+    case 'onboardingContinue':
+      safeTrigger(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
       return;
   }
 }

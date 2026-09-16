@@ -1761,7 +1761,7 @@ describe('MainTabsNavigator', () => {
       expect(expired.queryByTestId('sync-issue-toast')).toBeNull();
     });
 
-    it('no repite el snapshot al abrir y registra el fallo del refresco periódico sin romper la interfaz', async () => {
+    it('no repite el snapshot al abrir y tolera el fallo del refresco periódico sin romper la interfaz', async () => {
       jest.useFakeTimers();
       try {
         localCatalog();
@@ -1780,12 +1780,12 @@ describe('MainTabsNavigator', () => {
         });
 
         await waitFor(() => {
-          expect(consoleErrorSpy).toHaveBeenCalledWith(
-            '[sync] Restauración remota falló:',
-            restoreError,
-          );
+          expect(mockRestoreRemoteAccount).toHaveBeenCalledTimes(1);
         });
-        expect(mockRestoreRemoteAccount).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+          '[sync] Restauración remota falló:',
+          restoreError,
+        );
         expect(screen.getByText('Compra semanal')).toBeTruthy();
         expect(screen.getByText('Alimentación')).toBeTruthy();
       } finally {

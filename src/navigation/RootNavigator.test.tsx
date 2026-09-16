@@ -44,6 +44,10 @@ jest.mock('@/lib/auth-client', () => ({
   authClient: { signIn: { social: jest.fn() } },
 }));
 
+jest.mock('@/features/onboarding/utils/preloadOnboardingIllustrations', () => ({
+  preloadNameScreenIllustration: jest.fn(() => Promise.resolve()),
+}));
+
 jest.mock('@/navigation/MainTabsNavigator', () => {
   const { Text: RNText } = jest.requireActual('react-native');
   return {

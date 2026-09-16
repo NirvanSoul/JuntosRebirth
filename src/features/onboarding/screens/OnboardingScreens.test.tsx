@@ -10,6 +10,7 @@ import { OnboardingLoginScreen } from '@/features/onboarding/screens/OnboardingL
 import { WelcomeScreen } from '@/features/onboarding/screens/WelcomeScreen';
 import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
+import { triggerHaptic } from '@/lib/haptics/haptics';
 import { requestNotificationPermission } from '@/lib/notifications/localNotifications';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
@@ -25,6 +26,9 @@ jest.mock('@/features/access/screens/AccessScreen', () => ({
 }));
 jest.mock('@/lib/notifications/localNotifications', () => ({
   requestNotificationPermission: jest.fn(),
+}));
+jest.mock('@/lib/haptics/haptics', () => ({
+  triggerHaptic: jest.fn(),
 }));
 
 const mockUpdateProfileCountry = updateProfileCountry as jest.Mock;
@@ -54,6 +58,26 @@ describe('pantallas de onboarding', () => {
     expect(mockNavigation.navigate).toHaveBeenLastCalledWith(
       'NotificationsPermission',
     );
+  });
+
+  it('responde con un háptico al continuar, pero no al omitir ni volver', async () => {
+    const screen = await renderWithTheme(
+      <WelcomeScreen navigation={navigation} route={route} />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-welcome-skip'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-welcome-back'));
+    });
+    expect(triggerHaptic).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-welcome-action'));
+    });
+    expect(triggerHaptic).toHaveBeenCalledWith('onboardingContinue');
+    expect(mockNavigation.navigate).toHaveBeenLastCalledWith('CalendarPreview');
   });
 
   it('omite la lámina del calendario y lleva a la pregunta de notificaciones', async () => {
@@ -105,6 +129,7 @@ describe('pantallas de onboarding', () => {
     fireEvent.press(screen.getByTestId('onboarding-notifications-not-now'));
 
     expect(mockRequestNotificationPermission).not.toHaveBeenCalled();
+    expect(triggerHaptic).toHaveBeenCalledWith('onboardingContinue');
     expect(mockNavigation.navigate).toHaveBeenCalledWith('CreateFirstCategory');
   });
 

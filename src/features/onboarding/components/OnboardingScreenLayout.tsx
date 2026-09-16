@@ -13,17 +13,15 @@ import Animated from 'react-native-reanimated';
 import { Screen } from '@/components/layout/Screen/Screen';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
-import { OnboardingProgressIndicator } from '@/features/onboarding/components/OnboardingProgressIndicator';
-import {
-  estimateRevealDuration,
-  OnboardingRevealText,
-} from '@/features/onboarding/components/OnboardingRevealText';
-import { useReduceMotionPreference } from '@/features/onboarding/hooks/useReduceMotionPreference';
+import { OnboardingTopBar } from '@/features/onboarding/components/OnboardingTopBar';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
+import { triggerHaptic } from '@/lib/haptics/haptics';
 import { layout } from '@/theme/layout';
-import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
-import { getDisclosureLayoutTransition } from '@/theme/transitions';
+import {
+  getDisclosureLayoutTransition,
+  getOnboardingEntering,
+} from '@/theme/transitions';
 import { Text } from '@/components/ui/Text/Text';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
@@ -46,6 +44,20 @@ const heroIllustrationMaxHeight = { compact: 260, regular: 300 } as const;
 
 /** Tamaño de la ilustración cuando el teclado está abierto (modo compacto). */
 const compactIllustrationWidth = { compact: 112, regular: 128 } as const;
+
+/**
+ * Orden en que suben los bloques al montarse la lámina: mismo recorrido y
+ * desfase que la entrada de Home, de arriba abajo para que la lectura siga
+ * al movimiento. El indicador de progreso no entra: es la única pieza fija
+ * entre láminas y así marca la continuidad del recorrido.
+ */
+const entranceOrder = {
+  illustration: 0,
+  title: 1,
+  subtitle: 2,
+  content: 3,
+  actions: 4,
+} as const;
 
 type OnboardingScreenLayoutProps = PropsWithChildren<{
   actionLabel?: string;
@@ -126,21 +138,28 @@ export function OnboardingScreenLayout({
 }: OnboardingScreenLayoutProps) {
   const density = useLayoutDensity();
   const { width: windowWidth } = useWindowDimensions();
-  const reduceMotion = useReduceMotionPreference();
-  const subtitleDelay =
-    estimateRevealDuration() + motion.onboardingTextRevealBlockPause;
   const layoutTransition = getDisclosureLayoutTransition();
   const raiseActions = isCompact && compactRaisesActions;
   const canSkip = currentStep >= 3 && onSkip !== undefined;
+  const handleAction = () => {
+    triggerHaptic('onboardingContinue');
+    onAction?.();
+  };
 
-  const handleSkip = () => onSkip?.();
-
+  // Fuera del modo compacto la imagen puede encoger en alto (`flexShrink`) si
+  // la lámina no cabe: con `contain` se reduce a escala y la fila de acciones
+  // conserva su sitio al pie en vez de bajar con el desbordamiento. Esto es lo
+  // que iguala láminas con imagen de borde a borde o textos largos al resto.
   const illustrationStyle = (() => {
+    // A sangre: siempre el 100 % del ancho de la ventana, con el alto que
+    // dicta su proporción. Nunca encoge: si la lámina anda justa de alto, cede
+    // el área de contenido (vacía en estas láminas), no la imagen.
     if (illustrationFullBleed) {
       const width = Math.round(windowWidth);
       return {
         width,
         height: Math.round(width / (illustrationAspectRatio ?? 1)),
+        flexShrink: 0,
       };
     }
     // Fijar inmediatamente la huella compacta evita que el texto reciba
@@ -159,11 +178,19 @@ export function OnboardingScreenLayout({
     const height = width / ratio;
     // Redondeado a píxel entero: una medida fraccionaria durante el resorte
     // hace que la imagen nativa se rasterice borrosa en vez de nítida.
-    return { width: Math.round(width), height: Math.round(height) };
+    return {
+      width: Math.round(width),
+      height: Math.round(height),
+      flexShrink: isCompact ? 0 : 1,
+    };
   })();
 
   const illustrationWrapperStyle = illustrationFullBleed
-    ? [styles.illustration, { marginHorizontal: -layout.screenGutter[density] }]
+    ? [
+        styles.illustration,
+        styles.illustrationFullBleed,
+        { marginHorizontal: -layout.screenGutter[density] },
+      ]
     : isCompact
       ? styles.illustrationCompact
       : styles.illustration;
@@ -181,32 +208,22 @@ export function OnboardingScreenLayout({
         style={styles.dismissArea}
         testID={testID ? `${testID}-dismiss-area` : undefined}
       >
-        <View style={styles.topBar}>
-          <OnboardingProgressIndicator currentStep={currentStep} />
-          {canSkip ? (
-            <Pressable
-              accessibilityLabel="Omitir pantallas informativas"
-              accessibilityRole="button"
-              disabled={false}
-              hitSlop={spacing.sm}
-              onPress={() => void handleSkip()}
-              style={styles.skipAction}
-              testID={testID ? `${testID}-skip` : undefined}
-            >
-              <Text tone="secondary" variant="label" weight="medium">
-                Omitir
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
+        <OnboardingTopBar
+          canSkip={canSkip}
+          currentStep={currentStep}
+          onSkip={onSkip}
+          testID={testID}
+        />
         <Animated.View
           layout={layoutTransition}
           style={isCompact ? styles.headerCompact : styles.header}
         >
           {illustrationSource ? (
             <Animated.View
+              entering={getOnboardingEntering(entranceOrder.illustration)}
               layout={layoutTransition}
               style={illustrationWrapperStyle}
+              testID={testID ? `${testID}-illustration-frame` : undefined}
             >
               <AnimatedImage
                 accessible={false}
@@ -221,36 +238,49 @@ export function OnboardingScreenLayout({
             layout={layoutTransition}
             style={[
               styles.copy,
+              isCompact ? styles.copyCompact : null,
               isCompact && compactCopyOverlapsIllustration
                 ? styles.copyCompactOverlap
                 : null,
             ]}
           >
-            <OnboardingRevealText
-              accessibilityRole="header"
-              reduceMotion={reduceMotion}
-              text={title}
-              variant={isCompact ? 'heading' : 'heroTitle'}
-            />
+            <Animated.View
+              entering={getOnboardingEntering(entranceOrder.title)}
+            >
+              <Text
+                accessibilityRole="header"
+                variant={isCompact ? 'heading' : 'heroTitle'}
+              >
+                {title}
+              </Text>
+            </Animated.View>
             {subtitle ? (
-              <OnboardingRevealText
-                reduceMotion={reduceMotion}
-                startDelay={subtitleDelay}
-                text={subtitle}
-                tone="secondary"
-                variant={isCompact ? 'label' : 'subheading'}
-                weight="regular"
-              />
+              <Animated.View
+                entering={getOnboardingEntering(entranceOrder.subtitle)}
+              >
+                <Text
+                  tone="secondary"
+                  variant={isCompact ? 'label' : 'subheading'}
+                  weight="regular"
+                >
+                  {subtitle}
+                </Text>
+              </Animated.View>
             ) : null}
           </Animated.View>
         </Animated.View>
         <Animated.View
+          entering={getOnboardingEntering(entranceOrder.content)}
           layout={layoutTransition}
           style={raiseActions ? styles.visualCompact : styles.visual}
         >
           {children}
         </Animated.View>
-        <Animated.View layout={layoutTransition} style={styles.actionStack}>
+        <Animated.View
+          entering={getOnboardingEntering(entranceOrder.actions)}
+          layout={layoutTransition}
+          style={styles.actionStack}
+        >
           {secondaryAction}
           <View style={styles.actions}>
             {onBack ? (
@@ -267,7 +297,7 @@ export function OnboardingScreenLayout({
                 accessibilityLabel={actionLabel}
                 disabled={actionDisabled}
                 label={actionLabel}
-                onPress={onAction}
+                onPress={handleAction}
                 style={styles.primaryAction}
                 testID={testID ? `${testID}-action` : undefined}
                 variant="cta"
@@ -290,21 +320,27 @@ const styles = StyleSheet.create({
     paddingTop: spacing.huge + spacing.lg,
   },
   dismissArea: { flex: 1, gap: spacing.xxl },
-  topBar: { alignItems: 'center', flexDirection: 'row' },
-  skipAction: { marginLeft: 'auto', minHeight: 44, justifyContent: 'center' },
-  header: { gap: spacing.xxl },
+  // Cabecera e ilustración pueden ceder alto; el texto nunca (solo cede ancho
+  // en la fila compacta). Así una lámina que desborda encoge la imagen, no
+  // desplaza los botones.
+  header: { gap: spacing.xxl, flexShrink: 1, minHeight: 0 },
   headerCompact: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xl,
   },
-  copy: { gap: spacing.md, flexShrink: 1 },
+  copy: { gap: spacing.md },
+  copyCompact: { flexShrink: 1 },
   copyCompactOverlap: { marginLeft: -spacing.xl },
   illustration: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingBottom: spacing.xl,
+    flexShrink: 1,
+    minHeight: 0,
   },
+  // El marco tampoco cede alto: la imagen a sangre no se recorta ni encoge.
+  illustrationFullBleed: { flexShrink: 0 },
   illustrationCompact: { alignItems: 'center', justifyContent: 'center' },
   visual: { flex: 1, minHeight: 0 },
   visualCompact: {

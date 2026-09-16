@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { OnboardingScreenLayout } from '@/features/onboarding/components/OnboardingScreenLayout';
 import type { OnboardingStackParamList } from '@/features/onboarding/OnboardingNavigator';
+import { triggerHaptic } from '@/lib/haptics/haptics';
 import { requestNotificationPermission } from '@/lib/notifications/localNotifications';
 
 type Props = NativeStackScreenProps<
@@ -51,7 +52,10 @@ export function NotificationsPermissionScreen({ navigation }: Props) {
           accessibilityLabel="Ahora no"
           disabled={isRequesting}
           label="Ahora no"
-          onPress={continueToCategories}
+          onPress={() => {
+            triggerHaptic('onboardingContinue');
+            continueToCategories();
+          }}
           testID="onboarding-notifications-not-now"
           variant="surface"
         />
