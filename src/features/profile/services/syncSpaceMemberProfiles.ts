@@ -4,6 +4,8 @@ import { restoreOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { replaceSpaceMemberProfiles } from '@/features/profile/repositories/localSpaceMemberProfileRepository';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 
+const pendingProfileSyncs = new Map<string, Promise<boolean>>();
+
 /**
  * Refresca el censo local de un espacio compartido.
  *
@@ -11,7 +13,20 @@ import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedU
  * censo previo en ese caso, para no dejar sin nombre a los movimientos ya
  * bajados mientras la interfaz vuelve a la pantalla de acceso.
  */
-export async function syncSpaceMemberProfiles(
+export function syncSpaceMemberProfiles(spaceId: string): Promise<boolean> {
+  const pendingSync = pendingProfileSyncs.get(spaceId);
+  if (pendingSync) return pendingSync;
+
+  const sync = syncSpaceMemberProfilesForSpace(spaceId).finally(() => {
+    if (pendingProfileSyncs.get(spaceId) === sync) {
+      pendingProfileSyncs.delete(spaceId);
+    }
+  });
+  pendingProfileSyncs.set(spaceId, sync);
+  return sync;
+}
+
+async function syncSpaceMemberProfilesForSpace(
   spaceId: string,
 ): Promise<boolean> {
   const userId = await getAuthenticatedUserId();
