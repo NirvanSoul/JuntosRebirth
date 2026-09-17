@@ -445,7 +445,6 @@ export function MainTabsNavigator() {
       () => undefined,
     );
     void reconcileDailyReminder({ transactions }).catch(() => undefined);
-    if (session) void refreshSharedCoupleData(undefined, { mode: 'delta' });
   });
 
   const showSaveError = useSaveErrorAlert();

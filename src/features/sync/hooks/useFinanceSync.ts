@@ -85,19 +85,30 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
     }).catch(() => undefined);
   }, [setCategories, setMoneyAccounts, setTransactions]);
 
-  const syncAllUserSpaces = useCallback(async (): Promise<void> => {
-    if (!session) return;
-    for (const space of spaces) {
-      if (isAwaitingPartnerSpace(space)) {
-        continue;
+  const syncAllUserSpaces = useCallback(
+    async (propagateFailure = false): Promise<unknown[]> => {
+      if (!session) return [];
+      const failures: unknown[] = [];
+      for (const space of spaces) {
+        if (isAwaitingPartnerSpace(space)) {
+          continue;
+        }
+        try {
+          await syncSpaceDataForCurrentSession({ spaceId: space.id });
+        } catch (error) {
+          // Un refresco periódico debe conocer el rechazo de una escritura para
+          // aplicar su backoff. Aun así recorremos los demás espacios: un lote
+          // roto no debe dejar sin publicar cambios independientes.
+          failures.push(error);
+          if (!propagateFailure) {
+            console.error('[sync] Subida de espacio compartido falló:', error);
+          }
+        }
       }
-      try {
-        await syncSpaceDataForCurrentSession({ spaceId: space.id });
-      } catch (error) {
-        console.error('[sync] Subida de espacio compartido falló:', error);
-      }
-    }
-  }, [session, spaces]);
+      return failures;
+    },
+    [session, spaces],
+  );
 
   const refreshMemberProfiles = useCallback(
     async (spaceId?: string): Promise<void> => {
@@ -135,17 +146,26 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
     ): Promise<void> => {
       if (!session) return;
 
+      const uploadFailures: unknown[] = [];
       if (spaceId) {
         const targetSpace = spaces.find((space) => space.id === spaceId);
         if (targetSpace && !isAwaitingPartnerSpace(targetSpace)) {
           try {
             await syncSpaceDataForCurrentSession({ spaceId });
           } catch (error) {
-            console.error('[sync] Subida de espacio compartido falló:', error);
+            uploadFailures.push(error);
+            if (!options?.propagateFailure) {
+              console.error(
+                '[sync] Subida de espacio compartido falló:',
+                error,
+              );
+            }
           }
         }
       } else {
-        await syncAllUserSpaces();
+        uploadFailures.push(
+          ...(await syncAllUserSpaces(Boolean(options?.propagateFailure))),
+        );
       }
 
       try {
@@ -169,6 +189,12 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
         console.error('[sync] Restauración remota falló:', error);
       }
       await refreshMemberProfiles(spaceId);
+      // La caché y la descarga remota siguen funcionando aunque una subida
+      // falle. Pero ocultar el rechazo al polling lo hacía interpretar como
+      // éxito y repetir el POST cada dos segundos indefinidamente.
+      if (uploadFailures.length > 0 && options?.propagateFailure) {
+        throw uploadFailures[0];
+      }
     },
     [
       refreshMemberProfiles,

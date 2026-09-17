@@ -7,6 +7,7 @@ import { syncSpaceMemberProfiles } from '@/features/profile/services/syncSpaceMe
 import { retryPendingDisplayNameSync } from '@/features/profile/services/syncOwnDisplayName';
 import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
 import { syncOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
+import { syncSpaceDataForCurrentSession } from '@/features/sync/services/syncCoupleSpaceData';
 
 jest.mock('@/features/sync/services/restoreRemoteAccount', () => ({
   restoreRemoteAccountForCurrentSession: jest.fn(),
@@ -173,6 +174,51 @@ describe('useFinanceSync', () => {
         propagateFailure: true,
       }),
     ).rejects.toBe(failure);
+  });
+
+  it('propaga al polling un fallo de subida aunque la descarga remota funcione', async () => {
+    const failure = new Error('sync upload failed');
+    jest.mocked(syncSpaceDataForCurrentSession).mockRejectedValue(failure);
+    mockRestore.mockResolvedValue({
+      spaces: [],
+      localCategoryIdByRemoteId: new Map(),
+      localSpaceIdByRemoteId: new Map(),
+      outcome: {
+        mode: 'delta',
+        receivedRows: 0,
+        catalogueChanged: false,
+      },
+    });
+    const { result } = await renderHook(() =>
+      useFinanceSync({
+        refreshCoupleSpace: jest.fn(),
+        reloadCurrencyPreferences: jest.fn(),
+        reloadSpaces: mockReloadSpaces,
+        session,
+        setCategories: mockSetCategories,
+        setMoneyAccounts: mockSetMoneyAccounts,
+        setTransactions: mockSetTransactions,
+        spaces: [
+          {
+            id: 'personal-1',
+            name: 'Personal',
+            type: 'personal',
+            currency: 'USD',
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      result.current.refreshSharedCoupleData(undefined, {
+        mode: 'delta',
+        propagateFailure: true,
+      }),
+    ).rejects.toBe(failure);
+
+    // Conserva la restauración para recuperar el caso en que el servidor
+    // aceptó el lote pero se perdió la respuesta.
+    expect(mockRestore).toHaveBeenCalledWith({ mode: 'delta' });
   });
 
   it('modo full siempre recarga finanzas locales aunque receivedRows sea 0', async () => {
