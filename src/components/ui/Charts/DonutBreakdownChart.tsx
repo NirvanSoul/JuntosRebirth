@@ -216,7 +216,7 @@ export function DonutBreakdownChart({
                 adjustsFontSizeToFit
                 numberOfLines={1}
                 style={styles.total}
-                variant="heading"
+                variant="amount"
               >
                 {formattedTotal}
               </Text>
