@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { Category } from '@/features/categories/types';
+import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import { TransactionDetailModal } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { createProjectedTransactionId } from '@/features/transactions/utils/transactionRecurrence';
@@ -11,6 +12,8 @@ import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+
+jest.mock('@/features/exchangeRates/hooks/useExchangeRates');
 
 const category: Category = {
   id: 'food',
@@ -41,6 +44,74 @@ const transaction: SessionTransaction = {
 };
 
 describe('TransactionDetailModal', () => {
+  beforeEach(() => {
+    jest.mocked(useExchangeRates).mockReturnValue({ status: 'loading' });
+  });
+
+  it('conserva el importe y la divisa de un movimiento europeo aunque haya tasas venezolanas disponibles', async () => {
+    jest.mocked(useExchangeRates).mockReturnValue({
+      status: 'success',
+      rates: {
+        ratesUpdatedAt: '2026-09-24T10:00:00.000Z',
+        stale: false,
+        rates: {
+          BCV: {
+            baseCurrency: 'USD',
+            fetchedAt: '2026-09-24T10:00:00.000Z',
+            observedAt: '2026-09-24T10:00:00.000Z',
+            quoteCurrency: 'VES',
+            rate: '850',
+            source: 'BCV',
+          },
+          EURO: {
+            baseCurrency: 'EUR',
+            fetchedAt: '2026-09-24T10:00:00.000Z',
+            observedAt: '2026-09-24T10:00:00.000Z',
+            quoteCurrency: 'VES',
+            rate: '950',
+            source: 'EURO',
+          },
+        },
+      },
+    });
+    const europeanTransaction = {
+      ...transaction,
+      amountMinor: 22_000,
+      title: 'Vivienda',
+    };
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={europeanTransaction}
+            transactions={[europeanTransaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(
+      screen.getByTestId('transaction-detail-rate-badge').props.children,
+    ).toBe('220 €');
+  });
+
   it('cierra desde el botón de la barra fija, por encima del scroll', async () => {
     const onClose = jest.fn();
     const screen = await render(

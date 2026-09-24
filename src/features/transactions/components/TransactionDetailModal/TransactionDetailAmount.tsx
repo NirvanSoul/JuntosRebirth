@@ -3,7 +3,6 @@ import { useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text/Text';
-import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import {
   getVenezuelaDisplayValue,
   type VenezuelaDisplayMode,
@@ -40,7 +39,7 @@ function formatRateDate(dateStr: string): string {
   }).format(date);
 }
 
-/** Importe del movimiento, leído a las tasas congeladas de su snapshot o vigentes. */
+/** Importe del movimiento, leído únicamente desde su valor original o snapshot. */
 export function TransactionDetailAmount({
   mode,
   onPress,
@@ -50,29 +49,14 @@ export function TransactionDetailAmount({
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const isIncome = transaction.type === 'income';
 
-  const exchangeRatesState = useExchangeRates();
-  const apiRates =
-    exchangeRatesState.status === 'success' ||
-    exchangeRatesState.status === 'stale'
-      ? exchangeRatesState.rates.rates
-      : null;
-
   const snapshotBcv = transaction.exchangeSnapshot?.rates?.BCV;
   const snapshotEur = transaction.exchangeSnapshot?.rates?.EURO;
 
   const bcvRateNumber =
-    Number(snapshotBcv?.rate) > 0
-      ? Number(snapshotBcv?.rate)
-      : apiRates?.BCV?.rate
-        ? Number(apiRates.BCV.rate)
-        : null;
+    Number(snapshotBcv?.rate) > 0 ? Number(snapshotBcv?.rate) : null;
 
   const eurRateNumber =
-    Number(snapshotEur?.rate) > 0
-      ? Number(snapshotEur?.rate)
-      : apiRates?.EURO?.rate
-        ? Number(apiRates.EURO.rate)
-        : null;
+    Number(snapshotEur?.rate) > 0 ? Number(snapshotEur?.rate) : null;
 
   const displayValue = transaction.exchangeSnapshot
     ? getVenezuelaDisplayValue({
@@ -84,50 +68,9 @@ export function TransactionDetailAmount({
       })
     : null;
 
-  let effectiveAmountMinor =
+  const effectiveAmountMinor =
     displayValue?.amountMinor ?? transaction.amountMinor;
-  let effectiveCurrency = displayValue?.currency ?? transaction.currency;
-
-  if (!displayValue) {
-    if (mode === 'USD') {
-      if (transaction.currency === 'USD') {
-        effectiveAmountMinor = transaction.amountMinor;
-        effectiveCurrency = 'USD';
-      } else if (bcvRateNumber && bcvRateNumber > 0) {
-        effectiveAmountMinor = Math.round(
-          transaction.amountMinor / bcvRateNumber,
-        );
-        effectiveCurrency = 'USD';
-      }
-    } else if (mode === 'VES_BCV') {
-      if (transaction.currency === 'VES') {
-        effectiveAmountMinor = transaction.amountMinor;
-        effectiveCurrency = 'VES';
-      } else if (bcvRateNumber && bcvRateNumber > 0) {
-        effectiveAmountMinor = Math.round(
-          transaction.amountMinor * bcvRateNumber,
-        );
-        effectiveCurrency = 'VES';
-      }
-    } else if (mode === 'EUR') {
-      const activeRate = eurRateNumber ?? bcvRateNumber;
-      if (transaction.currency === 'USD') {
-        if (activeRate && activeRate > 0) {
-          effectiveAmountMinor = Math.round(
-            transaction.amountMinor * activeRate,
-          );
-          effectiveCurrency = 'VES';
-        }
-      } else if (transaction.currency === 'VES') {
-        if (bcvRateNumber && eurRateNumber && bcvRateNumber > 0) {
-          effectiveAmountMinor = Math.round(
-            (transaction.amountMinor / bcvRateNumber) * eurRateNumber,
-          );
-          effectiveCurrency = 'VES';
-        }
-      }
-    }
-  }
+  const effectiveCurrency = displayValue?.currency ?? transaction.currency;
 
   const amount = formatCurrency(
     effectiveAmountMinor,
