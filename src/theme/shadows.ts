@@ -1,31 +1,33 @@
-import type { ViewStyle } from 'react-native';
-
 import type { ColorScheme, ThemeShadows } from '@/theme/types';
 
-function createShadows(scheme: ColorScheme): ThemeShadows {
-  const shadowColor = scheme === 'dark' ? '#000000' : '#000000';
-  const shadowOpacity = scheme === 'dark' ? 0.32 : 0.05;
+/**
+ * Las sombras se expresan con `boxShadow` (sintaxis CSS) porque es la única
+ * propiedad que Android e iOS pintan igual: las props clásicas
+ * (`shadowOffset`, `shadowOpacity`, `shadowRadius`) solo existen en iOS y
+ * `elevation` en Android ignora desenfoque, desplazamiento y opacidad.
+ */
+function boxShadow(offsetY: number, blur: number, opacity: number): string {
+  return `0 ${offsetY}px ${blur}px rgba(0, 0, 0, ${opacity})`;
+}
 
-  const subtle = {
-    elevation: scheme === 'dark' ? 0 : 1,
-    shadowColor,
-    shadowOffset: { width: 0, height: scheme === 'dark' ? 2 : 6 },
-    shadowOpacity,
-    shadowRadius: scheme === 'dark' ? 4 : 12,
-  } as const satisfies ViewStyle;
+function createShadows(scheme: ColorScheme): ThemeShadows {
+  const isDark = scheme === 'dark';
 
   return {
-    subtle,
+    subtle: {
+      boxShadow: isDark ? boxShadow(2, 8, 0.32) : boxShadow(6, 24, 0.05),
+    },
+    raised: {
+      boxShadow: isDark ? boxShadow(2, 8, 0.32) : boxShadow(6, 24, 0.12),
+    },
     floatingAction: {
-      elevation: 6,
-      shadowColor,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: scheme === 'dark' ? 0.44 : 0.2,
-      shadowRadius: 8,
+      boxShadow: isDark ? boxShadow(4, 16, 0.44) : boxShadow(4, 16, 0.2),
     },
     mainMenu: {
-      ...subtle,
-      shadowOffset: { width: 0, height: -4 },
+      boxShadow: isDark ? boxShadow(-4, 8, 0.32) : boxShadow(-4, 24, 0.05),
+    },
+    none: {
+      boxShadow: [],
     },
   };
 }

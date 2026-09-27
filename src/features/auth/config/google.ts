@@ -4,7 +4,7 @@ export const googleAuthConfig = {
     '518884531876-sb1bhtaksbglhg780gqadvjmcl4j03n2.apps.googleusercontent.com',
   webClientId:
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-    '518884531876-sb1bhtaksbglhg780gqadvjmcl4j03n2.apps.googleusercontent.com',
+    '518884531876-rskanqcmci8cakfg5ben0kn7str91jsq.apps.googleusercontent.com',
   iosUrlScheme:
     'com.googleusercontent.apps.518884531876-sb1bhtaksbglhg780gqadvjmcl4j03n2',
 };

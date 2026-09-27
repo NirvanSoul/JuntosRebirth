@@ -9,6 +9,7 @@ import { colors } from '@/theme/colors';
 
 let latestOnDismiss: (() => void) | null = null;
 let mockLatestPresent = jest.fn();
+let latestBackdropDisappearsOnIndex: number | undefined;
 
 jest.mock('@gorhom/bottom-sheet', () => {
   const React = jest.requireActual('react');
@@ -17,10 +18,12 @@ jest.mock('@gorhom/bottom-sheet', () => {
   const BottomSheetModal = React.forwardRef(
     (
       {
+        backdropComponent,
         backgroundStyle,
         children,
         onDismiss,
       }: {
+        backdropComponent?: (props: object) => ReactNode;
         backgroundStyle?: object;
         children?: ReactNode;
         onDismiss?: () => void;
@@ -36,6 +39,7 @@ jest.mock('@gorhom/bottom-sheet', () => {
       }));
       return (
         <View style={backgroundStyle} testID="bottom-sheet">
+          {backdropComponent?.({})}
           {children}
         </View>
       );
@@ -48,7 +52,14 @@ jest.mock('@gorhom/bottom-sheet', () => {
     BottomSheetView: ({ children }: { children?: ReactNode }) => (
       <View>{children}</View>
     ),
-    BottomSheetBackdrop: () => null,
+    BottomSheetBackdrop: ({
+      disappearsOnIndex,
+    }: {
+      disappearsOnIndex?: number;
+    }) => {
+      latestBackdropDisappearsOnIndex = disappearsOnIndex;
+      return null;
+    },
   };
 });
 
@@ -58,10 +69,12 @@ function Harness({
   backgroundVariant,
   initialVisible = true,
   onCloseSpy,
+  onDismissedSpy,
 }: {
   backgroundVariant?: 'surface' | 'modal' | 'background';
   initialVisible?: boolean;
   onCloseSpy: () => void;
+  onDismissedSpy?: () => void;
 }) {
   const [visible, setVisible] = useState(initialVisible);
   const close = () => {
@@ -83,6 +96,7 @@ function Harness({
           <AppModal
             backgroundVariant={backgroundVariant}
             onClose={close}
+            onDismissed={onDismissedSpy}
             visible={visible}
           >
             <Text>Contenido</Text>
@@ -97,6 +111,7 @@ describe('AppModal', () => {
   beforeEach(() => {
     latestOnDismiss = null;
     mockLatestPresent = jest.fn();
+    latestBackdropDisappearsOnIndex = undefined;
   });
 
   it('presenta la hoja inmediatamente cuando cambia a visible', async () => {
@@ -122,6 +137,12 @@ describe('AppModal', () => {
     ).toBe(colors.background);
   });
 
+  it('desactiva el backdrop antes del índice cerrado para que no bloquee toques', async () => {
+    await render(<Harness onCloseSpy={jest.fn()} />);
+
+    expect(latestBackdropDisappearsOnIndex).toBe(-0.99);
+  });
+
   it('no queda cerrado si se reabre antes de que termine la animación de cierre previa', async () => {
     const onCloseSpy = jest.fn();
     const screen = await render(<Harness onCloseSpy={onCloseSpy} />);
@@ -140,14 +161,19 @@ describe('AppModal', () => {
 
   it('cierra normalmente cuando no se reabre antes de que termine la animación', async () => {
     const onCloseSpy = jest.fn();
-    const screen = await render(<Harness onCloseSpy={onCloseSpy} />);
+    const onDismissedSpy = jest.fn();
+    const screen = await render(
+      <Harness onCloseSpy={onCloseSpy} onDismissedSpy={onDismissedSpy} />,
+    );
 
     await fireEvent.press(screen.getByTestId('close'));
+    expect(onDismissedSpy).not.toHaveBeenCalled();
     await act(async () => {
       latestOnDismiss?.();
     });
 
     expect(onCloseSpy).toHaveBeenCalledTimes(1);
+    expect(onDismissedSpy).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Contenido')).toBeNull();
   });
 

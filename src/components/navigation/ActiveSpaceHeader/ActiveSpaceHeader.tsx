@@ -25,8 +25,8 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type ActiveSpaceHeaderProps = {
   onSpacePress: () => void;
   spaceName: string;
-  /** Bandera de la moneda activa en Inicio. Solo se pasa cuando el usuario
-   * tiene más de una moneda activa y está viendo esa pestaña. */
+  /** Bandera de la moneda activa en las pantallas financieras. Solo se pasa
+   * cuando el usuario tiene más de una moneda disponible. */
   currencyFlag?: string;
   onCurrencyPress?: () => void;
   /**
@@ -179,9 +179,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       opacity: 0.72,
     },
     currencyButton: {
-      ...shadows.subtle,
-      elevation: 4,
-      shadowOpacity: 0.12,
+      ...shadows.raised,
       width: layout.minTouchTarget,
       height: layout.minTouchTarget,
       flexShrink: 0,

@@ -1,24 +1,17 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { type ComponentProps, type PropsWithChildren, useState } from 'react';
+import { useState } from 'react';
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
 import { Text } from '@/components/ui/Text/Text';
-import {
-  AnimatedChevron,
-  AnimatedDisclosureContent,
-  getActivityLayoutTransition,
-} from '@/features/activity/components/ActivityCollapsibleSection';
+import { TransactionFilterGroup } from '@/features/activity/components/TransactionFilterGroup';
 import {
   formatTransactionDateRangeDate,
   TransactionDateRangePickerModal,
@@ -42,13 +35,18 @@ import {
   getCurrencyName,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
-import { iconSize, layout } from '@/theme/layout';
+import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
-import { useTheme } from '@/theme/useTheme';
 
 export type TransactionTypeFilter = 'all' | 'expense' | 'income';
 export type CategoryFilter = readonly string[];
 export type RecurrenceFilter = 'all' | TransactionRecurrence;
+export type TransactionAuthorFilter = 'all' | 'own' | 'partner';
+
+export type TransactionAuthorFilterOption = {
+  label: string;
+  value: TransactionAuthorFilter;
+};
 
 export type TransactionFilters = {
   category: CategoryFilter;
@@ -56,26 +54,23 @@ export type TransactionFilters = {
   date: TransactionDateFilter;
   recurrence: RecurrenceFilter;
   type: TransactionTypeFilter;
+  author?: TransactionAuthorFilter;
 };
 
 type TransactionFiltersModalProps = {
+  /** Acota los grupos de filtros sin cambiar el comportamiento del modal. */
+  authorOptions?: readonly TransactionAuthorFilterOption[];
   categories: readonly Category[];
   currencies: readonly CurrencyCode[];
   filters: TransactionFilters;
   onApply: (filters: TransactionFilters) => void;
   onClose: () => void;
+  variant?: 'all' | 'date-and-author';
   visible: boolean;
 };
 
-type FilterGroup = 'type' | 'category' | 'recurrence' | 'date' | 'currency';
-
-type CollapsibleFilterGroupProps = PropsWithChildren<{
-  expanded: boolean;
-  icon: ComponentProps<typeof Ionicons>['name'];
-  iconTestID: string;
-  onToggle: () => void;
-  title: string;
-}>;
+type FilterGroup =
+  'type' | 'category' | 'recurrence' | 'date' | 'currency' | 'author';
 
 const typeOptions: readonly {
   label: string;
@@ -109,57 +104,14 @@ const filterGridRows = 2;
 const filterCategoryColumns = 3;
 const selectableOptionHeight = 56;
 
-function CollapsibleFilterGroup({
-  children,
-  expanded,
-  icon,
-  iconTestID,
-  onToggle,
-  title,
-}: CollapsibleFilterGroupProps) {
-  const { colors } = useTheme();
-
-  return (
-    <Animated.View
-      layout={getActivityLayoutTransition()}
-      style={styles.filterGroup}
-    >
-      <Pressable
-        accessibilityHint={`${expanded ? 'Oculta' : 'Muestra'} las opciones de ${title.toLowerCase()}`}
-        accessibilityLabel={title}
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        hitSlop={spacing.sm}
-        onPress={onToggle}
-        style={({ pressed }) => [
-          styles.groupHeader,
-          pressed ? styles.pressed : null,
-        ]}
-      >
-        <View style={styles.groupTitle}>
-          <Ionicons
-            color={colors.textSecondary}
-            name={icon}
-            size={iconSize.xs}
-            testID={iconTestID}
-          />
-          <Text variant="label">{title}</Text>
-        </View>
-        <AnimatedChevron expanded={expanded} />
-      </Pressable>
-      <AnimatedDisclosureContent expanded={expanded}>
-        <View style={styles.groupContent}>{children}</View>
-      </AnimatedDisclosureContent>
-    </Animated.View>
-  );
-}
-
 export function TransactionFiltersModal({
+  authorOptions,
   categories,
   currencies,
   filters,
   onApply,
   onClose,
+  variant = 'all',
   visible,
 }: TransactionFiltersModalProps) {
   const density = useLayoutDensity();
@@ -179,6 +131,8 @@ export function TransactionFiltersModal({
   const recurrenceGridHeight =
     selectableOptionHeight * filterGridRows + spacing.sm;
   const hasMultipleCurrencies = currencies.length >= 2;
+  const isLimitedVariant = variant !== 'all';
+  const hasAuthorFilter = variant === 'date-and-author';
 
   if (useDepsChanged([visible, filters])) {
     if (visible) {
@@ -195,10 +149,12 @@ export function TransactionFiltersModal({
   }
 
   const hasDraftFilters =
-    draft.type !== 'all' ||
-    draft.category.length > 0 ||
-    draft.recurrence !== 'all' ||
-    draft.date !== 'all';
+    draft.date !== 'all' ||
+    (hasAuthorFilter
+      ? draft.author !== undefined && draft.author !== 'all'
+      : draft.type !== 'all' ||
+        draft.category.length > 0 ||
+        draft.recurrence !== 'all');
 
   const clearDraft = () => {
     setDraft((current) => ({
@@ -207,6 +163,7 @@ export function TransactionFiltersModal({
       currency: current.currency,
       recurrence: 'all',
       date: 'all',
+      author: hasAuthorFilter ? 'all' : current.author,
     }));
   };
 
@@ -264,7 +221,7 @@ export function TransactionFiltersModal({
           </View>
 
           <View style={styles.groups}>
-            <CollapsibleFilterGroup
+            <TransactionFilterGroup
               expanded={expandedGroup === 'date'}
               icon="calendar-outline"
               iconTestID="date-filter-group-icon"
@@ -291,10 +248,42 @@ export function TransactionFiltersModal({
                 selectedDate={dateAnchor}
                 testID="activity-date-period-selector"
               />
-            </CollapsibleFilterGroup>
+            </TransactionFilterGroup>
 
-            {hasMultipleCurrencies ? (
-              <CollapsibleFilterGroup
+            {hasAuthorFilter ? (
+              <TransactionFilterGroup
+                expanded={expandedGroup === 'author'}
+                icon="person-outline"
+                iconTestID="author-filter-group-icon"
+                onToggle={() => toggleGroup('author')}
+                title="Autor"
+              >
+                <View
+                  accessibilityRole="radiogroup"
+                  style={styles.currencyOptions}
+                >
+                  {(authorOptions ?? []).map((option) => (
+                    <SelectableOption
+                      accessibilityLabel={`Autor: ${option.label}`}
+                      indicatorTestID={`author-filter-${option.value}-indicator`}
+                      key={option.value}
+                      label={option.label}
+                      onPress={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          author: option.value,
+                        }))
+                      }
+                      selected={(draft.author ?? 'all') === option.value}
+                      testID={`author-filter-${option.value}`}
+                    />
+                  ))}
+                </View>
+              </TransactionFilterGroup>
+            ) : null}
+
+            {hasMultipleCurrencies && !isLimitedVariant ? (
+              <TransactionFilterGroup
                 expanded={expandedGroup === 'currency'}
                 icon="cash-outline"
                 iconTestID="currency-filter-group-icon"
@@ -319,133 +308,141 @@ export function TransactionFiltersModal({
                     />
                   ))}
                 </View>
-              </CollapsibleFilterGroup>
+              </TransactionFilterGroup>
             ) : null}
 
-            <CollapsibleFilterGroup
-              expanded={expandedGroup === 'type'}
-              icon="swap-vertical-outline"
-              iconTestID="type-filter-group-icon"
-              onToggle={() => toggleGroup('type')}
-              title="Tipo de movimiento"
-            >
-              <View accessibilityRole="radiogroup" style={styles.typeOptions}>
-                {typeOptions.map((option) => (
-                  <SelectableOption
-                    accessibilityLabel={`Tipo: ${option.label}`}
-                    indicatorTestID={`type-filter-${option.value}-indicator`}
-                    key={option.value}
-                    label={option.label}
-                    onPress={() =>
-                      setDraft((current) => ({
-                        ...current,
-                        type: option.value,
-                      }))
-                    }
-                    selected={draft.type === option.value}
-                    style={styles.typeOption}
-                    testID={`type-filter-${option.value}`}
-                  />
-                ))}
-              </View>
-            </CollapsibleFilterGroup>
-
-            <CollapsibleFilterGroup
-              expanded={expandedGroup === 'category'}
-              icon="pie-chart-outline"
-              iconTestID="category-filter-group-icon"
-              onToggle={() => toggleGroup('category')}
-              title="Categoría"
-            >
-              <ScrollView
-                contentContainerStyle={[
-                  styles.twoRowGrid,
-                  {
-                    height: categoryGridHeight,
-                    paddingHorizontal: gutter,
-                  },
-                ]}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={{ width, marginLeft: -gutter, overflow: 'visible' }}
-                testID="category-filter-scroll"
+            {!isLimitedVariant ? (
+              <TransactionFilterGroup
+                expanded={expandedGroup === 'type'}
+                icon="swap-vertical-outline"
+                iconTestID="type-filter-group-icon"
+                onToggle={() => toggleGroup('type')}
+                title="Tipo de movimiento"
               >
-                <CategorySelectionCard
-                  accessibilityLabel="Categoría: Todas"
-                  accessibilityRole="checkbox"
-                  category={allCategoriesOption}
-                  height={categorySelectionCardHeight[density]}
-                  onPress={() =>
-                    setDraft((current) => ({ ...current, category: [] }))
-                  }
-                  selected={draft.category.length === 0}
-                  showCheckmark
-                  testID="category-filter-all"
-                  width={categoryCardWidth}
-                />
-                {categories.map((category) => (
+                <View accessibilityRole="radiogroup" style={styles.typeOptions}>
+                  {typeOptions.map((option) => (
+                    <SelectableOption
+                      accessibilityLabel={`Tipo: ${option.label}`}
+                      indicatorTestID={`type-filter-${option.value}-indicator`}
+                      key={option.value}
+                      label={option.label}
+                      onPress={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          type: option.value,
+                        }))
+                      }
+                      selected={draft.type === option.value}
+                      style={styles.typeOption}
+                      testID={`type-filter-${option.value}`}
+                    />
+                  ))}
+                </View>
+              </TransactionFilterGroup>
+            ) : null}
+
+            {!isLimitedVariant ? (
+              <TransactionFilterGroup
+                expanded={expandedGroup === 'category'}
+                icon="pie-chart-outline"
+                iconTestID="category-filter-group-icon"
+                onToggle={() => toggleGroup('category')}
+                title="Categoría"
+              >
+                <ScrollView
+                  contentContainerStyle={[
+                    styles.twoRowGrid,
+                    {
+                      height: categoryGridHeight,
+                      paddingHorizontal: gutter,
+                    },
+                  ]}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ width, marginLeft: -gutter, overflow: 'visible' }}
+                  testID="category-filter-scroll"
+                >
                   <CategorySelectionCard
-                    accessibilityLabel={`Categoría: ${category.name}`}
+                    accessibilityLabel="Categoría: Todas"
                     accessibilityRole="checkbox"
-                    category={category}
+                    category={allCategoriesOption}
                     height={categorySelectionCardHeight[density]}
-                    key={category.id}
                     onPress={() =>
-                      setDraft((current) => ({
-                        ...current,
-                        category: current.category.includes(category.id)
-                          ? current.category.filter((id) => id !== category.id)
-                          : [...current.category, category.id],
-                      }))
+                      setDraft((current) => ({ ...current, category: [] }))
                     }
-                    selected={draft.category.includes(category.id)}
+                    selected={draft.category.length === 0}
                     showCheckmark
-                    testID={`category-filter-${category.id}`}
+                    testID="category-filter-all"
                     width={categoryCardWidth}
                   />
-                ))}
-              </ScrollView>
-            </CollapsibleFilterGroup>
+                  {categories.map((category) => (
+                    <CategorySelectionCard
+                      accessibilityLabel={`Categoría: ${category.name}`}
+                      accessibilityRole="checkbox"
+                      category={category}
+                      height={categorySelectionCardHeight[density]}
+                      key={category.id}
+                      onPress={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          category: current.category.includes(category.id)
+                            ? current.category.filter(
+                                (id) => id !== category.id,
+                              )
+                            : [...current.category, category.id],
+                        }))
+                      }
+                      selected={draft.category.includes(category.id)}
+                      showCheckmark
+                      testID={`category-filter-${category.id}`}
+                      width={categoryCardWidth}
+                    />
+                  ))}
+                </ScrollView>
+              </TransactionFilterGroup>
+            ) : null}
 
-            <CollapsibleFilterGroup
-              expanded={expandedGroup === 'recurrence'}
-              icon="sync-outline"
-              iconTestID="recurrence-filter-group-icon"
-              onToggle={() => toggleGroup('recurrence')}
-              title="Recurrencia"
-            >
-              <ScrollView
-                accessibilityRole="radiogroup"
-                contentContainerStyle={[
-                  styles.twoRowGrid,
-                  {
-                    height: recurrenceGridHeight,
-                    paddingHorizontal: gutter,
-                  },
-                ]}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={{ width, marginLeft: -gutter, overflow: 'visible' }}
-                testID="recurrence-filter-scroll"
+            {!isLimitedVariant ? (
+              <TransactionFilterGroup
+                expanded={expandedGroup === 'recurrence'}
+                icon="sync-outline"
+                iconTestID="recurrence-filter-group-icon"
+                onToggle={() => toggleGroup('recurrence')}
+                title="Recurrencia"
               >
-                {recurrenceOptions.map((option) => (
-                  <SelectableOption
-                    accessibilityLabel={`Recurrencia: ${option.label}`}
-                    indicatorTestID={`recurrence-filter-${option.value}-indicator`}
-                    key={option.value}
-                    label={option.label}
-                    onPress={() =>
-                      setDraft((current) => ({
-                        ...current,
-                        recurrence: option.value,
-                      }))
-                    }
-                    selected={draft.recurrence === option.value}
-                    testID={`recurrence-filter-${option.value}`}
-                  />
-                ))}
-              </ScrollView>
-            </CollapsibleFilterGroup>
+                <ScrollView
+                  accessibilityRole="radiogroup"
+                  contentContainerStyle={[
+                    styles.twoRowGrid,
+                    {
+                      height: recurrenceGridHeight,
+                      paddingHorizontal: gutter,
+                    },
+                  ]}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ width, marginLeft: -gutter, overflow: 'visible' }}
+                  testID="recurrence-filter-scroll"
+                >
+                  {recurrenceOptions.map((option) => (
+                    <SelectableOption
+                      accessibilityLabel={`Recurrencia: ${option.label}`}
+                      indicatorTestID={`recurrence-filter-${option.value}-indicator`}
+                      key={option.value}
+                      label={option.label}
+                      onPress={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          recurrence: option.value,
+                        }))
+                      }
+                      selected={draft.recurrence === option.value}
+                      testID={`recurrence-filter-${option.value}`}
+                    />
+                  ))}
+                </ScrollView>
+              </TransactionFilterGroup>
+            ) : null}
           </View>
 
           <View style={styles.actions}>
@@ -500,23 +497,6 @@ const styles = StyleSheet.create({
   groups: {
     gap: spacing.md,
   },
-  filterGroup: {
-    paddingBottom: spacing.md,
-  },
-  groupHeader: {
-    minHeight: layout.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  groupTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  groupContent: {
-    marginTop: spacing.sm,
-  },
   typeOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -542,7 +522,4 @@ const styles = StyleSheet.create({
   },
   clearAction: { flex: 0.7 },
   applyAction: { flex: 1.5 },
-  pressed: {
-    opacity: 0.64,
-  },
 });

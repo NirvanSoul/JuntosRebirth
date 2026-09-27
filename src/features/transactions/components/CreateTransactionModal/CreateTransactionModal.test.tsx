@@ -839,8 +839,7 @@ describe('CreateTransactionModal', () => {
     });
     expect(selectedRecurrenceStyle).toMatchObject({
       borderColor: colors.border,
-      elevation: 0,
-      shadowOpacity: 0,
+      ...shadows.none,
     });
     expect(
       StyleSheet.flatten(

@@ -2,16 +2,15 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
 import { ActiveSpaceHeader } from '@/components/navigation/ActiveSpaceHeader/ActiveSpaceHeader';
-import { FloatingCreateButton } from '@/components/navigation/FloatingCreateButton/FloatingCreateButton';
 import { AppTabBar } from '@/components/navigation/AppTabBar/AppTabBar';
 import { NoticeToast } from '@/components/overlays/NoticeToast/NoticeToast';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { ActivityTabContent } from '@/navigation/components/ActivityTabContent';
 import { HomeTabContent } from '@/navigation/components/HomeTabContent';
+import { MainFloatingActions } from '@/navigation/components/MainFloatingActions';
 import {
   getHomeCurrencyButtonLabel,
   resolveHomeCurrencies,
@@ -48,6 +47,7 @@ import {
   validateCategoryName,
 } from '@/features/categories/utils/categoryCatalog';
 import { HomeCurrencyPickerModal } from '@/features/dashboard/components/HomeCurrencyPickerModal/HomeCurrencyPickerModal';
+import { CurrencyExchangeModal } from '@/features/exchangeRates/components/CurrencyExchangeModal/CurrencyExchangeModal';
 import { ImportScreen } from '@/features/import/screens/ImportScreen';
 import {
   MapScreen,
@@ -77,7 +77,6 @@ import { useSaveErrorAlert } from '@/navigation/useSaveErrorAlert';
 import { CreateTransactionModal } from '@/features/transactions/components/CreateTransactionModal/CreateTransactionModal';
 import { TransactionDetailModal } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal';
 import type {
-  CreateTransactionDraft,
   SessionTransaction,
   TransactionEditorTarget,
   TransactionNotificationRule,
@@ -86,7 +85,6 @@ import type {
 } from '@/features/transactions/types';
 import {
   archiveLocalTransaction,
-  createLocalTransaction,
   updateLocalTransactionNote,
 } from '@/features/transactions/repositories/localTransactionRepository';
 import {
@@ -102,6 +100,7 @@ import {
   scheduleTransactionReminder,
 } from '@/features/transactions/services/transactionReminderService';
 import { useTransactionEditing } from '@/features/transactions/hooks/useTransactionEditing';
+import { useTransactionSubmit } from '@/features/transactions/hooks/useTransactionSubmit';
 import { resolveTransactionForDetail } from '@/features/transactions/utils/transactionDetailResolution';
 import { useAppForeground } from '@/hooks/useAppForeground';
 import {
@@ -112,7 +111,6 @@ import {
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import type { CreateActionType } from '@/navigation/createActions';
 import type { MainTabParamList, RootDrawerParamList } from '@/navigation/types';
-import { layout } from '@/theme/layout';
 import { useTheme } from '@/theme/useTheme';
 
 const Tabs = createBottomTabNavigator<MainTabParamList>();
@@ -127,7 +125,6 @@ type CategoryDetailRequest = {
 };
 
 export function MainTabsNavigator() {
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
   const {
@@ -201,6 +198,8 @@ export function MainTabsNavigator() {
   const [isActivitySummaryPinned, setActivitySummaryPinned] = useState(false);
   const [isCreateMenuVisible, setCreateMenuVisible] = useState(false);
   const [isImportVisible, setImportVisible] = useState(false);
+  const [isCurrencyExchangeVisible, setCurrencyExchangeVisible] =
+    useState(false);
   const [transactionType, setTransactionType] =
     useState<TransactionType>('expense');
   const [isTransactionModalVisible, setTransactionModalVisible] =
@@ -232,6 +231,8 @@ export function MainTabsNavigator() {
   >();
   const [detailRequest, setDetailRequest] =
     useState<CategoryDetailRequest | null>(null);
+  /** La solicitud se conserva mientras la hoja termina de cerrarse. */
+  const [isCategoryDetailVisible, setCategoryDetailVisible] = useState(false);
   const [detailTransactionId, setDetailTransactionId] = useState<string | null>(
     null,
   );
@@ -465,14 +466,9 @@ export function MainTabsNavigator() {
     setCreateMenuVisible(false);
 
     if (action === 'income' || action === 'expense') {
-      setEditingTransactionId(null);
-      setTransactionInitialDate(undefined);
-      setSelectedCategoryId(null);
-      setSelectedMoneyAccountId(null);
       setCategoryCreationContext(null);
       setCategoryPickerVisible(false);
-      setTransactionType(action);
-      setTransactionModalVisible(true);
+      openTransactionCreation({ type: action });
       return;
     }
 
@@ -481,8 +477,36 @@ export function MainTabsNavigator() {
       return;
     }
 
+    if (action === 'currency-exchange') {
+      setCurrencyExchangeVisible(true);
+      return;
+    }
+
     setCategoryCreationContext('quick');
     setCategoryPickerVisible(true);
+  };
+
+  const openCategoryDetail = (
+    categoryId: string,
+    displayCurrency: CurrencyCode,
+  ) => {
+    setDetailRequest({ categoryId, displayCurrency });
+    setCategoryDetailVisible(true);
+  };
+
+  /** Prepara la hoja de creación con el contexto desde el que se pidió. */
+  const openTransactionCreation = (options?: {
+    categoryId?: string;
+    date?: string;
+    moneyAccountId?: string;
+    type?: TransactionType;
+  }) => {
+    setEditingTransactionId(null);
+    setTransactionInitialDate(options?.date);
+    setSelectedCategoryId(options?.categoryId ?? null);
+    setSelectedMoneyAccountId(options?.moneyAccountId ?? null);
+    setTransactionType(options?.type ?? 'expense');
+    setTransactionModalVisible(true);
   };
 
   const closeCategoryPicker = () => {
@@ -606,82 +630,29 @@ export function MainTabsNavigator() {
     }
   };
 
-  const handleTransactionSubmit = async (draft: CreateTransactionDraft) => {
-    const targetCategory = categories.find(
-      (category) => category.id === draft.categoryId,
-    );
-    if (!targetCategory) {
-      console.error(
-        '[MainTabsNavigator] La categoría seleccionada no existe:',
-        draft.categoryId,
-      );
-      showSaveError();
-      return;
-    }
-
-    const safeDraft: CreateTransactionDraft = {
-      ...draft,
-      spaceId: activeSpace.id,
-    };
-
-    if (safeDraft.moneyAccountId) {
-      const account = moneyAccountsController.moneyAccounts.find(
-        (candidate) => candidate.id === safeDraft.moneyAccountId,
-      );
-      if (
-        account &&
-        !moneyAccountSupportsCurrency(account, safeDraft.currency) &&
-        !(await moneyAccountsController.ensureCurrency(
-          safeDraft.moneyAccountId,
-          safeDraft.currency,
-        ))
-      ) {
-        console.error(
-          '[MainTabsNavigator] No se pudo asegurar la moneda para la cuenta:',
-          safeDraft.currency,
-        );
-        showSaveError();
-        return;
-      }
-    }
-
-    if (editingTransactionId) {
-      const updated = await applyTransactionUpdate(
-        editingTransactionId,
-        safeDraft,
-      );
-      if (updated) {
+  const { submitCurrencyExchange, submitTransaction } = useTransactionSubmit({
+    activeSpaceId: activeSpace.id,
+    applyTransactionUpdate,
+    categories,
+    editingTransactionId,
+    ensureCurrency: moneyAccountsController.ensureCurrency,
+    moneyAccounts: moneyAccountsController.moneyAccounts,
+    onCategoriesCreated: (created) =>
+      setCategories((current) => [...current, ...created]),
+    onChangesPublished: () => publishActiveCoupleChanges(),
+    onError: () => showSaveError(),
+    onTransactionSaved: (mode) => {
+      if (mode === 'updated') {
         setEditingTransactionId(null);
         setTransactionInitialEditor(undefined);
-        setTransactionInitialDate(undefined);
-        setTransactionModalVisible(false);
-        setSelectedCategoryId(null);
-        setSelectedMoneyAccountId(null);
       }
-      return;
-    }
-
-    try {
-      const createdTransactions = await createLocalTransaction(safeDraft);
-      let nextTransactions: SessionTransaction[] = [];
-      setTransactions((current) => {
-        nextTransactions = [...createdTransactions, ...current];
-        return nextTransactions;
-      });
-      void reconcileNotificationRules({
-        categories,
-        transactions: nextTransactions,
-      }).catch(() => undefined);
-      publishActiveCoupleChanges();
       setTransactionInitialDate(undefined);
       setTransactionModalVisible(false);
       setSelectedCategoryId(null);
       setSelectedMoneyAccountId(null);
-    } catch (error) {
-      console.error('[MainTabsNavigator] createLocalTransaction falló:', error);
-      showSaveError();
-    }
-  };
+    },
+    setTransactions,
+  });
 
   const handleDeleteTransaction = async (transactionId: string) => {
     try {
@@ -889,7 +860,9 @@ export function MainTabsNavigator() {
               <ActiveSpaceHeader
                 currencyFlag={
                   countryCode !== null &&
-                  (activeMainTab === 'Home' || activeMainTab === 'Activity') &&
+                  (activeMainTab === 'Home' ||
+                    activeMainTab === 'Activity' ||
+                    activeMainTab === 'Map') &&
                   homeCurrencies.length > 1
                     ? getHomeCurrencyButtonLabel(
                         effectiveHomeCurrency,
@@ -961,10 +934,7 @@ export function MainTabsNavigator() {
                         setInvitePartnerVisible(false)
                       }
                       onOpenCategoryDetail={(categoryId) =>
-                        setDetailRequest({
-                          categoryId,
-                          displayCurrency: effectiveHomeCurrency,
-                        })
+                        openCategoryDetail(categoryId, effectiveHomeCurrency)
                       }
                       onOpenCountrySettings={() =>
                         navigation.navigate('Settings')
@@ -1011,10 +981,10 @@ export function MainTabsNavigator() {
                       }
                       onImport={() => setImportVisible(true)}
                       onOpenCategoryDetail={(categoryId, currency) =>
-                        setDetailRequest({
+                        openCategoryDetail(
                           categoryId,
-                          displayCurrency: currency ?? effectiveHomeCurrency,
-                        })
+                          currency ?? effectiveHomeCurrency,
+                        )
                       }
                       onOpenMoneyAccountDetail={
                         moneyAccountsController.openDetail
@@ -1046,14 +1016,10 @@ export function MainTabsNavigator() {
                   {() => (
                     <MapScreen
                       categories={activeSpaceCategories}
-                      onAddTransaction={(date) => {
-                        setEditingTransactionId(null);
-                        setTransactionInitialDate(date);
-                        setSelectedCategoryId(null);
-                        setSelectedMoneyAccountId(null);
-                        setTransactionType('expense');
-                        setTransactionModalVisible(true);
-                      }}
+                      currency={effectiveHomeCurrency}
+                      onAddTransaction={(date, type) =>
+                        openTransactionCreation({ date, type })
+                      }
                       onOpenTransactionDetail={setDetailTransactionId}
                       ref={mapScreenRef}
                       transactions={activeSpaceTransactions}
@@ -1062,16 +1028,17 @@ export function MainTabsNavigator() {
                 </Tabs.Screen>
               </Tabs.Navigator>
 
-              <FloatingCreateButton
-                bottom={insets.bottom + layout.floatingActionTabOffset}
-                onPress={() => setCreateMenuVisible(!areSpaceActionsBlocked)}
-                visible={
-                  isFloatingCreateButtonVisible && !areSpaceActionsBlocked
+              <MainFloatingActions
+                areSpaceActionsBlocked={areSpaceActionsBlocked}
+                isCreateButtonVisible={isFloatingCreateButtonVisible}
+                onCreatePress={() =>
+                  setCreateMenuVisible(!areSpaceActionsBlocked)
                 }
               />
               <QuickCreateMenu
                 onClose={() => setCreateMenuVisible(false)}
                 onSelect={handleCreateAction}
+                showCurrencyExchange={venezuelaCurrencyMode}
                 visible={isCreateMenuVisible && !areSpaceActionsBlocked}
               />
               <CreateTransactionModal
@@ -1093,12 +1060,22 @@ export function MainTabsNavigator() {
                   setCategoryCreationContext('transaction');
                   setCategoryPickerVisible(true);
                 }}
-                onSubmit={handleTransactionSubmit}
+                onSubmit={submitTransaction}
                 onTypeChange={setTransactionType}
                 selectedCategory={selectedCategory}
                 spaceCurrency={activeSpace.currency}
                 type={transactionType}
                 visible={isTransactionModalVisible}
+              />
+              <CurrencyExchangeModal
+                moneyAccounts={moneyAccountsController.activeSpaceMoneyAccounts}
+                onClose={() => setCurrencyExchangeVisible(false)}
+                onSubmit={async (submission) => {
+                  const saved = await submitCurrencyExchange(submission);
+                  if (saved) setCurrencyExchangeVisible(false);
+                  return saved;
+                }}
+                visible={isCurrencyExchangeVisible && venezuelaCurrencyMode}
               />
               <ImportScreen
                 activeSpaceId={activeSpace.id}
@@ -1154,20 +1131,16 @@ export function MainTabsNavigator() {
                   detailRequest?.displayCurrency ?? effectiveHomeCurrency
                 }
                 onAddTransaction={(categoryId) => {
-                  setDetailRequest(null);
-                  setTransactionInitialDate(undefined);
-                  setSelectedCategoryId(categoryId);
-                  setSelectedMoneyAccountId(null);
-                  setTransactionType('expense');
-                  setTransactionModalVisible(true);
+                  setCategoryDetailVisible(false);
+                  openTransactionCreation({ categoryId });
                 }}
-                onClose={() => setDetailRequest(null)}
+                onClose={() => setCategoryDetailVisible(false)}
                 onDelete={(categoryId) => {
-                  setDetailRequest(null);
+                  setCategoryDetailVisible(false);
                   handleArchiveCategory(categoryId);
                 }}
                 onEdit={(categoryId, initialEditor) => {
-                  setDetailRequest(null);
+                  setCategoryDetailVisible(false);
                   setEditingCategoryId(categoryId);
                   setCategoryInitialEditor(initialEditor);
                   setCustomCategoryVisible(true);
@@ -1179,19 +1152,15 @@ export function MainTabsNavigator() {
                 shareTargets={shareTargets}
                 spaceCurrency={activeSpace.currency}
                 transactions={activeSpaceTransactions}
-                visible={detailCategory !== null}
+                visible={isCategoryDetailVisible && detailCategory !== null}
               />
               <MoneyAccountModals
                 availableCurrencies={spaceCurrencies}
                 categories={spaceCategories}
                 controller={moneyAccountsController}
-                onAddTransaction={(moneyAccountId) => {
-                  setTransactionInitialDate(undefined);
-                  setSelectedCategoryId(null);
-                  setSelectedMoneyAccountId(moneyAccountId);
-                  setTransactionType('expense');
-                  setTransactionModalVisible(true);
-                }}
+                onAddTransaction={(moneyAccountId) =>
+                  openTransactionCreation({ moneyAccountId })
+                }
                 onOpenTransactionDetail={setDetailTransactionId}
                 spaceId={activeSpace.id}
                 spaceCurrency={activeSpace.currency}
@@ -1213,20 +1182,16 @@ export function MainTabsNavigator() {
                   );
                   if (!transaction) return;
                   setDetailTransactionId(null);
+                  openTransactionCreation({
+                    categoryId: transaction.categoryId,
+                    type: transaction.type,
+                  });
                   setEditingTransactionId(transaction.id);
                   setTransactionInitialEditor(initialEditor);
-                  setTransactionInitialDate(undefined);
-                  setSelectedCategoryId(transaction.categoryId);
-                  setSelectedMoneyAccountId(null);
-                  setTransactionType(transaction.type);
-                  setTransactionModalVisible(true);
                 }}
                 onOpenCategoryDetail={(categoryId) => {
                   if (!detailTransaction) return;
-                  setDetailRequest({
-                    categoryId,
-                    displayCurrency: detailTransaction.currency,
-                  });
+                  openCategoryDetail(categoryId, detailTransaction.currency);
                 }}
                 onQuickEdit={quickEditTransaction}
                 onRemoveReminder={handleRemoveTransactionReminder}

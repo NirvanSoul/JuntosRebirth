@@ -2,6 +2,7 @@ import { act, fireEvent, waitFor } from '@testing-library/react-native';
 
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
 import { verifyCode } from '@/features/auth/services/verifyCodeService';
+import { AuthApiError } from '@/features/auth/utils/authError';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import { motion } from '@/theme/motion';
 
@@ -92,6 +93,38 @@ describe('VerifyCodeScreen', () => {
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('verify-code-success')).toBeNull();
+  });
+
+  it('muestra un mensaje específico y el código técnico del error', async () => {
+    jest
+      .mocked(verifyCode)
+      .mockRejectedValueOnce(
+        new AuthApiError(
+          'TOO_MANY_ATTEMPTS',
+          'Has agotado los 3 intentos disponibles entre la verificación y el cambio de contraseña. Solicita un código nuevo para continuar.',
+        ),
+      );
+
+    const screen = await renderWithTheme(
+      <VerifyCodeScreen
+        email="ana@ejemplo.com"
+        onCancel={jest.fn()}
+        onSuccess={jest.fn()}
+        purpose="recovery"
+      />,
+    );
+
+    await fireEvent.changeText(
+      screen.getByTestId('verify-code-input'),
+      '123456',
+    );
+    await fireEvent.press(screen.getByTestId('verify-code-submit'));
+
+    expect(
+      await screen.findByText(
+        'Has agotado los 3 intentos disponibles entre la verificación y el cambio de contraseña. Solicita un código nuevo para continuar.\nCódigo: TOO_MANY_ATTEMPTS',
+      ),
+    ).toBeTruthy();
   });
 
   it('acepta códigos de la longitud configurada por el proveedor', async () => {

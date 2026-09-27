@@ -126,10 +126,9 @@ export function CategoryPickerModal({
   const { width } = useWindowDimensions();
   const [displayMode, setDisplayMode] = useState<'create' | 'select'>(mode);
   const gutter = layout.screenGutter[density];
-  const pageWidth = width;
-  const pageContentWidth = pageWidth - gutter * 2;
+  const pageWidth = width - gutter * 2;
   const cardWidth =
-    (pageContentWidth - spacing.sm * (categoryColumnsPerPage - 1)) /
+    (pageWidth - spacing.sm * (categoryColumnsPerPage - 1)) /
     categoryColumnsPerPage;
   const createdCategoryPages = useMemo(
     () => paginateCategories(categories, categoriesPerPage),
@@ -255,7 +254,6 @@ export function CategoryPickerModal({
                 {
                   width: pageWidth,
                   height: pageHeight,
-                  paddingHorizontal: gutter,
                 },
               ]}
             >
@@ -364,10 +362,7 @@ export function CategoryPickerModal({
             </View>
           )}
           showsHorizontalScrollIndicator={false}
-          style={[
-            styles.pages,
-            { width: pageWidth, height: pageHeight, marginLeft: -gutter },
-          ]}
+          style={[styles.pages, { width: pageWidth, height: pageHeight }]}
           testID="category-template-pages"
           viewabilityConfig={pageViewabilityConfig}
         />

@@ -28,6 +28,7 @@ type TransactionPreviewCardProps = {
   expanded?: boolean;
   onPress?: () => void;
   onToggleExpanded?: () => void;
+  showAuthorName?: boolean;
   stacked?: boolean;
   transaction: SessionTransaction;
 };
@@ -43,6 +44,7 @@ export function TransactionPreviewCard({
   expanded = false,
   onPress,
   onToggleExpanded,
+  showAuthorName = false,
   stacked = false,
   transaction,
 }: TransactionPreviewCardProps) {
@@ -134,6 +136,16 @@ export function TransactionPreviewCard({
                 testID="transaction-author-avatar"
                 uri={author.profile?.avatarUri}
               />
+            ) : null}
+            {author && showAuthorName ? (
+              <Text
+                numberOfLines={1}
+                testID="transaction-author-name"
+                tone="secondary"
+                variant="footnote"
+              >
+                {formatAuthorName(author)}
+              </Text>
             ) : null}
             <Text numberOfLines={1} tone="secondary" variant="footnote">
               {date}

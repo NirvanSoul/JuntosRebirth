@@ -5,6 +5,7 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { Text } from '@/components/ui/Text/Text';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
 import { requestPasswordReset } from '@/features/auth/services/resetPasswordService';
+import { getAuthErrorDisplayMessage } from '@/features/auth/utils/authError';
 import { isValidEmail } from '@/features/auth/utils/authValidation';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
@@ -49,10 +50,10 @@ export function ForgotPasswordScreen({
     } catch (caught) {
       setState({
         step: 'error',
-        message:
-          caught instanceof Error
-            ? caught.message
-            : 'No pudimos enviar el código de recuperación.',
+        message: getAuthErrorDisplayMessage(
+          caught,
+          'No pudimos enviar el código de recuperación.',
+        ),
       });
     }
   };

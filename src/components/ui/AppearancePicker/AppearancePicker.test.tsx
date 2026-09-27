@@ -10,6 +10,37 @@ const iconSections = [
 ] as const;
 
 describe('AppearancePicker', () => {
+  it('mantiene el carrusel de iconos dentro del ancho útil del modal', async () => {
+    const screen = await renderWithTheme(
+      <AppearancePicker
+        colorOptions={colorOptions}
+        iconSections={iconSections}
+        onSelectColor={jest.fn()}
+        onSelectIcon={jest.fn()}
+        renderIcon={(icon) => <View testID={`appearance-icon-${icon}`} />}
+        selectedColor="violet"
+        selectedIcon="bank"
+        testID="appearance"
+      />,
+    );
+
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('appearance-icons-scroll').props.style,
+      ),
+    ).toMatchObject({ marginTop: expect.any(Number) });
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('appearance-icons-scroll').props.style,
+      ),
+    ).not.toEqual(
+      expect.objectContaining({
+        marginLeft: expect.any(Number),
+        width: expect.any(Number),
+      }),
+    );
+  });
+
   it.each([
     ['light', lightColors.textSecondary],
     ['dark', darkColors.textSecondary],

@@ -11,6 +11,7 @@ import {
   verifyCode,
 } from '@/features/auth/services/verifyCodeService';
 import type { VerifyCodePurpose } from '@/features/auth/types';
+import { getAuthErrorDisplayMessage } from '@/features/auth/utils/authError';
 import { layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
@@ -121,10 +122,10 @@ export function VerifyCodeScreen({
     } catch (caught) {
       setState({
         step: 'error',
-        message:
-          caught instanceof Error
-            ? caught.message
-            : 'No pudimos verificar el código.',
+        message: getAuthErrorDisplayMessage(
+          caught,
+          'No pudimos verificar el código.',
+        ),
       });
     }
   };
@@ -140,9 +141,7 @@ export function VerifyCodeScreen({
       setCooldownRoundId((current) => current + 1);
     } catch (caught) {
       setResendMessage(
-        caught instanceof Error
-          ? caught.message
-          : 'No pudimos reenviar el código.',
+        getAuthErrorDisplayMessage(caught, 'No pudimos reenviar el código.'),
       );
     } finally {
       setResending(false);

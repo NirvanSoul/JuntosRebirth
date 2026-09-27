@@ -8,6 +8,8 @@ import { spacing } from '@/theme/spacing';
 
 type RateSourceSelectorProps = {
   availableSources: readonly ExchangeRateSource[];
+  /** Oculta el rótulo cuando el contexto ya deja claro qué se elige. */
+  hideLabel?: boolean;
   onChange: (source: ExchangeRateSource) => void;
   selectedSource: ExchangeRateSource;
   testID?: string;
@@ -16,6 +18,7 @@ type RateSourceSelectorProps = {
 /** Selector local de la fuente usada para leer conversiones históricas. */
 export function RateSourceSelector({
   availableSources,
+  hideLabel = false,
   onChange,
   selectedSource,
   testID,
@@ -24,9 +27,11 @@ export function RateSourceSelector({
 
   return (
     <View style={styles.container} testID={testID}>
-      <Text tone="secondary" variant="caption">
-        Tasa usada
-      </Text>
+      {hideLabel ? null : (
+        <Text tone="secondary" variant="caption">
+          Tasa usada
+        </Text>
+      )}
       <SegmentedControl
         onChange={onChange}
         options={availableSources.map((source) => ({

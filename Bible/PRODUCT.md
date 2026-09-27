@@ -504,77 +504,51 @@ no se muestra.
 
 ### Mapa
 
-Presenta los gastos e ingresos del espacio activo en un calendario continuo con
-desplazamiento vertical entre meses. El calendario ocupa todo el ancho de la
-pantalla, mientras el nombre de la sección permanece fijo arriba con el gutter
-habitual. Debajo del título, una pestaña con el mismo fondo blanco que el
-calendario muestra el mes enfocado —su nombre en negrita y el año con menor
-énfasis— unida sin separación a la superficie del calendario, como una pestaña
-que nace de ella; se actualiza con el mes que domina la pantalla tanto en la
-vista mensual como en la semanal. Dentro de la
-vista mensual, la fila Lun-Dom queda fija en la parte superior del calendario y
-solo los números se desplazan debajo: el nombre del mes y los días de la semana
-ya no se repiten dentro de cada bloque mensual. Los gastos se marcan en rojo y
-los ingresos en verde, sin una leyenda de texto adicional junto a los puntos de
-color. Al elegir un día, se abre una hoja con sus movimientos reutilizando
-las vistas previas y el detalle existentes. La hoja mantiene abajo una acción
-morada `Agregar movimiento` que abre el formulario con el día elegido. La
-acción permanece flotante mientras los movimientos se desplazan por debajo y
-el final de la lista reserva espacio para no ocultar contenido.
+Presenta los gastos e ingresos del espacio activo en un calendario semanal
+continuo, con desplazamiento vertical y mini tarjetas dentro del día de cada
+movimiento. El calendario ocupa todo el ancho de la pantalla. El selector del
+mes enfocado —nombre en negrita y año con menor énfasis— permanece encima de la
+superficie y se actualiza con el mes que domina la pantalla. Mapa usa
+exclusivamente esta vista semanal; no ofrece una vista mensual ni un control
+para alternar vistas. La fila Lun-Dom queda fija en la parte superior del
+calendario y no se repite dentro de cada semana.
 
-El historial navegable de ambas vistas comienza en enero de 2024. No se generan
-ni se muestran meses o semanas anteriores a ese límite. El horizonte futuro de
-ambas vistas llega hasta diciembre de 2080. Dentro del periodo visible, Mapa
-proyecta las ocurrencias futuras de las series semanales, quincenales y
-mensuales; así refleja tanto el pasado persistido como el futuro planificado sin
-crear por adelantado todas esas filas en la base local.
+Justo bajo el selector aparecen siempre los tres indicadores compactos
+reutilizados de Movimientos —ingresos, gastos y balance— calculados para el mes
+enfocado y para la moneda global seleccionada. El selector de moneda del
+encabezado también está disponible en Mapa cuando el espacio ofrece más de una,
+por lo que estos importes cambian entre las monedas reales del espacio sin
+sumarlas ni convertirlas entre sí. Al pulsar cada indicador se abre el detalle
+reutilizado de Ingresos, Gastos o Balance, ya situado en ese mes y moneda.
 
-Esa misma fila mantiene a la izquierda la pestaña con el mes enfocado y a la
-derecha un control con el mismo tamaño y tratamiento de pestaña, con el texto
-de la vista activa. Empieza en `Semanal` y al tocarlo cambia a `Mensual`. La
-vista semanal presenta una lista vertical de semanas:
-debajo del número de cada día aparecen tarjetas compactas de sus
-movimientos, reutilizando la identidad visual de las previews de categoría de
-Inicio pero mostrando únicamente el icono de categoría y el título del
-movimiento. Tocar una tarjeta abre el detalle del movimiento y tocar el día abre
-su hoja habitual. La primera entrada muestra inmediatamente la ventana del mes
-actual. Al desplazarse hacia atrás se incorporan semanas anteriores hasta enero
-de 2024 sin reemplazar la posición visible. Ese historial queda preparado tras
-el primer layout para que un desplazamiento rápido no espere nuevas cargas; al
-avanzar se muestran las semanas y movimientos futuros disponibles.
-La variante semanal conserva el fondo blanco, las siete columnas y la escala
-tipográfica de la vista mensual. Lun-Dom queda fijo en la parte superior igual
-que en la vista mensual: cada semana repite el número de cada día, pero no su
-nombre. Tampoco repite el nombre del mes sobre ninguna semana: la pestaña fija
-ya lo muestra, así que anunciarlo de nuevo dentro de la lista sería redundante.
-Las tarjetas son la única
-capa añadida bajo los números y usan un borde interior de un píxel para mantener
-contraste sobre el calendario blanco. Ambas variantes llevan los siete centros
-de columna hasta el mismo ancho útil, cercano a los bordes del teléfono, y el
-cambio entre ellas usa una transición breve que respeta movimiento reducido.
-La transición actúa sobre las dos superficies completas mediante opacidad y un
-desplazamiento vertical corto. Los días, etiquetas y tarjetas permanecen
-estables dentro de sus listas para que alternar repetidamente no reinicie trabajo
-por elemento. El periodo de la vista activa es la única referencia: la vista de
-destino se adelanta en segundo plano mediante el mismo tracker local, como máximo
-una vez cada 100 ms y solo cuando representa otra semana u otro mes. Al alternar,
-la posición visible confirmada vuelve a compararse con el periodo activo para no
-confiar únicamente en una solicitud de scroll todavía incompleta.
+Cada movimiento se representa con la mini tarjeta de su categoría. Su título
+ocupa una única línea y, cuando no cabe, se desplaza horizontalmente en bucle
+dentro de una tarjeta de altura fija; con movimiento reducido permanece estático
+y truncado. Al elegir un día, se abre una hoja con sus movimientos reutilizando
+las vistas previas y el detalle existentes. La hoja
+mantiene abajo una acción morada `Agregar movimiento` que abre el formulario con
+el día elegido. La acción permanece flotante mientras los movimientos se
+desplazan por debajo y el final de la lista reserva espacio para no ocultar
+contenido.
 
-Al volver a tocar el control se recupera la vista mensual continua.
+El historial navegable comienza en enero de 2024 y el horizonte futuro llega
+hasta diciembre de 2080. Dentro del periodo visible, Mapa proyecta las
+ocurrencias futuras de las series semanales, quincenales y mensuales; así refleja
+tanto el pasado persistido como el futuro planificado sin crear por adelantado
+todas esas filas en la base local.
 
 Los números de todos los meses mantienen el mismo contraste, sin cambios de
-opacidad ligados al foco o al scroll. Las marcas quedan separadas del fondo de
-selección para conservar su legibilidad.
+opacidad ligados al foco o al scroll. El día actual y el seleccionado conservan
+estados visuales diferenciados.
 
-El bloque fijo de nombre y pestaña de mes conserva además una separación
+El selector fijo del mes conserva además una separación
 superior amplia para no quedar cubierto por el selector flotante de espacio. Al
 alejarse seis meses o más del mes actual aparece, a la izquierda de la acción
 global de creación, el botón `Volver a hoy`: usa doble flecha hacia arriba al
 recorrer meses futuros y hacia abajo al recorrer meses antiguos. El botón se
 alinea verticalmente con la acción `+` y usa un borde gris sutil. Al pulsarlo,
-la superficie del calendario desaparece durante 200 ms, las vistas mensual y
-semanal se reinician localmente con hoy como ancla y la superficie reaparece
+la superficie del calendario desaparece durante 200 ms, la vista semanal se
+reinicia localmente con hoy como ancla y la superficie reaparece
 durante 300 ms. El retorno no recorre los periodos intermedios ni muestra texto,
 loader o estado direccional. Dentro del contenedor de Mapa, el botón compensa 32
 pt hacia abajo la diferencia respecto al nivel global de la acción `+`.
@@ -703,6 +677,58 @@ El espacio se deriva del contexto activo y no se pregunta de nuevo por defecto.
 El importe debe ser válido y la categoría es obligatoria: el movimiento no se
 puede guardar hasta seleccionar una categoría creada en el espacio activo.
 
+### Comprar / vender dólares (Venezuela)
+
+El menú del botón flotante añade la acción «Comprar / vender dólares» solo
+cuando la capacidad Venezuela está activa (`useCurrencyCapabilities`). El
+resto de usuarios no la ve y su flujo no cambia.
+
+No es un tipo de movimiento nuevo. Al confirmar, la operación se guarda como
+dos movimientos normales en una sola transacción local:
+
+- Comprar dólares: gasto en VES + ingreso en USD.
+- Vender dólares: gasto en USD + ingreso en VES.
+
+Reglas del modal:
+
+- Dos bloques, «Entregas <moneda>» y «Recibes <moneda>», con el importe
+  grande y el mismo teclado numérico del modal de movimiento (sin
+  calculadora). El título nombra la moneda, así que el modal no necesita uno
+  propio. Tocar un bloque lo activa para el teclado; la primera tecla
+  sustituye el valor sugerido.
+- Una flecha entre los dos bloques intercambia los lados y con ello la
+  operación (comprar o vender); los importes y cuentas siguen pegados a su
+  moneda.
+- El teclado y el botón de guardar quedan anclados abajo: lo que crece arriba
+  nunca los desplaza.
+- Con una fuente oficial manda la tasa: el importe que se escribe es el ancla
+  y el otro se recalcula con ella, aunque ya viniera derivado. Así se puede
+  empezar por los dólares o por los bolívares sin que la fuente cambie sola.
+- Con «Personalizada» mandan los importes: se escribe cuántos dólares se
+  entregan y cuántos bolívares se reciben, los dos se conservan y el recuadro
+  de la tasa muestra la implícita entre ambos. Solo se deriva el importe que
+  falte, y al borrar los dos la tasa sugerida vuelve a cero. Lo mismo ocurre
+  sin ninguna tasa disponible.
+- Fuentes de tasa: BCV, Tasa EUR y Personalizada. La tasa vigente siempre se
+  ve en el mismo recuadro editable («1 USD = ___ Bs»), sea cual sea la
+  fuente; escribir sobre ella la convierte en personalizada partiendo del
+  valor mostrado. Sin respuesta del backend solo queda la personalizada. El
+  contravalor calculado en la app es una sugerencia: se guardan los importes
+  confirmados y el servidor congela su propio snapshot por movimiento, como
+  en cualquier otro.
+- Cuenta opcional por lado, como un botón pequeño al lado de su importe, con
+  el mismo selector y la misma regla de añadir la divisa con saldo inicial
+  cero que el modal de movimiento.
+- Sin fecha, título ni recurrencia: hoy, «Compra de dólares» / «Venta de
+  dólares» y único.
+- Ambos movimientos van a la categoría «Cambio de divisa», que se crea sola
+  en el espacio la primera vez. No se ofrece como plantilla a otros países.
+
+Consecuencia visible: los dos movimientos cuentan en gastos e ingresos como
+cualquier otro. En contabilidad USD el efecto neto es cero a tasa BCV, o la
+diferencia frente a BCV cuando se registró una tasa personalizada. No existe
+un enlace entre ambos movimientos; se editan y eliminan por separado.
+
 ### Calculadora
 
 Debe priorizar entrada rápida, separador decimal local, agrupación visible de
@@ -817,9 +843,10 @@ es visible aquí en cuanto se crea, sin esperar a que su mes llegue. Ambas
 secciones reutilizan la misma lista de vistas previas y el mismo detalle al
 tocar un movimiento.
 
-En un espacio juntos, justo encima de `Movimientos`, una fila `Autor` permite
-filtrar el detalle entre ambos, los movimientos propios o los de la pareja. La
-opción de la pareja muestra su nombre cuando el censo del espacio está disponible.
+En un espacio juntos, a la derecha del número de `Movimientos`, el mismo botón
+de filtros de Actividad abre su hoja modal reutilizada. Esta variante contiene
+solo `Fecha` y `Autor`, para filtrar entre ambos, los movimientos propios o los
+de la pareja; esta última opción muestra su nombre cuando el censo está disponible.
 
 ### Detalle de movimiento
 

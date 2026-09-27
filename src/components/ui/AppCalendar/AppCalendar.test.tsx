@@ -125,12 +125,12 @@ describe('AppCalendar vertical', () => {
     expect(list.props.removeClippedSubviews).toBe(false);
     expect(list.props.scrollEventThrottle).toBe(16);
     expect(list.props.getItemLayout(null, 0)).toMatchObject({
-      length: 408,
+      length: 432,
       offset: 0,
     });
     expect(list.props.getItemLayout(null, 31)).toMatchObject({
-      length: 408,
-      offset: 31 * 408,
+      length: 432,
+      offset: 31 * 432,
     });
     expect(
       StyleSheet.flatten(
@@ -139,11 +139,39 @@ describe('AppCalendar vertical', () => {
     ).toMatchObject({ minHeight: 408, height: 408 });
   });
 
+  it('separa el mes y conserva vacías las columnas previas a su primer día', async () => {
+    const screen = await renderCalendar(
+      <AppCalendar
+        currentDate="2026-10-15"
+        mode="scroll"
+        onSelectDate={jest.fn()}
+        rangeEndDate="2080-12-31"
+        testID="calendar"
+      />,
+    );
+
+    // Octubre de 2026 empieza un jueves: lunes, martes y miércoles deben
+    // conservar su sitio en la primera fila, pero sin arrastrar los días de
+    // septiembre al bloque de octubre.
+    const previousMonthDays = ['2026-09-28', '2026-09-29', '2026-09-30'];
+    const firstDayOfMonth = screen.getByTestId(
+      'calendar.item_2026-10.day_2026-10-01',
+    );
+
+    previousMonthDays.forEach((date) => {
+      const blankDay = screen.getByTestId(`calendar.item_2026-10.day_${date}`);
+      expect(
+        within(blankDay).queryByText(String(Number(date.slice(-2)))),
+      ).toBeNull();
+    });
+    expect(within(firstDayOfMonth).getByText('1')).toBeTruthy();
+  });
+
   it('resuelve el mes dominante desde el centro visible sin alternar por items parcialmente visibles', () => {
-    expect(getDominantScrollMonthIndex(0, 408, 24)).toBe(0);
-    expect(getDominantScrollMonthIndex(203, 408, 24)).toBe(0);
-    expect(getDominantScrollMonthIndex(204, 408, 24)).toBe(1);
-    expect(getDominantScrollMonthIndex(408, 408, 24)).toBe(1);
+    expect(getDominantScrollMonthIndex(0, 432, 24)).toBe(0);
+    expect(getDominantScrollMonthIndex(215, 432, 24)).toBe(0);
+    expect(getDominantScrollMonthIndex(216, 432, 24)).toBe(1);
+    expect(getDominantScrollMonthIndex(432, 432, 24)).toBe(1);
     expect(getDominantScrollMonthIndex(999_999, 408, 24)).toBe(23);
   });
 
@@ -160,24 +188,24 @@ describe('AppCalendar vertical', () => {
       />,
     );
     const list = screen.getByTestId('calendar.list');
-    const augustOffset = 31 * 408;
+    const augustOffset = 31 * 432;
 
     await fireEvent.scroll(list, {
       nativeEvent: {
         contentOffset: { y: augustOffset },
-        layoutMeasurement: { height: 408 },
+        layoutMeasurement: { height: 432 },
       },
     });
     await fireEvent.scroll(list, {
       nativeEvent: {
-        contentOffset: { y: augustOffset + 203 },
-        layoutMeasurement: { height: 408 },
+        contentOffset: { y: augustOffset + 215 },
+        layoutMeasurement: { height: 432 },
       },
     });
     await fireEvent.scroll(list, {
       nativeEvent: {
-        contentOffset: { y: augustOffset + 204 },
-        layoutMeasurement: { height: 408 },
+        contentOffset: { y: augustOffset + 216 },
+        layoutMeasurement: { height: 432 },
       },
     });
 

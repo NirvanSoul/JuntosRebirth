@@ -995,7 +995,8 @@ describe('localTransactionRepository', () => {
   });
 
   describe('createLocalTransactions', () => {
-    it('inserta varios movimientos en una sola transacción exclusiva', async () => {
+    it('inserta varios movimientos en una sola transacción exclusiva con la autoría de la sesión', async () => {
+      mockGetAuthenticatedUserId.mockResolvedValueOnce('uuid-ana');
       mockRandomUUID
         .mockReturnValueOnce('00000000-0000-4000-8000-000000000010')
         .mockReturnValueOnce('00000000-0000-4000-8000-000000000011');
@@ -1017,7 +1018,7 @@ describe('localTransactionRepository', () => {
         'personal',
         'category-id',
         null,
-        'installation-id',
+        'uuid-ana',
         'expense',
         1250,
         'EUR',

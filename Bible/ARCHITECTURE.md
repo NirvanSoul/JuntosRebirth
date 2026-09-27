@@ -442,21 +442,13 @@ espacio en una ruta ni duplicar el encabezado por feature.
 
 La adaptación al tamaño de pantalla no usa consultas de medios: `useLayoutDensity` (`src/hooks/`) devuelve `compact` o `regular` a partir de la altura de la ventana. Los componentes leen el valor correspondiente de `layout` y la primitiva `Text` reduce únicamente los estilos grandes de presentación en densidad compacta; cuerpo, etiquetas y captions mantienen su tamaño legible. Las decisiones están registradas en ADR-035 y ADR-042.
 
-Mapa comparte un único modelo local de periodos, semanas y fechas entre sus
-composiciones mensual y semanal. Ambas conservan listas virtualizadas acordes a
-su geometría: los meses usan seis filas y una altura fija conocida; las semanas
-pueden crecer con sus previews, por lo que la vista semanal comienza directamente
-en la ventana del mes activo y precarga después el historial anterior completo
-preservando la posición visible. La vista mensual reutiliza una instancia de
-`Calendar` por mes sobre una `FlatList` nativa y mantiene una ventana adelantada
-para que un desplazamiento rápido no alcance placeholders. La selección, los
-límites, la identidad visual y
-la transición de capa se reutilizan sin forzar offsets comunes entre elementos
-de altura distinta. Las listas permanecen montadas y memoizadas; el coordinador
-de foco ya existente adelanta la vista inactiva en intervalos de 100 ms y confirma
-su posición mediante viewability. Al alternar vuelve a comparar el periodo activo
-con el periodo realmente visible. El modelo compartido abarca de enero de 2024 a
-diciembre de 2080.
+Mapa mantiene una única composición semanal virtualizada sobre una `FlatList`
+nativa. Cada fila calcula su altura a partir de las mini tarjetas de movimientos
+que contiene, y el encabezado Lun-Dom permanece fuera de la lista. La selección
+de día, los límites y la proyección de recurrencias comparten el mismo índice
+local de fechas. El modelo abarca de enero de 2024 a diciembre de 2080. El
+resumen mensual permanece montado sobre el calendario y recibe la moneda global
+efectiva desde navegación; no mezcla importes de monedas distintas.
 
 Los tamaños de fuente se declaran únicamente en `src/components/ui/Text/`. Las pantallas y componentes usan `<Text variant="…">`; usar el `Text` de React Native se salta los topes de escalado accesible.
 

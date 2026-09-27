@@ -209,11 +209,7 @@ function createStyles(colors: ColorTokens) {
       paddingVertical: spacing.md,
       borderRadius: radii.md,
       backgroundColor: colors.textPrimary,
-      elevation: 24,
-      shadowColor: colors.textPrimary,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.2,
-      shadowRadius: 18,
+      boxShadow: '0 8px 36px rgba(0, 0, 0, 0.2)',
     },
     message: {
       flex: 1,

@@ -11,6 +11,7 @@ import { Text } from '@/components/ui/Text/Text';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import { CategoryAmountSwitcher } from '@/features/categories/components/CategoryPreviewCard/CategoryAmountSwitcher';
+import { CompactPreviewMarqueeText } from '@/features/categories/components/CategoryPreviewCard/CompactPreviewMarqueeText';
 import { CategoryTile } from '@/features/categories/components/CategoryPreviewCard/CategoryTile';
 import type { CategoryIconName } from '@/features/categories/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
@@ -60,8 +61,8 @@ type DetailedCategoryPreviewCardProps = BaseCategoryPreviewCardProps & {
 export type CategoryPreviewCardProps =
   CompactCategoryPreviewCardProps | DetailedCategoryPreviewCardProps;
 
-export const compactCardMinHeight = 64;
 const compactIconSize = 28;
+export const compactCardHeight = 74;
 
 export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
   const { colors, shadows } = useTheme();
@@ -100,14 +101,7 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
         >
           <CategoryIcon color={colors.onBrand} name={icon} size={iconSize.xs} />
         </View>
-        <Text
-          align="center"
-          numberOfLines={2}
-          variant="caption"
-          weight="semibold"
-        >
-          {name}
-        </Text>
+        <CompactPreviewMarqueeText>{name}</CompactPreviewMarqueeText>
       </Pressable>
     );
   }
@@ -268,7 +262,7 @@ function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
     },
     compactCard: {
       ...shadows.subtle,
-      minHeight: compactCardMinHeight,
+      height: compactCardHeight,
       alignItems: 'center',
       justifyContent: 'flex-start',
       gap: spacing.xs,
@@ -277,7 +271,8 @@ function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderWidth: 1,
       backgroundColor: colors.surface,
       paddingHorizontal: spacing.xxs,
-      paddingVertical: spacing.sm,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.sm - spacing.xxs,
     },
   });
 }

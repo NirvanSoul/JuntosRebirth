@@ -28,7 +28,6 @@ import {
   type AutomaticTransactionRecurrence,
 } from '@/features/transactions/utils/transactionRecurrence';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
-import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
 
 type ExistingTransactionRow = {
   occurred_on: string;
@@ -288,7 +287,7 @@ export async function createLocalTransactions(
   for (const input of inputs) {
     await assertMoneyAccountAssignment(database, input);
   }
-  const createdBy = await getOrCreateInstallationId(database);
+  const createdBy = await resolveLocalAuthorId(database);
   const now = new Date().toISOString();
   const ids = inputs.map((input) => input.id ?? randomUUID());
 

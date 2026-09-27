@@ -136,6 +136,30 @@ describe('TransactionPeriodModal', () => {
     expect(getByText('60%')).toBeTruthy();
   });
 
+  it('respeta el mes y la moneda iniciales enviados por la pantalla de origen', async () => {
+    const { getByTestId, getByText } = await renderWithTheme(
+      <TransactionPeriodModal
+        categories={[]}
+        initialCurrency="USD"
+        initialDate={new Date(2026, 5, 1, 12)}
+        onAdd={jest.fn()}
+        onClose={jest.fn()}
+        transactions={[
+          transaction('expense-eur-june', 'expense', 5000, '2026-06-10'),
+          transaction('expense-usd-june', 'expense', 3000, '2026-06-12', 'USD'),
+        ]}
+        type="expense"
+        visible
+      />,
+    );
+
+    expect(getByText('Junio 2026')).toBeTruthy();
+    expect(getByText('USD')).toBeTruthy();
+    expect(getByTestId('expense-period-total').props.children).toContain('$');
+    expect(getByText('expense-usd-june')).toBeTruthy();
+    expect(() => getByText('expense-eur-june')).toThrow();
+  });
+
   it.each(['income', 'expense', 'balance'] as const)(
     'muestra el total de %s en Gilroy Medium',
     async (type) => {

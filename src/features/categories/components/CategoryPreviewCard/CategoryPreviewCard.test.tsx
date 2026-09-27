@@ -1,4 +1,4 @@
-import { render, within } from '@testing-library/react-native';
+import { fireEvent, render, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
@@ -6,6 +6,81 @@ import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
 
 describe('CategoryPreviewCard', () => {
+  it('mantiene fija la altura compacta y limita el título a una línea', async () => {
+    const screen = await render(
+      <ThemeProvider initialAppearance="light">
+        <CategoryPreviewCard
+          colorToken="orange"
+          icon="fork-knife"
+          name="Un almuerzo con un título especialmente largo"
+          variant="compact"
+        />
+      </ThemeProvider>,
+    );
+
+    const card = screen.getByTestId('category-preview-card-compact');
+    const title = screen.getByTestId('compact-preview-marquee-text');
+
+    expect(StyleSheet.flatten(card.props.style)).toMatchObject({ height: 74 });
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('compact-preview-marquee-viewport').props.style,
+      ),
+    ).toMatchObject({ height: 26, overflow: 'hidden' });
+    expect(title.props.numberOfLines).toBe(1);
+    expect(card.props.accessibilityLabel).toBe(
+      'Un almuerzo con un título especialmente largo',
+    );
+  });
+
+  it('activa el bucle solo cuando el título supera el ancho disponible', async () => {
+    const screen = await render(
+      <ThemeProvider initialAppearance="light">
+        <CategoryPreviewCard
+          colorToken="orange"
+          icon="fork-knife"
+          name="Almuerzo especialmente largo"
+          variant="compact"
+        />
+      </ThemeProvider>,
+    );
+
+    await fireEvent(
+      screen.getByTestId('compact-preview-marquee-viewport'),
+      'layout',
+      { nativeEvent: { layout: { height: 16, width: 44, x: 0, y: 0 } } },
+    );
+    await fireEvent(
+      screen.getByTestId('compact-preview-marquee-measurement', {
+        includeHiddenElements: true,
+      }),
+      'textLayout',
+      { nativeEvent: { lines: [{ width: 120 }] } },
+    );
+
+    expect(screen.getByTestId('compact-preview-marquee-copy')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('compact-preview-marquee-text').props.style,
+      ).width,
+    ).toBe(120);
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('compact-preview-marquee-copy').props.style,
+      ).width,
+    ).toBe(120);
+
+    await fireEvent(
+      screen.getByTestId('compact-preview-marquee-measurement', {
+        includeHiddenElements: true,
+      }),
+      'textLayout',
+      { nativeEvent: { lines: [{ width: 40 }] } },
+    );
+
+    expect(screen.queryByTestId('compact-preview-marquee-copy')).toBeNull();
+  });
+
   it('muestra el ingreso en lugar del gasto cuando la categoría solo tiene ingresos (row)', async () => {
     const screen = await render(
       <ThemeProvider initialAppearance="light">

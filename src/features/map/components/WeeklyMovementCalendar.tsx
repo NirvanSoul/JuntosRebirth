@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactElement,
 } from 'react';
 import {
   FlatList,
@@ -18,20 +19,22 @@ import {
 import { Text } from '@/components/ui/Text/Text';
 import {
   CategoryPreviewCard,
-  compactCardMinHeight,
+  compactCardHeight,
 } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
-import type { SessionTransaction } from '@/features/transactions/types';
 import {
-  getCalendarWeek,
-  getMonthIntroductionWeekIndex,
-  getWeeksInCalendarRange,
+  MapWeekdayHeader,
+  mapWeekdayLabels,
+} from '@/features/map/components/MapWeekdayHeader';
+import {
+  getMonthSeparatedWeekStart,
+  getMonthSeparatedWeeksInCalendarRange,
   parseCalendarDate,
+  startsNewMonthSeparatedWeek,
+  type MonthSeparatedCalendarWeek,
 } from '@/features/map/model/calendarPeriods';
-import {
-  maximumCalendarDate,
-  minimumCalendarDate,
-} from '@/lib/date/monthDistance';
+import type { MapCalendarDays } from '@/features/map/model/mapCalendarDays';
+import { minimumCalendarDate } from '@/lib/date/monthDistance';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
@@ -40,46 +43,21 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type WeeklyMovementCalendarProps = {
   categories: readonly Category[];
   currentDate: string;
+  days: MapCalendarDays;
+  footer?: ReactElement | null;
   onFocusedMonthChange?: (month: string, date?: string) => void;
   onOpenTransactionDetail?: (transactionId: string) => void;
   onSelectDate: (date: string) => void;
+  rangeEndDate: string;
   selectedDate?: string;
   testID: string;
   today?: string;
-  transactions: readonly SessionTransaction[];
 };
 
 export type WeeklyMovementCalendarHandle = {
   scrollToDate: (date: string) => void;
   scrollToToday: () => void;
 };
-
-const weekdayLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-
-// Lun-Dom es fijo fuera de la lista, igual que en la vista mensual de
-// AppCalendar: un hermano normal por encima del `FlatList`, no un overlay
-// sincronizado con el scroll. Los días vuelven a repetirse cada semana; solo
-// el nombre del día ya no lo hace.
-function WeekdayHeaderRow() {
-  const themedStyles = useThemedStyles(createThemedStyles);
-
-  return (
-    <View style={themedStyles.weekdayHeaderRow}>
-      {weekdayLabels.map((label) => (
-        <View key={label} style={styles.weekdayHeaderColumn}>
-          <Text
-            align="center"
-            style={styles.weekdayHeaderLabel}
-            tone="secondary"
-            variant="footnote"
-          >
-            {label}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-}
 
 export {
   formatWeekMonthLabel,
@@ -88,36 +66,29 @@ export {
 } from '@/features/map/model/calendarPeriods';
 
 const scrollRetryDelay = 50;
+const emptyTransactions = [] as const;
 
-// Igual que `calendarMonthHeight` en AppCalendar, pero aquí la altura de cada
-// fila varía según cuántos movimientos tiene su día más cargado: sin
-// `getItemLayout`, FlatList solo puede *adivinar* la posición de una semana a
-// partir del alto medio de lo que ya renderizó, y con filas tan dispares (una
-// semana vacía vs. una con varios movimientos) ese promedio se desvía tanto
-// que el scroll termina saltando a cualquier punto de la lista (típicamente
-// el tope, enero de 2024). Calculamos el alto real a partir de los mismos
-// tokens que usa el render, así el cálculo nunca se desincroniza del layout.
 const dayColumnBaseHeight = layout.minTouchTarget + spacing.sm;
 
 function getDayColumnHeight(cardCount: number): number {
   if (cardCount === 0) return dayColumnBaseHeight;
   return (
     dayColumnBaseHeight +
-    cardCount * compactCardMinHeight +
+    cardCount * compactCardHeight +
     (cardCount - 1) * spacing.xs
   );
 }
 
-function getWeekRowHeight(maxCardCount: number): number {
-  return spacing.xl + getDayColumnHeight(maxCardCount) + spacing.xl;
-}
-
-// Una semana que cruza de mes se ancla al mes que introduce (sus últimos
-// días), no al jueves: así la semana de transición ya cuenta como el mes
-// actual en vez de arrastrar el mes anterior.
-function getWeekMonthAnchorDate(week: readonly string[]): string {
-  const crossesMonth = week[0]!.slice(0, 7) !== week[6]!.slice(0, 7);
-  return crossesMonth ? week[6]! : week[3]!;
+function getWeekRowHeight(
+  maxCardCount: number,
+  hasMonthSeparator: boolean,
+): number {
+  return (
+    (hasMonthSeparator ? spacing.xxxl : 0) +
+    spacing.xl +
+    getDayColumnHeight(maxCardCount) +
+    spacing.xl
+  );
 }
 
 const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
@@ -128,54 +99,59 @@ export const WeeklyMovementCalendar = memo(
       {
         categories,
         currentDate,
+        days,
+        footer,
         onFocusedMonthChange,
         onOpenTransactionDetail,
         onSelectDate,
+        rangeEndDate,
         selectedDate,
         testID,
         today,
-        transactions,
       },
       ref,
     ) {
       const themedStyles = useThemedStyles(createThemedStyles);
       const [initialDate] = useState(currentDate);
       const calendarToday = today ?? initialDate;
-      const listRef = useRef<FlatList<readonly string[]>>(null);
+      const listRef = useRef<FlatList<MonthSeparatedCalendarWeek>>(null);
       const pendingScrollIndex = useRef<number | null>(null);
       const scrollRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(
         null,
       );
-      // Todo el rango pasado (acotado por minimumCalendarDate, unos pocos
-      // años) se mantiene siempre en `data`, igual que en AppCalendar: así no
-      // hace falta ninguna carga en caliente al desplazarse hacia meses
-      // anteriores, que era lo que causaba el glitch (cada lote cargado
-      // disparaba un cambio de estado que reflowaba la lista entera).
       const weeks = useMemo(
-        () => getWeeksInCalendarRange(minimumCalendarDate, maximumCalendarDate),
-        [],
+        () =>
+          getMonthSeparatedWeeksInCalendarRange(
+            minimumCalendarDate,
+            rangeEndDate,
+          ),
+        [rangeEndDate],
       );
       const initialWeekIndex = useMemo(
-        () => getMonthIntroductionWeekIndex(weeks, initialDate),
+        () =>
+          Math.max(
+            0,
+            weeks.findIndex(
+              (week) =>
+                getMonthSeparatedWeekStart(week)?.slice(0, 7) ===
+                initialDate.slice(0, 7),
+            ),
+          ),
         [initialDate, weeks],
       );
-      const weekIndexByStart = useMemo(
-        () => new Map(weeks.map((week, index) => [week[0]!, index])),
-        [weeks],
-      );
+      const weekIndexByDate = useMemo(() => {
+        const indexes = new Map<string, number>();
+        weeks.forEach((week, index) => {
+          week.forEach((date) => {
+            if (date) indexes.set(date, index);
+          });
+        });
+        return indexes;
+      }, [weeks]);
       const categoriesById = useMemo(
         () => new Map(categories.map((category) => [category.id, category])),
         [categories],
       );
-      const transactionsByDate = useMemo(() => {
-        const grouped = new Map<string, SessionTransaction[]>();
-        for (const transaction of transactions) {
-          const dayTransactions = grouped.get(transaction.occurredOn) ?? [];
-          dayTransactions.push(transaction);
-          grouped.set(transaction.occurredOn, dayTransactions);
-        }
-        return grouped;
-      }, [transactions]);
       const weekLayouts = useMemo(() => {
         const layouts: { index: number; length: number; offset: number }[] =
           new Array(weeks.length);
@@ -183,15 +159,18 @@ export const WeeklyMovementCalendar = memo(
         weeks.forEach((week, index) => {
           const maxCardCount = week.reduce(
             (max, date) =>
-              Math.max(max, transactionsByDate.get(date)?.length ?? 0),
+              Math.max(max, days.get(date ?? '')?.transactions.length ?? 0),
             0,
           );
-          const length = getWeekRowHeight(maxCardCount);
+          const length = getWeekRowHeight(
+            maxCardCount,
+            startsNewMonthSeparatedWeek(weeks, index),
+          );
           layouts[index] = { index, length, offset };
           offset += length;
         });
         return layouts;
-      }, [weeks, transactionsByDate]);
+      }, [days, weeks]);
       const getItemLayout = useCallback(
         (_: unknown, index: number) => weekLayouts[index]!,
         [weekLayouts],
@@ -204,13 +183,13 @@ export const WeeklyMovementCalendar = memo(
         ({
           viewableItems,
         }: {
-          viewableItems: ViewToken<readonly string[]>[];
+          viewableItems: ViewToken<MonthSeparatedCalendarWeek>[];
         }) => {
           const focusedWeek = viewableItems.find(
             (viewableItem) => viewableItem.isViewable,
           )?.item;
           const focusedDate = focusedWeek
-            ? getWeekMonthAnchorDate(focusedWeek)
+            ? getMonthSeparatedWeekStart(focusedWeek)
             : undefined;
           if (focusedDate) {
             onFocusedMonthChangeRef.current?.(
@@ -253,28 +232,30 @@ export const WeeklyMovementCalendar = memo(
         ref,
         () => ({
           scrollToDate: (date) => {
-            const index = weekIndexByStart.get(getCalendarWeek(date)[0]!) ?? -1;
+            const index = weekIndexByDate.get(date) ?? -1;
             scrollToFullIndex(index, false);
           },
           scrollToToday: () => {
-            const index =
-              weekIndexByStart.get(getCalendarWeek(calendarToday)[0]!) ?? -1;
+            const index = weekIndexByDate.get(calendarToday) ?? -1;
             scrollToFullIndex(index, true);
           },
         }),
-        [calendarToday, scrollToFullIndex, weekIndexByStart],
+        [calendarToday, scrollToFullIndex, weekIndexByDate],
       );
 
       return (
         <View style={styles.container}>
-          <WeekdayHeaderRow />
+          <MapWeekdayHeader />
           <FlatList
             contentContainerStyle={themedStyles.listContent}
             data={weeks}
             getItemLayout={getItemLayout}
             initialNumToRender={6}
             initialScrollIndex={initialWeekIndex}
-            keyExtractor={(week) => week[0]!}
+            keyExtractor={(week) =>
+              getMonthSeparatedWeekStart(week) ?? 'empty-week'
+            }
+            ListFooterComponent={footer}
             maxToRenderPerBatch={10}
             onViewableItemsChanged={handleViewableItemsChanged}
             removeClippedSubviews={false}
@@ -297,22 +278,34 @@ export const WeeklyMovementCalendar = memo(
               }, scrollRetryDelay);
             }}
             ref={listRef}
-            renderItem={({ item: week }) => {
+            renderItem={({ index, item: week }) => {
               return (
                 <View
-                  style={themedStyles.weekBlock}
-                  testID={`${testID}-week-${week[0]}`}
+                  style={[
+                    themedStyles.weekBlock,
+                    startsNewMonthSeparatedWeek(weeks, index) &&
+                      styles.monthSeparator,
+                  ]}
+                  testID={`${testID}-week-${getMonthSeparatedWeekStart(week)}`}
                 >
                   <View style={styles.weekRow}>
                     {week.map((date, dayIndex) => {
+                      if (!date) {
+                        return (
+                          <View
+                            key={`empty-${dayIndex}`}
+                            style={styles.dayColumn}
+                          />
+                        );
+                      }
                       const dayTransactions =
-                        transactionsByDate.get(date) ?? [];
+                        days.get(date)?.transactions ?? emptyTransactions;
                       const selected = selectedDate === date;
                       const isCurrentDate = calendarToday === date;
                       return (
                         <View key={date} style={styles.dayColumn}>
                           <Pressable
-                            accessibilityLabel={`${weekdayLabels[dayIndex]} ${parseCalendarDate(date).getDate()}`}
+                            accessibilityLabel={`${mapWeekdayLabels[dayIndex]} ${parseCalendarDate(date).getDate()}`}
                             accessibilityRole="button"
                             accessibilityState={{ selected }}
                             onPress={() => onSelectDate(date)}
@@ -394,12 +387,6 @@ export const WeeklyMovementCalendar = memo(
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  weekdayHeaderColumn: {
-    flex: 1,
-    minWidth: 0,
-    paddingHorizontal: spacing.xxs,
-  },
-  weekdayHeaderLabel: { marginBottom: spacing.lg },
   weekRow: {
     flexDirection: 'row',
     marginTop: spacing.xl,
@@ -423,16 +410,12 @@ const styles = StyleSheet.create({
     borderRadius: spacing.sm,
   },
   movementList: { gap: spacing.xs },
+  monthSeparator: { paddingTop: spacing.xxxl },
   pressed: { opacity: 0.64 },
 });
 
 function createThemedStyles(colors: ColorTokens) {
   return StyleSheet.create({
-    weekdayHeaderRow: {
-      flexDirection: 'row',
-      paddingTop: spacing.md,
-      backgroundColor: colors.surface,
-    },
     list: { flex: 1, backgroundColor: colors.surface },
     listContent: {
       backgroundColor: colors.surface,
@@ -440,6 +423,8 @@ function createThemedStyles(colors: ColorTokens) {
     },
     weekBlock: {
       backgroundColor: colors.surface,
+      borderBottomColor: colors.categoryPreviewBorder,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       paddingBottom: spacing.xl,
     },
     currentDay: {

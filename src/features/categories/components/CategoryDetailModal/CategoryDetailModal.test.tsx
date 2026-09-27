@@ -1,9 +1,13 @@
 import { fireEvent, render, within } from '@testing-library/react-native';
+import { useState } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { CategoryDetailModal } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal';
-import type { Category } from '@/features/categories/types';
+import type {
+  Category,
+  CategoryEditorTarget,
+} from '@/features/categories/types';
 import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
 import type { Space } from '@/features/spaces/types';
 import type { SessionTransaction } from '@/features/transactions/types';
@@ -81,6 +85,52 @@ const coupleSpace: Space = {
   currency: 'EUR',
 };
 
+/**
+ * Reproduce al padre real: `onClose` oculta la hoja y solo entonces se
+ * ejecuta la acción encadenada.
+ */
+function ClosableDetail({
+  onAddTransaction = jest.fn(),
+  onDelete = jest.fn(),
+  onEdit = jest.fn(),
+  onOpenTransactionDetail = jest.fn(),
+}: {
+  onAddTransaction?: (categoryId: string) => void;
+  onDelete?: (categoryId: string) => void;
+  onEdit?: (categoryId: string, initialEditor?: CategoryEditorTarget) => void;
+  onOpenTransactionDetail?: (transactionId: string) => void;
+}) {
+  const [visible, setVisible] = useState(true);
+
+  return (
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        insets: { top: 47, right: 0, bottom: 34, left: 0 },
+      }}
+    >
+      <ThemeProvider initialAppearance="light">
+        <CategoryDetailModal
+          category={category}
+          displayCurrency="EUR"
+          onAddTransaction={onAddTransaction}
+          onClose={() => setVisible(false)}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          onOpenTransactionDetail={onOpenTransactionDetail}
+          onSaveBudget={jest.fn()}
+          onSaveNote={jest.fn()}
+          onShare={jest.fn(() => true)}
+          shareTargets={[]}
+          spaceCurrency="EUR"
+          transactions={[transaction]}
+          visible={visible}
+        />
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}
+
 describe('CategoryDetailModal', () => {
   beforeEach(() => {
     jest.mocked(useCurrencyCapabilities).mockReturnValue({
@@ -93,7 +143,7 @@ describe('CategoryDetailModal', () => {
       multiRateMovementDisplay: false,
     });
   });
-  it('filtra los movimientos de un espacio juntos por autor', async () => {
+  it('muestra el autor y filtra los movimientos de un espacio juntos', async () => {
     const ownTransaction = {
       ...transaction,
       createdBy: 'uuid-ana',
@@ -137,18 +187,33 @@ describe('CategoryDetailModal', () => {
     );
 
     const detail = screen.getByTestId('category-detail-modal');
-    await screen.findByLabelText('Autor: Ambos');
     expect(within(detail).getByTestId('category-expense-metric')).toBeTruthy();
     expect(within(detail).getByTestId('category-income-metric')).toBeTruthy();
+    expect(
+      within(detail).getAllByTestId('transaction-author-name'),
+    ).toHaveLength(2);
+    expect(within(detail).getByText('Ana')).toBeTruthy();
+    expect(within(detail).getByText('Beto')).toBeTruthy();
     await fireEvent.press(
-      within(detail).getByTestId('category-detail-author-filter'),
+      within(detail).getByTestId('category-detail-filter-button'),
     );
-    const picker = screen.getByTestId('category-author-filter-modal');
-    await fireEvent.press(within(picker).getByRole('radio', { name: 'Beto' }));
+    const filtersModal = screen.getByTestId('transaction-filters-modal');
+    expect(within(filtersModal).getByText('Fecha')).toBeTruthy();
+    expect(within(filtersModal).getByText('Autor')).toBeTruthy();
+    expect(within(filtersModal).queryByText('Tipo de movimiento')).toBeNull();
+    await fireEvent.press(
+      within(filtersModal).getByRole('button', { name: 'Autor' }),
+    );
+    await fireEvent.press(
+      within(filtersModal).getByRole('radio', { name: 'Autor: Beto' }),
+    );
+    await fireEvent.press(
+      within(filtersModal).getByRole('button', { name: 'Aplicar filtros' }),
+    );
 
     expect(within(detail).queryByText('Almuerzo propio')).toBeNull();
     expect(within(detail).getByText('Cena de Beto')).toBeTruthy();
-    expect(within(detail).getByLabelText('Autor: Beto')).toBeTruthy();
+    expect(within(detail).getByLabelText('Filtros, 1 activos')).toBeTruthy();
   });
 
   it('expone presupuesto, compartir, edición y eliminación desde el detalle', async () => {
@@ -158,6 +223,7 @@ describe('CategoryDetailModal', () => {
     const onShare = jest.fn(() => true);
     const onEdit = jest.fn();
     const onDelete = jest.fn();
+    const onClose = jest.fn();
     const screen = await render(
       <SafeAreaProvider
         initialMetrics={{
@@ -170,7 +236,7 @@ describe('CategoryDetailModal', () => {
             category={category}
             displayCurrency="EUR"
             onAddTransaction={jest.fn()}
-            onClose={jest.fn()}
+            onClose={onClose}
             onDelete={onDelete}
             onEdit={onEdit}
             onOpenTransactionDetail={onOpenTransactionDetail}
@@ -214,14 +280,15 @@ describe('CategoryDetailModal', () => {
     await fireEvent.press(
       within(detail).getByLabelText('Editar apariencia de categoría'),
     );
-    expect(onEdit).toHaveBeenCalledWith('food', 'name');
-    expect(onEdit).toHaveBeenCalledWith('food', 'appearance');
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(2);
     expect(within(detail).queryByText('1 movimiento')).toBeNull();
     expect(within(detail).getByText('Almuerzo')).toBeTruthy();
     await fireEvent.press(
       within(detail).getByTestId('transaction-preview-card'),
     );
-    expect(onOpenTransactionDetail).toHaveBeenCalledWith('lunch');
+    expect(onOpenTransactionDetail).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(3);
     expect(within(detail).getByTestId('category-expense-metric')).toBeTruthy();
     expect(within(detail).queryByTestId('category-income-metric')).toBeNull();
     expect(
@@ -332,7 +399,7 @@ describe('CategoryDetailModal', () => {
     await fireEvent.press(
       within(detail).getByRole('button', { name: 'Editar categoría' }),
     );
-    expect(onEdit).toHaveBeenCalledWith('food');
+    expect(onClose).toHaveBeenCalledTimes(4);
 
     await fireEvent.press(
       within(detail).getByRole('button', { name: 'Eliminar categoría' }),
@@ -348,6 +415,55 @@ describe('CategoryDetailModal', () => {
     await fireEvent.press(
       within(detail).getByRole('button', { name: 'Eliminar' }),
     );
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(5);
+  });
+
+  it('abre el movimiento de la categoría cuando la hoja terminó de cerrarse', async () => {
+    const onAddTransaction = jest.fn();
+    const screen = await render(
+      <ClosableDetail onAddTransaction={onAddTransaction} />,
+    );
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Añadir movimiento' }),
+    );
+
+    expect(onAddTransaction).toHaveBeenCalledWith('food');
+    expect(
+      screen.queryByRole('button', { name: 'Añadir movimiento' }),
+    ).toBeNull();
+  });
+
+  it('abre el editor de la categoría cuando la hoja terminó de cerrarse', async () => {
+    const onEdit = jest.fn();
+    const screen = await render(<ClosableDetail onEdit={onEdit} />);
+
+    await fireEvent.press(screen.getByLabelText('Editar nombre de categoría'));
+
+    expect(onEdit).toHaveBeenCalledWith('food', 'name');
+  });
+
+  it('abre el detalle de un movimiento cuando la hoja terminó de cerrarse', async () => {
+    const onOpenTransactionDetail = jest.fn();
+    const screen = await render(
+      <ClosableDetail onOpenTransactionDetail={onOpenTransactionDetail} />,
+    );
+
+    await fireEvent.press(screen.getByTestId('transaction-preview-card'));
+
+    expect(onOpenTransactionDetail).toHaveBeenCalledWith('lunch');
+  });
+
+  it('elimina la categoría cuando la hoja terminó de cerrarse', async () => {
+    const onDelete = jest.fn();
+    const screen = await render(<ClosableDetail onDelete={onDelete} />);
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Eliminar categoría' }),
+    );
+    await fireEvent.press(screen.getByRole('button', { name: 'Eliminar' }));
+
     expect(onDelete).toHaveBeenCalledWith('food');
   });
 

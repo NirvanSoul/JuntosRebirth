@@ -20,6 +20,8 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type AppModalProps = PropsWithChildren<{
   visible: boolean;
   onClose: () => void;
+  /** Se ejecuta cuando la hoja terminó de cerrarse y no va a reabrirse. */
+  onDismissed?: () => void;
   variant?: 'compact' | 'catalog' | 'expanded';
   /** Superficie de la hoja; por defecto conserva el fondo estándar de modal. */
   backgroundVariant?: 'surface' | 'modal' | 'background';
@@ -40,6 +42,9 @@ type AppModalProps = PropsWithChildren<{
 
 /** Espacio vertical que la librería reserva al tirador del bottom sheet. */
 const bottomSheetHandleHeight = 24;
+// Reanimated puede dejar el índice cerrado ligeramente por encima de -1.
+// Este margen hace que el backdrop libere los toques aun con ese redondeo.
+const closedBackdropIndex = -0.99;
 const expandedSnapRatio = 0.94;
 export function useAppModalBottomInset(): number {
   const insets = useSafeAreaInsets();
@@ -60,6 +65,7 @@ export function AppModal({
   children,
   visible,
   onClose,
+  onDismissed,
   variant = 'compact',
   backgroundVariant,
   extendContentIntoBottomInset = false,
@@ -143,6 +149,7 @@ export function AppModal({
     if (!wasRequestedByParent) {
       setContentVisible(false);
       onClose();
+      onDismissed?.();
       return;
     }
 
@@ -153,14 +160,15 @@ export function AppModal({
     }
 
     setContentVisible(false);
-  }, [onClose]);
+    onDismissed?.();
+  }, [onClose, onDismissed]);
 
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop
         {...props}
         appearsOnIndex={0}
-        disappearsOnIndex={-1}
+        disappearsOnIndex={closedBackdropIndex}
         opacity={1}
         pressBehavior="close"
         style={[props.style, styles.transparentBackdrop]}

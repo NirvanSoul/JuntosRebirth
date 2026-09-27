@@ -558,8 +558,7 @@ describe('HomeScreen', () => {
     expect(StyleSheet.flatten(monthlyFilter.props.style)).toMatchObject({
       backgroundColor: colors.surface,
       borderColor: colors.border,
-      elevation: 0,
-      shadowOpacity: 0,
+      ...shadows.none,
     });
     expect(StyleSheet.flatten(monthlyFilter.props.style)).not.toHaveProperty(
       'minWidth',

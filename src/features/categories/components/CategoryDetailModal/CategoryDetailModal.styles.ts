@@ -90,6 +90,11 @@ export function createStyles(colors: ColorTokens, _shadows: ThemeShadows) {
       marginBottom: spacing.md,
       marginTop: spacing.xxl,
     },
+    movementsHeaderActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
     emptyMovements: {
       alignItems: 'center',
       gap: spacing.md,

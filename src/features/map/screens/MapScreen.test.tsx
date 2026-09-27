@@ -1,11 +1,23 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { createRef, type RefObject } from 'react';
+import {
+  act,
+  fireEvent,
+  render,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { Category } from '@/features/categories/types';
-import { MapScreen } from '@/features/map/screens/MapScreen';
+import { mapReturnToTodayRight } from '@/features/map/components/MapReturnToToday';
+import {
+  MapScreen,
+  type MapScreenHandle,
+} from '@/features/map/screens/MapScreen';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { createProjectedTransactionId } from '@/features/transactions/utils/transactionRecurrence';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
@@ -13,8 +25,6 @@ import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 
 const mockScrollToDate = jest.fn();
-const mockWeeklyScrollToDate = jest.fn();
-const mockMonthlyMount = jest.fn();
 const mockWeeklyMount = jest.fn();
 
 jest.mock('react-native-reanimated', () => {
@@ -33,31 +43,34 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 
-jest.mock('@/components/ui/AppCalendar/AppCalendar', () => {
+jest.mock('@/features/map/components/WeeklyMovementCalendar', () => {
   const React = jest.requireActual('react');
   const { Pressable, Text, View } = jest.requireActual('react-native');
 
-  const AppCalendar = React.forwardRef(
+  const WeeklyMovementCalendar = React.forwardRef(
     (
       {
-        markedDates,
-        mode,
+        days,
+        footer,
         onFocusedMonthChange,
         onSelectDate,
         rangeEndDate,
         testID,
       }: {
-        markedDates: object;
-        mode: string;
+        days: ReadonlyMap<
+          string,
+          { transactions: readonly SessionTransaction[] }
+        >;
+        footer?: React.ReactNode;
         onFocusedMonthChange?: (month: string, date?: string) => void;
         onSelectDate: (date: string) => void;
-        rangeEndDate?: string;
+        rangeEndDate: string;
         testID: string;
       },
       ref: React.ForwardedRef<{ scrollToDate: (date: string) => void }>,
     ) => {
       React.useEffect(() => {
-        mockMonthlyMount();
+        mockWeeklyMount();
       }, []);
       React.useImperativeHandle(ref, () => ({
         scrollToDate: (date: string) => {
@@ -67,8 +80,10 @@ jest.mock('@/components/ui/AppCalendar/AppCalendar', () => {
       }));
 
       return (
-        <View testID={`${testID}-${mode}`}>
-          <Text testID="map-marked-dates">{JSON.stringify(markedDates)}</Text>
+        <View testID={testID}>
+          <Text testID="map-weekly-dates">
+            {JSON.stringify([...days.keys()])}
+          </Text>
           <Text testID="map-calendar-range-end">{rangeEndDate}</Text>
           {['2026-01-31', '2026-02-10', '2026-02-28'].map((date) => (
             <Pressable
@@ -93,85 +108,40 @@ jest.mock('@/components/ui/AppCalendar/AppCalendar', () => {
             onPress={() => onFocusedMonthChange?.('2026-02', '2026-02-01')}
             testID="focus-current-month"
           />
-        </View>
-      );
-    },
-  );
-  AppCalendar.displayName = 'AppCalendarMock';
-
-  return {
-    AppCalendar,
-  };
-});
-
-jest.mock('@/features/map/components/WeeklyMovementCalendar', () => {
-  const React = jest.requireActual('react');
-  const { Pressable, Text, View } = jest.requireActual('react-native');
-  const WeeklyMovementCalendar = React.forwardRef(
-    (
-      {
-        onFocusedMonthChange,
-        testID,
-        transactions,
-      }: {
-        onFocusedMonthChange?: (month: string, date?: string) => void;
-        testID: string;
-        transactions: SessionTransaction[];
-      },
-      ref: React.ForwardedRef<{
-        scrollToDate: (date: string) => void;
-        scrollToToday: () => void;
-      }>,
-    ) => {
-      React.useEffect(() => {
-        mockWeeklyMount();
-      }, []);
-      React.useImperativeHandle(ref, () => ({
-        scrollToDate: (date: string) => {
-          mockWeeklyScrollToDate(date);
-          onFocusedMonthChange?.(date.slice(0, 7), date);
-        },
-        scrollToToday: jest.fn(),
-      }));
-      return (
-        <View testID={testID}>
-          <Text testID="map-weekly-transactions">
-            {JSON.stringify(
-              transactions.map((transaction) => transaction.occurredOn),
-            )}
-          </Text>
-          <Pressable
-            onPress={() => onFocusedMonthChange?.('2026-04', '2026-04-30')}
-            testID="focus-transition-week"
-          />
-          <Pressable
-            onPress={() => onFocusedMonthChange?.('2024-01', '2024-01-04')}
-            testID="focus-weekly-minimum-month"
-          />
-          <Pressable
-            onPress={() => onFocusedMonthChange?.('2026-02', '2026-02-05')}
-            testID="focus-weekly-current-month"
-          />
+          {footer}
         </View>
       );
     },
   );
   WeeklyMovementCalendar.displayName = 'WeeklyMovementCalendarMock';
+
   return {
     WeeklyMovementCalendar,
   };
 });
 
-jest.mock('@/components/overlays/AppModal/AppModal', () => ({
-  AppModal: ({
-    children,
-    visible,
-  }: {
-    children: React.ReactNode;
-    visible: boolean;
-  }) => (visible ? children : null),
-  useAppModalBottomInset: () => 24,
-}));
+jest.mock('@/components/overlays/AppModal/AppModal', () => {
+  const React = jest.requireActual('react');
+  return {
+    AppModal: ({
+      children,
+      onDismissed,
+      visible,
+    }: {
+      children: React.ReactNode;
+      onDismissed?: () => void;
+      visible: boolean;
+    }) => {
+      const wasVisible = React.useRef(visible);
+      React.useEffect(() => {
+        if (wasVisible.current && !visible) onDismissed?.();
+        wasVisible.current = visible;
+      }, [onDismissed, visible]);
+      return visible ? children : null;
+    },
+    useAppModalBottomInset: () => 24,
+  };
+});
 
 const category: Category = {
   id: 'subscriptions',
@@ -215,6 +185,12 @@ const incomeTransaction: SessionTransaction = {
 function renderMap(
   onAddTransaction = jest.fn(),
   onOpenTransactionDetail = jest.fn(),
+  ref?: RefObject<MapScreenHandle | null>,
+  transactions: readonly SessionTransaction[] = [
+    transaction,
+    incomeTransaction,
+  ],
+  currency: CurrencyCode = 'EUR',
 ) {
   return render(
     <SafeAreaProvider
@@ -226,10 +202,12 @@ function renderMap(
       <ThemeProvider initialAppearance="light">
         <MapScreen
           categories={[category]}
+          currency={currency}
           onAddTransaction={onAddTransaction}
           onOpenTransactionDetail={onOpenTransactionDetail}
+          ref={ref}
           today="2026-02-02"
-          transactions={[transaction, incomeTransaction]}
+          transactions={transactions}
         />
       </ThemeProvider>
     </SafeAreaProvider>,
@@ -239,57 +217,50 @@ function renderMap(
 describe('MapScreen', () => {
   beforeEach(() => {
     mockScrollToDate.mockClear();
-    mockWeeklyScrollToDate.mockClear();
-    mockMonthlyMount.mockClear();
     mockWeeklyMount.mockClear();
   });
 
-  it('usa el calendario vertical y distingue gastos de ingresos', async () => {
+  it('usa siempre el calendario semanal con sus mini previews', async () => {
     const onAddTransaction = jest.fn();
     const screen = await renderMap(onAddTransaction);
 
     expect(screen.getByTestId('map-weekly-calendar')).toBeTruthy();
-    expect(
-      screen.getByTestId('map-calendar-view-monthly', {
-        includeHiddenElements: true,
-      }),
-    ).toBeTruthy();
+    expect(screen.queryByTestId('map-calendar-scroll')).toBeNull();
     expect(
       StyleSheet.flatten(screen.getByTestId('map-header').props.style),
-    ).toMatchObject({ paddingTop: spacing.huge });
-    const markedDates = screen.getByTestId('map-marked-dates', {
-      includeHiddenElements: true,
-    }).props.children;
-    expect(markedDates).toContain('2026-01-31');
-    expect(markedDates).toContain('income');
-    expect(markedDates).toContain('expense');
-    expect(markedDates).toContain('2026-02-28');
-    expect(
-      screen.getByTestId('map-weekly-transactions', {
-        includeHiddenElements: true,
-      }).props.children,
-    ).toContain('2026-02-28');
-    expect(
-      StyleSheet.flatten(screen.getByTestId('map-month-tab').props.style),
     ).toMatchObject({
-      backgroundColor: colors.surface,
+      paddingTop: spacing.xxxl,
+      paddingBottom: spacing.lg,
+    });
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('map-calendar-viewport').props.style,
+      ),
+    ).toMatchObject({
       borderTopLeftRadius: radii.md,
       borderTopRightRadius: radii.md,
+      overflow: 'hidden',
     });
+    const weeklyDates = screen.getByTestId('map-weekly-dates').props.children;
+    expect(weeklyDates).toContain('2026-01-31');
+    expect(weeklyDates).toContain('2026-02-28');
+    expect(screen.getByTestId('map-month-navigator')).toBeTruthy();
     expect(screen.getByText('Febrero 2026')).toBeTruthy();
     expect(screen.queryByTestId('map-expense-legend-badge')).toBeNull();
     expect(screen.queryByTestId('map-income-legend-badge')).toBeNull();
-    expect(screen.getByLabelText('Vista Semanal')).toBeTruthy();
+    expect(screen.queryByRole('header', { name: 'Mapa' })).toBeNull();
+    expect(screen.queryByText('Mensual')).toBeNull();
+    expect(screen.queryByText('Semanal')).toBeNull();
     expect(
       screen.getByTestId('map-calendar-range-end', {
         includeHiddenElements: true,
       }).props.children,
-    ).toBe('2080-12-31');
+    ).toBe('2028-02-29');
 
-    await fireEvent.press(screen.getByLabelText('Vista Semanal'));
     await fireEvent.press(screen.getByTestId('2026-01-31'));
-    expect(screen.getAllByText('Gastos')).toHaveLength(1);
-    expect(screen.getAllByText('Ingresos')).toHaveLength(1);
+    const dayScroll = within(screen.getByTestId('map-day-scroll'));
+    expect(dayScroll.getByText('Gastos')).toBeTruthy();
+    expect(dayScroll.getByText('Ingresos')).toBeTruthy();
     expect(screen.getByText('Música')).toBeTruthy();
     expect(screen.getByText('Nómina')).toBeTruthy();
     expect(
@@ -305,88 +276,177 @@ describe('MapScreen', () => {
     });
     expect(StyleSheet.flatten(addButton.props.style).bottom).toBeGreaterThan(0);
     await fireEvent.press(addButton);
-    expect(onAddTransaction).toHaveBeenCalledWith('2026-01-31');
+    await waitFor(() =>
+      expect(onAddTransaction).toHaveBeenCalledWith('2026-01-31'),
+    );
   });
 
-  it('alterna el mapa entre la vista mensual y semanal', async () => {
+  it('reemplaza el título y los controles por un navegador de meses', async () => {
     const screen = await renderMap();
 
     expect(screen.getByTestId('map-weekly-calendar')).toBeTruthy();
-    const toggle = screen.getByLabelText('Vista Semanal');
-    expect(StyleSheet.flatten(toggle.props.style)).toMatchObject({
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: radii.md,
-      borderTopRightRadius: radii.md,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.sm,
-    });
+    expect(screen.queryByTestId('map-calendar-scroll')).toBeNull();
+    expect(screen.queryByRole('header', { name: 'Mapa' })).toBeNull();
+    expect(screen.queryByTestId('map-calendar-view-toggle')).toBeNull();
 
-    await fireEvent.press(toggle);
-    expect(await screen.findByTestId('map-calendar-scroll')).toBeTruthy();
-    expect(await screen.findByTestId('map-calendar-view-monthly')).toBeTruthy();
-    expect(screen.getByRole('header', { name: 'Mapa' })).toBeTruthy();
-    expect(
-      screen.queryByText(
-        'Mira tus movimientos de forma mensual o semanal, toca un día para ver los detalles.',
-      ),
-    ).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Ver mes siguiente'));
+    expect(mockScrollToDate).toHaveBeenLastCalledWith('2026-03-01');
+    expect(screen.getByText('Marzo 2026')).toBeTruthy();
 
-    await fireEvent.press(screen.getByLabelText('Vista Mensual'));
-    expect(screen.getByTestId('map-weekly-calendar')).toBeTruthy();
-    expect(
-      screen.getByTestId('map-weekly-calendar', {
-        includeHiddenElements: true,
+    await fireEvent.press(screen.getByLabelText('Ver mes anterior'));
+    expect(mockScrollToDate).toHaveBeenLastCalledWith('2026-02-01');
+    expect(screen.getByText('Febrero 2026')).toBeTruthy();
+  });
+
+  it('mantiene visibles los badges y actualiza sus importes con el mes', async () => {
+    const ref = createRef<MapScreenHandle>();
+    const februaryIncome: SessionTransaction = {
+      ...incomeTransaction,
+      id: 'february-income',
+      amountMinor: 50000,
+      occurredOn: '2026-02-02',
+    };
+    const otherCurrencyIncome: SessionTransaction = {
+      ...februaryIncome,
+      id: 'february-usd-income',
+      amountMinor: 100000,
+      currency: 'USD',
+    };
+    const screen = await renderMap(jest.fn(), jest.fn(), ref, [
+      transaction,
+      incomeTransaction,
+      februaryIncome,
+      otherCurrencyIncome,
+    ]);
+
+    expect(ref.current).toEqual(
+      expect.objectContaining({
+        resetToToday: expect.any(Function),
       }),
+    );
+    expect(screen.getByTestId('map-month-summary-panel')).toBeTruthy();
+    expect(screen.getByTestId('map-month-income-badge')).toBeTruthy();
+    expect(screen.getByTestId('map-month-expense-badge')).toBeTruthy();
+    expect(screen.getByTestId('map-month-balance-badge')).toBeTruthy();
+    expect(screen.getByTestId('map-month-income-amount').props.children).toBe(
+      '500 €',
+    );
+    expect(
+      screen.getByTestId('map-month-expense-amount').props.children,
+    ).toContain('12,99');
+    expect(
+      screen.getByTestId('map-month-balance-amount').props.children,
+    ).toContain('487,01');
+    expect(
+      StyleSheet.flatten(screen.getByTestId('map-month-summary').props.style),
+    ).toMatchObject({ minHeight: layout.minTouchTarget });
+
+    await fireEvent.press(screen.getByLabelText('Ver mes siguiente'));
+    expect(screen.getByTestId('map-month-income-amount').props.children).toBe(
+      '0 €',
+    );
+    expect(
+      screen.getByTestId('map-month-expense-amount').props.children,
+    ).toContain('12,99');
+    expect(
+      screen.getByTestId('map-month-balance-amount').props.children,
+    ).toContain('-12,99');
+
+    expect(screen.getByTestId('map-month-summary-panel')).toBeTruthy();
+  });
+
+  it('abre desde cada badge el detalle del mes enfocado', async () => {
+    const onAddTransaction = jest.fn();
+    const februaryIncome: SessionTransaction = {
+      ...incomeTransaction,
+      id: 'february-income',
+      amountMinor: 50000,
+      occurredOn: '2026-02-02',
+    };
+    const screen = await renderMap(onAddTransaction, jest.fn(), undefined, [
+      transaction,
+      incomeTransaction,
+      februaryIncome,
+    ]);
+
+    await fireEvent.press(screen.getByTestId('map-month-income-badge'));
+    expect(
+      within(screen.getByTestId('income-period-selector')).getByText(
+        'Febrero 2026',
+      ),
     ).toBeTruthy();
-    expect(
-      StyleSheet.flatten(
-        screen.getByTestId('map-calendar-view-weekly').props.style,
-      ),
-    ).toMatchObject({ zIndex: 1 });
-    expect(
-      StyleSheet.flatten(
-        screen.getByTestId('map-calendar-view-monthly', {
-          includeHiddenElements: true,
-        }).props.style,
-      ),
-    ).toMatchObject({ zIndex: 0 });
-    expect(screen.getByLabelText('Vista Semanal')).toBeTruthy();
-    expect(mockWeeklyScrollToDate).not.toHaveBeenCalled();
-    expect(mockScrollToDate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('income-period-total').props.children).toContain(
+      '500',
+    );
+    expect(screen.getByTestId('income-period-transaction-list')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Cerrar'));
+
+    await fireEvent.press(screen.getByTestId('map-month-expense-badge'));
+    expect(screen.getByTestId('expense-period-total').props.children).toContain(
+      '12,99',
+    );
+    expect(screen.getByTestId('expense-period-transaction-list')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Añadir gasto' }));
+    expect(onAddTransaction).toHaveBeenCalledWith('2026-02-01', 'expense');
+
+    await fireEvent.press(screen.getByTestId('map-month-balance-badge'));
+    expect(screen.getByTestId('balance-period-total').props.children).toContain(
+      '487,01',
+    );
+    expect(screen.getByTestId('balance-period-transaction-list')).toBeTruthy();
   });
 
-  it('mantiene el periodo activo al cambiar en ambos sentidos', async () => {
-    const screen = await renderMap();
+  it('formatea los badges con la moneda seleccionada por el usuario', async () => {
+    const usdIncome: SessionTransaction = {
+      ...incomeTransaction,
+      id: 'usd-income',
+      amountMinor: 125000,
+      currency: 'USD',
+      occurredOn: '2026-02-02',
+    };
+    const screen = await renderMap(
+      jest.fn(),
+      jest.fn(),
+      undefined,
+      [transaction, usdIncome],
+      'USD',
+    );
 
-    await fireEvent.press(screen.getByTestId('focus-transition-week'));
-    await fireEvent.press(screen.getByLabelText('Vista Semanal'));
-    expect(mockScrollToDate).toHaveBeenCalledWith('2026-04-30');
+    expect(
+      screen.getByTestId('map-month-income-amount').props.children,
+    ).toContain('$');
+    expect(
+      screen.getByTestId('map-month-income-amount').props.children,
+    ).not.toContain('€');
 
-    await fireEvent.press(screen.getByTestId('focus-future-month'));
-    await fireEvent.press(screen.getByLabelText('Vista Mensual'));
-    expect(mockWeeklyScrollToDate).toHaveBeenCalledWith('2026-08-01');
+    await fireEvent.press(screen.getByTestId('map-month-income-badge'));
+    expect(
+      within(screen.getByTestId('income-period-selector')).getByText(
+        'Febrero 2026',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByTestId('income-period-total').props.children).toContain(
+      '$',
+    );
+    expect(
+      screen.getByTestId('income-period-total').props.children,
+    ).not.toContain('€');
   });
 
-  it('adelanta la vista inactiva mientras se desplaza la vista activa', async () => {
+  it('amplía el futuro bajo demanda en bloques de dos años', async () => {
     const screen = await renderMap();
 
-    await fireEvent.press(screen.getByTestId('focus-transition-week'));
-    await act(() => new Promise((resolve) => setTimeout(resolve, 120)));
-    expect(mockScrollToDate).toHaveBeenCalledTimes(1);
-    expect(mockScrollToDate).toHaveBeenLastCalledWith('2026-04-30');
-
-    await fireEvent.press(screen.getByLabelText('Vista Semanal'));
-    expect(mockScrollToDate).toHaveBeenCalledTimes(1);
-
-    await fireEvent.press(screen.getByTestId('focus-future-month'));
-    await act(() => new Promise((resolve) => setTimeout(resolve, 120)));
-    expect(mockWeeklyScrollToDate).toHaveBeenLastCalledWith('2026-08-01');
+    await fireEvent.press(screen.getByLabelText('Ver más'));
+    expect(
+      screen.getByTestId('map-calendar-range-end', {
+        includeHiddenElements: true,
+      }).props.children,
+    ).toBe('2030-02-28');
   });
 
   it('muestra un estado vacío al elegir un día sin gastos', async () => {
     const screen = await renderMap();
 
-    await fireEvent.press(screen.getByLabelText('Vista Semanal'));
     await fireEvent.press(screen.getByTestId('2026-02-10'));
     expect(screen.getByText('No hay movimientos este día')).toBeTruthy();
   });
@@ -395,15 +455,16 @@ describe('MapScreen', () => {
     const onOpenTransactionDetail = jest.fn();
     const screen = await renderMap(jest.fn(), onOpenTransactionDetail);
 
-    await fireEvent.press(screen.getByLabelText('Vista Semanal'));
     await fireEvent.press(screen.getByTestId('2026-02-28'));
     await fireEvent.press(
       screen.getByRole('button', {
         name: 'Gasto: Música, 12,99 €, 28/02/2026',
       }),
     );
-    expect(onOpenTransactionDetail).toHaveBeenCalledWith(
-      createProjectedTransactionId('music-series', '2026-02-28'),
+    await waitFor(() =>
+      expect(onOpenTransactionDetail).toHaveBeenCalledWith(
+        createProjectedTransactionId('music-series', '2026-02-28'),
+      ),
     );
   });
 
@@ -412,8 +473,9 @@ describe('MapScreen', () => {
 
     expect(screen.queryByLabelText('Volver a hoy')).toBeNull();
 
-    await fireEvent.press(screen.getByLabelText('Vista Semanal'));
-    await fireEvent.press(screen.getByTestId('focus-future-month'));
+    for (let index = 0; index < 6; index += 1) {
+      await fireEvent.press(screen.getByLabelText('Ver mes siguiente'));
+    }
     expect(screen.getByTestId('map-return-direction-up')).toBeTruthy();
     expect(screen.queryByTestId('map-return-direction-down')).toBeNull();
     expect(
@@ -422,7 +484,7 @@ describe('MapScreen', () => {
       ),
     ).toMatchObject({
       bottom: 34 + layout.floatingActionTabOffset - spacing.xxl,
-      right: spacing.xl + layout.floatingActionSize + spacing.md,
+      right: mapReturnToTodayRight,
       height: layout.floatingActionSize,
     });
     expect(
@@ -431,33 +493,19 @@ describe('MapScreen', () => {
       ),
     ).toMatchObject({ borderColor: colors.border, borderWidth: 1 });
 
-    const monthlyMounts = mockMonthlyMount.mock.calls.length;
-    const weeklyMounts = mockWeeklyMount.mock.calls.length;
     await fireEvent.press(screen.getByLabelText('Volver a hoy'));
-    await fireEvent.press(screen.getByTestId('focus-minimum-month'));
-    await fireEvent.press(
-      screen.getByTestId('focus-weekly-minimum-month', {
-        includeHiddenElements: true,
-      }),
-    );
     expect(screen.getByText('Febrero 2026')).toBeTruthy();
     expect(screen.queryByLabelText('Volver a hoy')).toBeNull();
-    await fireEvent.press(screen.getByTestId('focus-current-month'));
-    await fireEvent.press(
-      screen.getByTestId('focus-weekly-current-month', {
-        includeHiddenElements: true,
-      }),
-    );
     await act(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-    expect(mockMonthlyMount).toHaveBeenCalledTimes(monthlyMounts + 1);
-    expect(mockWeeklyMount).toHaveBeenCalledTimes(weeklyMounts + 1);
-    expect(mockScrollToDate).not.toHaveBeenCalledWith('2026-02-02');
-    expect(mockWeeklyScrollToDate).not.toHaveBeenCalledWith('2026-02-02');
+    expect(mockWeeklyMount).toHaveBeenCalledTimes(1);
+    expect(mockScrollToDate).toHaveBeenCalledWith('2026-02-02');
     expect(screen.queryByLabelText('Volver a hoy')).toBeNull();
     expect(screen.queryByText(/Volviendo al/)).toBeNull();
 
     await act(() => new Promise((resolve) => setTimeout(resolve, 1000)));
-    await fireEvent.press(screen.getByTestId('focus-past-month'));
+    for (let index = 0; index < 6; index += 1) {
+      await fireEvent.press(screen.getByLabelText('Ver mes anterior'));
+    }
     expect(screen.getByTestId('map-return-direction-down')).toBeTruthy();
     expect(screen.queryByTestId('map-return-direction-up')).toBeNull();
   });

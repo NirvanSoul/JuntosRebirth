@@ -4,6 +4,7 @@ import type {
   SignUpInput,
   VerifyCodeInput,
 } from '@/features/auth/types';
+import { AuthApiError } from '@/features/auth/utils/authError';
 import { unregisterCurrentDeviceFromInvitationPush } from '@/lib/notifications/invitationPushTokenStore';
 
 /**
@@ -106,12 +107,15 @@ function describeAuthError(error: ApiError, fallback: string): string {
     case 'EMAIL_NOT_VERIFIED':
       return 'Confirma tu correo antes de continuar.';
     case 'INVALID_OTP':
+      return 'El código ingresado no es correcto. Revisa los dígitos e inténtalo de nuevo.';
     case 'OTP_EXPIRED':
+      return 'El código ha caducado. Solicita uno nuevo para continuar.';
     case 'INVALID_OR_EXPIRED_OTP':
-      return 'El código venció o no es válido. Solicita uno nuevo.';
+      return 'El código no es válido o ha caducado. Solicita uno nuevo para continuar.';
     case 'TOO_MANY_ATTEMPTS':
+      return 'Has agotado los 3 intentos disponibles entre la verificación y el cambio de contraseña. Solicita un código nuevo para continuar.';
     case 'TOO_MANY_REQUESTS':
-      return 'Has hecho demasiados intentos. Espera unos minutos antes de volver a probar.';
+      return 'Has solicitado códigos demasiadas veces. Espera unos minutos antes de pedir otro.';
     case 'PASSWORD_TOO_SHORT':
       return 'La contraseña es demasiado corta. Usa al menos 8 caracteres.';
     case 'PASSWORD_TOO_LONG':
@@ -156,7 +160,9 @@ function readLockout(error: ApiError): Date | null {
 }
 
 function fail(error: ApiError, fallback: string): never {
-  throw new Error(describeAuthError(error, fallback));
+  const message = describeAuthError(error, fallback);
+  if (error.code) throw new AuthApiError(error.code, message);
+  throw new Error(message);
 }
 
 /**

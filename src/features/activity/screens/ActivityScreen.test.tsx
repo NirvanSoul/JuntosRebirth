@@ -191,7 +191,7 @@ describe('ActivityScreen', () => {
       'borderWidth',
     );
     expect(StyleSheet.flatten(categoryCard.props.style)).not.toHaveProperty(
-      'shadowOffset',
+      'boxShadow',
     );
     expect(screen.queryByTestId('activity-category-scroller')).toBeNull();
     expect(
@@ -254,7 +254,7 @@ describe('ActivityScreen', () => {
       StyleSheet.flatten(chart.props.style).backgroundColor,
     ).toBeUndefined();
     expect(StyleSheet.flatten(chart.props.style).padding).toBeUndefined();
-    expect(StyleSheet.flatten(chart.props.style).elevation).toBeUndefined();
+    expect(StyleSheet.flatten(chart.props.style).boxShadow).toBeUndefined();
     expect(StyleSheet.flatten(chart.props.style).borderWidth).toBeUndefined();
     expect(
       StyleSheet.flatten(
@@ -986,8 +986,7 @@ describe('ActivityScreen', () => {
       borderWidth: 1,
       backgroundColor: colors.keypad,
     });
-    expect(filterButtonStyle.shadowOpacity).toBeUndefined();
-    expect(filterButtonStyle.elevation).toBeUndefined();
+    expect(filterButtonStyle.boxShadow).toBeUndefined();
     // Cada botón cubre media separación hacia el otro: ni queda una franja
     // muerta entre ambos ni se solapan sus áreas táctiles.
     expect(filterButton.props.hitSlop).toMatchObject({
@@ -1097,8 +1096,7 @@ describe('ActivityScreen', () => {
       backgroundColor: colors.surface,
       borderColor: colors.border,
       borderWidth: 1,
-      elevation: 0,
-      shadowOpacity: 0,
+      ...shadows.none,
     });
     expect(within(allType).getByText('Todos')).toBeTruthy();
     expect(
@@ -1568,7 +1566,7 @@ describe('ActivityScreen', () => {
       const onCreateMoneyAccount = jest.fn();
       const screen = await renderWithAccounts({ onCreateMoneyAccount });
 
-      expect(screen.getByText('Aún no hay cuentas')).toBeTruthy();
+      expect(screen.getByText('Crea una cuenta')).toBeTruthy();
       await fireEvent.press(screen.getByLabelText('Crear primera cuenta'));
 
       expect(onCreateMoneyAccount).toHaveBeenCalled();

@@ -75,11 +75,7 @@ function createStyles(colors: ColorTokens) {
       overflow: 'hidden',
       borderRadius: radii.md,
       backgroundColor: colors.keypad,
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.34,
-      shadowRadius: 6,
-      elevation: 4,
+      boxShadow: '0 3px 12px rgba(0, 0, 0, 0.34)',
     },
     fill: {
       position: 'absolute',

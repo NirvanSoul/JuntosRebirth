@@ -46,6 +46,7 @@ describe('QuickCreateMenu', () => {
     expect(screen.queryByText('Dinero que sale')).toBeNull();
     expect(screen.queryByText('Organiza tus movimientos')).toBeNull();
     expect(screen.queryByLabelText('Importar movimientos (beta)')).toBeNull();
+    expect(screen.queryByLabelText('Comprar o vender dólares')).toBeNull();
     expect(
       screen.getByTestId('quick-create-category-icon').props.children,
     ).toContain(
@@ -98,5 +99,31 @@ describe('QuickCreateMenu', () => {
 
     fireEvent.press(expense);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('solo ofrece comprar o vender dólares cuando se pide explícitamente', async () => {
+    const onSelect = jest.fn();
+    const screen = await renderWithTheme(
+      <QuickCreateMenu
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        showCurrencyExchange
+        visible
+      />,
+    );
+
+    const exchange = screen.getByLabelText('Comprar o vender dólares');
+    expect(screen.getByText('Comprar / vender dólares')).toBeTruthy();
+    expect(screen.getByTestId('quick-create-currency-exchange')).toBe(exchange);
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('quick-create-currency-exchange-icon-background')
+          .props.style,
+      ).backgroundColor,
+    ).toBe(colors.cta);
+
+    fireEvent.press(exchange);
+
+    expect(onSelect).toHaveBeenCalledWith('currency-exchange');
   });
 });

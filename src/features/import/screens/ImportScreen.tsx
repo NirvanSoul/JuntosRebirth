@@ -36,6 +36,7 @@ import { ColumnMappingSheet } from '@/features/import/components/ColumnMappingSh
 import { ImportMerchantGroup } from '@/features/import/components/ImportMerchantGroup/ImportMerchantGroup';
 import { ImportProgressAction } from '@/features/import/components/ImportProgressAction/ImportProgressAction';
 import { ImportSummary } from '@/features/import/components/ImportSummary/ImportSummary';
+import { ImportIntro } from '@/features/import/components/ImportIntro/ImportIntro';
 import { importAcceptedMimeTypes } from '@/features/import/constants/importLimits';
 import {
   columnMappingHasMinimumRoles,
@@ -831,6 +832,17 @@ export function ImportScreen({
     (candidate) =>
       candidate.duplicateStatus !== 'exact' && isCandidateReady(candidate),
   ).length;
+  const headerSubtitle =
+    phase.kind === 'review'
+      ? (remainingImportNotice ?? 'Revisa antes de importar')
+      : phase.kind === 'saved-batches'
+        ? 'Tienes revisiones pendientes'
+        : phase.kind === 'duplicate-file'
+          ? 'Ya vimos este archivo antes'
+          : phase.kind === 'select-currency'
+            ? 'Elige la moneda de este documento'
+            : null;
+
   return (
     <AppModal
       containsScrollable
@@ -852,17 +864,11 @@ export function ImportScreen({
             <Text accessibilityRole="header" variant="heading">
               Importar movimientos
             </Text>
-            <Text tone="secondary" variant="label">
-              {phase.kind === 'review'
-                ? (remainingImportNotice ?? 'Revisa antes de importar')
-                : phase.kind === 'saved-batches'
-                  ? 'Tienes revisiones pendientes'
-                  : phase.kind === 'duplicate-file'
-                    ? 'Ya vimos este archivo antes'
-                    : phase.kind === 'select-currency'
-                      ? 'Elige la moneda de este documento'
-                      : 'Estamos buscando tus movimientos.'}
-            </Text>
+            {headerSubtitle ? (
+              <Text tone="secondary" variant="label">
+                {headerSubtitle}
+              </Text>
+            ) : null}
           </View>
           {phase.kind !== 'review' ? (
             <ModalCloseButton onPress={handleClose} />
@@ -878,29 +884,13 @@ export function ImportScreen({
         ) : null}
 
         {phase.kind === 'idle' ? (
-          <View style={styles.body} testID="import-intro">
-            <Text variant="body">
-              Sube un extracto bancario en Excel o CSV. Revisarás los
-              movimientos, categorías y posibles duplicados antes de guardar.
-            </Text>
-            <ModalPrimaryAction
-              accessibilityLabel="Elegir un archivo bancario"
-              icon="folder-open-outline"
-              label="Elegir archivo"
-              onPress={() => void handlePickFile()}
-              testID="import-select-file"
-            />
-            {resumableBatches.length > 0 ? (
-              <ModalPrimaryAction
-                accessibilityLabel="Ver revisiones de importación guardadas"
-                label="Ver revisiones guardadas"
-                onPress={() =>
-                  setPhase({ kind: 'saved-batches', batches: resumableBatches })
-                }
-                variant="surface"
-              />
-            ) : null}
-          </View>
+          <ImportIntro
+            hasSavedBatches={resumableBatches.length > 0}
+            onPickFile={() => void handlePickFile()}
+            onViewSavedBatches={() =>
+              setPhase({ kind: 'saved-batches', batches: resumableBatches })
+            }
+          />
         ) : null}
 
         {phase.kind === 'failed' ? (

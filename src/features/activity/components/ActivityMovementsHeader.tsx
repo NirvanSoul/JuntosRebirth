@@ -3,9 +3,9 @@ import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { DocumentDownloadBoldIcon } from '@/components/icons/DocumentDownloadBoldIcon';
-import { FilterIcon } from '@/components/icons/FilterIcon';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { Text } from '@/components/ui/Text/Text';
+import { TransactionFilterButton } from '@/components/ui/TransactionFilterButton/TransactionFilterButton';
 import { getActivityLayoutTransition } from '@/features/activity/components/ActivityCollapsibleSection';
 import { iconSize, layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
@@ -18,7 +18,6 @@ type ActivityMovementsHeaderProps = {
   onOpenImport?: () => void;
 };
 
-const filterIconSize = iconSize.xl * 0.8 * 0.9 * 0.9;
 const importIconSize = iconSize.xl * 0.85 * 0.9 * 0.9;
 const movementActionButtonSize = layout.minTouchTarget;
 /**
@@ -64,17 +63,10 @@ export function ActivityMovementsHeader({
         Movimientos
       </Text>
       <View style={styles.actions}>
-        <ModalCloseButton
-          accessibilityHint="Abre las opciones de filtrado"
-          accessibilityLabel={
-            activeFilterCount > 0
-              ? `Filtros, ${activeFilterCount} activos`
-              : 'Filtros'
-          }
+        <TransactionFilterButton
+          activeFilterCount={activeFilterCount}
           hitSlop={filterButtonHitSlop}
-          iconContent={<FilterIcon size={filterIconSize} />}
           onPress={onOpenFilters}
-          size={movementActionButtonSize}
           testID="activity-filter-button"
         />
         <ModalCloseButton

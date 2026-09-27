@@ -7,10 +7,8 @@ import { layout, type LayoutDensity } from '@/theme/layout';
 import { typography } from '@/theme/typography';
 
 const amountAreaMinHeight = { compact: 64, regular: 88 } as const;
-const keypadRowGap = { compact: spacing.md, regular: spacing.lg } as const;
 const categoryIconSize = 44;
 const typeSelectorWidth = { compact: 216, regular: 240 } as const;
-const operatorColumnRatio = 0.72;
 
 export function createStyles(
   colors: ColorTokens,
@@ -116,22 +114,6 @@ export function createStyles(
       width: StyleSheet.hairlineWidth,
       height: layout.controlHeight[density] - spacing.xl,
       backgroundColor: colors.border,
-    },
-    keypad: { rowGap: keypadRowGap[density] },
-    keypadRow: { flexDirection: 'row', columnGap: layout.controlGap[density] },
-    key: {
-      ...shadows.subtle,
-      flex: 1,
-      height: layout.keypadKeyHeight[density],
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.md,
-      backgroundColor: colors.surface,
-    },
-    operatorKey: { flex: operatorColumnRatio },
-    keyPressed: {
-      backgroundColor: colors.surfaceMuted,
-      transform: [{ scale: 0.97 }],
     },
     footer: { flexDirection: 'row', gap: layout.controlGap[density] },
     categoryButton: {

@@ -8,6 +8,7 @@ import { categoryColors, categoryColorTokens } from '@/theme/categoryColors';
 import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
+import { spacing } from '@/theme/spacing';
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
   AppModal: ({
@@ -251,9 +252,15 @@ describe('CreateCategoryModal', () => {
     const iconScrollerStyle = StyleSheet.flatten(
       screen.getByTestId('category-appearance-icons-scroll').props.style,
     );
-    expect(iconScrollerStyle.marginLeft).toBe(-layout.screenGutter.regular);
-    expect(iconScrollerStyle.width).toBeGreaterThan(layout.minTouchTarget);
-    expect(iconScrollerStyle.overflow).toBe('visible');
+    expect(iconScrollerStyle.marginLeft).toBeUndefined();
+    expect(iconScrollerStyle.width).toBeUndefined();
+    expect(iconScrollerStyle.overflow).toBeUndefined();
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('category-appearance-icons-scroll').props
+          .contentContainerStyle,
+      ),
+    ).toMatchObject({ paddingRight: spacing.xl });
     expect(screen.getByLabelText('Icono bus')).toBeTruthy();
     expect(screen.getByLabelText('Icono bread')).toBeTruthy();
     expect(screen.getByLabelText('Icono ice-cream')).toBeTruthy();

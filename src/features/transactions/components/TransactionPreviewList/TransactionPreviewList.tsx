@@ -26,6 +26,7 @@ type TransactionPreviewListProps = {
   groupingTransactions?: readonly SessionTransaction[];
   limit?: number;
   onOpenTransactionDetail?: (transactionId: string) => void;
+  showAuthorName?: boolean;
   testID?: string;
   transactions: readonly SessionTransaction[];
 };
@@ -96,6 +97,7 @@ export function TransactionPreviewList({
   groupingTransactions,
   limit,
   onOpenTransactionDetail,
+  showAuthorName = false,
   testID,
   transactions,
 }: TransactionPreviewListProps) {
@@ -178,6 +180,7 @@ export function TransactionPreviewList({
                     return next;
                   })
                 }
+                showAuthorName={showAuthorName}
                 stacked={isCustomFolder}
                 transaction={primary}
               />
@@ -206,6 +209,7 @@ export function TransactionPreviewList({
                               ? () => onOpenTransactionDetail(transaction.id)
                               : undefined
                           }
+                          showAuthorName={showAuthorName}
                           transaction={transaction}
                         />
                       </Animated.View>

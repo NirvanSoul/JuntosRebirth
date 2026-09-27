@@ -141,8 +141,9 @@ export function ImportMerchantGroup({
               borderColor: category
                 ? categoryColors[category.colorToken]
                 : colors.cta,
-              shadowColor: isDark ? '#000000' : colors.textPrimary,
-              shadowOpacity: isDark ? 0.42 : 0.14,
+              boxShadow: isDark
+                ? '0 2px 8px rgba(0, 0, 0, 0.42)'
+                : '0 2px 8px rgba(0, 0, 0, 0.14)',
             },
           ]}
         >
@@ -219,9 +220,6 @@ function createStyles(colors: ColorTokens) {
       borderRadius: radii.sm,
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 4,
-      elevation: 3,
     },
     expandButton: {
       width: 32,

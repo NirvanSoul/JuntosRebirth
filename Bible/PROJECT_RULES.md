@@ -326,7 +326,12 @@ Obligatorio:
 - Usar tokens de color.
 - Usar escala de espaciado.
 - Usar tipografías definidas.
-- Usar radios y sombras del tema.
+- Usar radios y sombras del tema. Las sombras se expresan solo con
+  `boxShadow` (`shadows.subtle`, `raised`, `floatingAction`, `mainMenu`,
+  `none`); no usar `shadowColor`/`shadowOffset`/`shadowOpacity`/`shadowRadius`
+  ni `elevation` para sombras, porque Android los pinta distinto que iOS.
+  `elevation` queda reservado a contenedores sin fondo que necesiten orden de
+  apilado en Android.
 - Usar componentes base.
 - Respetar estados disabled, pressed, loading y error.
 - Considerar accesibilidad.

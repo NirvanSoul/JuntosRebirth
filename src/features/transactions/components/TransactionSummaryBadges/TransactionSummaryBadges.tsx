@@ -118,7 +118,7 @@ function MetricBadge({
           testID={`${testIDPrefix}-${icon}-icon-background`}
         >
           <View
-            style={isBalance ? null : styles.diagonalArrow}
+            style={styles.diagonalArrow}
             testID={`${testIDPrefix}-${icon}-icon`}
           >
             <Ionicons

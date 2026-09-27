@@ -1,12 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 
 import { Text } from '@/components/ui/Text/Text';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
@@ -105,12 +100,13 @@ export function AppearancePicker<TColor extends string, TIcon extends string>({
         accessibilityRole="radiogroup"
         contentContainerStyle={[
           styles.iconSections,
-          { paddingLeft: gutter, paddingRight: gutter + spacing.xl },
+          { paddingRight: spacing.xl },
         ]}
+        directionalLockEnabled
         horizontal
         nestedScrollEnabled
         showsHorizontalScrollIndicator={false}
-        style={[styles.iconScroll, { width, marginLeft: -gutter }]}
+        style={styles.iconScroll}
         testID={testID && `${testID}-icons-scroll`}
       >
         {iconSections.map((section) => (
@@ -168,7 +164,7 @@ function createStyles(colors: ColorTokens) {
       borderRadius: radii.md,
     },
     selectedColorOption: { borderColor: colors.onBrand, borderWidth: 3 },
-    iconScroll: { marginTop: spacing.xl, overflow: 'visible' },
+    iconScroll: { marginTop: spacing.xl },
     iconSections: { gap: spacing.xl },
     iconSection: { gap: spacing.sm },
     iconColumns: { flexDirection: 'row', gap: spacing.sm },

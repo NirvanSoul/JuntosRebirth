@@ -7,6 +7,7 @@ import {
   AppModal,
   useAppModalBottomInset,
 } from '@/components/overlays/AppModal/AppModal';
+import { useModalChainedAction } from '@/components/overlays/AppModal/useModalChainedAction';
 import { CopyToSpaceModal } from '@/components/overlays/CopyToSpaceModal/CopyToSpaceModal';
 import { DestructiveConfirmationPanel } from '@/components/overlays/DestructiveConfirmationPanel/DestructiveConfirmationPanel';
 import { DetailActionCard } from '@/components/overlays/DetailActionCard/DetailActionCard';
@@ -15,6 +16,11 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { NoteEditorModal } from '@/components/ui/NoteEditorModal/NoteEditorModal';
 import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
+import { TransactionFilterButton } from '@/components/ui/TransactionFilterButton/TransactionFilterButton';
+import {
+  TransactionFiltersModal,
+  type TransactionFilters,
+} from '@/features/activity/components/TransactionFiltersModal';
 import { extractRatesFromTransactions } from '@/features/accounts/utils/moneyAccountValuation';
 import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
 import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
@@ -23,10 +29,8 @@ import { CategoryBudgetProgress } from '@/features/categories/components/Categor
 import { createStyles } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal.styles';
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
 import { CategoryTransactionMetrics } from '@/features/categories/components/CategoryDetailModal/CategoryTransactionMetrics';
-import {
-  CategoryAuthorFilter,
-  type CategoryAuthorFilterValue,
-} from '@/features/categories/components/CategoryDetailModal/CategoryAuthorFilter';
+import { getCategoryDetailAuthorOptions } from '@/features/categories/components/CategoryDetailModal/categoryDetailFilters';
+import { useCategoryDetailTransactions } from '@/features/categories/components/CategoryDetailModal/useCategoryDetailTransactions';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type {
   Category,
@@ -39,12 +43,10 @@ import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCap
 import { useSpaceMembership } from '@/features/profile/state/SpaceMembershipContext';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { SessionTransaction } from '@/features/transactions/types';
-import { resolveTransactionAuthor } from '@/features/transactions/utils/transactionAuthor';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
-import { getLocalTodayKey } from '@/lib/date/localDate';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
@@ -95,8 +97,15 @@ export function CategoryDetailModal({
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const membership = useSpaceMembership();
   const [panel, setPanel] = useState<DetailPanel>(null);
-  const [authorFilter, setAuthorFilter] =
-    useState<CategoryAuthorFilterValue>('all');
+  const [filters, setFilters] = useState<TransactionFilters>({
+    author: 'all',
+    category: [],
+    currency: displayCurrency,
+    date: 'all',
+    recurrence: 'all',
+    type: 'all',
+  });
+  const [isFiltersModalVisible, setFiltersModalVisible] = useState(false);
   const [isBudgetModalVisible, setBudgetModalVisible] = useState(false);
   const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
@@ -105,6 +114,7 @@ export function CategoryDetailModal({
   const [valuationMode, setValuationMode] =
     useState<VenezuelaDisplayMode>('USD');
   const modalBottomInset = useAppModalBottomInset();
+  const { closeThenRun, handleDismissed } = useModalChainedAction(onClose);
   const detailCurrencies = useMemo<readonly CurrencyCode[]>(() => {
     if (!category) return [];
 
@@ -116,72 +126,20 @@ export function CategoryDetailModal({
       ),
     );
   }, [category, transactions]);
-  const authorFilteredTransactions = useMemo(() => {
-    if (authorFilter === 'all' || !membership.isSharedSpace) {
-      return transactions;
-    }
-
-    return transactions.filter(
-      (transaction) =>
-        resolveTransactionAuthor(transaction.createdBy, membership).isOwn ===
-        (authorFilter === 'own'),
-    );
-  }, [authorFilter, membership, transactions]);
-  const categoryTransactions = useMemo(
-    () =>
-      category
-        ? listTransactionsThroughCurrentMonth(
-            authorFilteredTransactions,
-          ).filter(
-            (t) =>
-              t.categoryId === category.id &&
-              (venezuelaCurrencyMode ? true : t.currency === selectedCurrency),
-          )
-        : [],
-    [
-      authorFilteredTransactions,
-      category,
-      selectedCurrency,
-      venezuelaCurrencyMode,
-    ],
-  );
-  const allCategoryTransactions = useMemo(
-    () =>
-      category
-        ? authorFilteredTransactions.filter(
-            (t) =>
-              t.categoryId === category.id &&
-              (venezuelaCurrencyMode ? true : t.currency === selectedCurrency),
-          )
-        : [],
-    [
-      authorFilteredTransactions,
-      category,
-      selectedCurrency,
-      venezuelaCurrencyMode,
-    ],
-  );
-  const todayKey = getLocalTodayKey();
-  const pastCategoryTransactions = useMemo(
-    () => categoryTransactions.filter((t) => t.occurredOn <= todayKey),
-    [categoryTransactions, todayKey],
-  );
-  const upcomingCategoryTransactions = useMemo(() => {
-    const seenIds = new Set<string>();
-    const upcoming: SessionTransaction[] = [];
-    for (const transaction of [
-      ...allCategoryTransactions,
-      ...categoryTransactions,
-    ]) {
-      if (transaction.occurredOn <= todayKey || seenIds.has(transaction.id))
-        continue;
-      seenIds.add(transaction.id);
-      upcoming.push(transaction);
-    }
-    return upcoming.sort((left, right) =>
-      left.occurredOn.localeCompare(right.occurredOn),
-    );
-  }, [allCategoryTransactions, categoryTransactions, todayKey]);
+  const {
+    authorFilteredTransactions,
+    categoryTransactions,
+    pastCategoryTransactions,
+    upcomingCategoryTransactions,
+  } = useCategoryDetailTransactions({
+    category,
+    filters,
+    isSharedSpace: membership.isSharedSpace,
+    membership,
+    selectedCurrency,
+    transactions,
+    venezuelaCurrencyMode,
+  });
   const summary = useMemo(
     () =>
       category
@@ -236,7 +194,15 @@ export function CategoryDetailModal({
     setBudgetModalVisible(false);
     setNoteModalVisible(false);
     setSpacePickerVisible(false);
-    setAuthorFilter('all');
+    setFilters({
+      author: 'all',
+      category: [],
+      currency: displayCurrency,
+      date: 'all',
+      recurrence: 'all',
+      type: 'all',
+    });
+    setFiltersModalVisible(false);
     setSelectedCurrency(
       detailCurrencies.includes(displayCurrency)
         ? displayCurrency
@@ -287,8 +253,6 @@ export function CategoryDetailModal({
   const budgetProgress = category.budgetMinor
     ? Math.min(budgetExpenseMinor / category.budgetMinor, 1)
     : 0;
-  const openDeletePanel = () => setPanel('delete');
-
   return (
     <>
       <AppModal
@@ -296,6 +260,7 @@ export function CategoryDetailModal({
         extendContentIntoBottomInset
         hideHandle
         onClose={onClose}
+        onDismissed={handleDismissed}
         testID="category-detail-modal"
         variant="expanded"
         visible={visible}
@@ -305,8 +270,8 @@ export function CategoryDetailModal({
             <DetailActionMenu
               itemLabel="categoría"
               key={category.id}
-              onDelete={openDeletePanel}
-              onEdit={() => onEdit(category.id)}
+              onDelete={() => setPanel('delete')}
+              onEdit={() => closeThenRun(() => onEdit(category.id))}
               testIDPrefix="category"
             />
             <ModalCloseButton onPress={onClose} />
@@ -325,7 +290,9 @@ export function CategoryDetailModal({
               <Pressable
                 accessibilityLabel="Editar apariencia de categoría"
                 accessibilityRole="button"
-                onPress={() => onEdit(category.id, 'appearance')}
+                onPress={() =>
+                  closeThenRun(() => onEdit(category.id, 'appearance'))
+                }
                 style={[
                   styles.heroIcon,
                   { backgroundColor: categoryColors[category.colorToken] },
@@ -340,7 +307,7 @@ export function CategoryDetailModal({
               <Pressable
                 accessibilityLabel="Editar nombre de categoría"
                 accessibilityRole="button"
-                onPress={() => onEdit(category.id, 'name')}
+                onPress={() => closeThenRun(() => onEdit(category.id, 'name'))}
                 style={styles.titleBlock}
               >
                 <Text
@@ -367,7 +334,7 @@ export function CategoryDetailModal({
               <DestructiveConfirmationPanel
                 description="Se ocultará de este espacio. Sus movimientos asociados se conservarán."
                 onCancel={() => setPanel(null)}
-                onConfirm={() => onDelete(category.id)}
+                onConfirm={() => closeThenRun(() => onDelete(category.id))}
                 testID="category-delete-panel"
                 title="¿Eliminar esta categoría?"
               />
@@ -473,7 +440,9 @@ export function CategoryDetailModal({
               <DetailActionCard
                 icon="add"
                 label="Añadir movimiento"
-                onPress={() => onAddTransaction(category.id)}
+                onPress={() =>
+                  closeThenRun(() => onAddTransaction(category.id))
+                }
                 testIDPrefix="category"
               />
               <DetailActionCard
@@ -496,24 +465,34 @@ export function CategoryDetailModal({
               ) : null}
             </View>
 
-            <CategoryAuthorFilter
-              onChange={setAuthorFilter}
-              value={authorFilter}
-            />
-
             <View style={styles.movementsHeader}>
               <Text accessibilityRole="header" variant="subheading">
                 Movimientos
               </Text>
-              <Text tone="secondary" variant="footnote">
-                {pastCategoryTransactions.length}
-              </Text>
+              <View style={styles.movementsHeaderActions}>
+                <Text tone="secondary" variant="footnote">
+                  {pastCategoryTransactions.length}
+                </Text>
+                {membership.isSharedSpace ? (
+                  <TransactionFilterButton
+                    activeFilterCount={
+                      Number(filters.date !== 'all') +
+                      Number(filters.author !== 'all')
+                    }
+                    onPress={() => setFiltersModalVisible(true)}
+                    testID="category-detail-filter-button"
+                  />
+                ) : null}
+              </View>
             </View>
             {pastCategoryTransactions.length > 0 ? (
               <TransactionPreviewList
                 categories={[category]}
                 groupingTransactions={authorFilteredTransactions}
-                onOpenTransactionDetail={onOpenTransactionDetail}
+                onOpenTransactionDetail={(transactionId) =>
+                  closeThenRun(() => onOpenTransactionDetail(transactionId))
+                }
+                showAuthorName={membership.isSharedSpace}
                 testID="category-detail-transaction-list"
                 transactions={pastCategoryTransactions}
               />
@@ -546,7 +525,10 @@ export function CategoryDetailModal({
                 <TransactionPreviewList
                   categories={[category]}
                   groupingTransactions={authorFilteredTransactions}
-                  onOpenTransactionDetail={onOpenTransactionDetail}
+                  onOpenTransactionDetail={(transactionId) =>
+                    closeThenRun(() => onOpenTransactionDetail(transactionId))
+                  }
+                  showAuthorName={membership.isSharedSpace}
                   testID="category-detail-upcoming-transaction-list"
                   transactions={upcomingCategoryTransactions}
                 />
@@ -555,6 +537,21 @@ export function CategoryDetailModal({
           </BottomSheetScrollView>
         </View>
       </AppModal>
+      {membership.isSharedSpace ? (
+        <TransactionFiltersModal
+          authorOptions={getCategoryDetailAuthorOptions(membership)}
+          categories={[]}
+          currencies={[selectedCurrency]}
+          filters={filters}
+          onApply={(nextFilters) => {
+            setFilters(nextFilters);
+            setFiltersModalVisible(false);
+          }}
+          onClose={() => setFiltersModalVisible(false)}
+          variant="date-and-author"
+          visible={isFiltersModalVisible}
+        />
+      ) : null}
       <CategoryBudgetModal
         categoryColor={categoryColors[category.colorToken]}
         categoryName={category.name}

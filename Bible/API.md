@@ -16,6 +16,12 @@ La autenticación se integra con Better Auth para Expo en `/api/auth` mediante
 `src/lib/auth-client.ts`; no se implementan llamadas HTTP de autenticación a
 mano. Apple Sign In no está disponible.
 
+Google Sign-In nativo solicita el ID token con el cliente OAuth de tipo Web
+declarado en `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`. Ese identificador debe
+coincidir con `GOOGLE_CLIENT_ID` en Better Auth. El cliente OAuth de iOS se
+mantiene separado, y Android autoriza cada firma mediante un cliente propio de
+tipo Android con el package `com.juntoss.app` y su SHA-1 correspondiente.
+
 ## Sesión y restauración
 
 - Tras registro con OTP válido o inicio de sesión: `POST /v1/bootstrap` con `{ timezone }`,
@@ -108,6 +114,13 @@ floats.
 El registro por correo ya genera el OTP en el servidor (`sendVerificationOnSignUp`).
 El cliente no debe solicitar un segundo código inmediatamente después de crear
 la cuenta: solo puede usar el reenvío explícito desde la pantalla OTP.
+
+La recuperación comprueba el OTP con `checkVerificationOtp` y
+`type: "forget-password"`; no usa `verifyEmail`. El cambio de contraseña vuelve
+a enviar a `resetPassword` el mismo correo y OTP. Ambos pasos comparten los tres
+intentos permitidos por el servidor. La interfaz conserva y muestra el código
+estable de los errores de autenticación —en particular `INVALID_OTP`,
+`OTP_EXPIRED` y `TOO_MANY_ATTEMPTS`— junto a un mensaje específico en español.
 
 Iniciar sesión con un correo sin verificar es distinto: la API responde
 `403 EMAIL_NOT_VERIFIED` y **no** envía ningún código. El cliente pide uno con

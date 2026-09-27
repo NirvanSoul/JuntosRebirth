@@ -5,6 +5,7 @@ import {
   AppModal,
   useAppModalBottomInset,
 } from '@/components/overlays/AppModal/AppModal';
+import { useModalChainedAction } from '@/components/overlays/AppModal/useModalChainedAction';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
@@ -47,6 +48,7 @@ export function MapDayModal({
   const bottomInset = useAppModalBottomInset();
   const floatingActionClearance =
     bottomInset + layout.actionHeight[density] + spacing.xl;
+  const { closeThenRun, handleDismissed } = useModalChainedAction(onClose);
   if (!date) return null;
 
   const categoriesById = new Map(
@@ -65,10 +67,9 @@ export function MapDayModal({
         <TransactionPreviewCard
           category={categoriesById.get(transaction.categoryId) ?? null}
           key={transaction.id}
-          onPress={() => {
-            onClose();
-            onOpenTransactionDetail?.(transaction.id);
-          }}
+          onPress={() =>
+            closeThenRun(() => onOpenTransactionDetail?.(transaction.id))
+          }
           transaction={transaction}
         />
       ))}
@@ -80,6 +81,7 @@ export function MapDayModal({
       containsScrollable
       extendContentIntoBottomInset
       onClose={onClose}
+      onDismissed={handleDismissed}
       testID="map-day-modal"
       variant="expanded"
       visible={visible}
@@ -138,10 +140,7 @@ export function MapDayModal({
         <ModalPrimaryAction
           accessibilityLabel="Agregar movimiento"
           label="Agregar movimiento"
-          onPress={() => {
-            onClose();
-            onAddTransaction(date);
-          }}
+          onPress={() => closeThenRun(() => onAddTransaction(date))}
           style={[styles.addAction, { bottom: bottomInset }]}
           testID="map-add-transaction-button"
         />

@@ -186,6 +186,43 @@ jest.mock(
   }),
 );
 
+// El modal de compra/venta de dólares pide la tasa vigente al abrirse; sin
+// este mock la petición sale contra la API real y falla en Jest.
+jest.mock(
+  '@/features/exchangeRates/gateways/juntossExchangeRateGateway',
+  () => ({
+    getCurrentExchangeRates: jest.fn(async () => ({
+      rates: {
+        BCV: {
+          source: 'BCV',
+          baseCurrency: 'USD',
+          quoteCurrency: 'VES',
+          rate: '40.0000000000',
+          observedAt: '2026-09-22T19:00:00.000Z',
+          fetchedAt: '2026-09-22T19:05:00.000Z',
+        },
+        EURO: {
+          source: 'EURO',
+          baseCurrency: 'EUR',
+          quoteCurrency: 'VES',
+          rate: '50.0000000000',
+          observedAt: '2026-09-22T19:00:00.000Z',
+          fetchedAt: '2026-09-22T19:05:00.000Z',
+        },
+      },
+      ratesUpdatedAt: '2026-09-22T19:05:00.000Z',
+      stale: false,
+    })),
+    previewExchangeRate: jest.fn(async () => ({
+      conversions: {
+        BCV: { amountMinor: 0, currency: 'VES', rate: '40.0000000000' },
+        EURO: { amountMinor: 0, currency: 'VES', rate: '50.0000000000' },
+      },
+      ratesUpdatedAt: '2026-09-22T19:05:00.000Z',
+    })),
+  }),
+);
+
 // `SettingsScreen` vive en el mismo drawer que la pantalla principal y
 // carga el avatar de perfil al montarse, también contra SQLite real.
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
@@ -741,7 +778,7 @@ describe('MainTabsNavigator', () => {
     expect(screen.queryByLabelText('Espacio Personal')).toBeNull();
   });
 
-  it('alterna entre dos monedas desde Inicio y Actividad sin abrir el selector', async () => {
+  it('alterna entre dos monedas desde Inicio, Actividad y Mapa', async () => {
     await AsyncStorage.setItem(
       '@juntoss/currency-preferences/v1',
       JSON.stringify({ currencies: ['EUR', 'USD'], version: 1 }),
@@ -782,6 +819,18 @@ describe('MainTabsNavigator', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('Moneda seleccionada: 🇪🇺')).toBeTruthy(),
     );
+    expect(screen.queryByTestId('home-currency-picker')).toBeNull();
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Mapa' }));
+    expect(screen.getByTestId('map-month-summary-panel')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('home-currency-flag-button'));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Moneda seleccionada: 🇺🇸')).toBeTruthy(),
+    );
+    expect(
+      screen.getByTestId('map-month-income-amount').props.children,
+    ).toContain('$');
     expect(screen.queryByTestId('home-currency-picker')).toBeNull();
   });
 
@@ -854,6 +903,60 @@ describe('MainTabsNavigator', () => {
     );
     expect(screen.queryByTestId('home-currency-picker')).toBeNull();
     expect(screen.queryByText('🇪🇺')).toBeNull();
+  });
+
+  it('en Venezuela el menú de crear ofrece comprar o vender dólares', async () => {
+    mockCountryCode = 'VE';
+
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+
+    // El país llega de SQLite después del primer render: la acción aparece
+    // en cuanto `useCurrencyCapabilities` lo conoce, con el menú ya abierto.
+    expect(
+      await screen.findByTestId('quick-create-currency-exchange'),
+    ).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('quick-create-currency-exchange'));
+
+    expect(await screen.findByText('Entregas bolívares')).toBeTruthy();
+    expect(screen.getByText('Recibes dólares')).toBeTruthy();
+  });
+
+  it('fuera de Venezuela el menú de crear no ofrece el cambio de dólares', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+
+    expect(await screen.findByTestId('quick-create-income')).toBeTruthy();
+    expect(screen.queryByTestId('quick-create-currency-exchange')).toBeNull();
   });
 
   it('desplaza el selector y fija el mismo resumen al recorrer movimientos', async () => {
@@ -1120,6 +1223,11 @@ describe('MainTabsNavigator', () => {
         name: 'Añadir movimiento',
       }),
     );
+
+    expect(await screen.findByLabelText('Título del movimiento')).toBeTruthy();
+    expect(screen.queryByTestId('category-detail-modal')).toBeNull();
+    expect(screen.getByLabelText('Categoría Salario')).toBeTruthy();
+
     await fireEvent.press(screen.getByLabelText('1'));
 
     expect(
@@ -1127,7 +1235,6 @@ describe('MainTabsNavigator', () => {
     ).toMatchObject({
       selected: true,
     });
-    expect(screen.getByLabelText('Categoría Salario')).toBeTruthy();
     expect(
       StyleSheet.flatten(
         screen.getByTestId('transaction-type-indicator-expense').props.style,

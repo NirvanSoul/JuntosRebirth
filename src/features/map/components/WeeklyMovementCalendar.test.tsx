@@ -11,8 +11,10 @@ import {
 import {
   addCalendarDays,
   getCalendarWeek,
+  getMonthSeparatedWeeksInCalendarRange,
   shouldShowWeekMonthLabel,
 } from '@/features/map/model/calendarPeriods';
+import { indexMapCalendarDays } from '@/features/map/model/mapCalendarDays';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
@@ -57,10 +59,11 @@ function renderCalendar(
         <WeeklyMovementCalendar
           categories={[category]}
           currentDate="2026-08-12"
+          days={indexMapCalendarDays([transaction])}
           onOpenTransactionDetail={onOpenTransactionDetail}
           onSelectDate={onSelectDate}
+          rangeEndDate="2028-08-31"
           testID="weekly-calendar"
-          transactions={[transaction]}
         />
       </ThemeProvider>
     </SafeAreaProvider>,
@@ -104,6 +107,36 @@ describe('WeeklyMovementCalendar', () => {
     expect(onSelectDate).toHaveBeenCalledWith('2026-08-12');
   });
 
+  it('separa los meses sin desplazar el día 1 de su columna real', async () => {
+    const augustWeeks = getMonthSeparatedWeeksInCalendarRange(
+      '2026-08-01',
+      '2026-08-31',
+    );
+
+    // Agosto de 2026 empieza en sábado; no debe mostrar los días finales de
+    // julio bajo el encabezado de agosto.
+    expect(augustWeeks[0]).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+      '2026-08-01',
+      '2026-08-02',
+    ]);
+
+    const screen = await renderCalendar();
+    expect(screen.getByTestId('weekly-calendar-day-2026-08-01')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('weekly-calendar-week-2026-08-03').props.style,
+      ),
+    ).toMatchObject({
+      borderBottomColor: colors.categoryPreviewBorder,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    });
+  });
+
   it('nombra con ambos meses la semana que cruza su límite', async () => {
     expect(formatWeekMonthLabel(getCalendarWeek('2026-08-02'))).toBe(
       'Julio - Agosto 2026',
@@ -132,7 +165,7 @@ describe('WeeklyMovementCalendar', () => {
     expect(weeks).toHaveLength(137);
   });
 
-  it('mantiene todo el historial precargado y arranca posicionado en el mes actual', async () => {
+  it('mantiene el historial y limita el futuro al rango cargado', async () => {
     const screen = await renderCalendar();
     const list = screen.getByTestId('weekly-calendar');
     const weeks = list.props.data as string[][];
@@ -147,7 +180,7 @@ describe('WeeklyMovementCalendar', () => {
     expect(typeof initialScrollIndex).toBe('number');
     expect(weeks[initialScrollIndex]).toContain('2026-08-01');
     expect(weeks[initialScrollIndex + 2]).toContain('2026-08-12');
-    expect(weeks.at(-1)?.[0]).toBe('2080-12-30');
+    expect(weeks.at(-1)).toContain('2028-08-31');
   });
 
   it('deriva getItemLayout de los movimientos reales, en vez de depender de medir la lista al desplazarse', async () => {
@@ -175,7 +208,7 @@ describe('WeeklyMovementCalendar', () => {
     expect(nextLayout.offset).toBe(busyLayout.offset + busyLayout.length);
   });
 
-  it('reporta el mes actual aunque la semana inicial cruce desde el mes anterior', async () => {
+  it('reporta el mes actual desde su primera fila parcial', async () => {
     const onFocusedMonthChange = jest.fn();
     const screen = await render(
       <SafeAreaProvider
@@ -188,10 +221,11 @@ describe('WeeklyMovementCalendar', () => {
           <WeeklyMovementCalendar
             categories={[category]}
             currentDate="2026-08-03"
+            days={indexMapCalendarDays([])}
             onFocusedMonthChange={onFocusedMonthChange}
             onSelectDate={jest.fn()}
+            rangeEndDate="2028-08-31"
             testID="weekly-calendar"
-            transactions={[]}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -212,7 +246,7 @@ describe('WeeklyMovementCalendar', () => {
       ],
     });
 
-    expect(onFocusedMonthChange).toHaveBeenCalledWith('2026-08', '2026-08-02');
+    expect(onFocusedMonthChange).toHaveBeenCalledWith('2026-08', '2026-08-01');
   });
 
   it('nunca reemplaza los datos de la lista al desplazarse (historial siempre precargado, sin lotes ni glitches)', async () => {

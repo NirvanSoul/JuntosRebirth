@@ -14,18 +14,27 @@ const expoConfig = require('eslint-config-expo/flat');
 const frozenLineDebt = {
   // Bajado de 1372 a 1317 el 2026-09-06 al extraer la sincronización financiera
   // a `features/sync/hooks/useFinanceSync.ts`, y a 1261 el 2026-09-11 al
-  // extraer la apertura de sesión a `features/sync/hooks/useSessionStartup.ts`.
-  'src/navigation/MainTabsNavigator.tsx': 1260,
+  // extraer la apertura de sesión a `features/sync/hooks/useSessionStartup.ts`,
+  // y a 1226 el 2026-09-22 al extraer el guardado de movimientos a
+  // `features/transactions/hooks/useTransactionSubmit.ts`, y a 1224 el
+  // 2026-09-23 al unificar la apertura de la hoja de movimiento en
+  // `openTransactionCreation`.
+  'src/navigation/MainTabsNavigator.tsx': 1224,
   // Umbral elevado de 1209 (techo 1216) el 2026-08-16 por la corrección del
   // stale closure del catálogo (F4, commit 5c19b3b), con aprobación explícita
   // del responsable. La encapsulación en `updateLocalCategories` lo dejó en
   // 1214. Candidato prioritario a extracción (PLAN.md §3 Fase 4).
   'src/features/import/screens/ImportScreen.tsx': 1214,
-  'src/features/transactions/components/CreateTransactionModal/CreateTransactionModal.tsx': 1163,
+  // Bajado de 1163 a 942 el 2026-09-22 al extraer el teclado numérico a
+  // `features/transactions/components/AmountKeypad/AmountKeypad.tsx`.
+  'src/features/transactions/components/CreateTransactionModal/CreateTransactionModal.tsx': 942,
   'src/features/transactions/repositories/localTransactionRepository.ts': 873,
   'src/features/transactions/components/TransactionDetailModal/TransactionDetailModal.tsx': 701,
   'src/features/settings/screens/SettingsScreen.tsx': 660,
-  'src/features/categories/components/CategoryDetailModal/CategoryDetailModal.tsx': 627,
+  // Bajado de 627 a 576 el 2026-09-23 al extraer la selección de movimientos
+  // a `useCategoryDetailTransactions.ts` y el encadenado de hojas a
+  // `components/overlays/AppModal/useModalChainedAction.ts`.
+  'src/features/categories/components/CategoryDetailModal/CategoryDetailModal.tsx': 576,
   'src/features/map/screens/MapScreen.tsx': 597,
   'src/features/activity/screens/ActivityScreen.tsx': 573,
   'src/components/ui/AppCalendar/AppCalendar.tsx': 565,

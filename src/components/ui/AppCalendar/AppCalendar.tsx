@@ -2,6 +2,7 @@ import {
   type ComponentProps,
   forwardRef,
   memo,
+  type ReactElement,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -17,12 +18,13 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars';
 import type { CalendarProps, DateData } from 'react-native-calendars';
 import {
   MonthNavigatorArrow,
   MonthNavigatorLabel,
 } from '@/components/ui/MonthNavigator/MonthNavigator';
+import '@/components/ui/AppCalendar/calendarLocale';
 import { Text } from '@/components/ui/Text/Text';
 import {
   getCalendarFutureMonthRange,
@@ -44,6 +46,7 @@ export type MarkedDates = NonNullable<CalendarProps['markedDates']>;
 
 type AppCalendarProps = {
   currentDate: string;
+  footer?: ReactElement | null;
   markedDates?: MarkedDates;
   mode?: 'month' | 'scroll';
   onFocusedMonthChange?: (month: string, date?: string) => void;
@@ -70,16 +73,17 @@ const scrollCalendarDayHeight = 52;
 const scrollCalendarNumberSize = 32;
 const calendarDotSize = 7;
 const scrollCalendarRenderWindow = 9;
-// showSixWeeks fuerza una grilla de 6 filas por mes en modo scroll, así que
-// la altura de cada item es siempre la misma grilla sin cabecera propia (el
-// nombre del mes y la fila Lun-Dom viven fuera de la lista, ver
-// `ScrollWeekdayRow`). Cada fila suma el alto fijo del día más el margen
-// vertical que ya declara `stylesheet.calendar.main.week`.
+// showSixWeeks mantiene seis filas por mes, con las celdas ajenas al mes
+// vacías. La separación después de cada bloque evita que dos meses parezcan
+// una única cuadrícula continua. El nombre del mes y Lun-Dom viven fuera de la
+// lista (ver `ScrollWeekdayRow`).
 const calendarGridRows = 6;
 const calendarWeekRowVerticalMargin = spacing.sm;
-const calendarMonthHeight =
+const calendarMonthGridHeight =
   calendarGridRows *
   (scrollCalendarDayHeight + calendarWeekRowVerticalMargin * 2);
+const calendarMonthSpacing = spacing.xl;
+const calendarMonthHeight = calendarMonthGridHeight + calendarMonthSpacing;
 
 export function getDominantScrollMonthIndex(
   contentOffsetY: number,
@@ -98,12 +102,16 @@ export function getDominantScrollMonthIndex(
 type ScrollCalendarDayProps = Omit<
   ComponentProps<NonNullable<CalendarProps['dayComponent']>>,
   'date'
-> & { date?: DateData };
+> & {
+  date?: DateData;
+  displayMonth: string;
+};
 
 function ScrollCalendarDay({
   accessibilityLabel,
   children,
   date,
+  displayMonth,
   marking,
   onPress,
   state,
@@ -113,7 +121,8 @@ function ScrollCalendarDay({
   const isSelected = Boolean(marking?.selected) || state === 'selected';
   const isDisabled = Boolean(marking?.disabled) || state === 'disabled';
   const isToday = state === 'today';
-  if (state === 'disabled') {
+  const isOutsideDisplayedMonth = date?.dateString.slice(0, 7) !== displayMonth;
+  if (state === 'disabled' || isOutsideDisplayedMonth) {
     return <View style={styles.scrollDay} testID={testID} />;
   }
 
@@ -159,48 +168,6 @@ function ScrollCalendarDay({
     </Pressable>
   );
 }
-
-LocaleConfig.locales.es = {
-  monthNames: [
-    'Enero',
-    'Febrero',
-    'Marzo',
-    'Abril',
-    'Mayo',
-    'Junio',
-    'Julio',
-    'Agosto',
-    'Septiembre',
-    'Octubre',
-    'Noviembre',
-    'Diciembre',
-  ],
-  monthNamesShort: [
-    'Ene.',
-    'Feb.',
-    'Mar.',
-    'Abr.',
-    'Jun.',
-    'Jul.',
-    'Ago.',
-    'Sept.',
-    'Oct.',
-    'Nov.',
-    'Dic.',
-  ],
-  dayNames: [
-    'Domingo',
-    'Lunes',
-    'Martes',
-    'Miércoles',
-    'Jueves',
-    'Viernes',
-    'Sábado',
-  ],
-  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
-  today: 'Hoy',
-};
-LocaleConfig.defaultLocale = 'es';
 
 const scrollWeekdayLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -335,6 +302,7 @@ export const AppCalendar = memo(
   forwardRef<AppCalendarHandle, AppCalendarProps>(function AppCalendar(
     {
       currentDate,
+      footer,
       markedDates = {},
       mode = 'month',
       onFocusedMonthChange,
@@ -450,17 +418,24 @@ export const AppCalendar = memo(
     );
     const renderScrollMonth = useCallback(
       ({ item: monthStart }: { item: string }) => (
-        <Calendar
-          {...commonProps}
-          current={monthStart}
-          customHeader={ScrollCalendarNullHeader}
-          dayComponent={ScrollCalendarDay}
-          disableMonthChange
-          hideArrows
-          showSixWeeks
-          style={styles.calendarListMonth}
-          testID={`${testID}.item_${monthStart.slice(0, 7)}`}
-        />
+        <View style={styles.calendarListMonth}>
+          <Calendar
+            {...commonProps}
+            current={monthStart}
+            customHeader={ScrollCalendarNullHeader}
+            dayComponent={(props) => (
+              <ScrollCalendarDay
+                {...props}
+                displayMonth={monthStart.slice(0, 7)}
+              />
+            )}
+            disableMonthChange
+            hideArrows
+            showSixWeeks
+            style={styles.calendarListMonthGrid}
+            testID={`${testID}.item_${monthStart.slice(0, 7)}`}
+          />
+        </View>
       ),
       [commonProps, testID],
     );
@@ -479,6 +454,7 @@ export const AppCalendar = memo(
             initialNumToRender={5}
             initialScrollIndex={pastScrollRange}
             keyExtractor={(monthStart) => monthStart}
+            ListFooterComponent={footer}
             maxToRenderPerBatch={scrollCalendarRenderWindow}
             onScroll={handleScroll}
             ref={calendarListRef}
@@ -526,6 +502,10 @@ const styles = StyleSheet.create({
   calendarListMonth: {
     height: calendarMonthHeight,
     minHeight: calendarMonthHeight,
+  },
+  calendarListMonthGrid: {
+    height: calendarMonthGridHeight,
+    minHeight: calendarMonthGridHeight,
     paddingHorizontal: spacing.none,
   },
   scrollWeekdayColumn: {
@@ -567,7 +547,8 @@ function createThemedStyles(colors: ColorTokens) {
   return StyleSheet.create({
     scrollContainer: {
       flex: 1,
-      borderRadius: radii.md,
+      borderTopLeftRadius: radii.md,
+      borderTopRightRadius: radii.md,
       overflow: 'hidden',
       backgroundColor: colors.surface,
     },

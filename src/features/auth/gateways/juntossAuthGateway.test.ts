@@ -3,6 +3,7 @@ import {
   createJuntossAuthGateway,
   EmailVerificationRequiredError,
 } from '@/features/auth/gateways/juntossAuthGateway';
+import { AuthApiError } from '@/features/auth/utils/authError';
 import { authClient } from '@/lib/auth-client';
 import { unregisterCurrentDeviceFromInvitationPush } from '@/lib/notifications/invitationPushTokenStore';
 
@@ -74,6 +75,56 @@ describe('juntossAuthGateway', () => {
       email: 'ana@example.test',
       otp: '123456',
       password: 'nueva-contrasena',
+    });
+  });
+
+  it.each([
+    [
+      'INVALID_OTP',
+      'El código ingresado no es correcto. Revisa los dígitos e inténtalo de nuevo.',
+    ],
+    [
+      'OTP_EXPIRED',
+      'El código ha caducado. Solicita uno nuevo para continuar.',
+    ],
+    [
+      'TOO_MANY_ATTEMPTS',
+      'Has agotado los 3 intentos disponibles entre la verificación y el cambio de contraseña. Solicita un código nuevo para continuar.',
+    ],
+  ])(
+    'conserva el código %s y le asigna un mensaje específico',
+    async (code, message) => {
+      mockedClient.emailOtp.checkVerificationOtp.mockResolvedValueOnce({
+        data: null,
+        error: { code },
+      } as never);
+
+      const promise = createJuntossAuthGateway().verifyOtp({
+        email: 'ana@example.test',
+        purpose: 'recovery',
+        token: '123456',
+      });
+
+      await expect(promise).rejects.toBeInstanceOf(AuthApiError);
+      await expect(promise).rejects.toMatchObject({ code, message });
+    },
+  );
+
+  it('conserva también el código devuelto al cambiar la contraseña', async () => {
+    mockedClient.emailOtp.resetPassword.mockResolvedValueOnce({
+      data: null,
+      error: { error: { code: 'OTP_EXPIRED' } },
+    } as never);
+
+    await expect(
+      createJuntossAuthGateway().setNewPassword({
+        code: '123456',
+        email: 'ana@example.test',
+        password: 'nueva-contrasena',
+      }),
+    ).rejects.toMatchObject({
+      code: 'OTP_EXPIRED',
+      message: 'El código ha caducado. Solicita uno nuevo para continuar.',
     });
   });
 

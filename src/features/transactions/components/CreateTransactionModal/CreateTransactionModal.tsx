@@ -7,8 +7,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -20,6 +18,10 @@ import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
+import {
+  AmountKeypad,
+  operatorPresentation,
+} from '@/features/transactions/components/AmountKeypad/AmountKeypad';
 import { TransactionExchangePreview } from '@/features/exchangeRates/components/TransactionExchangePreview';
 import { useExchangePreview } from '@/features/exchangeRates/hooks/useExchangePreview';
 import type { VenezuelaCurrencyCode } from '@/features/exchangeRates/types';
@@ -38,6 +40,7 @@ import {
   formatAmountInputForDisplay,
   parseAmountMinor,
 } from '@/features/transactions/utils/transactionAmount';
+import { useAmountInputPulse } from '@/hooks/useAmountInputPulse';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { getLocalTodayKey } from '@/lib/date/localDate';
@@ -55,7 +58,6 @@ import {
   getCategoryContentContrast,
 } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
-import { motion } from '@/theme/motion';
 import { maxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -101,23 +103,6 @@ type CreateTransactionModalProps = {
 type PendingOperationStep = {
   valueMinor: number;
   operator: CalculatorOperator;
-};
-
-const keypadRows = [
-  ['7', '8', '9', 'divide'],
-  ['4', '5', '6', 'multiply'],
-  ['1', '2', '3', 'subtract'],
-  [',', '0', 'backspace', 'add'],
-] as const;
-
-const operatorPresentation: Record<
-  CalculatorOperator,
-  { label: string; symbol: string }
-> = {
-  divide: { label: 'Dividir', symbol: '÷' },
-  multiply: { label: 'Multiplicar', symbol: '×' },
-  subtract: { label: 'Restar', symbol: '−' },
-  add: { label: 'Sumar', symbol: '+' },
 };
 
 /** Referencia estable: un array literal en el valor por defecto se recrearía en cada render. */
@@ -188,9 +173,8 @@ export function CreateTransactionModal({
   const openedInitialEditor = useRef<TransactionEditorTarget | undefined>(
     undefined,
   );
-  const amountScale = useSharedValue(1);
-  const amountTranslateY = useSharedValue(0);
   const amountCursorOpacity = useSharedValue(1);
+  const { amountPulseStyle, pulseAmount } = useAmountInputPulse();
   const amountMinor = parseAmountMinor(amountInput);
   const recurrence = recurrenceOptions[recurrenceIndex] ?? defaultRecurrence;
   const isCalculationPending = pendingOperations.length > 0;
@@ -364,13 +348,6 @@ export function CreateTransactionModal({
     }
   }, [initialEditor, onOpenCategoryPicker, visible]);
 
-  const amountAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: amountTranslateY.value },
-      { scale: amountScale.value },
-    ],
-  }));
-
   const amountCursorAnimatedStyle = useAnimatedStyle(() => ({
     opacity: amountCursorOpacity.value,
   }));
@@ -396,38 +373,13 @@ export function CreateTransactionModal({
     );
   }, [amountCursorOpacity, isAmountEmpty, visible]);
 
-  const animateAmountInput = () => {
-    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
-    amountScale.value = withSequence(
-      withTiming(0.96, {
-        duration: motion.inputPulseDuration,
-        reduceMotion: ReduceMotion.System,
-      }),
-      withSpring(1, {
-        ...motion.disclosureSpring,
-        reduceMotion: ReduceMotion.System,
-      }),
-    );
-    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
-    amountTranslateY.value = withSequence(
-      withTiming(2, {
-        duration: motion.inputPulseDuration,
-        reduceMotion: ReduceMotion.System,
-      }),
-      withSpring(0, {
-        ...motion.disclosureSpring,
-        reduceMotion: ReduceMotion.System,
-      }),
-    );
-  };
-
   const handleDigit = (key: string) => {
     setHasEnteredAmount(true);
     setAmountInput((current) =>
       appendAmountKey(replaceAmount ? '0' : current, key),
     );
     setReplaceAmount(false);
-    animateAmountInput();
+    pulseAmount();
   };
 
   const handleOperator = (operator: CalculatorOperator) => {
@@ -437,7 +389,7 @@ export function CreateTransactionModal({
         next[next.length - 1] = { ...next[next.length - 1]!, operator };
         return next;
       });
-      animateAmountInput();
+      pulseAmount();
       return;
     }
 
@@ -446,7 +398,7 @@ export function CreateTransactionModal({
       { valueMinor: amountMinor, operator },
     ]);
     setReplaceAmount(true);
-    animateAmountInput();
+    pulseAmount();
   };
 
   const handleBackspace = () => {
@@ -458,14 +410,14 @@ export function CreateTransactionModal({
       setAmountInput(amountMinorToInput(lastOperation.valueMinor));
       setPendingOperations((current) => current.slice(0, -1));
       setReplaceAmount(false);
-      animateAmountInput();
+      pulseAmount();
       return;
     }
 
     setAmountInput((current) =>
       current.length <= 1 ? '0' : current.slice(0, -1),
     );
-    animateAmountInput();
+    pulseAmount();
   };
 
   const evaluateExpression = (): number => {
@@ -495,7 +447,7 @@ export function CreateTransactionModal({
     setAmountInput(amountMinorToInput(result));
     setPendingOperations([]);
     setReplaceAmount(true);
-    animateAmountInput();
+    pulseAmount();
   };
 
   const handleSubmit = () => {
@@ -669,7 +621,7 @@ export function CreateTransactionModal({
                   : `${displayAmount} ${currencyPluralName}`
             }
             accessibilityLiveRegion="polite"
-            style={[styles.amountArea, amountAnimatedStyle]}
+            style={[styles.amountArea, amountPulseStyle]}
             testID="transaction-amount"
           >
             {isAmountEmpty ? (
@@ -851,62 +803,11 @@ export function CreateTransactionModal({
             ) : null}
           </View>
 
-          <View style={styles.keypad}>
-            {keypadRows.map((row, rowIndex) => (
-              <View key={rowIndex} style={styles.keypadRow}>
-                {row.map((key) => {
-                  const isOperator = key in operatorPresentation;
-                  const presentation = isOperator
-                    ? operatorPresentation[key as CalculatorOperator]
-                    : null;
-                  return (
-                    <Pressable
-                      accessibilityLabel={
-                        presentation?.label ??
-                        (key === 'backspace' ? 'Borrar' : key)
-                      }
-                      accessibilityRole="button"
-                      key={key}
-                      onPress={() => {
-                        triggerHaptic('keypadPress');
-                        if (presentation) {
-                          handleOperator(key as CalculatorOperator);
-                        } else if (key === 'backspace') {
-                          handleBackspace();
-                        } else {
-                          handleDigit(key);
-                        }
-                      }}
-                      style={({ pressed }) => [
-                        styles.key,
-                        isOperator && styles.operatorKey,
-                        pressed && styles.keyPressed,
-                      ]}
-                    >
-                      {presentation ? (
-                        <Text tone="primary" variant="title" weight="medium">
-                          {presentation.symbol}
-                        </Text>
-                      ) : key === 'backspace' ? (
-                        <Ionicons
-                          color={colors.textPrimary}
-                          name="backspace-outline"
-                          size={iconSize.lg}
-                        />
-                      ) : (
-                        <Text
-                          variant={density === 'compact' ? 'heading' : 'title'}
-                          weight="medium"
-                        >
-                          {key}
-                        </Text>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))}
-          </View>
+          <AmountKeypad
+            onBackspace={handleBackspace}
+            onDigit={handleDigit}
+            onOperator={handleOperator}
+          />
 
           <View style={styles.footer}>
             <Pressable

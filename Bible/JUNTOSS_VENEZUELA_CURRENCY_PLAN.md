@@ -1691,3 +1691,99 @@ Consecuencias para el frontend:
   al guardar (sección 14): no hay nada adicional que hacer aquí por esta
   regla horaria, solo confirma por qué es importante no recalcular con la
   tasa "actual" en pantallas de detalle/histórico.
+
+---
+
+# 60. Herramienta de compra/venta de dólares
+
+> Entregada el 2026-09-22. Decisiones del responsable: sin enlace entre
+> movimientos, categoría automática y lote atómico con autoría de sesión.
+
+## 60.1 Qué es
+
+Una acción del menú de crear, «Comprar / vender dólares», visible solo con
+`venezuelaCurrencyMode`. Genera **dos movimientos normales** (gasto + ingreso,
+uno en VES y otro en USD) mediante `createLocalTransactions`, en una sola
+transacción SQLite. No existe un tipo `transfer`, ni `exchangeGroupId`, ni
+cambio de esquema o de contrato de sync.
+
+```text
+QuickCreateMenu ── currency-exchange ──▶ CurrencyExchangeModal
+                                              │
+                                   useTransactionSubmit.submitCurrencyExchange
+                                              │
+                                 gasto (VES|USD) + ingreso (USD|VES)
+```
+
+Código: `features/exchangeRates/components/CurrencyExchangeModal/`,
+`features/exchangeRates/hooks/useCurrencyExchangeForm.ts`,
+`features/exchangeRates/utils/currencyExchangeForm.ts` (reducer puro),
+`features/transactions/hooks/useTransactionSubmit.ts` y el teclado
+compartido `features/transactions/components/AmountKeypad/AmountKeypad.tsx`
+(el modal de movimiento lo usa con calculadora; este, solo con dígitos).
+
+Composición: bloque «Entregas <moneda>» (título + importe grande + botón de
+cuenta), flecha que intercambia los lados, bloque «Recibes <moneda>»,
+selector de fuente con el recuadro editable de la tasa, teclado y botón de
+guardar. Solo los bloques crecen (`flex: 1`), así que el teclado y el botón
+no se desplazan cuando aparece un aviso de tasa.
+
+Movimiento: la operación cambia al instante y los dos bloques arrancan
+dibujados en el sitio del otro, así que el recorrido los lleva de verdad a su
+posición nueva; el salto se mide con la colocación real de cada bloque, no con
+una distancia fija. Se atenúan al cruzarse para no solaparse y la flecha gira
+media vuelta con el mismo recorrido (`currencySwapDuration`). El importe que
+se escribe acusa cada tecla con el pulso compartido `useAmountInputPulse`, el
+mismo del modal de movimiento.
+
+## 60.2 Importes y tasa
+
+- Ancla y derivado con fuente oficial (`BCV`, `EURO`): el último importe
+  escrito es el ancla y el otro se deriva con `Math.round(usdMinor * rate)` o
+  `Math.round(vesMinor / rate)`. Escribir en el importe derivado no cambia la
+  fuente: ese campo pasa a ser el ancla y el otro se recalcula, porque calcular
+  cuántos dólares se compran con unos bolívares es tan normal como el camino
+  inverso.
+- Con `CUSTOM` mandan los importes: los dos se conservan tal como se escriben
+  y `customRateInput` pasa a ser la implícita (`getImpliedExchangeRate`), sin
+  obligar a escribir en el recuadro de la tasa. Solo se deriva el importe que
+  siga vacío; borrar uno no lo repone desde el otro y, sin ningún importe, la
+  tasa sugerida vuelve a cero en vez de dejar a la vista la implícita de lo que
+  se acaba de borrar. La misma regla aplica sin ninguna tasa utilizable, que es
+  cuando los dos importes son el único dato disponible. Editar el recuadro de la tasa
+  (`editCustomRate`) sí recalcula el derivado desde el ancla. Cambiar
+  comprar/vender no toca importes ni cuentas.
+- Fuentes: `BCV` y `EURO` salen de `useExchangeRates` (tasa del día, sección
+  59); `EURO` se aplica como Bs por USD igual que en el detalle de movimiento.
+  Las tres fuentes comparten el mismo recuadro editable: escribir sobre una
+  tasa oficial la convierte en `CUSTOM` partiendo del valor visible. `CUSTOM`
+  es un valor transitorio del formulario: no se guarda en
+  `/v1/exchange/custom-rates` ni envía `customRateId` (el modal de tasa
+  personalizada de las secciones 12-13 sigue pendiente y es independiente).
+- La fecha de observación de la tasa no se muestra aquí para no competir con
+  los importes; el detalle del movimiento sí enseña el snapshot congelado
+  (sección 20). Solo se explica lo excepcional: cargando, tasa no fresca o
+  sin tasa.
+- Sin tasa del backend (`error`) solo queda `CUSTOM`; en `loading` no se puede
+  guardar con una fuente oficial.
+- El cálculo en cliente es una sugerencia para la persona. Se guardan los
+  importes que confirma y el servidor sigue congelando `exchangeSnapshot` por
+  fila al sincronizar (sección 14): la app no envía tasas.
+
+## 60.3 Cuentas, categoría y contabilidad
+
+- Cuenta opcional por lado. Se reutiliza `TransactionMoneyAccountPickerModal`
+  y la misma regla que `handleTransactionSubmit`: si la cuenta no tiene la
+  divisa, `ensureCurrency` la añade con saldo cero. Es el comportamiento
+  vigente para cualquier movimiento VES con cuenta; la regla de saldo único
+  USD de la sección 0.2 depende de la Entrega E.
+- Categoría «Cambio de divisa» (`templateKey: 'currency-exchange'`), definida
+  en `currencyExchangeCategoryDefinition` fuera de las plantillas generales y
+  creada en el espacio la primera vez que se registra una operación.
+- Los dos movimientos cuentan en gastos e ingresos. En valor contable USD el
+  neto es cero a tasa BCV, o la diferencia frente a BCV con tasa personalizada.
+
+## 60.4 Fuera de alcance
+
+Editar o eliminar la operación como unidad, fecha o título editables,
+recurrencia, selector de categoría y creación de cuenta desde el modal.

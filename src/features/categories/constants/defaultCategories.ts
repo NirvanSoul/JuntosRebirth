@@ -99,6 +99,19 @@ export const defaultCategoryPages: readonly (readonly DefaultCategoryDefinition[
     ],
   ] as const;
 
+/**
+ * Categoría que reciben los dos movimientos de una compra o venta de dólares
+ * (Venezuela). Vive fuera de `defaultCategoryPages` a propósito: se crea sola
+ * la primera vez que se registra una operación y no se ofrece como plantilla
+ * al resto de países.
+ */
+export const currencyExchangeCategoryDefinition: DefaultCategoryDefinition = {
+  key: 'currency-exchange',
+  name: 'Cambio de divisa',
+  icon: 'coins',
+  colorToken: 'teal',
+};
+
 export function createDefaultCategoryInputForSpace(
   spaceId: string,
   definition: DefaultCategoryDefinition,

@@ -56,6 +56,8 @@ export type TransactionPeriodModalType = TransactionType | 'balance';
 
 type TransactionPeriodModalProps = {
   categories: readonly Category[];
+  initialCurrency?: CurrencyCode;
+  initialDate?: Date;
   onAdd: () => void;
   onClose: () => void;
   onOpenTransactionDetail?: (transactionId: string) => void;
@@ -66,6 +68,8 @@ type TransactionPeriodModalProps = {
 
 export function TransactionPeriodModal({
   categories,
+  initialCurrency,
+  initialDate,
   onAdd,
   onClose,
   onOpenTransactionDetail,
@@ -77,9 +81,11 @@ export function TransactionPeriodModal({
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const { venezuelaCurrencyMode } = useCurrencyCapabilities();
   const [period, setPeriod] = useState<TransactionPeriod>('month');
-  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState(() =>
+    initialDate ? new Date(initialDate) : new Date(),
+  );
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode | null>(
-    null,
+    initialCurrency ?? null,
   );
   const [valuationMode, setValuationMode] =
     useState<VenezuelaDisplayMode>('USD');
@@ -125,10 +131,13 @@ export function TransactionPeriodModal({
     () => listTransactionsByPeriod(typeTransactions, period, selectedDate),
     [period, selectedDate, typeTransactions],
   );
-  const availableCurrencies = useMemo(
-    () => getAvailableCurrencies(typeTransactions),
-    [typeTransactions],
-  );
+  const availableCurrencies = useMemo(() => {
+    const currencies = getAvailableCurrencies(typeTransactions);
+    if (!initialCurrency || currencies.includes(initialCurrency)) {
+      return currencies;
+    }
+    return [initialCurrency, ...currencies];
+  }, [initialCurrency, typeTransactions]);
   const hasMultipleCurrencies = availableCurrencies.length > 1;
   const effectiveCurrency: CurrencyCode = pickEffectiveCurrency(
     availableCurrencies,
@@ -238,10 +247,13 @@ export function TransactionPeriodModal({
         ? 'Añadir gasto'
         : 'Añadir movimiento';
 
-  if (useDepsChanged([visible]) && visible) {
+  if (
+    useDepsChanged([visible, initialCurrency, initialDate?.getTime()]) &&
+    visible
+  ) {
     setPeriod('month');
-    setSelectedDate(new Date());
-    setSelectedCurrency(null);
+    setSelectedDate(initialDate ? new Date(initialDate) : new Date());
+    setSelectedCurrency(initialCurrency ?? null);
     setCurrencyPickerVisible(false);
     setValuationMode('USD');
   }

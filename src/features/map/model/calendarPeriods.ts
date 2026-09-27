@@ -1,4 +1,7 @@
-import { minimumCalendarDate } from '@/lib/date/monthDistance';
+import {
+  getMonthStartAtOffset,
+  minimumCalendarDate,
+} from '@/lib/date/monthDistance';
 import { toLocalDateKey } from '@/lib/date/localDate';
 
 const millisecondsPerWeek = 7 * 24 * 60 * 60 * 1000;
@@ -50,6 +53,70 @@ export function getWeeksInCalendarRange(
   return Array.from({ length: weekCount }, (_, index) =>
     firstWeek.map((weekDate) => addCalendarDays(weekDate, index * 7)),
   );
+}
+
+export type MonthSeparatedCalendarWeek = readonly (string | null)[];
+
+export function getMonthSeparatedWeekStart(
+  week: MonthSeparatedCalendarWeek,
+): string | undefined {
+  return week.find((date): date is string => date !== null);
+}
+
+export function startsNewMonthSeparatedWeek(
+  weeks: readonly MonthSeparatedCalendarWeek[],
+  index: number,
+): boolean {
+  return (
+    index > 0 &&
+    getMonthSeparatedWeekStart(weeks[index]!)?.slice(0, 7) !==
+      getMonthSeparatedWeekStart(weeks[index - 1]!)?.slice(0, 7)
+  );
+}
+
+/**
+ * Mantiene la columna real de cada fecha, pero no une visualmente dos meses
+ * dentro de la misma semana. Así, un mes que empieza en jueves deja Lun-Mié
+ * vacíos y termina con sus propias celdas finales, sin arrastrar fechas del
+ * mes vecino.
+ */
+export function getMonthSeparatedWeeksInCalendarRange(
+  startDate: string,
+  endDate: string,
+): MonthSeparatedCalendarWeek[] {
+  const boundedStart =
+    startDate < minimumCalendarDate ? minimumCalendarDate : startDate;
+  const boundedEnd = endDate < boundedStart ? boundedStart : endDate;
+  const weeks: MonthSeparatedCalendarWeek[] = [];
+
+  for (
+    let monthStart = `${boundedStart.slice(0, 7)}-01`;
+    monthStart.slice(0, 7) <= boundedEnd.slice(0, 7);
+    monthStart = getMonthStartAtOffset(monthStart, 1)
+  ) {
+    const weekdayOffset = (parseCalendarDate(monthStart).getDay() + 6) % 7;
+    const daysInMonth = new Date(
+      Number(monthStart.slice(0, 4)),
+      Number(monthStart.slice(5, 7)),
+      0,
+      12,
+    ).getDate();
+    const cells: (string | null)[] = Array.from(
+      { length: weekdayOffset },
+      () => null,
+    );
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${monthStart.slice(0, 7)}-${String(day).padStart(2, '0')}`;
+      cells.push(date >= boundedStart && date <= boundedEnd ? date : null);
+    }
+    while (cells.length % 7 !== 0) cells.push(null);
+    for (let index = 0; index < cells.length; index += 7) {
+      weeks.push(cells.slice(index, index + 7));
+    }
+  }
+
+  return weeks;
 }
 
 function getMonthKey(date: string): string {

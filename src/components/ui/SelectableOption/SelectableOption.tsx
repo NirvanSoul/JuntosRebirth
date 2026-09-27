@@ -50,8 +50,7 @@ function createSelectableOptionStyles(
       paddingHorizontal: spacing.sm,
     },
     selectedOption: {
-      elevation: 0,
-      shadowOpacity: 0,
+      ...shadows.none,
     },
     disabledOption: {
       opacity: 0.56,

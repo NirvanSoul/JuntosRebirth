@@ -24,7 +24,9 @@ type MonthNavigatorProps = {
   onNext: () => void;
   onPrevious: () => void;
   previousAccessibilityLabel: string;
+  previousDisabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  testID?: string;
 };
 
 export function MonthNavigatorArrow({
@@ -63,17 +65,21 @@ export function MonthNavigator({
   onNext,
   onPrevious,
   previousAccessibilityLabel,
+  previousDisabled = false,
   style,
+  testID,
 }: MonthNavigatorProps) {
   return (
-    <View style={[styles.navigator, style]}>
+    <View style={[styles.navigator, style]} testID={testID}>
       <Pressable
         accessibilityLabel={previousAccessibilityLabel}
         accessibilityRole="button"
+        accessibilityState={{ disabled: previousDisabled }}
+        disabled={previousDisabled}
         onPress={onPrevious}
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
       >
-        <MonthNavigatorArrow direction="left" />
+        <MonthNavigatorArrow direction="left" disabled={previousDisabled} />
       </Pressable>
       <View style={styles.label}>
         <MonthNavigatorLabel label={label} />

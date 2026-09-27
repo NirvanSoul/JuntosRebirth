@@ -9,6 +9,7 @@ import {
   isValidPassword,
   minPasswordLength,
 } from '@/features/auth/utils/authValidation';
+import { getAuthErrorDisplayMessage } from '@/features/auth/utils/authError';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -63,10 +64,10 @@ export function ResetPasswordScreen({
     } catch (caught) {
       setState({
         step: 'error',
-        message:
-          caught instanceof Error
-            ? caught.message
-            : 'No pudimos actualizar tu contraseña.',
+        message: getAuthErrorDisplayMessage(
+          caught,
+          'No pudimos actualizar tu contraseña.',
+        ),
       });
     }
   };

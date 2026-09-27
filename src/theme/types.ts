@@ -1,3 +1,5 @@
+import type { ViewStyle } from 'react-native';
+
 export type ColorTokens = {
   background: string;
   surface: string;
@@ -29,26 +31,15 @@ export type AppearancePreference = 'light' | 'dark' | 'system';
 
 export type ColorScheme = 'light' | 'dark';
 
+export type ShadowStyle = Required<Pick<ViewStyle, 'boxShadow'>>;
+
 export type ThemeShadows = {
-  subtle: {
-    elevation: number;
-    shadowColor: string;
-    shadowOffset: { width: number; height: number };
-    shadowOpacity: number;
-    shadowRadius: number;
-  };
-  floatingAction: {
-    elevation: number;
-    shadowColor: string;
-    shadowOffset: { width: number; height: number };
-    shadowOpacity: number;
-    shadowRadius: number;
-  };
-  mainMenu: {
-    elevation: number;
-    shadowColor: string;
-    shadowOffset: { width: number; height: number };
-    shadowOpacity: number;
-    shadowRadius: number;
-  };
+  /** Sombra informativa de cards y controles en reposo. */
+  subtle: ShadowStyle;
+  /** Variante más marcada de `subtle` para controles destacados. */
+  raised: ShadowStyle;
+  floatingAction: ShadowStyle;
+  mainMenu: ShadowStyle;
+  /** Anula la sombra heredada (estados seleccionados, planos). */
+  none: ShadowStyle;
 };

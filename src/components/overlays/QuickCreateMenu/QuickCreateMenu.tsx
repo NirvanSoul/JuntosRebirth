@@ -15,6 +15,11 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 type QuickCreateMenuProps = {
   /** Acciones que se muestran para enseñar el menú, pero aún no se pueden usar. */
   disabledActionTypes?: readonly CreateActionType[];
+  /**
+   * Añade «Comprar / vender dólares». Solo tiene sentido con la capacidad
+   * Venezuela activa; el resto de usuarios no debe ver la acción.
+   */
+  showCurrencyExchange?: boolean;
   visible: boolean;
   onClose: () => void;
   onSelect: (action: CreateActionType) => void;
@@ -23,14 +28,31 @@ type QuickCreateMenuProps = {
 const actionIconSize = 48;
 const actionMinHeight = 76;
 
-function createActions(colors: ColorTokens): readonly {
+type QuickCreateAction = {
   type: CreateActionType;
   label: string;
   accessibilityLabel: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   backgroundColor: string;
-}[] {
+  /** Gira el icono 45° para las flechas diagonales del sistema de diseño. */
+  diagonalIcon?: boolean;
+};
+
+function createActions(
+  colors: ColorTokens,
+  showCurrencyExchange: boolean,
+): readonly QuickCreateAction[] {
+  const currencyExchangeAction: QuickCreateAction = {
+    type: 'currency-exchange',
+    label: 'Comprar / vender dólares',
+    accessibilityLabel: 'Comprar o vender dólares',
+    icon: 'swap-vertical-outline',
+    color: colors.onBrand,
+    backgroundColor: colors.cta,
+    diagonalIcon: true,
+  };
+
   return [
     {
       type: 'income',
@@ -39,6 +61,7 @@ function createActions(colors: ColorTokens): readonly {
       icon: 'arrow-up',
       color: colors.onBrand,
       backgroundColor: colors.incomeSoft,
+      diagonalIcon: true,
     },
     {
       type: 'expense',
@@ -47,6 +70,7 @@ function createActions(colors: ColorTokens): readonly {
       icon: 'arrow-down',
       color: colors.onBrand,
       backgroundColor: colors.expenseSoft,
+      diagonalIcon: true,
     },
     {
       type: 'category',
@@ -56,18 +80,20 @@ function createActions(colors: ColorTokens): readonly {
       color: colors.onBrand,
       backgroundColor: colors.categoryAction,
     },
+    ...(showCurrencyExchange ? [currencyExchangeAction] : []),
   ];
 }
 
 export function QuickCreateMenu({
   disabledActionTypes = [],
+  showCurrencyExchange = false,
   visible,
   onClose,
   onSelect,
 }: QuickCreateMenuProps) {
   const { colors, colorScheme, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
-  const actions = createActions(colors);
+  const actions = createActions(colors, showCurrencyExchange);
 
   return (
     <AppModal
@@ -118,11 +144,7 @@ export function QuickCreateMenu({
               testID={`quick-create-${action.type}-icon-background`}
             >
               <View
-                style={
-                  action.type === 'income' || action.type === 'expense'
-                    ? styles.diagonalArrow
-                    : undefined
-                }
+                style={action.diagonalIcon ? styles.diagonalArrow : undefined}
               >
                 <Ionicons
                   color={action.color}
