@@ -4,6 +4,7 @@
     "slug": "juntoss",
     "scheme": "juntoss",
     "version": "0.1.0",
+    "icon": "./assets/icons/App Icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {

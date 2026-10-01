@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { AssetSvgIcon } from '@/components/icons/AssetSvgIcon';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
@@ -28,6 +29,9 @@ type LoginState =
   | { step: 'idle' }
   | { step: 'submitting' }
   | { step: 'error'; message: string };
+
+const loginLogoWidth = 200;
+const loginLogoHeight = loginLogoWidth / (1698 / 1131);
 
 export function LoginScreen({
   onNavigateToForgotPassword,
@@ -80,6 +84,21 @@ export function LoginScreen({
 
   return (
     <View style={styles.container}>
+      <View
+        accessibilityLabel="Juntos"
+        accessibilityRole="image"
+        accessible
+        style={styles.logoContainer}
+        testID="login-logo"
+      >
+        <AssetSvgIcon
+          height={loginLogoHeight}
+          size={loginLogoWidth}
+          source={require('../../../../assets/icons/Juntos Logo.svg')}
+          width={loginLogoWidth}
+        />
+      </View>
+
       <AuthTextField
         autoComplete="email"
         editable={!isSubmitting}
@@ -161,6 +180,7 @@ export function LoginScreen({
 function createStyles() {
   return StyleSheet.create({
     container: { gap: spacing.lg },
+    logoContainer: { alignItems: 'center' },
     linkButton: {
       minHeight: layout.minTouchTarget,
       alignItems: 'center',

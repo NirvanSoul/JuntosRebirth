@@ -5,12 +5,20 @@ import { SvgXml } from 'react-native-svg';
 
 type AssetSvgIconProps = {
   color?: string;
+  height?: number;
   size: number;
   source: ImageSourcePropType;
+  width?: number;
 };
 
 /** Renderiza y adapta al tema un SVG local empaquetado por Metro. */
-export function AssetSvgIcon({ color, size, source }: AssetSvgIconProps) {
+export function AssetSvgIcon({
+  color,
+  size,
+  source,
+  height = size,
+  width = size,
+}: AssetSvgIconProps) {
   const uri = Image.resolveAssetSource(source).uri;
   const [xml, setXml] = useState<string | null>(null);
 
@@ -35,5 +43,5 @@ export function AssetSvgIcon({ color, size, source }: AssetSvgIconProps) {
     };
   }, [uri]);
 
-  return <SvgXml color={color} height={size} width={size} xml={xml} />;
+  return <SvgXml color={color} height={height} width={width} xml={xml} />;
 }

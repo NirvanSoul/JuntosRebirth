@@ -106,4 +106,21 @@ describe('LoginScreen — Google', () => {
       signUp.parent?.parent?.children.indexOf(signUp.parent) ?? Infinity,
     );
   });
+
+  it('muestra el logo completo de Juntos sobre el formulario', async () => {
+    await renderWithTheme(<LoginScreen onSuccess={jest.fn()} />);
+
+    const logo = screen.getByTestId('login-logo');
+    const emailField = screen.getByTestId('login-email');
+    expect(logo.props).toEqual(
+      expect.objectContaining({
+        accessibilityLabel: 'Juntos',
+        accessibilityRole: 'image',
+      }),
+    );
+    const emailFieldContainer = emailField.parent ?? emailField;
+    expect(logo.parent?.children.indexOf(logo)).toBeLessThan(
+      logo.parent?.children.indexOf(emailFieldContainer) ?? Infinity,
+    );
+  });
 });
