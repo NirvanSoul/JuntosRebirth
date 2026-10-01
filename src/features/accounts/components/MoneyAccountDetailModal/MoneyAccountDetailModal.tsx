@@ -18,7 +18,6 @@ import type { MoneyAccount } from '@/features/accounts/types';
 import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
 import {
   computeCombinedAccountBalance,
-  computeEffectiveAccountBalance,
   extractRatesFromTransactions,
 } from '@/features/accounts/utils/moneyAccountValuation';
 import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
@@ -66,7 +65,10 @@ export function MoneyAccountDetailModal({
   visible,
 }: MoneyAccountDetailModalProps) {
   const { colors } = useTheme();
-  const { venezuelaCurrencyMode } = useCurrencyCapabilities();
+  const { multiRateMovementDisplay, venezuelaCurrencyMode } =
+    useCurrencyCapabilities();
+  const canDisplayVenezuelaRates =
+    multiRateMovementDisplay && venezuelaCurrencyMode;
   const styles = useThemedStyles((palette) => createStyles(palette));
   const [isDeletePanelVisible, setDeletePanelVisible] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export function MoneyAccountDetailModal({
     selectedCurrencyTransactions,
   );
   const hasHistoricalValuation =
-    historicalValuation.availableSources.length > 0;
+    canDisplayVenezuelaRates && historicalValuation.availableSources.length > 0;
   const bcvSummary = useMemo(
     () =>
       hasHistoricalValuation
@@ -121,7 +123,9 @@ export function MoneyAccountDetailModal({
     [hasHistoricalValuation, selectedCurrencyTransactions],
   );
 
-  const exchangeRatesState = useExchangeRates({ enabled: visible });
+  const exchangeRatesState = useExchangeRates({
+    enabled: visible && canDisplayVenezuelaRates,
+  });
   const apiRates =
     exchangeRatesState.status === 'success' ||
     exchangeRatesState.status === 'stale'
@@ -150,11 +154,6 @@ export function MoneyAccountDetailModal({
     [apiRates, snapshotRates],
   );
 
-  const hasValuation =
-    venezuelaCurrencyMode ||
-    hasHistoricalValuation ||
-    effectiveRates.bcvRate !== null;
-
   if (!account || !summary || !selectedBalance) return null;
 
   const effective = venezuelaCurrencyMode
@@ -165,13 +164,12 @@ export function MoneyAccountDetailModal({
         mode: valuationMode,
         rates: effectiveRates,
       })
-    : computeEffectiveAccountBalance({
-        balance: selectedBalance,
-        bcvSummary,
-        eurSummary,
-        mode: valuationMode,
-        rates: effectiveRates,
-      });
+    : {
+        balanceMinor: selectedBalance.balanceMinor,
+        currency: selectedBalance.currency,
+        expenseMinor: selectedBalance.expenseMinor,
+        incomeMinor: selectedBalance.incomeMinor,
+      };
 
   const effectiveCurrency = effective.currency;
   const effectiveBalanceMinor = effective.balanceMinor;
@@ -250,7 +248,7 @@ export function MoneyAccountDetailModal({
             />
           ) : null}
 
-          {hasValuation ? (
+          {canDisplayVenezuelaRates ? (
             <VenezuelaDisplayModeSelector
               hideLabel
               indicatorColor={accountColor}

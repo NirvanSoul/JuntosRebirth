@@ -8,6 +8,7 @@ import type {
   Category,
   CategoryEditorTarget,
 } from '@/features/categories/types';
+import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
 import type { Space } from '@/features/spaces/types';
 import type { SessionTransaction } from '@/features/transactions/types';
@@ -20,6 +21,7 @@ import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCap
 import { spacing } from '@/theme/spacing';
 
 jest.mock('@/features/profile/hooks/useCurrencyCapabilities');
+jest.mock('@/features/exchangeRates/hooks/useExchangeRates');
 
 jest.mock('@/features/legal/services/authenticatedUser', () => ({
   getAuthenticatedUserId: jest.fn(async () => 'uuid-ana'),
@@ -133,6 +135,7 @@ function ClosableDetail({
 
 describe('CategoryDetailModal', () => {
   beforeEach(() => {
+    jest.mocked(useExchangeRates).mockReturnValue({ status: 'loading' });
     jest.mocked(useCurrencyCapabilities).mockReturnValue({
       accountingCurrency: undefined,
       allowedTransactionInputCurrencies: undefined,
@@ -143,6 +146,51 @@ describe('CategoryDetailModal', () => {
       multiRateMovementDisplay: false,
     });
   });
+
+  it('oculta los modos BCV para España aunque haya tasas disponibles', async () => {
+    jest.mocked(useCurrencyCapabilities).mockReturnValue({
+      accountingCurrency: undefined,
+      allowedTransactionInputCurrencies: undefined,
+      allowsMultipleAccountCurrencies: true,
+      countryCode: 'ES',
+      venezuelaCurrencyMode: false,
+      customExchangeRate: false,
+      multiRateMovementDisplay: false,
+    });
+    jest.mocked(useExchangeRates).mockReturnValue({
+      status: 'success',
+      rates: {
+        ratesUpdatedAt: '2026-09-24T10:00:00.000Z',
+        stale: false,
+        rates: {
+          BCV: {
+            baseCurrency: 'USD',
+            fetchedAt: '2026-09-24T10:00:00.000Z',
+            observedAt: '2026-09-24T10:00:00.000Z',
+            quoteCurrency: 'VES',
+            rate: '850',
+            source: 'BCV',
+          },
+          EURO: {
+            baseCurrency: 'EUR',
+            fetchedAt: '2026-09-24T10:00:00.000Z',
+            observedAt: '2026-09-24T10:00:00.000Z',
+            quoteCurrency: 'VES',
+            rate: '950',
+            source: 'EURO',
+          },
+        },
+      },
+    });
+
+    const screen = await render(<ClosableDetail />);
+
+    expect(useExchangeRates).toHaveBeenCalledWith({ enabled: false });
+    expect(screen.queryByTestId('category-historical-valuation')).toBeNull();
+    expect(screen.getByText('Gastos')).toBeTruthy();
+    expect(screen.getAllByText(/18,90/).length).toBeGreaterThan(0);
+  });
+
   it('muestra el autor y filtra los movimientos de un espacio juntos', async () => {
     const ownTransaction = {
       ...transaction,

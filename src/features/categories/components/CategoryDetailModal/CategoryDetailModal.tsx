@@ -93,7 +93,9 @@ export function CategoryDetailModal({
   visible,
 }: CategoryDetailModalProps) {
   const { colors, shadows } = useTheme();
-  const { venezuelaCurrencyMode } = useCurrencyCapabilities();
+  const currencyCapabilities = useCurrencyCapabilities();
+  const isVenezuela = currencyCapabilities.venezuelaCurrencyMode;
+  const showRates = currencyCapabilities.multiRateMovementDisplay;
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const membership = useSpaceMembership();
   const [panel, setPanel] = useState<DetailPanel>(null);
@@ -138,7 +140,7 @@ export function CategoryDetailModal({
     membership,
     selectedCurrency,
     transactions,
-    venezuelaCurrencyMode,
+    venezuelaCurrencyMode: isVenezuela,
   });
   const summary = useMemo(
     () =>
@@ -151,7 +153,9 @@ export function CategoryDetailModal({
         : undefined,
     [authorFilteredTransactions, category, selectedCurrency],
   );
-  const exchangeRatesState = useExchangeRates({ enabled: visible });
+  const exchangeRatesState = useExchangeRates({
+    enabled: visible && showRates,
+  });
   const apiRates =
     exchangeRatesState.status === 'success' ||
     exchangeRatesState.status === 'stale'
@@ -173,7 +177,6 @@ export function CategoryDetailModal({
     ? Number(apiRates.EURO.rate)
     : fallbackRates.eurRate;
 
-  const hasValuation = venezuelaCurrencyMode || bcvRate !== null;
   const budgetExpenseMinor = useMemo(() => {
     if (!category) return 0;
     return listTransactionsThroughCurrentMonth(transactions)
@@ -225,21 +228,14 @@ export function CategoryDetailModal({
     mode: valuationMode,
     selectedCurrency,
     transactions: categoryTransactions,
-    venezuelaCurrencyMode,
+    venezuelaCurrencyMode: isVenezuela,
   });
-  const effectiveExpenseMinor = metrics.expenseMinor;
-  const effectiveIncomeMinor = metrics.incomeMinor;
-  const effectiveCurrency = metrics.currency;
   const expense = formatCurrency(
-    effectiveExpenseMinor,
-    effectiveCurrency,
+    metrics.expenseMinor,
+    metrics.currency,
     'es-ES',
   );
-  const income = formatCurrency(
-    effectiveIncomeMinor,
-    effectiveCurrency,
-    'es-ES',
-  );
+  const income = formatCurrency(metrics.incomeMinor, metrics.currency, 'es-ES');
   const budget = category.budgetMinor
     ? formatCurrency(category.budgetMinor, spaceCurrency, 'es-ES')
     : null;
@@ -340,7 +336,7 @@ export function CategoryDetailModal({
               />
             ) : null}
 
-            {!venezuelaCurrencyMode && detailCurrencies.length > 1 ? (
+            {!isVenezuela && detailCurrencies.length > 1 ? (
               <SegmentedControl
                 onChange={setSelectedCurrency}
                 options={detailCurrencies.map((currency) => ({
@@ -353,7 +349,7 @@ export function CategoryDetailModal({
               />
             ) : null}
 
-            {hasValuation ? (
+            {showRates ? (
               <VenezuelaDisplayModeSelector
                 hideLabel
                 indicatorColor={categoryColors[category.colorToken]}
@@ -366,9 +362,9 @@ export function CategoryDetailModal({
 
             <CategoryTransactionMetrics
               expense={expense}
-              expenseMinor={effectiveExpenseMinor}
+              expenseMinor={metrics.expenseMinor}
               income={income}
-              incomeMinor={effectiveIncomeMinor}
+              incomeMinor={metrics.incomeMinor}
             />
 
             <Pressable

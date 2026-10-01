@@ -5,13 +5,15 @@ import { StyleSheet } from 'react-native';
 import { MoneyAccountDetailModal } from '@/features/accounts/components/MoneyAccountDetailModal/MoneyAccountDetailModal';
 import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
-import type { SessionTransaction } from '@/features/transactions/types';
+import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
+import type { SessionTransaction } from '@/features/transactions/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 
 jest.mock('@/features/profile/hooks/useCurrencyCapabilities');
+jest.mock('@/features/exchangeRates/hooks/useExchangeRates');
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
   AppModal: ({
@@ -103,6 +105,7 @@ async function renderModal(
 
 describe('MoneyAccountDetailModal', () => {
   beforeEach(() => {
+    jest.mocked(useExchangeRates).mockReturnValue({ status: 'loading' });
     jest.mocked(useCurrencyCapabilities).mockReturnValue({
       accountingCurrency: undefined,
       allowedTransactionInputCurrencies: undefined,
@@ -113,6 +116,45 @@ describe('MoneyAccountDetailModal', () => {
       multiRateMovementDisplay: false,
     });
   });
+
+  it('oculta los modos y conserva el saldo original para una cuenta VES de un perfil de España', async () => {
+    const bolivarAccount: MoneyAccount = {
+      ...account,
+      balances: [{ currency: 'VES', openingBalanceMinor: 100_000 }],
+    };
+    const bolivarTransaction: SessionTransaction = {
+      ...transactions[0]!,
+      amountMinor: 2_500,
+      currency: 'VES',
+      exchangeSnapshot: {
+        countryCode: 'VE',
+        createdWithCurrency: 'VES',
+        rates: {
+          BCV: {
+            baseCurrency: 'USD',
+            quoteCurrency: 'VES',
+            rate: '50',
+            convertedAmountMinor: 2_500,
+            convertedCurrency: 'VES',
+            observedAt: '2026-09-05T04:00:00.000Z',
+          },
+        },
+      },
+    };
+
+    const screen = await renderModal({
+      account: bolivarAccount,
+      transactions: [bolivarTransaction],
+    });
+
+    expect(useExchangeRates).toHaveBeenCalledWith({ enabled: false });
+    expect(
+      screen.queryByTestId('money-account-historical-valuation'),
+    ).toBeNull();
+    expect(screen.getByText('Balance VES')).toBeTruthy();
+    expect(screen.getByText('Gastos VES')).toBeTruthy();
+  });
+
   it('muestra los movimientos convertidos como un valor histórico separado del balance', async () => {
     jest.mocked(useCurrencyCapabilities).mockReturnValue({
       accountingCurrency: 'USD',
