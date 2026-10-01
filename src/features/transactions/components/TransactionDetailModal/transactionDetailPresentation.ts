@@ -2,6 +2,7 @@ import type {
   SessionTransaction,
   TransactionRecurrence,
 } from '@/features/transactions/types';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 
 /**
  * El servidor congela las tasas aplicables de un movimiento de Venezuela. Solo
@@ -12,6 +13,18 @@ export function hasVenezuelaExchangeSnapshot(
 ): boolean {
   const rates = transaction.exchangeSnapshot?.rates;
   return rates !== undefined && rates !== null && Object.keys(rates).length > 0;
+}
+
+/** Habilita las lecturas BCV solo para el contexto de país Venezuela activo. */
+export function useCanDisplayVenezuelaRates(
+  transaction: SessionTransaction | null,
+): boolean {
+  const { multiRateMovementDisplay } = useCurrencyCapabilities();
+  return Boolean(
+    transaction &&
+    multiRateMovementDisplay &&
+    hasVenezuelaExchangeSnapshot(transaction),
+  );
 }
 
 export const transactionRecurrenceLabels: Record<

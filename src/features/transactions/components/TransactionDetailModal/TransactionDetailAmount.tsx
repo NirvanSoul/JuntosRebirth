@@ -16,7 +16,7 @@ import { createStyles } from './TransactionDetailModal.styles';
 
 type TransactionDetailAmountProps = {
   /** Divisa en la que se lee el importe; no altera el guardado. */
-  mode: VenezuelaDisplayMode;
+  mode?: VenezuelaDisplayMode;
   onPress: () => void;
   transaction: SessionTransaction;
 };
@@ -58,15 +58,16 @@ export function TransactionDetailAmount({
   const eurRateNumber =
     Number(snapshotEur?.rate) > 0 ? Number(snapshotEur?.rate) : null;
 
-  const displayValue = transaction.exchangeSnapshot
-    ? getVenezuelaDisplayValue({
-        accountingAmountMinorUsd: transaction.accountingAmountMinorUsd,
-        amountMinor: transaction.amountMinor,
-        currency: transaction.currency,
-        exchangeSnapshot: transaction.exchangeSnapshot,
-        mode,
-      })
-    : null;
+  const displayValue =
+    mode && transaction.exchangeSnapshot
+      ? getVenezuelaDisplayValue({
+          accountingAmountMinorUsd: transaction.accountingAmountMinorUsd,
+          amountMinor: transaction.amountMinor,
+          currency: transaction.currency,
+          exchangeSnapshot: transaction.exchangeSnapshot,
+          mode,
+        })
+      : null;
 
   const effectiveAmountMinor =
     displayValue?.amountMinor ?? transaction.amountMinor;
@@ -79,6 +80,8 @@ export function TransactionDetailAmount({
   );
 
   const rateFooterInfo = useMemo(() => {
+    if (!mode) return null;
+
     const rawDate =
       mode === 'EUR'
         ? (snapshotEur?.observedAt ?? transaction.occurredOn)

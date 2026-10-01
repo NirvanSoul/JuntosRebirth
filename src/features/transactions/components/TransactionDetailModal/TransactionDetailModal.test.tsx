@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { Category } from '@/features/categories/types';
 import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
+import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { TransactionDetailModal } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { createProjectedTransactionId } from '@/features/transactions/utils/transactionRecurrence';
@@ -14,6 +15,7 @@ import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
 
 jest.mock('@/features/exchangeRates/hooks/useExchangeRates');
+jest.mock('@/features/profile/hooks/useCurrencyCapabilities');
 
 const category: Category = {
   id: 'food',
@@ -43,9 +45,39 @@ const transaction: SessionTransaction = {
   updatedAt: '2026-07-30T12:00:00.000Z',
 };
 
+const bolivarTransaction: SessionTransaction = {
+  ...transaction,
+  accountingAmountMinorUsd: 1_000,
+  amountMinor: 50_000,
+  currency: 'VES',
+  exchangeSnapshot: {
+    countryCode: 'VE',
+    createdWithCurrency: 'VES',
+    rates: {
+      BCV: {
+        baseCurrency: 'USD',
+        quoteCurrency: 'VES',
+        rate: '50',
+        convertedAmountMinor: 50_000,
+        convertedCurrency: 'VES',
+        observedAt: '2026-09-05T04:00:00.000Z',
+      },
+    },
+  },
+};
+
 describe('TransactionDetailModal', () => {
   beforeEach(() => {
     jest.mocked(useExchangeRates).mockReturnValue({ status: 'loading' });
+    jest.mocked(useCurrencyCapabilities).mockReturnValue({
+      accountingCurrency: undefined,
+      allowedTransactionInputCurrencies: undefined,
+      allowsMultipleAccountCurrencies: true,
+      countryCode: 'ES',
+      venezuelaCurrencyMode: false,
+      customExchangeRate: false,
+      multiRateMovementDisplay: false,
+    });
   });
 
   it('conserva el importe y la divisa de un movimiento europeo aunque haya tasas venezolanas disponibles', async () => {
@@ -110,6 +142,43 @@ describe('TransactionDetailModal', () => {
     expect(
       screen.getByTestId('transaction-detail-rate-badge').props.children,
     ).toBe('220 €');
+  });
+
+  it('oculta los modos y conserva el importe original para un perfil de España aunque exista snapshot VE', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={bolivarTransaction}
+            transactions={[bolivarTransaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(
+      screen.queryByTestId('transaction-detail-display-mode-selector'),
+    ).toBeNull();
+    expect(
+      screen.getByTestId('transaction-detail-rate-badge').props.children,
+    ).toBe('Bs. 500');
+    expect(screen.queryByTestId('transaction-detail-rate-footer')).toBeNull();
   });
 
   it('cierra desde el botón de la barra fija, por encima del scroll', async () => {
@@ -676,6 +745,15 @@ describe('TransactionDetailModal', () => {
     });
 
     it('muestra el selector Dolar, $ BCV y € BCV y actualiza el importe', async () => {
+      jest.mocked(useCurrencyCapabilities).mockReturnValue({
+        accountingCurrency: 'USD',
+        allowedTransactionInputCurrencies: ['USD', 'VES'],
+        allowsMultipleAccountCurrencies: false,
+        countryCode: 'VE',
+        venezuelaCurrencyMode: true,
+        customExchangeRate: true,
+        multiRateMovementDisplay: true,
+      });
       const venezuelaTransaction: SessionTransaction = {
         ...transaction,
         amountMinor: 1_000,

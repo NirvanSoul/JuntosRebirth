@@ -27,8 +27,8 @@ import { createStyles } from '@/features/transactions/components/TransactionDeta
 import {
   formatTransactionDetailDate,
   getNextRecurrenceLabel,
-  hasVenezuelaExchangeSnapshot,
   transactionRecurrenceLabels,
+  useCanDisplayVenezuelaRates,
 } from '@/features/transactions/components/TransactionDetailModal/transactionDetailPresentation';
 import { TransactionDetailAmount } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailAmount';
 import { TransactionDetailSecondaryActions } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailSecondaryActions';
@@ -131,6 +131,7 @@ export function TransactionDetailModal({
     useState<VenezuelaDisplayMode>('USD');
   const modalBottomInset = useAppModalBottomInset();
   const author = useTransactionAuthor(transaction?.createdBy ?? '');
+  const canDisplayVenezuelaRates = useCanDisplayVenezuelaRates(transaction);
 
   if (useDepsChanged([transaction, visible]) && visible) {
     setSpacePickerVisible(false);
@@ -151,7 +152,6 @@ export function TransactionDetailModal({
 
   if (!transaction) return null;
 
-  const hasExchangeSnapshot = hasVenezuelaExchangeSnapshot(transaction);
   const title = transaction.title.trim() || category?.name || 'Movimiento';
   const openCategory = () => category && onOpenCategoryDetail?.(category.id);
   const isProjected = parseProjectedTransactionId(transaction.id) !== null;
@@ -268,7 +268,7 @@ export function TransactionDetailModal({
               </Pressable>
             </View>
 
-            {hasExchangeSnapshot ? (
+            {canDisplayVenezuelaRates ? (
               <VenezuelaDisplayModeSelector
                 hideLabel
                 indicatorColor={
@@ -296,7 +296,7 @@ export function TransactionDetailModal({
             ) : null}
 
             <TransactionDetailAmount
-              mode={valuationMode}
+              mode={canDisplayVenezuelaRates ? valuationMode : undefined}
               onPress={() => onEdit(transaction.id)}
               transaction={transaction}
             />
