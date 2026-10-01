@@ -194,7 +194,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       alignItems: 'center',
       gap: spacing.md,
       borderRadius: radii.md,
-      backgroundColor: colors.modalBackground,
+      backgroundColor: colors.surface,
       padding: spacing.md,
     },
     actionLight: {
