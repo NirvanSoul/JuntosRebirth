@@ -293,7 +293,7 @@ describe('juntossAuthGateway', () => {
     ],
     [
       'UNTRUSTED_ORIGIN',
-      'Esta versión de la app no está autorizada para crear cuentas. Actualízala o usa la development build de Juntoss.',
+      'Esta versión de la app no está autorizada para crear cuentas. Actualízala o usa la development build de Juntos.',
     ],
   ])(
     'explica el fallo de registro %s sin mostrar el detalle técnico',

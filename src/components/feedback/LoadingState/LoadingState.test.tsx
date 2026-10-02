@@ -21,6 +21,9 @@ it('monta el contenido solo al estar listo, sin esperar al final de la animació
     </LoadingState>,
   );
   expect(screen.getByRole('progressbar')).toBeTruthy();
+  expect(screen.getByRole('progressbar').props.accessibilityLabel).toBe(
+    'Cargando Juntos',
+  );
   expect(onMount).not.toHaveBeenCalled();
 
   await screen.rerender(

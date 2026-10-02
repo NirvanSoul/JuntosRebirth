@@ -950,7 +950,7 @@ export function ImportScreen({
         {phase.kind === 'complete' ? (
           <View style={styles.body}>
             <Text tone="cta" variant="body">
-              Tus movimientos ya están en juntoss.
+              Tus movimientos ya están en Juntos.
             </Text>
             <ModalPrimaryAction
               accessibilityLabel="Listo"

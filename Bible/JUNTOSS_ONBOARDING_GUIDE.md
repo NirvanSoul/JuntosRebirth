@@ -2,7 +2,7 @@
 
 ## 1. Objetivo
 
-Esta guía define el sistema de onboarding, la pantalla de acceso autenticado y la primera llegada a Inicio de `juntoss`.
+Esta guía define el sistema de onboarding, la pantalla de acceso autenticado y la primera llegada a Inicio de Juntos.
 
 El onboarding debe sentirse:
 
@@ -16,7 +16,7 @@ El onboarding debe sentirse:
 Principio central:
 
 > La cuenta y la verificación de correo protegen desde el inicio los datos que
-> el usuario verá y guardará en juntoss.
+> el usuario verá y guardará en Juntos.
 
 ---
 
@@ -53,7 +53,7 @@ Recomendación:
 
 ## Objetivo
 
-Explicar qué hace juntoss y dejar claro que no es una aplicación financiera complicada.
+Explicar qué hace Juntos y dejar claro que no es una aplicación financiera complicada.
 
 ## Concepto visual
 
@@ -111,15 +111,15 @@ Elegir una moneda principal sin pedir datos financieros ni crear una cuenta.
 
 ## Concepto visual
 
-Preguntar «¿Desde dónde usarás juntoss?» con un campo de texto. No se muestra
+Preguntar «¿Desde dónde usarás Juntos?» con un campo de texto. No se muestra
 ningún país hasta que la persona escribe; a medida que introduce letras, se
 ofrecen opciones con nombres similares. Cada opción indica su moneda y, al
 seleccionarla, esta se guarda como predeterminada para movimientos nuevos.
 
 ## Opciones de título
 
-1. **¿Desde dónde usarás juntoss?**
-2. **¿En qué país usas juntoss?**
+1. **¿Desde dónde usarás Juntos?**
+2. **¿En qué país usas Juntos?**
 3. **Empecemos por tu país**
 
 ## Opciones de subtítulo
@@ -130,7 +130,7 @@ seleccionarla, esta se guarda como predeterminada para movimientos nuevos.
 
 ## Combinación implementada
 
-**¿Desde dónde usarás juntoss?**
+**¿Desde dónde usarás Juntos?**
 Escribe el nombre de tu país y te mostraremos opciones similares.
 
 ---
@@ -139,7 +139,7 @@ Escribe el nombre de tu país y te mostraremos opciones similares.
 
 ## Objetivo
 
-Presentar uno de los principales diferenciadores de juntoss: visualizar los movimientos en el tiempo.
+Presentar uno de los principales diferenciadores de Juntos: visualizar los movimientos en el tiempo.
 
 ## Concepto visual
 
@@ -446,7 +446,7 @@ Permitir:
 
 ## Jerarquía recomendada
 
-1. Logo o nombre de juntoss.
+1. Logo o nombre de Juntos.
 2. Título.
 3. Subtítulo.
 4. Botón principal.
@@ -469,7 +469,7 @@ con el teclado.
 
 ## Opciones de título
 
-1. **Empieza con juntoss**
+1. **Empieza con Juntos**
 2. **Todo listo para comenzar**
 3. **Organiza tu dinero a tu manera**
 4. **Entra y mantén tus finanzas claras**
@@ -511,7 +511,7 @@ Opciones:
 
 - **Ya tengo cuenta**
 - Iniciar sesión
-- ¿Ya usas juntoss? Inicia sesión.
+- ¿Ya usas Juntos? Inicia sesión.
 - Entrar con mi cuenta
 
 Recomendación visual:
@@ -564,7 +564,7 @@ del contexto monetario correcto.
 
 1. **¿Cómo quieres que te llamemos?**
 2. Antes de empezar, dinos tu nombre.
-3. Hagamos juntoss un poco más tuyo.
+3. Hagamos Juntos un poco más tuyo.
 4. ¿Cuál es tu nombre?
 
 ## Opciones de subtítulo
@@ -608,7 +608,7 @@ Después del onboarding, Inicio no debe sentirse vacío ni abandonado.
 ## Opciones de saludo
 
 - Hola, `{{name}}`.
-- Bienvenido a juntoss.
+- Bienvenido a Juntos.
 - Empecemos por tu primer movimiento.
 - Todo listo para organizarte.
 - Tu espacio personal ya está preparado.
@@ -656,7 +656,7 @@ Evitar una única acción ambigua como “Añadir”.
 
 # 16. Tono de marca
 
-La voz de juntoss debe ser:
+La voz de Juntos debe ser:
 
 - Cercana.
 - Serena.
@@ -814,7 +814,7 @@ Registra ingresos y gastos en segundos y entiende cuánto tienes disponible.
 
 ### Pantalla 2
 
-**¿Desde dónde usarás juntoss?**
+**¿Desde dónde usarás Juntos?**
 Escribe tu país y elige una de las sugerencias para configurar tu moneda principal.
 
 ### Pantalla 3
@@ -829,7 +829,7 @@ Mantén tus finanzas personales separadas y organiza los gastos compartidos con 
 
 ### Acceso
 
-**Empieza con juntoss**  
+**Empieza con Juntos**
 Crea una cuenta para guardar y sincronizar tu información.
 
 - Empezar gratis.
@@ -902,7 +902,7 @@ Cambia de espacio sin mezclar tus finanzas.
 
 ### Acceso
 
-**Bienvenido a juntoss**
+**Bienvenido a Juntos**
 
 - Crear cuenta.
 - Iniciar sesión.
@@ -937,7 +937,7 @@ Comparte gastos con tu pareja y conserva lo personal en tu propio espacio.
 
 ## Pantalla de acceso
 
-**Empieza con juntoss**  
+**Empieza con Juntos**
 Crea una cuenta para guardar y sincronizar tu información.
 
 Acciones:
@@ -970,6 +970,6 @@ Microtexto:
 
 # 25. Regla final
 
-> El onboarding de juntoss no debe enseñar toda la aplicación. Debe hacer que el usuario quiera descubrirla.
+> El onboarding de Juntos no debe enseñar toda la aplicación. Debe hacer que el usuario quiera descubrirla.
 
 La claridad, la confianza y la posibilidad de probar antes de registrarse tienen prioridad sobre la cantidad de información mostrada.

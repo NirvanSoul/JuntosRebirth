@@ -307,7 +307,7 @@ describe('ImportScreen', () => {
       canonicalCategoryKey: 'groceries',
     });
     expect(
-      await screen.findByText('Tus movimientos ya están en juntoss.'),
+      await screen.findByText('Tus movimientos ya están en Juntos.'),
     ).toBeTruthy();
     expect(onImportComplete).toHaveBeenCalled();
   });

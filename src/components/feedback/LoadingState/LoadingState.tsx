@@ -31,7 +31,7 @@ type LoadingStateProps = {
 export function LoadingState({
   children,
   loading = true,
-  label = 'Cargando juntoss',
+  label = 'Cargando Juntos',
   testID = 'app-loading',
 }: LoadingStateProps) {
   const styles = useThemedStyles(createStyles);

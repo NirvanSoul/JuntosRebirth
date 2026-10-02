@@ -238,7 +238,7 @@ const dailyTemplates: readonly NotificationTemplate[] = [
     id: 'daily_engagement_09',
     type: 'daily',
     title: 'Organizarte sigue siendo sencillo',
-    body: 'Añade tus movimientos en juntoss.',
+    body: 'Añade tus movimientos en Juntos.',
     requiredVariables: [],
   },
   {

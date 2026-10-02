@@ -910,7 +910,7 @@ Principios:
 - La invitación se dirige exclusivamente al correo de una cuenta existente;
   la app no genera enlaces manuales para compartir.
 - Si el correo no tiene cuenta, no se crea la invitación y quien invita debe
-  pedir a esa persona que descargue Juntoss y se registre con ese correo.
+  pedir a esa persona que descargue Juntos y se registre con ese correo.
 - Sin una invitación activa, «Espacio de pareja» muestra el formulario de
   correo integrado en Inicio: conserva la cabecera global y las acciones
   flotantes, no añade una flecha ni una cabecera secundaria, y presenta la

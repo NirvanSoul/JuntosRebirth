@@ -182,7 +182,7 @@ describe('SettingsScreen', () => {
       StyleSheet.flatten(screen.getByTestId('settings-back-icon').props.style)
         .color,
     ).toBe(colors.textPrimary);
-    expect(screen.getByText('juntoss 0.1.0')).toBeTruthy();
+    expect(screen.getByText('Juntos 0.1.0')).toBeTruthy();
   });
 
   it('explica una opción pendiente', async () => {

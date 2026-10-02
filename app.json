@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "juntoss",
+    "name": "Juntos",
     "slug": "juntoss",
     "scheme": "juntoss",
     "version": "0.1.0",
@@ -53,8 +53,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Juntoss necesita acceso a tus fotos para que elijas una imagen de perfil.",
-          "cameraPermission": "Juntoss necesita acceso a la cámara para tomar tu foto de perfil.",
+          "photosPermission": "Juntos necesita acceso a tus fotos para que elijas una imagen de perfil.",
+          "cameraPermission": "Juntos necesita acceso a la cámara para tomar tu foto de perfil.",
           "microphonePermission": false
         }
       ],

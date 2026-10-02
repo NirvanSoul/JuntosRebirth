@@ -115,8 +115,9 @@ describe('RootNavigator', () => {
   it('espera las fuentes sin mostrar texto ni abrir la cuenta prematuramente', async () => {
     const screen = await renderWithTheme(<RootNavigator fontsReady={false} />);
 
-    expect(screen.getByRole('progressbar')).toBeTruthy();
-    expect(screen.queryByText('Abriendo juntoss')).toBeNull();
+    expect(screen.getByRole('progressbar').props.accessibilityLabel).toBe(
+      'Cargando Juntos',
+    );
     expect(screen.queryByText('pestañas')).toBeNull();
 
     await screen.rerender(<RootNavigator fontsReady />);

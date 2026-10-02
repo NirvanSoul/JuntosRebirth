@@ -80,7 +80,7 @@ export function InvitationPushRegistration() {
         if (!isMounted || alreadyPrompted) return;
         Alert.alert(
           'Activa las notificaciones',
-          'Juntoss puede avisarte cuando alguien te invite a compartir un espacio. No mostraremos datos financieros en la pantalla bloqueada.',
+          'Juntos puede avisarte cuando alguien te invite a compartir un espacio. No mostraremos datos financieros en la pantalla bloqueada.',
           [
             {
               style: 'cancel',

@@ -165,7 +165,7 @@ export function VerifyCodeScreen({
           ¡Cuenta creada!
         </Text>
         <Text style={styles.successSubtitle} tone="secondary" variant="label">
-          Ya puedes empezar a usar Juntoss.
+          Ya puedes empezar a usar Juntos.
         </Text>
         <ModalPrimaryAction
           accessibilityLabel="Continuar"

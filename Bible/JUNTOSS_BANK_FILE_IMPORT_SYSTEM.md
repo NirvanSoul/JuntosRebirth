@@ -1853,7 +1853,7 @@ Encontramos los movimientos, pero necesitamos confirmar algunos datos.
 
 **Todo listo**
 
-Tus movimientos ya están en juntoss.
+Tus movimientos ya están en Juntos.
 
 ---
 

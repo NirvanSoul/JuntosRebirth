@@ -2,7 +2,7 @@
 
 ## 1. Propósito
 
-Este documento define las plantillas, el tono y las reglas de implementación de las notificaciones de `juntoss`.
+Este documento define las plantillas, el tono y las reglas de implementación de las notificaciones de Juntos.
 
 La aplicación utiliza cuatro tipos de notificaciones:
 
@@ -14,7 +14,7 @@ La aplicación utiliza cuatro tipos de notificaciones:
 ### Compatibilidad con Expo Go
 
 En Android, Expo Go no admite notificaciones push remotas desde SDK 53. Para
-que el entorno de desarrollo siga siendo utilizable, Juntoss no carga el
+que el entorno de desarrollo siga siendo utilizable, Juntos no carga el
 módulo de notificaciones cuando se ejecuta dentro de Expo Go: no programa
 recordatorios ni registra tokens de invitación. Estas funciones se habilitan
 en una development build o en la aplicación distribuida.
@@ -66,7 +66,7 @@ Todas las notificaciones deben cumplir estas reglas:
 | `{{amount}}` | Importe formateado | 42,90 € |
 | `{{date}}` | Fecha formateada | 12 de agosto |
 | `{{userName}}` | Nombre del usuario | Alan |
-| `{{appName}}` | Nombre de la aplicación | juntoss |
+| `{{appName}}` | Nombre de la aplicación | Juntos |
 
 ### Reglas para variables opcionales
 
@@ -92,7 +92,7 @@ Deben utilizar el icono de la categoría del ingreso.
 
 ### Recordatorios diarios de la aplicación
 
-Deben utilizar el logo de `juntoss`.
+Deben utilizar el logo de Juntos.
 
 ### Limitaciones de plataforma
 
@@ -277,7 +277,7 @@ Frecuencia:
 ## Plantilla 9
 
 **Título:** Organizarte sigue siendo sencillo  
-**Texto:** Añade tus movimientos en juntoss.
+**Texto:** Añade tus movimientos en Juntos.
 
 ## Plantilla 10
 
@@ -317,7 +317,7 @@ Las invitaciones son remotas, no programadas localmente. La invitación
 persistida en `space_invitations` sigue siendo la autoridad y debe aparecer en
 Inicio aunque Expo, APNs o FCM no puedan mostrar el push.
 
-**Título:** Nueva invitación en Juntoss
+**Título:** Nueva invitación en Juntos
 
 **Texto:** Te invitaron a compartir un espacio. Abre la app para responder.
 
@@ -404,7 +404,7 @@ Debe existir una opción para ocultar importes o detalles sensibles en la pantal
 Ejemplo privado:
 
 **Título:** Tienes un movimiento pendiente  
-**Texto:** Abre juntoss para revisar los detalles.
+**Texto:** Abre Juntos para revisar los detalles.
 
 ---
 
@@ -585,6 +585,6 @@ La interpolación debe:
 
 ## 19. Regla final
 
-> Una notificación de juntoss debe ayudar al usuario a recordar algo importante, no recordarle que la aplicación quiere su atención.
+> Una notificación de Juntos debe ayudar al usuario a recordar algo importante, no recordarle que la aplicación quiere su atención.
 
 La utilidad, la claridad y el respeto por el usuario tienen prioridad sobre la frecuencia de apertura.

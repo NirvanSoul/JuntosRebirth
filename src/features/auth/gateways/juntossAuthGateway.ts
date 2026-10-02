@@ -131,7 +131,7 @@ function describeAuthError(error: ApiError, fallback: string): string {
     case 'UNTRUSTED_ORIGIN':
     case 'INVALID_ORIGIN':
     case 'FORBIDDEN':
-      return 'Esta versión de la app no está autorizada para crear cuentas. Actualízala o usa la development build de Juntoss.';
+      return 'Esta versión de la app no está autorizada para crear cuentas. Actualízala o usa la development build de Juntos.';
     case 'FAILED_TO_CREATE_USER':
       return 'No pudimos guardar tu cuenta en el servidor. No se ha creado: inténtalo de nuevo en unos minutos.';
     case 'INTERNAL_SERVER_ERROR':

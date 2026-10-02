@@ -63,7 +63,7 @@ export function ProfileHeader() {
 
     Alert.alert(
       'Foto de perfil',
-      'Para elegir una imagen, Juntoss necesita acceder a tus fotos o a la cámara. Se usará solo como tu foto de perfil.',
+      'Para elegir una imagen, Juntos necesita acceder a tus fotos o a la cámara. Se usará solo como tu foto de perfil.',
       options,
     );
   };

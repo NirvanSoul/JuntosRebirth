@@ -34,7 +34,7 @@ export type ApiEnvironment = {
 export function getApiEnvironment(url: string | undefined): ApiEnvironment {
   if (!url) {
     throw new Error(
-      'Configura EXPO_PUBLIC_API_URL para conectar Juntoss con su API.',
+      'Configura EXPO_PUBLIC_API_URL para conectar Juntos con su API.',
     );
   }
 

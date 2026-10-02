@@ -261,7 +261,7 @@ export function AcceptInvitationScreen({
             </Text>
             <Text tone="secondary" variant="body">
               {preview.inviterDisplayName} te invitó a compartir &quot;
-              {preview.spaceName}&quot; en Juntoss.
+              {preview.spaceName}&quot; en Juntos.
             </Text>
 
             {acceptState.status === 'error' ? (
@@ -309,7 +309,7 @@ export function AcceptInvitationScreen({
           </Text>
           <Text tone="secondary" variant="body">
             {preview.inviterDisplayName} te invitó a compartir &quot;
-            {preview.spaceName}&quot; en Juntoss.
+            {preview.spaceName}&quot; en Juntos.
             {preview.invitedEmailMasked
               ? ` Invitado como ${preview.invitedEmailMasked}.`
               : ''}

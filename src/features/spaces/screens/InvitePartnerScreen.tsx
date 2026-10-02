@@ -116,7 +116,7 @@ export function InvitePartnerScreen({
             <View style={styles.copy}>
               <Text variant="title">¿A quién quieres invitar?</Text>
               <Text tone="secondary" variant="body">
-                Escribe el correo asociado a su cuenta de Juntoss.
+                Escribe el correo asociado a su cuenta de Juntos.
               </Text>
             </View>
             <AuthTextField
@@ -184,7 +184,7 @@ export function InvitePartnerScreen({
                 ¡Invitación enviada!
               </Text>
               <Text align="center" tone="secondary" variant="body">
-                La invitación ya está dentro de Juntoss. También recibirá un
+                La invitación ya está dentro de Juntos. También recibirá un
                 aviso si tiene las notificaciones activadas.
               </Text>
             </View>
@@ -212,7 +212,7 @@ export function InvitePartnerScreen({
                 No encontramos esa cuenta
               </Text>
               <Text align="center" tone="secondary" variant="body">
-                Revisa el correo. Si esa persona todavía no usa Juntoss, pídele
+                Revisa el correo. Si esa persona todavía no usa Juntos, pídele
                 que descargue la app y cree una cuenta antes de volver a
                 intentarlo.
               </Text>

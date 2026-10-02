@@ -525,7 +525,7 @@ export function SettingsScreen({
             />
 
             <Text align="center" tone="muted" variant="caption">
-              juntoss 0.1.0
+              Juntos 0.1.0
             </Text>
           </ScrollView>
         </View>
