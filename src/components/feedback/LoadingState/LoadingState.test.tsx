@@ -26,8 +26,8 @@ it('monta el contenido solo al estar listo, sin esperar al final de la animació
   expect(
     screen.getByTestId('app-loading-logo-image', {
       includeHiddenElements: true,
-    }),
-  ).toBeTruthy();
+    }).props.width,
+  ).toBe(144);
   expect(loadingTrack.parent).toBe(loadingLogo.parent);
   expect(loadingTrack.parent?.children.indexOf(loadingTrack)).toBeLessThan(
     loadingLogo.parent?.children.indexOf(loadingLogo) ?? Infinity,

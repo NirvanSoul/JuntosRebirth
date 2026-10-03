@@ -21,6 +21,7 @@ describe('createLoadingProgress', () => {
     const { progress, controller } = createProgress();
     controller.begin();
     expect(progress.value).toBe(0.92);
+    controller.release();
     controller.complete();
     expect(progress.value).toBe(1);
     controller.begin();
@@ -34,6 +35,20 @@ describe('createLoadingProgress', () => {
     controller.release();
     controller.begin();
     expect(progress.value).toBe(0.5);
+  });
+
+  it('no reinicia la barra cuando dos etapas de carga se solapan', () => {
+    const { progress, controller } = createProgress();
+    controller.begin();
+    progress.value = 0.5;
+    controller.begin();
+    expect(progress.value).toBe(0.5);
+    controller.release();
+    controller.complete();
+    expect(progress.value).toBe(0.5);
+    controller.release();
+    controller.complete();
+    expect(progress.value).toBe(1);
   });
 
   it('vuelve a empezar si nadie toma el relevo de inmediato', async () => {

@@ -42,11 +42,13 @@ export function createLoadingProgress(
   progress: SharedValue<number>,
 ): LoadingProgress {
   let handoffPending = false;
+  let activeLoaders = 0;
   return {
     progress,
     begin: () => {
-      const continued = handoffPending;
+      const continued = handoffPending || activeLoaders > 0;
       handoffPending = false;
+      activeLoaders += 1;
       if (!continued) progress.value = 0;
       if (progress.value !== 0) return;
       progress.value = withSequence(
@@ -63,6 +65,8 @@ export function createLoadingProgress(
       );
     },
     complete: () => {
+      if (activeLoaders > 0) return;
+      handoffPending = false;
       progress.value = withTiming(1, {
         duration: motion.loadingCompletionDuration,
         easing: Easing.out(Easing.cubic),
@@ -70,6 +74,8 @@ export function createLoadingProgress(
       });
     },
     release: () => {
+      activeLoaders = Math.max(0, activeLoaders - 1);
+      if (activeLoaders > 0) return;
       handoffPending = true;
       // Los efectos de montaje del mismo commit corren antes que esta microtarea.
       void Promise.resolve().then(() => {

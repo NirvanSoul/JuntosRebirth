@@ -19,7 +19,7 @@ import type { ColorTokens } from '@/theme/types';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const TRACK_WIDTH = 200;
-const LOGO_WIDTH = 188;
+const LOGO_WIDTH = 144;
 
 type LoadingStateProps = {
   children?: ReactNode;
