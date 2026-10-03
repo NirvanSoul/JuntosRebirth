@@ -26,20 +26,34 @@ type CurrencyFormatter = (
   options?: FormatCurrencyOptions,
 ) => string;
 
-type CurrencySymbolPreferenceContextValue = {
+export type CurrencySymbolPreferenceContextValue = {
   formatCurrency: CurrencyFormatter;
   showCurrencySymbols: boolean;
   setShowCurrencySymbols: (show: boolean) => Promise<void>;
 };
 
-const defaultContextValue: CurrencySymbolPreferenceContextValue = {
-  formatCurrency: formatCurrencyValue,
-  showCurrencySymbols: defaultCurrencySymbolPreference.showCurrencySymbols,
-  setShowCurrencySymbols: async () => undefined,
-};
+export const defaultCurrencySymbolPreferenceContextValue: CurrencySymbolPreferenceContextValue =
+  {
+    formatCurrency: formatCurrencyValue,
+    showCurrencySymbols: defaultCurrencySymbolPreference.showCurrencySymbols,
+    setShowCurrencySymbols: async () => undefined,
+  };
 
 const CurrencySymbolPreferenceContext =
-  createContext<CurrencySymbolPreferenceContextValue>(defaultContextValue);
+  createContext<CurrencySymbolPreferenceContextValue>(
+    defaultCurrencySymbolPreferenceContextValue,
+  );
+
+export function CurrencySymbolPreferenceScope({
+  children,
+  value,
+}: PropsWithChildren<{ value: CurrencySymbolPreferenceContextValue }>) {
+  return (
+    <CurrencySymbolPreferenceContext.Provider value={value}>
+      {children}
+    </CurrencySymbolPreferenceContext.Provider>
+  );
+}
 
 type CurrencySymbolPreferenceProviderProps = PropsWithChildren<{
   accountId: string;
@@ -99,9 +113,9 @@ export function CurrencySymbolPreferenceProvider({
   if (!isReady) return null;
 
   return (
-    <CurrencySymbolPreferenceContext.Provider value={value}>
+    <CurrencySymbolPreferenceScope value={value}>
       {children}
-    </CurrencySymbolPreferenceContext.Provider>
+    </CurrencySymbolPreferenceScope>
   );
 }
 

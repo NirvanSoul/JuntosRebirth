@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { type ReactNode, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -6,6 +7,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
+import {
+  CurrencySymbolPreferenceProvider,
+  useCurrencySymbolPreference,
+} from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
+import { saveCurrencySymbolPreference } from '@/state/appPreferences/currencySymbolPreferenceRepository';
 
 let latestOnDismiss: (() => void) | null = null;
 let mockLatestPresent = jest.fn();
@@ -14,6 +20,12 @@ let latestBackdropDisappearsOnIndex: number | undefined;
 jest.mock('@gorhom/bottom-sheet', () => {
   const React = jest.requireActual('react');
   const { View } = jest.requireActual('react-native');
+  const {
+    CurrencySymbolPreferenceScope,
+    defaultCurrencySymbolPreferenceContextValue,
+  } = jest.requireActual(
+    '@/state/appPreferences/CurrencySymbolPreferenceProvider',
+  );
 
   const BottomSheetModal = React.forwardRef(
     (
@@ -38,10 +50,14 @@ jest.mock('@gorhom/bottom-sheet', () => {
         dismiss: jest.fn(),
       }));
       return (
-        <View style={backgroundStyle} testID="bottom-sheet">
-          {backdropComponent?.({})}
-          {children}
-        </View>
+        <CurrencySymbolPreferenceScope
+          value={defaultCurrencySymbolPreferenceContextValue}
+        >
+          <View style={backgroundStyle} testID="bottom-sheet">
+            {backdropComponent?.({})}
+            {children}
+          </View>
+        </CurrencySymbolPreferenceScope>
       );
     },
   );
@@ -64,6 +80,11 @@ jest.mock('@gorhom/bottom-sheet', () => {
 });
 
 jest.mock('expo-blur', () => ({ BlurView: () => null }));
+
+function ModalCurrencyAmount() {
+  const { formatCurrency } = useCurrencySymbolPreference();
+  return <Text>{formatCurrency(100_000, 'EUR', 'es-ES')}</Text>;
+}
 
 function Harness({
   backgroundVariant,
@@ -112,6 +133,7 @@ describe('AppModal', () => {
     latestOnDismiss = null;
     mockLatestPresent = jest.fn();
     latestBackdropDisappearsOnIndex = undefined;
+    return AsyncStorage.clear();
   });
 
   it('presenta la hoja inmediatamente cuando cambia a visible', async () => {
@@ -141,6 +163,31 @@ describe('AppModal', () => {
     await render(<Harness onCloseSpy={jest.fn()} />);
 
     expect(latestBackdropDisappearsOnIndex).toBe(-0.99);
+  });
+
+  it('conserva la preferencia de símbolos dentro del portal del modal', async () => {
+    await saveCurrencySymbolPreference('account-1', {
+      showCurrencySymbols: false,
+    });
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CurrencySymbolPreferenceProvider accountId="account-1">
+            <AppModal onClose={jest.fn()} visible>
+              <ModalCurrencyAmount />
+            </AppModal>
+          </CurrencySymbolPreferenceProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(await screen.findByText('1.000')).toBeTruthy();
+    expect(screen.queryByText(/€/)).toBeNull();
   });
 
   it('no queda cerrado si se reabre antes de que termine la animación de cierre previa', async () => {

@@ -11,6 +11,10 @@ import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
+import {
+  CurrencySymbolPreferenceScope,
+  useCurrencySymbolPreference,
+} from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import type { ColorTokens } from '@/theme/types';
@@ -75,6 +79,7 @@ export function AppModal({
   stackBehavior = 'replace',
   testID,
 }: AppModalProps) {
+  const currencySymbolPreference = useCurrencySymbolPreference();
   const modalRef = useRef<BottomSheetModal>(null);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -194,18 +199,22 @@ export function AppModal({
     catalogContentHeight !== null && { height: catalogContentHeight },
   ];
   const innerContent = (
-    <View
-      style={[
-        hasFixedHeight && styles.fixedInnerContent,
-        {
-          paddingHorizontal: layout.screenGutter[density],
-          paddingBottom: extendContentIntoBottomInset ? 0 : modalBottomPadding,
-        },
-      ]}
-      testID={testID ? `${testID}-content` : undefined}
-    >
-      {isContentVisible ? children : null}
-    </View>
+    <CurrencySymbolPreferenceScope value={currencySymbolPreference}>
+      <View
+        style={[
+          hasFixedHeight && styles.fixedInnerContent,
+          {
+            paddingHorizontal: layout.screenGutter[density],
+            paddingBottom: extendContentIntoBottomInset
+              ? 0
+              : modalBottomPadding,
+          },
+        ]}
+        testID={testID ? `${testID}-content` : undefined}
+      >
+        {isContentVisible ? children : null}
+      </View>
+    </CurrencySymbolPreferenceScope>
   );
 
   return (
