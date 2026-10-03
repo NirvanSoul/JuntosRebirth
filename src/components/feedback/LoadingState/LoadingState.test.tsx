@@ -21,7 +21,17 @@ it('monta el contenido solo al estar listo, sin esperar al final de la animació
     </LoadingState>,
   );
   expect(screen.getByRole('progressbar')).toBeTruthy();
-  expect(screen.getByTestId('app-loading-logo')).toBeTruthy();
+  const loadingTrack = screen.getByTestId('app-loading-track');
+  const loadingLogo = screen.getByTestId('app-loading-logo');
+  expect(
+    screen.getByTestId('app-loading-logo-image', {
+      includeHiddenElements: true,
+    }),
+  ).toBeTruthy();
+  expect(loadingTrack.parent).toBe(loadingLogo.parent);
+  expect(loadingTrack.parent?.children.indexOf(loadingTrack)).toBeLessThan(
+    loadingLogo.parent?.children.indexOf(loadingLogo) ?? Infinity,
+  );
   expect(screen.getByRole('progressbar').props.accessibilityLabel).toBe(
     'Cargando Juntos',
   );
