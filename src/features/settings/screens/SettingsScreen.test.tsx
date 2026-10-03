@@ -124,6 +124,7 @@ describe('SettingsScreen', () => {
     }
 
     expect(screen.getByTestId('pending-Idioma')).toBeTruthy();
+    expect(screen.getByTestId('currency-symbols-toggle')).toBeTruthy();
     expect(screen.queryByText('Gestionar espacios')).toBeNull();
     expect(screen.queryByText('Borrar mis datos')).toBeNull();
     expect(screen.queryByText('Cómo funciona Juntos')).toBeNull();

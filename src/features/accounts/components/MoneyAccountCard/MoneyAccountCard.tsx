@@ -8,7 +8,7 @@ import {
   type MoneyAccountSummary,
 } from '@/features/accounts/utils/moneyAccountSummary';
 import { calculatePeriodComparison } from '@/features/transactions/utils/periodComparison';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -37,6 +37,7 @@ export function MoneyAccountCard({
   bordered = false,
   onPress,
 }: MoneyAccountCardProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors, shadows } = useTheme();
   const themedStyles = useThemedStyles((palette) =>
     createThemedStyles(palette, shadows),

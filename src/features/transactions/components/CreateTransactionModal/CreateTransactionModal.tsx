@@ -26,6 +26,7 @@ import { TransactionExchangePreview } from '@/features/exchangeRates/components/
 import { useExchangePreview } from '@/features/exchangeRates/hooks/useExchangePreview';
 import type { VenezuelaCurrencyCode } from '@/features/exchangeRates/types';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { createStyles } from '@/features/transactions/components/CreateTransactionModal/CreateTransactionModal.styles';
 import type {
   CreateTransactionDraft,
@@ -134,6 +135,7 @@ export function CreateTransactionModal({
   type,
   visible,
 }: CreateTransactionModalProps) {
+  const { showCurrencySymbols } = useCurrencySymbolPreference();
   const density = useLayoutDensity();
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) =>
@@ -602,7 +604,7 @@ export function CreateTransactionModal({
                   variant="subheading"
                   weight="regular"
                 >
-                  {shouldUseVenezuelaCurrencySelector
+                  {shouldUseVenezuelaCurrencySelector && showCurrencySymbols
                     ? currency === 'VES'
                       ? 'Bs'
                       : currencySymbol
@@ -668,7 +670,8 @@ export function CreateTransactionModal({
                   })}
                   {showCurrentOperand ? (
                     <>
-                      {currencySymbolPosition === 'before' ? (
+                      {showCurrencySymbols &&
+                      currencySymbolPosition === 'before' ? (
                         <Text
                           testID="transaction-amount-currency"
                           tone={transactionTone}
@@ -679,7 +682,8 @@ export function CreateTransactionModal({
                         </Text>
                       ) : null}
                       {formatAmountInputForDisplay(amountInput)}
-                      {currencySymbolPosition === 'after' ? (
+                      {showCurrencySymbols &&
+                      currencySymbolPosition === 'after' ? (
                         <Text
                           testID="transaction-amount-currency"
                           tone={transactionTone}

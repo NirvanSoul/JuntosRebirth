@@ -37,7 +37,7 @@ import {
   defaultCurrencyCode,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 import { getStartupEntering } from '@/theme/transitions';
@@ -100,6 +100,7 @@ export function HomeScreen({
   topContent,
   transactions = [],
 }: HomeScreenProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors } = useTheme();
   const density = useLayoutDensity();
   const scrollRef = useRef<ScrollView>(null);

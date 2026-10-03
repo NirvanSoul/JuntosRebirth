@@ -5,7 +5,7 @@ import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type { Category } from '@/features/categories/types';
 import type { ImportedTransactionCandidate } from '@/features/import/types';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { defaultCurrencyCode } from '@/lib/currency/currencyCatalog';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
@@ -40,6 +40,7 @@ export function ImportRow({
   onPressCategory,
   onToggleSelected,
 }: ImportRowProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const isExactDuplicate = candidate.duplicateStatus === 'exact';

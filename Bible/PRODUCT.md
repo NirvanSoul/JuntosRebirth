@@ -573,6 +573,11 @@ Reúne:
 - Estado local de los datos, importación, exportación y privacidad.
 - Ayuda, soporte, política de privacidad y versión de la aplicación.
 
+La preferencia «Símbolos de moneda» pertenece al perfil y se conserva en el
+dispositivo. Al desactivarla, todos los importes visibles muestran únicamente
+el número formateado; no cambia la moneda del movimiento, sus cálculos, filtros
+ni datos sincronizados. Está activada por defecto.
+
 Mientras una capacidad todavía no esté implementada, su fila permanece visible
 para validar la arquitectura de la pantalla, muestra un punto rojo junto a la
 acción y comunica al tocarla que está pendiente. Las acciones operativas no

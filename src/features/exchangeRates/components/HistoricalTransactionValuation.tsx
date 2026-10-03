@@ -4,7 +4,7 @@ import { Text } from '@/components/ui/Text/Text';
 import { RateSourceSelector } from '@/features/exchangeRates/components/RateSourceSelector';
 import type { HistoricalTransactionSummary } from '@/features/exchangeRates/utils/transactionSnapshot';
 import type { ExchangeRateSource } from '@/lib/currency/exchangeRateSource';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
@@ -82,6 +82,7 @@ function Value({
   summary: HistoricalTransactionSummary;
   value: number;
 }) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   return (
     <View style={styles.value}>
       <Text tone="secondary" variant="caption">

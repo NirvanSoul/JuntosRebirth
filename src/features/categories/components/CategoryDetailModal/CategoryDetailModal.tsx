@@ -46,7 +46,7 @@ import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
@@ -92,6 +92,7 @@ export function CategoryDetailModal({
   transactions,
   visible,
 }: CategoryDetailModalProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors, shadows } = useTheme();
   const currencyCapabilities = useCurrencyCapabilities();
   const isVenezuela = currencyCapabilities.venezuelaCurrencyMode;

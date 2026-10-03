@@ -7,7 +7,7 @@ import {
   getPrimaryBalance,
   type MoneyAccountSummary,
 } from '@/features/accounts/utils/moneyAccountSummary';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import {
   categoryColors,
   getCategoryContentContrast,
@@ -23,6 +23,7 @@ type MoneyAccountRowProps = {
 };
 
 export function MoneyAccountRow({ account, onPress }: MoneyAccountRowProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const styles = useThemedStyles(createStyles);
   const accountColor = categoryColors[account.colorToken];
   const contentContrast = getCategoryContentContrast(account.colorToken);

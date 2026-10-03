@@ -12,7 +12,7 @@ import { CategoryIcon } from '@/features/categories/components/CategoryIcon/Cate
 import { CategoryAmountSwitcher } from '@/features/categories/components/CategoryPreviewCard/CategoryAmountSwitcher';
 import type { CategoryIconName } from '@/features/categories/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import {
   categoryColors,
   type CategoryColorToken,
@@ -67,6 +67,7 @@ export function CategoryTile({
   testID = 'category-preview-card',
   variant = 'tile',
 }: CategoryTileProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors, shadows } = useTheme();
   const themedStyles = useThemedStyles((palette) =>
     createThemedStyles(palette, shadows),

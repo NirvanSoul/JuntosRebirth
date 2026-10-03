@@ -1,4 +1,7 @@
-import { getVenezuelaDisplayValue } from './venezuelaDisplayMode';
+import {
+  getHistoricalRateDescription,
+  getVenezuelaDisplayValue,
+} from './venezuelaDisplayMode';
 
 const snapshot = {
   countryCode: 'VE' as const,
@@ -96,5 +99,22 @@ describe('getVenezuelaDisplayValue', () => {
         mode: 'VES_BCV',
       }),
     ).toBeNull();
+  });
+
+  it('describe la tasa histórica solo con números cuando se ocultan los símbolos', () => {
+    const displayValue = getVenezuelaDisplayValue({
+      amountMinor: 1_000,
+      currency: 'USD',
+      exchangeSnapshot: snapshot,
+      mode: 'VES_BCV',
+    });
+
+    expect(displayValue).not.toBeNull();
+    expect(getHistoricalRateDescription(displayValue!, false)).toContain(
+      '50,00',
+    );
+    expect(getHistoricalRateDescription(displayValue!, false)).not.toMatch(
+      /\$|Bs\.|USD|VES/,
+    );
   });
 });

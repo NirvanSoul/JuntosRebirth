@@ -44,7 +44,7 @@ import {
   getCurrencyName,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { iconSize } from '@/theme/layout';
@@ -77,6 +77,7 @@ export function TransactionPeriodModal({
   type,
   visible,
 }: TransactionPeriodModalProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const { venezuelaCurrencyMode } = useCurrencyCapabilities();

@@ -30,7 +30,7 @@ import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
@@ -64,6 +64,7 @@ export function MoneyAccountDetailModal({
   transactions,
   visible,
 }: MoneyAccountDetailModalProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors } = useTheme();
   const { multiRateMovementDisplay, venezuelaCurrencyMode } =
     useCurrencyCapabilities();

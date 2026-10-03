@@ -70,6 +70,7 @@ export function getVenezuelaDisplayValue({
 
 export function getHistoricalRateDescription(
   displayValue: VenezuelaDisplayValue,
+  showCurrencySymbols = true,
 ): string {
   if (!displayValue.rate || !displayValue.source) return 'Importe original';
 
@@ -84,7 +85,9 @@ export function getHistoricalRateDescription(
     : null;
   const formattedRate =
     isCurrencyCode(baseCurrency) && isCurrencyCode(quoteCurrency)
-      ? formatExchangeRate(rate, baseCurrency, quoteCurrency, 'es-ES')
+      ? formatExchangeRate(rate, baseCurrency, quoteCurrency, 'es-ES', {
+          showCurrencySymbol: showCurrencySymbols,
+        })
       : source;
 
   return formattedDate

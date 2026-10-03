@@ -3,8 +3,9 @@ import {
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 
-type FormatCurrencyOptions = {
+export type FormatCurrencyOptions = {
   omitZeroDecimals?: boolean;
+  showCurrencySymbol?: boolean;
 };
 
 function getGroupingSeparator(locale: string): string {
@@ -90,7 +91,9 @@ export function formatCurrency(
     locale,
   );
 
-  return applyCurrencySymbol(currency, groupedAmount);
+  return options.showCurrencySymbol === false
+    ? groupedAmount
+    : applyCurrencySymbol(currency, groupedAmount);
 }
 
 /**
@@ -106,6 +109,7 @@ export function formatExchangeRate(
   baseCurrency: CurrencyCode,
   quoteCurrency: CurrencyCode,
   locale: string,
+  options: Pick<FormatCurrencyOptions, 'showCurrencySymbol'> = {},
 ): string {
   const rateValue = Number(rate);
   if (!Number.isFinite(rateValue)) {
@@ -119,6 +123,8 @@ export function formatExchangeRate(
   });
 
   const groupedRate = enforceGrouping(formatter.format(rateValue), 2, locale);
+
+  if (options.showCurrencySymbol === false) return groupedRate;
 
   return `1 ${baseCurrency} = ${applyCurrencySymbol(quoteCurrency, groupedRate)}`;
 }

@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { Text } from '@/components/ui/Text/Text';
 import type { MoneyAccountCurrencyBalance } from '@/features/accounts/utils/moneyAccountSummary';
 import { createMetricStyles } from '@/features/accounts/components/MoneyAccountDetailModal/MoneyAccountDetailModal.styles';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { iconSize } from '@/theme/layout';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -18,6 +18,7 @@ export function AccountTransactionMetric({
   balance,
   type,
 }: AccountTransactionMetricProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors } = useTheme();
   const styles = useThemedStyles((palette) => createMetricStyles(palette));
   const isIncome = type === 'income';

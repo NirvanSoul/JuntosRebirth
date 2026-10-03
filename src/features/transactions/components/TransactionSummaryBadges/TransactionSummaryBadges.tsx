@@ -10,7 +10,7 @@ import {
   defaultCurrencyCode,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { iconSize } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
@@ -193,6 +193,7 @@ export function TransactionSummaryBadges({
   style,
   testIDPrefix,
 }: TransactionSummaryBadgesProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const income = formatCurrency(incomeMinor, currency, 'es-ES');

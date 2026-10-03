@@ -17,7 +17,7 @@ import { MonthNavigator } from '@/components/ui/MonthNavigator/MonthNavigator';
 import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
@@ -92,6 +92,7 @@ export function DonutBreakdownChart({
   slicePressHint,
   slices,
 }: DonutBreakdownChartProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const styles = useThemedStyles(createStyles);
   const data = useMemo(() => {
     const items = slices

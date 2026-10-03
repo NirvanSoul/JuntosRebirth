@@ -10,7 +10,7 @@ import {
 } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import type { TransactionExchangeSnapshot } from '@/features/transactions/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
@@ -29,6 +29,7 @@ export function TransactionExchangeSnapshotCard({
   currency,
   exchangeSnapshot,
 }: TransactionExchangeSnapshotCardProps) {
+  const { formatCurrency, showCurrencySymbols } = useCurrencySymbolPreference();
   const styles = useThemedStyles(createStyles);
   const [mode, setMode] = useState<VenezuelaDisplayMode>('USD');
   if (!exchangeSnapshot) return null;
@@ -64,7 +65,7 @@ export function TransactionExchangeSnapshotCard({
             )}
           </Text>
           <Text tone="secondary" variant="footnote">
-            {getHistoricalRateDescription(displayValue)}
+            {getHistoricalRateDescription(displayValue, showCurrencySymbols)}
           </Text>
         </>
       ) : (

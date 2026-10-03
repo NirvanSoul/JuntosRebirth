@@ -23,6 +23,7 @@ import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 type CategoryBudgetModalProps = {
   categoryColor: string;
@@ -53,6 +54,7 @@ export function CategoryBudgetModal({
   spaceCurrency,
   visible,
 }: CategoryBudgetModalProps) {
+  const { showCurrencySymbols } = useCurrencySymbolPreference();
   const density = useLayoutDensity();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -129,7 +131,8 @@ export function CategoryBudgetModal({
             variant="amountHero"
             weight="medium"
           >
-            {displayAmount} {currencySymbol}
+            {displayAmount}
+            {showCurrencySymbols ? ` ${currencySymbol}` : ''}
           </Text>
         </View>
 

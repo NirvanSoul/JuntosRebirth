@@ -2,7 +2,7 @@ import { Text } from '@/components/ui/Text/Text';
 import { getExchangeRateSourceLabel } from '@/lib/currency/exchangeRateSource';
 import type { ExchangeRateSource } from '@/lib/currency/exchangeRateSource';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 type RateBadgeProps = {
   convertedAmountMinor: number;
@@ -21,6 +21,7 @@ export function RateBadge({
   stale = false,
   testID,
 }: RateBadgeProps) {
+  const { formatCurrency, showCurrencySymbols } = useCurrencySymbolPreference();
   const formattedAmount = formatCurrency(
     convertedAmountMinor,
     currency,
@@ -28,9 +29,13 @@ export function RateBadge({
   );
   const sourceLabel =
     source === 'BCV'
-      ? '$ BCV'
+      ? showCurrencySymbols
+        ? '$ BCV'
+        : 'BCV'
       : source === 'EURO'
-        ? '€ BCV'
+        ? showCurrencySymbols
+          ? '€ BCV'
+          : 'Euro BCV'
         : getExchangeRateSourceLabel(source);
 
   return (

@@ -8,7 +8,7 @@ import {
   type VenezuelaDisplayMode,
 } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import type { SessionTransaction } from '@/features/transactions/types';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { iconSize } from '@/theme/layout';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -45,6 +45,7 @@ export function TransactionDetailAmount({
   onPress,
   transaction,
 }: TransactionDetailAmountProps) {
+  const { formatCurrency, showCurrencySymbols } = useCurrencySymbolPreference();
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const isIncome = transaction.type === 'income';
@@ -92,7 +93,9 @@ export function TransactionDetailAmount({
       if (bcvRateNumber && bcvRateNumber > 0) {
         return {
           dateText: dateFormatted,
-          rateText: `1 $ BCV = Bs ${formatRateNumber(bcvRateNumber)}`,
+          rateText: showCurrencySymbols
+            ? `1 $ BCV = Bs ${formatRateNumber(bcvRateNumber)}`
+            : `Tasa BCV: ${formatRateNumber(bcvRateNumber)}`,
         };
       }
     } else if (mode === 'EUR') {
@@ -100,14 +103,18 @@ export function TransactionDetailAmount({
       if (activeEurRate && activeEurRate > 0) {
         return {
           dateText: dateFormatted,
-          rateText: `1 € BCV = Bs ${formatRateNumber(activeEurRate)}`,
+          rateText: showCurrencySymbols
+            ? `1 € BCV = Bs ${formatRateNumber(activeEurRate)}`
+            : `Tasa euro BCV: ${formatRateNumber(activeEurRate)}`,
         };
       }
     } else if (mode === 'USD' && transaction.currency === 'VES') {
       if (bcvRateNumber && bcvRateNumber > 0) {
         return {
           dateText: dateFormatted,
-          rateText: `1 $ BCV = Bs ${formatRateNumber(bcvRateNumber)}`,
+          rateText: showCurrencySymbols
+            ? `1 $ BCV = Bs ${formatRateNumber(bcvRateNumber)}`
+            : `Tasa BCV: ${formatRateNumber(bcvRateNumber)}`,
         };
       }
     }
@@ -118,6 +125,7 @@ export function TransactionDetailAmount({
     mode,
     snapshotBcv?.observedAt,
     snapshotEur?.observedAt,
+    showCurrencySymbols,
     transaction.currency,
     transaction.occurredOn,
   ]);

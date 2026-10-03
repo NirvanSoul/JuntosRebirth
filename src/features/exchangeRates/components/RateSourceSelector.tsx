@@ -5,6 +5,7 @@ import { Text } from '@/components/ui/Text/Text';
 import { getExchangeRateSourceLabel } from '@/lib/currency/exchangeRateSource';
 import type { ExchangeRateSource } from '@/lib/currency/exchangeRateSource';
 import { spacing } from '@/theme/spacing';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 type RateSourceSelectorProps = {
   availableSources: readonly ExchangeRateSource[];
@@ -23,6 +24,7 @@ export function RateSourceSelector({
   selectedSource,
   testID,
 }: RateSourceSelectorProps) {
+  const { showCurrencySymbols } = useCurrencySymbolPreference();
   if (availableSources.length < 2) return null;
 
   return (
@@ -37,9 +39,13 @@ export function RateSourceSelector({
         options={availableSources.map((source) => ({
           label:
             source === 'BCV'
-              ? '$ BCV'
+              ? showCurrencySymbols
+                ? '$ BCV'
+                : 'BCV'
               : source === 'EURO'
-                ? '€ BCV'
+                ? showCurrencySymbols
+                  ? '€ BCV'
+                  : 'Euro BCV'
                 : getExchangeRateSourceLabel(source),
           value: source,
         }))}

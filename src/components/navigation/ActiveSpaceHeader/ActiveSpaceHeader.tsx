@@ -21,6 +21,7 @@ import { spacing } from '@/theme/spacing';
 import type { ColorTokens, ThemeShadows } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 type ActiveSpaceHeaderProps = {
   onSpacePress: () => void;
@@ -48,6 +49,7 @@ export function ActiveSpaceHeader({
   memberAvatarUris,
   visible = true,
 }: ActiveSpaceHeaderProps) {
+  const { showCurrencySymbols } = useCurrencySymbolPreference();
   const density = useLayoutDensity();
   const { width } = useWindowDimensions();
   const { colors, shadows } = useTheme();
@@ -136,7 +138,15 @@ export function ActiveSpaceHeader({
             ]}
             testID="home-currency-flag-button"
           >
-            <Text style={styles.currencyFlag}>{currencyFlag}</Text>
+            <Text style={styles.currencyFlag}>
+              {showCurrencySymbols
+                ? currencyFlag
+                : currencyFlag === '$'
+                  ? '🇺🇸'
+                  : currencyFlag === 'Bs'
+                    ? '🇻🇪'
+                    : currencyFlag}
+            </Text>
           </Pressable>
         ) : null}
       </View>

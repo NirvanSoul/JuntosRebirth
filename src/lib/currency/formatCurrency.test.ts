@@ -40,6 +40,16 @@ describe('formatCurrency', () => {
     expect(formatCurrency(150_000, 'EUR', 'es-ES')).toBe('1.500 €');
   });
 
+  it('puede mostrar solo el número sin importar la moneda', () => {
+    for (const currency of ['COP', 'VES', 'EUR'] as const) {
+      expect(
+        formatCurrency(150_000, currency, 'es-ES', {
+          showCurrencySymbol: false,
+        }),
+      ).toBe('1.500');
+    }
+  });
+
   it('funciona en runtimes sin Intl.NumberFormat.formatToParts', () => {
     const formatterPrototype = Intl.NumberFormat.prototype as {
       formatToParts?: Intl.NumberFormat['formatToParts'];
@@ -87,5 +97,13 @@ describe('formatExchangeRate', () => {
     expect(() => formatExchangeRate('abc', 'USD', 'VES', 'es-ES')).toThrow(
       'número válido',
     );
+  });
+
+  it('puede mostrar una tasa sin identificadores de moneda', () => {
+    expect(
+      formatExchangeRate('52.3456', 'USD', 'VES', 'es-ES', {
+        showCurrencySymbol: false,
+      }),
+    ).toBe('52,35');
   });
 });

@@ -15,6 +15,7 @@ import { getCurrencySymbol } from '@/lib/currency/currencyCatalog';
 import { iconSize } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 type CurrencyExchangeAmountBlockProps = {
   /** Nombre de la cuenta elegida para este lado, si hay alguna. */
@@ -70,6 +71,7 @@ export function CurrencyExchangeAmountBlock({
   onPress,
   onPressAccount,
 }: CurrencyExchangeAmountBlockProps) {
+  const { showCurrencySymbols } = useCurrencySymbolPreference();
   const { colors } = useTheme();
   const testID = `currency-exchange-${role}`;
   const pluralName = currencyExchangePluralNames[currency];
@@ -111,14 +113,16 @@ export function CurrencyExchangeAmountBlock({
             >
               {displayValue || '0'}
             </Text>
-            <Text
-              testID={`${testID}-amount-currency`}
-              tone={active ? tone : 'muted'}
-              variant="label"
-              weight="semibold"
-            >
-              {getCurrencySymbol(currency)}
-            </Text>
+            {showCurrencySymbols ? (
+              <Text
+                testID={`${testID}-amount-currency`}
+                tone={active ? tone : 'muted'}
+                variant="label"
+                weight="semibold"
+              >
+                {getCurrencySymbol(currency)}
+              </Text>
+            ) : null}
           </Animated.View>
           <View
             style={[

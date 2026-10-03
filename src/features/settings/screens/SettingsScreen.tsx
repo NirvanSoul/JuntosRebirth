@@ -56,6 +56,7 @@ import { SettingsHelpSection } from '@/features/settings/components/SettingsHelp
 import { saveCountryChangeNotice } from '@/features/spaces/repositories/countryChangeNoticeRepository';
 import { ProfileHeader } from '@/features/settings/components/ProfileHeader/ProfileHeader';
 import { CurrencyPreferencesModal } from '@/features/settings/components/CurrencyPreferencesModal/CurrencyPreferencesModal';
+import { CurrencySymbolsToggleRow } from '@/features/settings/components/CurrencySymbolsToggleRow/CurrencySymbolsToggleRow';
 import { useSettingsBackSwipe } from '@/features/settings/hooks/useSettingsBackSwipe';
 import { useProfileCountry } from '@/features/profile/hooks/useProfileCountry';
 import type { Space } from '@/features/spaces/types';
@@ -386,6 +387,7 @@ export function SettingsScreen({
                 testID="home-comparison-toggle"
               />
               <SettingsDivider />
+              <CurrencySymbolsToggleRow />
               <SettingsRow
                 icon="language-outline"
                 iconBackgroundColor={categoryColors.blue}

@@ -16,6 +16,7 @@ import type { TransactionRecurrence } from '@/features/transactions/types';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 import { TransactionCustomRecurrenceModal } from './TransactionCustomRecurrenceModal';
 
@@ -143,6 +144,7 @@ export function TransactionCurrencyPickerModal({
   onClose,
   onSelectCurrency,
 }: TransactionCurrencyPickerModalProps) {
+  const { showCurrencySymbols } = useCurrencySymbolPreference();
   const [draftCurrency, setDraftCurrency] = useState(currency);
 
   if (useDepsChanged([currency, visible]) && visible) {
@@ -182,8 +184,12 @@ export function TransactionCurrencyPickerModal({
               label={
                 venezuelaMode
                   ? code === 'USD'
-                    ? '$  Dólares'
-                    : 'Bs.  Bolívares'
+                    ? showCurrencySymbols
+                      ? '$  Dólares'
+                      : 'Dólares'
+                    : showCurrencySymbols
+                      ? 'Bs.  Bolívares'
+                      : 'Bolívares'
                   : `${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`
               }
               onPress={() => setDraftCurrency(code)}

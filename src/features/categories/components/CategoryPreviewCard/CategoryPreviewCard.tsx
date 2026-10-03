@@ -15,7 +15,7 @@ import { CompactPreviewMarqueeText } from '@/features/categories/components/Cate
 import { CategoryTile } from '@/features/categories/components/CategoryPreviewCard/CategoryTile';
 import type { CategoryIconName } from '@/features/categories/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import {
   categoryColors,
   type CategoryColorToken,
@@ -65,6 +65,7 @@ const compactIconSize = 28;
 export const compactCardHeight = 74;
 
 export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors, shadows } = useTheme();
   const themedStyles = useThemedStyles((palette) =>
     createThemedStyles(palette, shadows),

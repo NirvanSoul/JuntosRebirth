@@ -16,6 +16,7 @@ import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import { fontFamily } from '@/theme/fonts';
 import { markStartup } from '@/lib/diagnostics/startupTrace';
+import { CurrencySymbolPreferenceProvider } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   const { colors, isDark, isReady: isThemeReady } = useTheme();
@@ -87,7 +88,12 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   }
 
   const content = hasVerifiedSession ? (
-    <MainTabsNavigator />
+    <CurrencySymbolPreferenceProvider
+      accountId={session.user.id}
+      key={session.user.id}
+    >
+      <MainTabsNavigator />
+    </CurrencySymbolPreferenceProvider>
   ) : !hasCompletedOnboarding ? (
     <OnboardingNavigator onComplete={completeOnboarding} />
   ) : (

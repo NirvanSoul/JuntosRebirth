@@ -5,6 +5,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedCont
 import { Text, type TextTone } from '@/components/ui/Text/Text';
 import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import { spacing } from '@/theme/spacing';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 type VenezuelaDisplayModeSelectorProps = {
   hideLabel?: boolean;
@@ -26,6 +27,7 @@ export function VenezuelaDisplayModeSelector({
   style,
   testID,
 }: VenezuelaDisplayModeSelectorProps) {
+  const { showCurrencySymbols } = useCurrencySymbolPreference();
   return (
     <View style={[styles.container, style]} testID={testID}>
       {!hideLabel ? (
@@ -38,8 +40,14 @@ export function VenezuelaDisplayModeSelector({
         onChange={onChange}
         options={[
           { label: 'Dolar', value: 'USD' },
-          { label: '$ BCV', value: 'VES_BCV' },
-          { label: '€ BCV', value: 'EUR' },
+          {
+            label: showCurrencySymbols ? '$ BCV' : 'BCV',
+            value: 'VES_BCV',
+          },
+          {
+            label: showCurrencySymbols ? '€ BCV' : 'Euro BCV',
+            value: 'EUR',
+          },
         ]}
         selectedTextTone={
           selectedTextTone ?? (indicatorColor ? 'onBrand' : 'primary')

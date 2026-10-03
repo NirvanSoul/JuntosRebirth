@@ -13,7 +13,7 @@ import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { useTransactionAuthor } from '@/features/transactions/hooks/useTransactionAuthor';
 import { formatAuthorName } from '@/features/transactions/utils/transactionAuthor';
-import { formatCurrency } from '@/lib/currency/formatCurrency';
+import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
@@ -48,6 +48,7 @@ export function TransactionPreviewCard({
   stacked = false,
   transaction,
 }: TransactionPreviewCardProps) {
+  const { formatCurrency } = useCurrencySymbolPreference();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   // `undefined` en un espacio personal: allí el círculo del autor sería ruido.
