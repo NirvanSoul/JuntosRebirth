@@ -29,9 +29,8 @@ export type LoadingProgress = {
   /** Lleva la barra al final antes de mostrar el contenido. */
   complete: () => void;
   /**
-   * Una barra que se desmonta sin terminar ofrece su avance a la siguiente.
-   * Solo cuenta si la sucesora se monta en el mismo commit (fuentes → datos);
-   * si nadie lo toma, la próxima barra vuelve a empezar desde cero.
+   * Libera una etapa sin descartar su avance. La siguiente continúa desde el
+   * mismo punto hasta que el ciclo completo termina.
    */
   release: () => void;
 };
@@ -41,15 +40,16 @@ const LoadingProgressContext = createContext<LoadingProgress | null>(null);
 export function createLoadingProgress(
   progress: SharedValue<number>,
 ): LoadingProgress {
-  let handoffPending = false;
+  let cycleCompleted = false;
   let activeLoaders = 0;
   return {
     progress,
     begin: () => {
-      const continued = handoffPending || activeLoaders > 0;
-      handoffPending = false;
+      if (cycleCompleted) {
+        progress.value = 0;
+        cycleCompleted = false;
+      }
       activeLoaders += 1;
-      if (!continued) progress.value = 0;
       if (progress.value !== 0) return;
       progress.value = withSequence(
         withTiming(FAST_PROGRESS, {
@@ -66,7 +66,7 @@ export function createLoadingProgress(
     },
     complete: () => {
       if (activeLoaders > 0) return;
-      handoffPending = false;
+      cycleCompleted = true;
       progress.value = withTiming(1, {
         duration: motion.loadingCompletionDuration,
         easing: Easing.out(Easing.cubic),
@@ -75,12 +75,6 @@ export function createLoadingProgress(
     },
     release: () => {
       activeLoaders = Math.max(0, activeLoaders - 1);
-      if (activeLoaders > 0) return;
-      handoffPending = true;
-      // Los efectos de montaje del mismo commit corren antes que esta microtarea.
-      void Promise.resolve().then(() => {
-        handoffPending = false;
-      });
     },
   };
 }

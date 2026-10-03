@@ -51,13 +51,13 @@ describe('createLoadingProgress', () => {
     expect(progress.value).toBe(1);
   });
 
-  it('vuelve a empezar si nadie toma el relevo de inmediato', async () => {
+  it('conserva el avance entre etapas aunque el relevo llegue después', async () => {
     const { progress, controller } = createProgress();
     controller.begin();
     progress.value = 0.5;
     controller.release();
     await Promise.resolve();
     controller.begin();
-    expect(progress.value).toBe(0.92);
+    expect(progress.value).toBe(0.5);
   });
 });
