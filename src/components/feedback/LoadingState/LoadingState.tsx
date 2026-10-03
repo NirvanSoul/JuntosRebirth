@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useLoadingProgress } from './LoadingProgressProvider';
+import { AssetSvgIcon } from '@/components/icons/AssetSvgIcon';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
@@ -18,6 +19,8 @@ import type { ColorTokens } from '@/theme/types';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const TRACK_WIDTH = 200;
+const LOGO_WIDTH = 160;
+const LOGO_HEIGHT = LOGO_WIDTH / (1698 / 1131);
 
 type LoadingStateProps = {
   children?: ReactNode;
@@ -81,11 +84,21 @@ export function LoadingState({
         style={[styles.loading, overlayStyle]}
         testID={loading ? testID : undefined}
       >
-        <View style={styles.track}>
-          <Animated.View
-            style={[styles.fill, fillStyle]}
-            testID={`${testID}-fill`}
-          />
+        <View style={styles.loadingContent}>
+          <View testID={`${testID}-logo`}>
+            <AssetSvgIcon
+              height={LOGO_HEIGHT}
+              size={LOGO_WIDTH}
+              source={require('../../../../assets/icons/Juntos Logo.svg')}
+              width={LOGO_WIDTH}
+            />
+          </View>
+          <View style={styles.track}>
+            <Animated.View
+              style={[styles.fill, fillStyle]}
+              testID={`${testID}-fill`}
+            />
+          </View>
         </View>
       </Animated.View>
     </View>
@@ -103,6 +116,7 @@ function createStyles(colors: ColorTokens) {
       padding: spacing.xl,
       backgroundColor: colors.background,
     },
+    loadingContent: { alignItems: 'center', gap: spacing.lg },
     track: {
       width: TRACK_WIDTH,
       height: spacing.xs,
