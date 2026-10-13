@@ -114,20 +114,4 @@ describe('LoginScreen — Google', () => {
       actionsRow.parent?.children.indexOf(passwordFieldContainer) ?? -1,
     );
   });
-
-  it('muestra el logo completo de Juntos sobre el botón de acceso', async () => {
-    await renderWithTheme(<LoginScreen onSuccess={jest.fn()} />);
-
-    const logo = screen.getByTestId('login-logo');
-    const submitButton = screen.getByTestId('login-submit');
-    expect(logo.props).toEqual(
-      expect.objectContaining({
-        accessibilityLabel: 'Juntos',
-        accessibilityRole: 'image',
-      }),
-    );
-    expect(logo.parent?.children.indexOf(logo)).toBeLessThan(
-      logo.parent?.children.indexOf(submitButton) ?? Infinity,
-    );
-  });
 });

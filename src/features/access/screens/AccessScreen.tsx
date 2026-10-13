@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 
+import { JuntosLogo } from '@/components/icons/JuntosLogo';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { StepProgressBar } from '@/components/ui/StepProgressBar/StepProgressBar';
@@ -46,6 +47,7 @@ const stepTitles: Record<AccessStep['screen'], string> = {
 
 /** Ancho ÷ alto real de `10_loginicon.png`, para el tamaño estándar de lámina. */
 const entryIllustrationAspectRatio = 1206 / 1218;
+const loginLogoWidth = 200;
 
 /** Host único a pantalla completa para los flujos de autenticación. */
 type AccessScreenProps = {
@@ -170,6 +172,18 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
         showsVerticalScrollIndicator={false}
         testID="access-screen"
       >
+        {step.screen === 'login' ? (
+          <View
+            accessibilityLabel="Juntos"
+            accessibilityRole="image"
+            accessible
+            style={styles.loginLogo}
+            testID="login-logo"
+          >
+            <JuntosLogo width={loginLogoWidth} />
+          </View>
+        ) : null}
+
         <View
           style={[
             styles.header,
@@ -290,6 +304,7 @@ function createStyles(colors: ColorTokens) {
       alignItems: 'center',
       gap: spacing.sm,
     },
+    loginLogo: { alignItems: 'center' },
     backAction: { alignSelf: 'flex-start' },
     onboardingLoginAction: { backgroundColor: colors.keypad, borderWidth: 0 },
   });

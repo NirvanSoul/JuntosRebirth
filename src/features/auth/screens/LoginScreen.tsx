@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { JuntosLogo } from '@/components/icons/JuntosLogo';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
@@ -29,8 +28,6 @@ type LoginState =
   | { step: 'idle' }
   | { step: 'submitting' }
   | { step: 'error'; message: string };
-
-const loginLogoWidth = 200;
 
 export function LoginScreen({
   onNavigateToForgotPassword,
@@ -146,16 +143,6 @@ export function LoginScreen({
         </Text>
       ) : null}
 
-      <View
-        accessibilityLabel="Juntos"
-        accessibilityRole="image"
-        accessible
-        style={styles.logoContainer}
-        testID="login-logo"
-      >
-        <JuntosLogo width={loginLogoWidth} />
-      </View>
-
       <ModalPrimaryAction
         accessibilityLabel="Iniciar sesión"
         disabled={isSubmitting}
@@ -178,7 +165,6 @@ export function LoginScreen({
 function createStyles() {
   return StyleSheet.create({
     container: { gap: spacing.lg },
-    logoContainer: { alignItems: 'center' },
     linkButton: {
       flex: 1,
       minHeight: layout.minTouchTarget,

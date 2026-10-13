@@ -92,6 +92,19 @@ describe('AccessScreen', () => {
     expect(screen.queryByText('Atrás')).toBeNull();
   });
 
+  it('muestra el logo de Juntos antes del título de iniciar sesión', async () => {
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    fireEvent.press(screen.getByTestId('onboarding-login-open-login'));
+
+    const logo = await screen.findByTestId('login-logo');
+    const title = screen.getByText('Iniciar sesión');
+    const titleContainer = title.parent ?? title;
+    expect(logo.parent?.children.indexOf(logo)).toBeLessThan(
+      logo.parent?.children.indexOf(titleContainer) ?? Infinity,
+    );
+  });
+
   it('retoma la verificación cuando Better Auth creó una sesión sin verificar', async () => {
     mockSession = {
       user: { email: 'ana@ejemplo.com', emailVerified: false },
