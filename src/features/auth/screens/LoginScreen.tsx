@@ -83,16 +83,6 @@ export function LoginScreen({
 
   return (
     <View style={styles.container}>
-      <View
-        accessibilityLabel="Juntos"
-        accessibilityRole="image"
-        accessible
-        style={styles.logoContainer}
-        testID="login-logo"
-      >
-        <JuntosLogo width={loginLogoWidth} />
-      </View>
-
       <AuthTextField
         autoComplete="email"
         editable={!isSubmitting}
@@ -120,11 +110,51 @@ export function LoginScreen({
         value={password}
       />
 
+      {onNavigateToForgotPassword || onNavigateToSignUp ? (
+        <View style={styles.actionsRow} testID="login-secondary-actions">
+          {onNavigateToForgotPassword ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={isSubmitting}
+              onPress={onNavigateToForgotPassword}
+              style={styles.linkButton}
+            >
+              <Text tone="muted" variant="footnote">
+                Olvidé mi contraseña
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {onNavigateToSignUp ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={isSubmitting}
+              onPress={onNavigateToSignUp}
+              style={[styles.linkButton, styles.signUpLinkButton]}
+            >
+              <Text tone="secondary" variant="footnote">
+                Crear cuenta
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       {state.step === 'error' ? (
         <Text tone="expense" variant="footnote">
           {state.message}
         </Text>
       ) : null}
+
+      <View
+        accessibilityLabel="Juntos"
+        accessibilityRole="image"
+        accessible
+        style={styles.logoContainer}
+        testID="login-logo"
+      >
+        <JuntosLogo width={loginLogoWidth} />
+      </View>
 
       <ModalPrimaryAction
         accessibilityLabel="Iniciar sesión"
@@ -141,32 +171,6 @@ export function LoginScreen({
         onSuccess={onSuccess}
         testID="login-google"
       />
-
-      {onNavigateToForgotPassword ? (
-        <Pressable
-          accessibilityRole="button"
-          disabled={isSubmitting}
-          onPress={onNavigateToForgotPassword}
-          style={styles.linkButton}
-        >
-          <Text tone="muted" variant="footnote">
-            ¿Olvidaste tu contraseña?
-          </Text>
-        </Pressable>
-      ) : null}
-
-      {onNavigateToSignUp ? (
-        <Pressable
-          accessibilityRole="button"
-          disabled={isSubmitting}
-          onPress={onNavigateToSignUp}
-          style={styles.linkButton}
-        >
-          <Text tone="secondary" variant="footnote">
-            ¿No tienes cuenta? Crear una
-          </Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -176,14 +180,15 @@ function createStyles() {
     container: { gap: spacing.lg },
     logoContainer: { alignItems: 'center' },
     linkButton: {
+      flex: 1,
       minHeight: layout.minTouchTarget,
-      alignItems: 'center',
       justifyContent: 'center',
     },
     actionsRow: {
       flexDirection: 'row',
       gap: spacing.md,
+      marginTop: -spacing.lg,
     },
-    actionButton: { flex: 1 },
+    signUpLinkButton: { alignItems: 'flex-end' },
   });
 }

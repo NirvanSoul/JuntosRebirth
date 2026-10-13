@@ -82,7 +82,7 @@ describe('LoginScreen — Google', () => {
     );
   });
 
-  it('centra el enlace gris de recuperación entre Google y el registro', async () => {
+  it('muestra recuperación y registro en una fila bajo la contraseña', async () => {
     const screen = await renderWithTheme(
       <LoginScreen
         onNavigateToForgotPassword={jest.fn()}
@@ -91,10 +91,15 @@ describe('LoginScreen — Google', () => {
       />,
     );
 
-    const forgot = screen.getByText('¿Olvidaste tu contraseña?');
-    const signUp = screen.getByText('¿No tienes cuenta? Crear una');
-    expect(forgot.parent?.props.style).toEqual(
-      expect.objectContaining({ alignItems: 'center' }),
+    const forgot = screen.getByText('Olvidé mi contraseña');
+    const signUp = screen.getByText('Crear cuenta');
+    const actionsRow = screen.getByTestId('login-secondary-actions');
+    const passwordField = screen.getByTestId('login-password');
+    const forgotButton = forgot.parent ?? forgot;
+    const signUpButton = signUp.parent ?? signUp;
+    const passwordFieldContainer = passwordField.parent ?? passwordField;
+    expect(actionsRow.props.style).toEqual(
+      expect.objectContaining({ flexDirection: 'row' }),
     );
     expect(forgot.props.style).toEqual(
       expect.arrayContaining([
@@ -102,25 +107,27 @@ describe('LoginScreen — Google', () => {
       ]),
     );
     expect(screen.queryByText('Cancelar')).toBeNull();
-    expect(forgot.parent?.parent?.children.indexOf(forgot.parent)).toBeLessThan(
-      signUp.parent?.parent?.children.indexOf(signUp.parent) ?? Infinity,
+    expect(actionsRow.children.indexOf(forgotButton)).toBeLessThan(
+      actionsRow.children.indexOf(signUpButton),
+    );
+    expect(actionsRow.parent?.children.indexOf(actionsRow)).toBeGreaterThan(
+      actionsRow.parent?.children.indexOf(passwordFieldContainer) ?? -1,
     );
   });
 
-  it('muestra el logo completo de Juntos sobre el formulario', async () => {
+  it('muestra el logo completo de Juntos sobre el botón de acceso', async () => {
     await renderWithTheme(<LoginScreen onSuccess={jest.fn()} />);
 
     const logo = screen.getByTestId('login-logo');
-    const emailField = screen.getByTestId('login-email');
+    const submitButton = screen.getByTestId('login-submit');
     expect(logo.props).toEqual(
       expect.objectContaining({
         accessibilityLabel: 'Juntos',
         accessibilityRole: 'image',
       }),
     );
-    const emailFieldContainer = emailField.parent ?? emailField;
     expect(logo.parent?.children.indexOf(logo)).toBeLessThan(
-      logo.parent?.children.indexOf(emailFieldContainer) ?? Infinity,
+      logo.parent?.children.indexOf(submitButton) ?? Infinity,
     );
   });
 });
