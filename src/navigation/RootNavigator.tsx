@@ -1,4 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -109,10 +110,21 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   ) : (
     <AccessScreen />
   );
-  const themedContent = forceLightTheme ? (
-    <ThemeProvider initialAppearance="light">{content}</ThemeProvider>
+  const navigationContent = (
+    <BottomSheetModalProvider>
+      <NavigationContainer
+        fallback={<LoadingState />}
+        linking={linking}
+        theme={navigationTheme}
+      >
+        {content}
+      </NavigationContainer>
+    </BottomSheetModalProvider>
+  );
+  const themedNavigationContent = forceLightTheme ? (
+    <ThemeProvider initialAppearance="light">{navigationContent}</ThemeProvider>
   ) : (
-    content
+    navigationContent
   );
 
   // El fondo del root nativo es blanco. Las escenas del drawer y de las pestañas
@@ -125,13 +137,7 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
       {/* Mientras `linking` resuelve la URL inicial no hay hijos montados; la
           misma barra ocupa ese hueco para que su avance continúe sin reinicio. */}
       <OnboardingRestartContext.Provider value={resetOnboarding}>
-        <NavigationContainer
-          fallback={<LoadingState />}
-          linking={linking}
-          theme={navigationTheme}
-        >
-          {themedContent}
-        </NavigationContainer>
+        {themedNavigationContent}
       </OnboardingRestartContext.Provider>
     </View>
   );

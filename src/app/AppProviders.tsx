@@ -1,4 +1,3 @@
-import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import type { PropsWithChildren } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -10,9 +9,7 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <ThemeProvider>
-          <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
-        </ThemeProvider>
+        <ThemeProvider>{children}</ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -44,8 +44,20 @@ jest.mock('@gorhom/bottom-sheet', () => {
     BottomSheetFlatList: FlatList,
     BottomSheetScrollView: ScrollView,
     BottomSheetModal,
-    BottomSheetModalProvider: ({ children }: { children: React.ReactNode }) =>
-      children,
+    BottomSheetModalProvider: ({ children }: { children: React.ReactNode }) => {
+      const { useThemeOptional } = jest.requireActual('@/theme/ThemeProvider');
+      const theme = useThemeOptional();
+
+      return React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(View, {
+          style: { backgroundColor: theme?.colors.background },
+          testID: 'bottom-sheet-provider-theme',
+        }),
+        children,
+      );
+    },
     BottomSheetTextInput: TextInput,
     BottomSheetView: View,
   };

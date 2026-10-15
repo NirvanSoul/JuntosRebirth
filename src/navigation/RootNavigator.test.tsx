@@ -261,6 +261,11 @@ describe('RootNavigator', () => {
         screen.getByTestId('onboarding-theme').props.style,
       ),
     ).toBe(lightColors.background);
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('bottom-sheet-provider-theme').props.style,
+      ),
+    ).toBe(lightColors.background);
   });
 
   it('cambia a tema claro al reiniciar el onboarding desde una sesión oscura', async () => {
@@ -288,6 +293,11 @@ describe('RootNavigator', () => {
     expect(
       backdropBackgroundColor(
         screen.getByTestId('onboarding-theme').props.style,
+      ),
+    ).toBe(lightColors.background);
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('bottom-sheet-provider-theme').props.style,
       ),
     ).toBe(lightColors.background);
   });
