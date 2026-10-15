@@ -342,20 +342,6 @@ export function SettingsScreen({
 
             <SettingsSection
               emphasizeIcon={false}
-              icon="person-circle-outline"
-              title="Cuenta"
-            >
-              <SettingsRow
-                icon="log-out-outline"
-                iconBackgroundColor={categoryColors.blue}
-                label="Cerrar sesión"
-                onPress={handleAccountRowPress}
-                value={session?.user.email ?? undefined}
-              />
-            </SettingsSection>
-
-            <SettingsSection
-              emphasizeIcon={false}
               icon="options-outline"
               title="Preferencias"
             >
@@ -525,6 +511,20 @@ export function SettingsScreen({
               onOpenPrivacy={() => setPrivacyModalVisible(true)}
               onRestartOnboarding={() => void handleSignOut(resetOnboarding)}
             />
+
+            <SettingsSection
+              emphasizeIcon={false}
+              icon="person-circle-outline"
+              title="Cuenta"
+            >
+              <SettingsRow
+                icon="log-out-outline"
+                iconBackgroundColor={categoryColors.blue}
+                label="Cerrar sesión"
+                onPress={handleAccountRowPress}
+                value={session?.user.email ?? undefined}
+              />
+            </SettingsSection>
 
             <Text align="center" tone="muted" variant="caption">
               Juntos 0.1.0

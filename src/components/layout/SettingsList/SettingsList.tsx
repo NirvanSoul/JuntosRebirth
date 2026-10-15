@@ -220,11 +220,12 @@ export function SettingsToggleRow({
       </View>
       <Switch
         accessibilityLabel={label}
+        ios_backgroundColor={colors.textMuted}
         onValueChange={onToggle}
         style={styles.toggleSwitch}
         testID={testID}
         thumbColor={colors.surface}
-        trackColor={{ false: colors.border, true: colors.cta }}
+        trackColor={{ false: colors.textMuted, true: colors.cta }}
         value={enabled}
       />
     </View>

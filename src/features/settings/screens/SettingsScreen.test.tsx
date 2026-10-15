@@ -186,6 +186,24 @@ describe('SettingsScreen', () => {
     expect(screen.getByText('Juntos 0.1.0')).toBeTruthy();
   });
 
+  it('deja cerrar sesión como la última acción de Ajustes', async () => {
+    const { screen } = await renderScreen();
+    const renderedSettings = JSON.stringify(screen.toJSON());
+
+    expect(renderedSettings.indexOf('Cerrar sesión')).toBeGreaterThan(
+      renderedSettings.indexOf('Reiniciar onboarding'),
+    );
+  });
+
+  it('mantiene visibles los switches apagados en modo claro', async () => {
+    const { screen } = await renderScreen({ currencies: ['EUR'] }, false);
+    const toggle = screen.getByTestId('home-comparison-toggle');
+
+    expect(toggle.props.tintColor).toBe(colors.textMuted);
+    expect(toggle.props.onTintColor).toBe(colors.cta);
+    expect(toggle.props.thumbTintColor).toBe(colors.surface);
+  });
+
   it('explica una opción pendiente', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
     const { screen } = await renderScreen();
