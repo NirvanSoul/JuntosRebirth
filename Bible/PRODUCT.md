@@ -555,7 +555,7 @@ Los espacios no ocupan una pestaña.
 
 ### Ajustes
 
-Se accede desde la acción inferior del menú lateral de espacios y se presenta
+Se accede desde el bloque de acciones del menú lateral de espacios y se presenta
 como una pantalla independiente, sin ocupar una pestaña principal.
 
 La flecha de la cabecera y el gesto horizontal de izquierda a derecha regresan
@@ -622,7 +622,8 @@ Opciones compatibles:
 Reglas:
 
 - Mostrar siempre el espacio activo.
-- Integrar la representación del perfil dentro del selector de espacio, sin
+- Integrar la representación del perfil dentro del selector de espacio, con
+  foto circular y nombre. Al tocarla se abre una edición breve de ambos, sin
   reservar un segundo botón permanente en el extremo opuesto del encabezado.
 - Mantener fijo el selector de espacio y el acceso al perfil mientras se
   desplaza el contenido de cualquier pestaña principal.
@@ -631,8 +632,9 @@ Reglas:
 - Evitar mezclar o mostrar brevemente datos anteriores.
 - Marcar claramente cuál está activo.
 - Separar selección rápida de gestión profunda.
-- Permitir crear y seleccionar espacios locales desde un menú lateral. El
-  acceso a Ajustes permanece al pie y abre su pantalla independiente.
+- Permitir crear y seleccionar espacios locales desde un menú lateral. Tras
+  los espacios, un divisor separa el acceso a Ajustes y el interruptor de modo
+  claro u oscuro; Ajustes abre su pantalla independiente.
 
 Plan gratuito previsto, sujeto a definición:
 

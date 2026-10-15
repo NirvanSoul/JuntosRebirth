@@ -1,9 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Fragment, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '@/components/ui/Avatar/Avatar';
 import { Text } from '@/components/ui/Text/Text';
+import { ProfileEditorModal } from '@/features/profile/components/ProfileEditorModal';
 import { SpaceCreationView } from '@/features/spaces/components/SpaceCreationView';
 import { isAwaitingPartnerSpace, type Space } from '@/features/spaces/types';
 import { iconSize, minTouchTarget } from '@/theme/layout';
@@ -21,12 +23,21 @@ type SpaceSideMenuProps = {
   onInvitePartner: () => void;
   onOpenSettings: () => void;
   onSelectSpace: (spaceId: string) => Promise<void>;
+  profileAvatarUri?: string | null;
+  profileName?: string | null;
   spaces: readonly Space[];
   storageError?: string | null;
 };
 
 const spaceRowHeight = 64,
-  spaceIconSize = 36;
+  spaceIconSize = 36,
+  profileAvatarSize = 56;
+
+function getSpaceLabel(space: Space): string {
+  if (space.type === 'personal') return 'Personal';
+  if (space.type === 'couple') return 'Juntos';
+  return space.name;
+}
 
 export function SpaceSideMenu({
   activeSpaceId,
@@ -36,12 +47,15 @@ export function SpaceSideMenu({
   onInvitePartner,
   onOpenSettings,
   onSelectSpace,
+  profileAvatarUri = null,
+  profileName = null,
   spaces,
   storageError = null,
 }: SpaceSideMenuProps) {
-  const { colors, shadows } = useTheme();
+  const { colors, isDark, setAppearance, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const [isCreating, setCreating] = useState(false);
+  const [isProfileEditorVisible, setProfileEditorVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasCoupleSpace = spaces.some((space) => space.type === 'couple');
   const orderedSpaces = [...spaces].sort((first, second) => {
@@ -75,9 +89,10 @@ export function SpaceSideMenu({
           ]}
         >
           <Ionicons
-            color={colors.textPrimary}
+            color={colors.textMuted}
             name="close"
             size={iconSize.md}
+            testID="side-menu-close-icon"
           />
         </Pressable>
       </View>
@@ -94,103 +109,116 @@ export function SpaceSideMenu({
       ) : (
         <>
           <ScrollView
-            contentContainerStyle={styles.spaceList}
+            contentContainerStyle={styles.menuContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             style={styles.spaceScroll}
           >
-            <Text tone="secondary" variant="footnote">
-              Elige dónde quieres organizar tus movimientos.
-            </Text>
-            {orderedSpaces.map((space) => {
-              const isActive =
-                !isInvitePartnerActive && space.id === activeSpaceId;
+            <View accessibilityRole="radiogroup" style={styles.spaceList}>
+              {orderedSpaces.map((space) => {
+                const isActive =
+                  !isInvitePartnerActive && space.id === activeSpaceId;
+                const label = getSpaceLabel(space);
 
-              return (
-                <Fragment key={space.id}>
-                  <Pressable
-                    accessibilityLabel={`Seleccionar espacio ${space.name}`}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: isActive }}
-                    onPress={() => void selectSpace(space.id)}
-                    style={({ pressed }) => [
-                      styles.spaceRow,
-                      isActive && styles.spaceRowActive,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <View style={styles.spaceIcon}>
-                      <Ionicons
-                        color={colors.cta}
-                        name={
-                          space.type === 'personal'
-                            ? 'person'
-                            : space.type === 'couple'
-                              ? 'people'
-                              : 'wallet'
-                        }
-                        size={iconSize.sm}
-                      />
-                    </View>
-                    <View style={styles.spaceName}>
-                      <Text numberOfLines={1} variant="label" weight="semibold">
-                        {space.name}
-                      </Text>
-                      {isAwaitingPartnerSpace(space) ? (
-                        <Text tone="secondary" variant="footnote">
-                          Esperando a que acepten
-                        </Text>
-                      ) : null}
-                    </View>
-                    {isActive ? (
-                      <Ionicons
-                        color={colors.cta}
-                        name="checkmark-circle"
-                        size={iconSize.md}
-                      />
-                    ) : null}
-                  </Pressable>
-
-                  {space.type === 'personal' && !hasCoupleSpace ? (
+                return (
+                  <Fragment key={space.id}>
                     <Pressable
-                      accessibilityHint="Invita a tu pareja a compartir un espacio"
-                      accessibilityLabel="Espacio de pareja"
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isInvitePartnerActive }}
-                      onPress={onInvitePartner}
+                      accessibilityLabel={`Seleccionar espacio ${label}`}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: isActive }}
+                      onPress={() => void selectSpace(space.id)}
                       style={({ pressed }) => [
-                        styles.coupleSpaceButton,
-                        isInvitePartnerActive && styles.spaceRowActive,
+                        styles.spaceRow,
+                        isActive && styles.spaceRowActive,
                         pressed && styles.pressed,
                       ]}
                     >
-                      <View style={styles.spaceIcon}>
+                      <View
+                        style={[
+                          styles.spaceIcon,
+                          isActive && styles.spaceIconActive,
+                        ]}
+                      >
                         <Ionicons
-                          color={colors.cta}
-                          name="people"
+                          color={isActive ? colors.onBrand : colors.cta}
+                          name={
+                            space.type === 'personal'
+                              ? 'person'
+                              : space.type === 'couple'
+                                ? 'people'
+                                : 'wallet'
+                          }
                           size={iconSize.sm}
+                          testID={`space-icon-${space.id}`}
                         />
                       </View>
-                      <Text
-                        numberOfLines={1}
-                        style={styles.spaceName}
-                        variant="label"
-                        weight="semibold"
-                      >
-                        Espacio de pareja
-                      </Text>
-                      {isInvitePartnerActive ? (
-                        <Ionicons
-                          color={colors.cta}
-                          name="checkmark-circle"
-                          size={iconSize.md}
-                        />
-                      ) : null}
+                      <View style={styles.spaceName}>
+                        <Text
+                          numberOfLines={1}
+                          tone={isActive ? 'onBrand' : 'primary'}
+                          variant={isActive ? 'subheading' : 'label'}
+                          weight="semibold"
+                        >
+                          {label}
+                        </Text>
+                        {isAwaitingPartnerSpace(space) ? (
+                          <Text
+                            tone={isActive ? 'onBrand' : 'secondary'}
+                            variant={isActive ? 'subheading' : 'footnote'}
+                          >
+                            Esperando a que acepten
+                          </Text>
+                        ) : null}
+                      </View>
                     </Pressable>
-                  ) : null}
-                </Fragment>
-              );
-            })}
+
+                    {space.type === 'personal' && !hasCoupleSpace ? (
+                      <Pressable
+                        accessibilityHint="Invita a tu pareja a compartir un espacio"
+                        accessibilityLabel="Seleccionar espacio Juntos"
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isInvitePartnerActive }}
+                        onPress={onInvitePartner}
+                        style={({ pressed }) => [
+                          styles.coupleSpaceButton,
+                          isInvitePartnerActive && styles.spaceRowActive,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.spaceIcon,
+                            isInvitePartnerActive && styles.spaceIconActive,
+                          ]}
+                        >
+                          <Ionicons
+                            color={
+                              isInvitePartnerActive
+                                ? colors.onBrand
+                                : colors.cta
+                            }
+                            name="people"
+                            size={iconSize.sm}
+                            testID="space-icon-invite-juntos"
+                          />
+                        </View>
+                        <Text
+                          numberOfLines={1}
+                          style={styles.spaceName}
+                          tone={isInvitePartnerActive ? 'onBrand' : 'primary'}
+                          variant={
+                            isInvitePartnerActive ? 'subheading' : 'label'
+                          }
+                          weight="semibold"
+                        >
+                          Juntos
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </View>
             {error ? (
               <Text tone="expense" variant="footnote">
                 {error}
@@ -200,15 +228,15 @@ export function SpaceSideMenu({
                 {storageError}
               </Text>
             ) : null}
-          </ScrollView>
 
-          <View style={styles.footer}>
+            <View style={styles.divider} />
+
             <Pressable
               accessibilityHint="Abre la pantalla de ajustes"
               accessibilityRole="button"
               onPress={onOpenSettings}
               style={({ pressed }) => [
-                styles.settingsButton,
+                styles.actionRow,
                 pressed && styles.pressed,
               ]}
             >
@@ -218,13 +246,89 @@ export function SpaceSideMenu({
                 size={iconSize.sm}
                 testID="settings-menu-icon"
               />
-              <Text variant="label" weight="semibold">
+              <Text
+                style={styles.actionLabel}
+                variant="label"
+                weight="semibold"
+              >
                 Ajustes
               </Text>
+              <Ionicons
+                color={colors.textMuted}
+                name="chevron-forward"
+                size={iconSize.xs}
+              />
+            </Pressable>
+
+            <View style={styles.actionRow}>
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={styles.actionIcon}
+                testID={`appearance-menu-icon-${isDark ? 'dark' : 'light'}`}
+              >
+                <Ionicons
+                  color={colors.textPrimary}
+                  name={isDark ? 'moon-outline' : 'sunny-outline'}
+                  size={iconSize.sm}
+                />
+              </View>
+              <Text
+                style={styles.actionLabel}
+                variant="label"
+                weight="semibold"
+              >
+                Modo oscuro
+              </Text>
+              <Switch
+                accessibilityLabel="Modo oscuro"
+                ios_backgroundColor={colors.textMuted}
+                onValueChange={(enabled) => {
+                  void setAppearance(enabled ? 'dark' : 'light');
+                }}
+                testID="side-menu-dark-mode-toggle"
+                thumbColor={colors.surface}
+                trackColor={{ false: colors.textMuted, true: colors.cta }}
+                style={styles.themeSwitch}
+                value={isDark}
+              />
+            </View>
+          </ScrollView>
+
+          <View style={styles.profileFooter}>
+            <Pressable
+              accessibilityHint="Abre la edición de tu foto y tu nombre"
+              accessibilityLabel="Editar perfil"
+              accessibilityRole="button"
+              onPress={() => setProfileEditorVisible(true)}
+              style={({ pressed }) => [
+                styles.profileButton,
+                pressed && styles.pressed,
+              ]}
+              testID="side-menu-profile-button"
+            >
+              <Avatar
+                size={profileAvatarSize}
+                testID="side-menu-profile-avatar"
+                uri={profileAvatarUri}
+              />
+              <View style={styles.profileText}>
+                <Text numberOfLines={1} variant="bodyStrong" weight="semibold">
+                  {profileName?.trim() || 'Tu perfil'}
+                </Text>
+                <Text tone="secondary" variant="footnote">
+                  Editar perfil
+                </Text>
+              </View>
             </Pressable>
           </View>
         </>
       )}
+
+      <ProfileEditorModal
+        onClose={() => setProfileEditorVisible(false)}
+        visible={isProfileEditorVisible}
+      />
     </SafeAreaView>
   );
 }
@@ -241,24 +345,33 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: spacing.xl,
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
       marginTop: spacing.sm,
     },
+    profileButton: {
+      minWidth: 0,
+      minHeight: profileAvatarSize,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    profileText: { minWidth: 0, flex: 1 },
     iconButton: {
       width: minTouchTarget,
       height: minTouchTarget,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: radii.round,
-      backgroundColor: colors.surfaceMuted,
     },
     pressed: {
       opacity: 0.68,
     },
-    spaceList: {
+    menuContent: {
       gap: spacing.sm,
       paddingBottom: spacing.xl,
     },
+    spaceList: { gap: spacing.sm },
     spaceScroll: {
       flex: 1,
     },
@@ -273,8 +386,9 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderColor: 'transparent',
     },
     spaceRowActive: {
-      backgroundColor: colors.surface,
-      borderColor: colors.cta,
+      ...shadows.none,
+      backgroundColor: colors.cta,
+      borderColor: 'transparent',
     },
     spaceIcon: {
       width: spaceIconSize,
@@ -284,6 +398,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: radii.round,
       backgroundColor: colors.surface,
     },
+    spaceIconActive: { backgroundColor: 'transparent' },
     spaceName: {
       minWidth: 0,
       flex: 1,
@@ -300,34 +415,33 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderColor: colors.border,
       backgroundColor: colors.surface,
     },
-    addSpaceButton: {
-      ...shadows.subtle,
-      minHeight: minTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radii.round,
-      backgroundColor: colors.surface,
-      marginTop: spacing.sm,
-      paddingHorizontal: spacing.lg,
-    },
-    addSpaceButtonDisabled: {
-      opacity: 0.5,
-    },
-    footer: {
+    divider: {
       borderColor: colors.border,
       borderTopWidth: 1,
-      paddingTop: spacing.md,
+      marginVertical: spacing.sm,
     },
-    settingsButton: {
+    actionRow: {
       minHeight: minTouchTarget,
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
       paddingHorizontal: spacing.md,
+    },
+    actionLabel: { minWidth: 0, flex: 1 },
+    actionIcon: {
+      width: iconSize.sm,
+      height: iconSize.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    themeSwitch: {
+      marginTop: spacing.sm,
+      transform: [{ scale: 0.84 }],
+    },
+    profileFooter: {
+      borderColor: colors.border,
+      borderTopWidth: 1,
+      paddingTop: spacing.lg,
     },
   });
 }

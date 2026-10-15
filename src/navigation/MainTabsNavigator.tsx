@@ -830,6 +830,8 @@ export function MainTabsNavigator() {
               }
               await selectSpace(spaceId);
             }}
+            profileAvatarUri={spaceMemberAvatarUris[0]}
+            profileName={userDisplayName}
             spaces={displayedSpaces}
             storageError={spacesError}
           />

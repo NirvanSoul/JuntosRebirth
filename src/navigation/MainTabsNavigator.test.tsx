@@ -382,7 +382,7 @@ describe('MainTabsNavigator', () => {
     ).toMatchObject({ selected: true });
 
     await fireEvent.press(screen.getByLabelText('Espacio Personal'));
-    const invitePartner = screen.getByLabelText('Espacio de pareja', {
+    const invitePartner = screen.getByLabelText('Seleccionar espacio Juntos', {
       includeHiddenElements: true,
     });
     await fireEvent.press(invitePartner);
@@ -424,7 +424,7 @@ describe('MainTabsNavigator', () => {
     );
 
     await fireEvent.press(screen.getByLabelText('Espacio Personal'));
-    const invitePartner = screen.getByLabelText('Espacio de pareja', {
+    const invitePartner = screen.getByLabelText('Seleccionar espacio Juntos', {
       includeHiddenElements: true,
     });
     await fireEvent.press(invitePartner);
@@ -455,7 +455,7 @@ describe('MainTabsNavigator', () => {
     );
 
     await fireEvent.press(screen.getByLabelText('Espacio Personal'));
-    const invitePartner = screen.getByLabelText('Espacio de pareja', {
+    const invitePartner = screen.getByLabelText('Seleccionar espacio Juntos', {
       includeHiddenElements: true,
     });
     await fireEvent.press(invitePartner);
@@ -501,7 +501,7 @@ describe('MainTabsNavigator', () => {
     ).toMatchObject({ selected: true });
 
     await fireEvent.press(screen.getByLabelText('Espacio Personal'));
-    const invitePartner = screen.getByLabelText('Espacio de pareja', {
+    const invitePartner = screen.getByLabelText('Seleccionar espacio Juntos', {
       includeHiddenElements: true,
     });
     await fireEvent.press(invitePartner);
