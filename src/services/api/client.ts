@@ -1,8 +1,14 @@
 type ApiErrorBody = {
   error?: {
     code?: unknown;
+    details?: unknown;
     message?: unknown;
   };
+};
+
+type ApiErrorDetails = {
+  path?: (string | number)[];
+  reason?: string;
 };
 
 type RequestOptions = {
@@ -24,6 +30,7 @@ type ApiClientDependencies = {
 /** Error normalizado para que la interfaz no exponga respuestas del servidor. */
 export class ApiError extends Error {
   readonly code: string;
+  readonly details?: ApiErrorDetails;
   readonly endpoint?: string;
   readonly requestId?: string;
   readonly status: number;
@@ -31,12 +38,14 @@ export class ApiError extends Error {
   constructor({
     status,
     code,
+    details,
     endpoint,
     message,
     requestId,
   }: {
     status: number;
     code: string;
+    details?: ApiErrorDetails;
     endpoint?: string;
     message: string;
     requestId?: string;
@@ -45,9 +54,26 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.details = details;
     this.endpoint = endpoint;
     this.requestId = requestId;
   }
+}
+
+function apiErrorDetails(value: unknown): ApiErrorDetails | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const candidate = value as Record<string, unknown>;
+  const path = Array.isArray(candidate.path)
+    ? candidate.path.filter(
+        (part): part is string | number =>
+          typeof part === 'string' || typeof part === 'number',
+      )
+    : undefined;
+  const reason =
+    typeof candidate.reason === 'string' ? candidate.reason : undefined;
+  return path || reason
+    ? { ...(path ? { path } : {}), ...(reason ? { reason } : {}) }
+    : undefined;
 }
 
 function requestIdFrom(response: Response): string | undefined {
@@ -163,6 +189,7 @@ export function createApiClient({
       const error = new ApiError({
         status: response.status,
         code,
+        details: apiErrorDetails(errorBody?.error?.details),
         endpoint: path,
         message: apiErrorMessage(response.status),
         requestId: requestIdFrom(response),
@@ -174,6 +201,7 @@ export function createApiClient({
         status: error.status,
         code: error.code,
         endpoint: error.endpoint,
+        ...(error.details ? { details: error.details } : {}),
         ...(error.requestId ? { requestId: error.requestId } : {}),
       });
       throw error;

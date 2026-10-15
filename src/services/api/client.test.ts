@@ -60,7 +60,15 @@ describe('apiClient', () => {
       fetchImpl: jest.fn().mockResolvedValue(
         createResponse(
           {
-            error: { code: 'INVALID_INPUT', message: 'column users leaked' },
+            error: {
+              code: 'INVALID_INPUT',
+              message: 'column users leaked',
+              details: {
+                path: ['transactions', 0, 'title'],
+                reason: 'REQUIRED_STRING',
+                ignored: 'not exposed',
+              },
+            },
           },
           400,
           { 'x-request-id': 'req-123' },
@@ -72,6 +80,10 @@ describe('apiClient', () => {
     await expect(client.get('/v1/spaces')).rejects.toEqual(
       expect.objectContaining({
         code: 'INVALID_INPUT',
+        details: {
+          path: ['transactions', 0, 'title'],
+          reason: 'REQUIRED_STRING',
+        },
         message: 'Revisa los datos e inténtalo de nuevo.',
         endpoint: '/v1/spaces',
         requestId: 'req-123',
@@ -82,6 +94,10 @@ describe('apiClient', () => {
       status: 400,
       code: 'INVALID_INPUT',
       endpoint: '/v1/spaces',
+      details: {
+        path: ['transactions', 0, 'title'],
+        reason: 'REQUIRED_STRING',
+      },
       requestId: 'req-123',
     });
     log.mockRestore();

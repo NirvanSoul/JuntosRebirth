@@ -151,6 +151,9 @@ describe('syncSpaceDataForCurrentSession', () => {
         }),
       ],
     });
+    expect(getAllAsync.mock.calls[5]?.[0]).toEqual(
+      expect.stringContaining("NULLIF(TRIM(transactions.title), '')"),
+    );
     expect(runAsync).toHaveBeenCalledTimes(3);
     expect(runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE money_accounts'),
