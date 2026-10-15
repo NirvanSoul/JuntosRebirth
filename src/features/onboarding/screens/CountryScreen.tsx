@@ -44,7 +44,7 @@ export function CountryScreen({ navigation }: Props) {
     setError(null);
     try {
       await updateProfileCountry(selected.iso2, { sync: 'deferred' });
-      navigation.navigate('Welcome');
+      navigation.navigate('Juntos');
     } catch (error) {
       console.error('[onboarding] No se pudo guardar el país/moneda', error);
       setError('No pudimos guardar tu moneda. Inténtalo de nuevo.');

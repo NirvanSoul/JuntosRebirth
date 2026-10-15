@@ -143,15 +143,16 @@ describe('initializeAuthenticatedSession', () => {
     expect(restoreRemoteAccountForCurrentSession).toHaveBeenCalledTimes(2);
   });
 
-  it('restaura de nuevo tras una subida incierta sin reintentar la escritura', async () => {
+  it('restaura de nuevo y propaga una subida fallida sin reintentar la escritura', async () => {
     const errorLog = jest
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
     try {
+      const failure = new Error('Network request failed');
       (syncSpaceDataForCurrentSession as jest.Mock).mockRejectedValueOnce(
-        new Error('Network request failed'),
+        failure,
       );
-      await initializeAuthenticatedSession();
+      await expect(initializeAuthenticatedSession()).rejects.toBe(failure);
       expect(restoreRemoteAccountForCurrentSession).toHaveBeenCalledTimes(2);
       expect(syncSpaceDataForCurrentSession).toHaveBeenCalledTimes(2);
     } finally {

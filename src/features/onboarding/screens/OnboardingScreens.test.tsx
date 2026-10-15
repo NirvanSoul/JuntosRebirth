@@ -2,13 +2,10 @@ import { act, fireEvent, waitFor } from '@testing-library/react-native';
 import { Keyboard } from 'react-native';
 
 import { CountryScreen } from '@/features/onboarding/screens/CountryScreen';
-import { CalendarPreviewScreen } from '@/features/onboarding/screens/CalendarPreviewScreen';
 import { JuntosScreen } from '@/features/onboarding/screens/JuntosScreen';
 import { NameScreen } from '@/features/onboarding/screens/NameScreen';
 import { NotificationsPermissionScreen } from '@/features/onboarding/screens/NotificationsPermissionScreen';
 import { OnboardingLoginScreen } from '@/features/onboarding/screens/OnboardingLoginScreen';
-import { WelcomeScreen } from '@/features/onboarding/screens/WelcomeScreen';
-import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { requestNotificationPermission } from '@/lib/notifications/localNotifications';
@@ -47,60 +44,33 @@ describe('pantallas de onboarding', () => {
     mockRequestNotificationPermission.mockResolvedValue(true);
   });
 
-  it('omite la bienvenida y lleva a la pregunta de notificaciones', async () => {
-    const screen = await renderWithTheme(
-      <OnboardingFlowContext.Provider value={{ completeOnboarding }}>
-        <WelcomeScreen navigation={navigation} route={route} />
-      </OnboardingFlowContext.Provider>,
-    );
-
-    fireEvent.press(screen.getByTestId('onboarding-welcome-skip'));
-    expect(mockNavigation.navigate).toHaveBeenLastCalledWith(
-      'NotificationsPermission',
-    );
-  });
-
-  it('responde con un háptico al continuar, pero no al omitir ni volver', async () => {
-    const screen = await renderWithTheme(
-      <WelcomeScreen navigation={navigation} route={route} />,
-    );
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('onboarding-welcome-skip'));
-    });
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('onboarding-welcome-back'));
-    });
-    expect(triggerHaptic).not.toHaveBeenCalled();
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('onboarding-welcome-action'));
-    });
-    expect(triggerHaptic).toHaveBeenCalledWith('onboardingContinue');
-    expect(mockNavigation.navigate).toHaveBeenLastCalledWith('CalendarPreview');
-  });
-
-  it('omite la lámina del calendario y lleva a la pregunta de notificaciones', async () => {
-    const screen = await renderWithTheme(
-      <CalendarPreviewScreen navigation={navigation} route={route} />,
-    );
-
-    fireEvent.press(screen.getByTestId('onboarding-calendar-skip'));
-    expect(mockNavigation.navigate).toHaveBeenLastCalledWith(
-      'NotificationsPermission',
-    );
-  });
-
-  it('omite la lámina compartida y lleva a la pregunta de notificaciones', async () => {
+  it('responde con un háptico al continuar, pero no al volver', async () => {
     const screen = await renderWithTheme(
       <JuntosScreen navigation={navigation} route={route} />,
     );
 
-    fireEvent.press(screen.getByTestId('onboarding-juntos-skip'));
+    expect(screen.queryByTestId('onboarding-juntos-skip')).toBeNull();
 
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-juntos-back'));
+    });
+    expect(triggerHaptic).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-juntos-action'));
+    });
+    expect(triggerHaptic).toHaveBeenCalledWith('onboardingContinue');
     expect(mockNavigation.navigate).toHaveBeenLastCalledWith(
       'NotificationsPermission',
     );
+  });
+
+  it('no muestra el botón de omitir en la lámina compartida', async () => {
+    const screen = await renderWithTheme(
+      <JuntosScreen navigation={navigation} route={route} />,
+    );
+
+    expect(screen.queryByTestId('onboarding-juntos-skip')).toBeNull();
   });
 
   it('solicita el permiso en la nueva lámina y continúa aunque el sistema lo deniegue', async () => {
@@ -160,13 +130,14 @@ describe('pantallas de onboarding', () => {
     dismissKeyboard.mockRestore();
   });
 
-  it('muestra el primer paso con la ilustración y los once segmentos', async () => {
+  it('muestra el primer paso con la ilustración y los nueve segmentos', async () => {
     const screen = await renderWithTheme(
       <NameScreen navigation={navigation} route={route} />,
     );
 
     expect(screen.getByTestId('onboarding-name-illustration')).toBeTruthy();
-    expect(screen.getByTestId('onboarding-progress-segment-11')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-progress-segment-9')).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-progress-segment-10')).toBeNull();
     expect(screen.queryByTestId('onboarding-name-back')).toBeNull();
   });
 
@@ -239,7 +210,7 @@ describe('pantallas de onboarding', () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigation.navigate).toHaveBeenCalledWith('Welcome');
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('Juntos');
     });
     expect(mockUpdateProfileCountry).toHaveBeenCalledWith('VE', {
       sync: 'deferred',

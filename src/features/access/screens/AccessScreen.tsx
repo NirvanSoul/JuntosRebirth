@@ -131,8 +131,8 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
     });
   };
 
-  // La entrada es la undécima lámina del onboarding: se dibuja con la misma
-  // estructura que las diez anteriores (progreso, ilustración a tamaño
+  // La entrada es la novena lámina del onboarding: se dibuja con la misma
+  // estructura que las ocho anteriores (progreso, ilustración a tamaño
   // estándar, titular revelado y acción principal al pie) en vez de repetir
   // aquí sus medidas. El resto de pasos conserva el andamiaje con scroll,
   // porque son formularios que conviven con el teclado.
@@ -140,7 +140,9 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
     return (
       <OnboardingScreenLayout
         actionLabel="Crear cuenta"
-        currentStep={11}
+        actionStyle={styles.onboardingCreateAccountAction}
+        actionVariant="surface"
+        currentStep={9}
         illustrationAspectRatio={entryIllustrationAspectRatio}
         illustrationSource={require('../../../../assets/Onboarding/10_loginicon.png')}
         onAction={() => setStep({ screen: 'signup', step: 1 })}
@@ -149,9 +151,8 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
             accessibilityLabel="Iniciar sesión"
             label="Iniciar sesión"
             onPress={() => setStep({ screen: 'login' })}
-            style={styles.onboardingLoginAction}
             testID="onboarding-login-open-login"
-            variant="surface"
+            variant="cta"
           />
         }
         subtitle="Inicia sesión fácilmente o crea una cuenta, para empezar a mejorar tus finanzas."
@@ -167,23 +168,14 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
       style={styles.safeArea}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          step.screen === 'login' ? styles.loginScrollContent : null,
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         testID="access-screen"
       >
-        {step.screen === 'login' ? (
-          <View
-            accessibilityLabel="Juntos"
-            accessibilityRole="image"
-            accessible
-            style={styles.loginLogo}
-            testID="login-logo"
-          >
-            <JuntosLogo width={loginLogoWidth} />
-          </View>
-        ) : null}
-
         <View
           style={[
             styles.header,
@@ -218,16 +210,33 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
           />
         ) : null}
 
-        <Animated.View entering={getDisclosureEntering()} key={step.screen}>
+        <Animated.View
+          entering={getDisclosureEntering()}
+          key={step.screen}
+          style={step.screen === 'login' ? styles.loginContent : undefined}
+        >
           {step.screen === 'login' ? (
-            <LoginScreen
-              onEmailVerificationRequired={(email) =>
-                setStep({ screen: 'verify-signup', email })
-              }
-              onNavigateToForgotPassword={() => setStep({ screen: 'forgot' })}
-              onNavigateToSignUp={() => setStep({ screen: 'signup', step: 1 })}
-              onSuccess={handleAuthenticated}
-            />
+            <>
+              <LoginScreen
+                onEmailVerificationRequired={(email) =>
+                  setStep({ screen: 'verify-signup', email })
+                }
+                onNavigateToForgotPassword={() => setStep({ screen: 'forgot' })}
+                onNavigateToSignUp={() =>
+                  setStep({ screen: 'signup', step: 1 })
+                }
+                onSuccess={handleAuthenticated}
+              />
+              <View
+                accessibilityLabel="Juntos"
+                accessibilityRole="image"
+                accessible
+                style={styles.loginLogo}
+                testID="login-logo"
+              >
+                <JuntosLogo testID="login-logo-image" width={loginLogoWidth} />
+              </View>
+            </>
           ) : null}
 
           {step.screen === 'signup' ? (
@@ -298,14 +307,23 @@ function createStyles(colors: ColorTokens) {
       paddingTop: spacing.huge,
       paddingBottom: spacing.huge,
     },
+    loginScrollContent: { paddingBottom: spacing.lg },
+    loginContent: { flex: 1 },
     header: { gap: spacing.lg },
     inlineHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
     },
-    loginLogo: { alignItems: 'center' },
+    loginLogo: {
+      alignItems: 'center',
+      marginTop: 'auto',
+      paddingTop: spacing.xl,
+    },
     backAction: { alignSelf: 'flex-start' },
-    onboardingLoginAction: { backgroundColor: colors.keypad, borderWidth: 0 },
+    onboardingCreateAccountAction: {
+      backgroundColor: colors.keypad,
+      borderWidth: 0,
+    },
   });
 }

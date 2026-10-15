@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { fireEvent } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { renderWithTheme } from '@/test/renderWithTheme';
@@ -10,12 +10,20 @@ import { shadows } from '@/theme/shadows';
 const mockAppModal = jest.fn(
   ({
     children,
+    onDismissed,
     visible,
   }: {
     backgroundVariant?: string;
     children: React.ReactNode;
+    onDismissed?: () => void;
     visible: boolean;
-  }) => (visible ? children : null),
+  }) =>
+    visible ? (
+      <>
+        {children}
+        <Pressable onPress={onDismissed} testID="finish-modal-dismiss" />
+      </>
+    ) : null,
 );
 
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
@@ -26,7 +34,12 @@ describe('QuickCreateMenu', () => {
   it('expone las tres acciones de creación sin subtítulos y devuelve la seleccionada', async () => {
     const onSelect = jest.fn();
     const screen = await renderWithTheme(
-      <QuickCreateMenu onClose={jest.fn()} onSelect={onSelect} visible />,
+      <QuickCreateMenu
+        chainSelectionAfterDismiss
+        onClose={jest.fn()}
+        onSelect={onSelect}
+        visible
+      />,
     );
 
     expect(mockAppModal).toHaveBeenCalledWith(
@@ -70,7 +83,10 @@ describe('QuickCreateMenu', () => {
     });
     expect(screen.getByTestId('quick-create-close-button')).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText('Crear gasto'));
+    await fireEvent.press(screen.getByLabelText('Crear gasto'));
+
+    expect(onSelect).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('finish-modal-dismiss'));
 
     expect(onSelect).toHaveBeenCalledWith('expense');
   });
@@ -97,7 +113,7 @@ describe('QuickCreateMenu', () => {
       disabled: false,
     });
 
-    fireEvent.press(expense);
+    await fireEvent.press(expense);
     expect(onSelect).not.toHaveBeenCalled();
   });
 
@@ -105,6 +121,7 @@ describe('QuickCreateMenu', () => {
     const onSelect = jest.fn();
     const screen = await renderWithTheme(
       <QuickCreateMenu
+        chainSelectionAfterDismiss
         onClose={jest.fn()}
         onSelect={onSelect}
         showCurrencyExchange
@@ -122,7 +139,10 @@ describe('QuickCreateMenu', () => {
       ).backgroundColor,
     ).toBe(colors.cta);
 
-    fireEvent.press(exchange);
+    await fireEvent.press(exchange);
+
+    expect(onSelect).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('finish-modal-dismiss'));
 
     expect(onSelect).toHaveBeenCalledWith('currency-exchange');
   });

@@ -5,8 +5,10 @@ import {
   Keyboard,
   Pressable,
   StyleSheet,
+  type StyleProp,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -62,6 +64,8 @@ const entranceOrder = {
 type OnboardingScreenLayoutProps = PropsWithChildren<{
   actionLabel?: string;
   actionDisabled?: boolean;
+  actionStyle?: StyleProp<ViewStyle>;
+  actionVariant?: 'cta' | 'surface';
   /** Acción circular colocada junto a Atrás, normalmente el FAB del onboarding. */
   footerAccessory?: ReactNode;
   /**
@@ -118,6 +122,8 @@ type OnboardingScreenLayoutProps = PropsWithChildren<{
 export function OnboardingScreenLayout({
   actionDisabled = false,
   actionLabel,
+  actionStyle,
+  actionVariant = 'cta',
   children,
   compactCopyOverlapsIllustration = false,
   compactRaisesActions = false,
@@ -227,6 +233,7 @@ export function OnboardingScreenLayout({
             >
               <AnimatedImage
                 accessible={false}
+                fadeDuration={0}
                 resizeMode="contain"
                 source={illustrationSource}
                 style={illustrationStyle}
@@ -298,9 +305,9 @@ export function OnboardingScreenLayout({
                 disabled={actionDisabled}
                 label={actionLabel}
                 onPress={handleAction}
-                style={styles.primaryAction}
+                style={[styles.primaryAction, actionStyle]}
                 testID={testID ? `${testID}-action` : undefined}
-                variant="cta"
+                variant={actionVariant}
               />
             ) : null}
             {footerAccessory ? (

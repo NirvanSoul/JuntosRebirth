@@ -42,7 +42,7 @@ export function NotificationsPermissionScreen({ navigation }: Props) {
     <OnboardingScreenLayout
       actionDisabled={isRequesting}
       actionLabel={isRequesting ? 'Activando…' : 'Activar notificaciones'}
-      currentStep={6}
+      currentStep={4}
       illustrationAspectRatio={notificationsIllustrationAspectRatio}
       illustrationSource={require('../../../../assets/Onboarding/5.5_Notificaciones.png')}
       onAction={() => void handleEnableNotifications()}

@@ -6,9 +6,9 @@ import type {
   SessionTransaction,
 } from '@/features/transactions/types';
 import {
+  archiveProjectedTransaction,
   materializeDueRecurringTransactions,
-  materializeRecurringSeriesThroughDate,
-  type RecurringSeriesRow,
+  materializeProjectedTransaction,
 } from '@/features/transactions/repositories/localTransactionMaterialization';
 import {
   assertMoneyAccountAssignment,
@@ -333,39 +333,12 @@ export async function updateLocalTransaction(
   const projectedIdentity = parseProjectedTransactionId(id);
 
   if (projectedIdentity) {
-    const series = await database.getFirstAsync<RecurringSeriesRow>(
-      `SELECT id, space_id, category_id, money_account_id, created_by, type,
-              amount_minor,
-              currency, title, frequency, starts_on, generated_occurrences,
-              next_occurrence_on
-         FROM recurring_transaction_series
-        WHERE id = ? AND space_id = ? AND is_archived = 0`,
-      projectedIdentity.seriesId,
-      draft.spaceId,
-    );
-    if (!series) {
-      throw new Error('La serie recurrente ya no está disponible');
-    }
-
-    await materializeRecurringSeriesThroughDate(
+    const materializedId = await materializeProjectedTransaction(
       database,
-      series,
-      projectedIdentity.occurredOn,
-    );
-    const materializedOccurrence = await database.getFirstAsync<{ id: string }>(
-      `SELECT id
-         FROM transactions
-        WHERE recurrence_series_id = ? AND occurred_on = ?
-          AND space_id = ? AND is_archived = 0`,
-      projectedIdentity.seriesId,
-      projectedIdentity.occurredOn,
+      projectedIdentity,
       draft.spaceId,
     );
-    if (!materializedOccurrence) {
-      throw new Error('No pudimos preparar la ocurrencia futura');
-    }
-
-    return updateLocalTransaction(materializedOccurrence.id, draft);
+    return updateLocalTransaction(materializedId, draft);
   }
 
   const now = new Date().toISOString();
@@ -823,6 +796,12 @@ export async function archiveLocalTransaction(
   spaceId: string,
 ): Promise<void> {
   const database = await getLocalDatabase();
+  const projectedIdentity = parseProjectedTransactionId(transactionId);
+
+  if (projectedIdentity) {
+    return archiveProjectedTransaction(database, projectedIdentity, spaceId);
+  }
+
   const now = new Date().toISOString();
   const result = await database.runAsync(
     `UPDATE transactions

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { authClient } from '@/lib/auth-client';
 
 export type BetterAuthSession = NonNullable<
@@ -23,10 +25,23 @@ export type BetterAuthSessionState = {
  */
 export function useBetterAuthSession(): BetterAuthSessionState {
   const { data, error, isPending } = authClient.useSession();
+  const isCurrentSessionReady = !isPending || data !== null;
+  const [hasResolvedInitialSession, setHasResolvedInitialSession] = useState(
+    isCurrentSessionReady,
+  );
+
+  // Una vez resuelta, la lectura inicial no vuelve al estado de arranque.
+  if (isCurrentSessionReady && !hasResolvedInitialSession) {
+    setHasResolvedInitialSession(true);
+  }
 
   return {
     error,
-    isReady: !isPending || data !== null,
+    // Better Auth marca una sesión anónima como pendiente cada vez que
+    // recupera el foco. En iOS, Face ID provoca una transición inactive/active
+    // al autorizar el autocompletado. La espera solo debe bloquear el arranque:
+    // desmontar Acceso en los refrescos posteriores borra el formulario.
+    isReady: isCurrentSessionReady || hasResolvedInitialSession,
     session: data ?? null,
   };
 }

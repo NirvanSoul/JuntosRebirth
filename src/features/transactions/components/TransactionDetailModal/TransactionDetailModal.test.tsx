@@ -597,12 +597,13 @@ describe('TransactionDetailModal', () => {
     expect(onSaveNote).toHaveBeenCalledWith('lunch', null);
   });
 
-  it('oculta la nota en ocurrencias proyectadas sin materializar', async () => {
+  it('permite eliminar una ocurrencia proyectada sin ofrecer acciones que requieren materializarla', async () => {
     const projectedId = createProjectedTransactionId(
       'monthly-series',
       '2026-09-30',
     );
     const projectedTransaction = { ...transaction, id: projectedId };
+    const onDelete = jest.fn();
     const screen = await render(
       <SafeAreaProvider
         initialMetrics={{
@@ -615,7 +616,7 @@ describe('TransactionDetailModal', () => {
             category={category}
             onClose={jest.fn()}
             onCopy={jest.fn(() => true)}
-            onDelete={jest.fn()}
+            onDelete={onDelete}
             onEdit={jest.fn()}
             onRemoveReminder={jest.fn(() => true)}
             onSaveNote={jest.fn()}
@@ -631,6 +632,12 @@ describe('TransactionDetailModal', () => {
     );
 
     expect(screen.queryByTestId('transaction-detail-note')).toBeNull();
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Eliminar movimiento' }),
+    );
+    expect(screen.getByText('¿Eliminar esta repetición?')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Eliminar' }));
+    expect(onDelete).toHaveBeenCalledWith(projectedId);
   });
   describe('cuenta del movimiento', () => {
     const bankAccount = {

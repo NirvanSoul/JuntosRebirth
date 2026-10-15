@@ -67,6 +67,7 @@ type TransactionDetailModalProps = {
   /** Cuentas asignables: solo las activas del espacio en esta misma moneda. */
   assignableMoneyAccounts?: readonly MoneyAccount[];
   onClose: () => void;
+  onDismissed?: () => void;
   onCopy: (
     transactionId: string,
     targetSpaceId: string,
@@ -101,6 +102,7 @@ export function TransactionDetailModal({
   category,
   moneyAccount,
   onClose,
+  onDismissed,
   onCreateMoneyAccount,
   onOpenCategoryDetail,
   onQuickEdit,
@@ -178,6 +180,7 @@ export function TransactionDetailModal({
         extendContentIntoBottomInset
         hideHandle
         onClose={onClose}
+        onDismissed={onDismissed}
         testID="transaction-detail-modal"
         variant="expanded"
         visible={visible}
@@ -187,7 +190,7 @@ export function TransactionDetailModal({
             <DetailActionMenu
               itemLabel="movimiento"
               key={transaction.id}
-              onDelete={isProjected ? undefined : () => setDeleteVisible(true)}
+              onDelete={() => setDeleteVisible(true)}
               onEdit={() => onEdit(transaction.id)}
               testIDPrefix="transaction"
             />
@@ -284,14 +287,20 @@ export function TransactionDetailModal({
             {isDeleteVisible ? (
               <DestructiveConfirmationPanel
                 description={
-                  transaction.sourceTransactionId
-                    ? 'Es una copia de otro espacio. Se eliminará solo en este espacio; el movimiento original no se verá afectado.'
-                    : 'Dejará de aparecer en este espacio y sus totales se actualizarán.'
+                  isProjected
+                    ? 'Se omitirá solo esta repetición. Las demás fechas de la serie seguirán iguales.'
+                    : transaction.sourceTransactionId
+                      ? 'Es una copia de otro espacio. Se eliminará solo en este espacio; el movimiento original no se verá afectado.'
+                      : 'Dejará de aparecer en este espacio y sus totales se actualizarán.'
                 }
                 onCancel={() => setDeleteVisible(false)}
                 onConfirm={() => onDelete(transaction.id)}
                 testID="transaction-delete-panel"
-                title="¿Eliminar este movimiento?"
+                title={
+                  isProjected
+                    ? '¿Eliminar esta repetición?'
+                    : '¿Eliminar este movimiento?'
+                }
               />
             ) : null}
 

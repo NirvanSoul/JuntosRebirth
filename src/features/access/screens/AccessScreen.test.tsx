@@ -1,4 +1,5 @@
 import { fireEvent, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { renderWithTheme } from '@/test/renderWithTheme';
@@ -16,7 +17,10 @@ jest.mock('@/features/auth/hooks/useBetterAuthSession', () => ({
 }));
 
 jest.mock('@/features/auth/screens/LoginScreen', () => ({
-  LoginScreen: () => null,
+  LoginScreen: () => {
+    const { View } = jest.requireActual('react-native');
+    return <View testID="login-content" />;
+  },
 }));
 jest.mock('@/features/auth/services/pendingEmailVerification', () => ({
   loadPendingEmailVerification: jest.fn(
@@ -76,7 +80,8 @@ describe('AccessScreen', () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
     expect(screen.getByTestId('onboarding-login-illustration')).toBeTruthy();
-    expect(screen.getByTestId('onboarding-progress-segment-10')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-progress-segment-9')).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-progress-segment-10')).toBeNull();
     expect(screen.getByText('Empecemos esto\nJuntos.')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('onboarding-login-action'));
@@ -92,17 +97,41 @@ describe('AccessScreen', () => {
     expect(screen.queryByText('Atrás')).toBeNull();
   });
 
-  it('muestra el logo de Juntos antes del título de iniciar sesión', async () => {
+  it('muestra el logo de Juntos después del contenido de inicio de sesión', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
     fireEvent.press(screen.getByTestId('onboarding-login-open-login'));
 
     const logo = await screen.findByTestId('login-logo');
-    const title = screen.getByText('Iniciar sesión');
-    const titleContainer = title.parent ?? title;
-    expect(logo.parent?.children.indexOf(logo)).toBeLessThan(
-      logo.parent?.children.indexOf(titleContainer) ?? Infinity,
+    const loginContent = screen.getByTestId('login-content');
+    expect(
+      screen.getByTestId('login-logo-image', {
+        includeHiddenElements: true,
+      }).props.height,
+    ).toBeCloseTo((200 * 1095) / 2803);
+    expect(logo.parent).toBe(loginContent.parent);
+    expect(logo.parent?.children.indexOf(logo)).toBeGreaterThan(
+      logo.parent?.children.indexOf(loginContent) ?? Infinity,
     );
+    expect(StyleSheet.flatten(logo.props.style)).toMatchObject({
+      marginTop: 'auto',
+      paddingTop: 24,
+    });
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('access-screen').props.contentContainerStyle,
+      ).paddingBottom,
+    ).toBe(16);
+  });
+
+  it('muestra iniciar sesión con CTA principal y crear cuenta con variante surface', async () => {
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    const loginButton = screen.getByTestId('onboarding-login-open-login');
+    const signupButton = screen.getByTestId('onboarding-login-action');
+
+    expect(loginButton).toHaveTextContent('Iniciar sesión');
+    expect(signupButton).toHaveTextContent('Crear cuenta');
   });
 
   it('retoma la verificación cuando Better Auth creó una sesión sin verificar', async () => {

@@ -25,85 +25,30 @@ Principio central:
 ```text
 Pantalla 1 → Nombre y bienvenida personal
 Pantalla 2 → País y moneda principal
-Pantalla 3 → Promesa principal
-Pantalla 4 → Diferenciador visual
-Pantalla 5 → Uso personal y compartido
-Pantalla 6 → Activar notificaciones o continuar sin ellas
-Pantalla 7 → Crear al menos tres categorías
-Pantalla 8 → Añadir el primer ingreso
-Pantalla 9 → Añadir el primer gasto
-Pantalla 10 → Cierre: listo para explorar
-Pantalla 11 (acceso) → Crear cuenta o iniciar sesión
+Pantalla 3 → Uso personal y compartido
+Pantalla 4 → Activar notificaciones o continuar sin ellas
+Pantalla 5 → Crear al menos tres categorías
+Pantalla 6 → Añadir el primer ingreso
+Pantalla 7 → Añadir el primer gasto
+Pantalla 8 → Cierre: listo para explorar
+Pantalla 9 (acceso) → Crear cuenta o iniciar sesión
 Inicio → Primer movimiento y estado vacío guiado
 ```
 
 Recomendación:
 
-- 9 láminas, además de la captura inicial de nombre (ampliado desde el límite
-  original de 4 por decisiones explícitas de producto sucesivas: se explica
-  el permiso de notificaciones y las últimas cuatro cierran el onboarding con
-  acciones reales dentro de la app —crear categorías, registrar un ingreso y
-  un gasto— en vez de solo mensaje).
+- 7 láminas, además de la captura inicial de nombre: una explica el uso
+  personal y compartido, otra contextualiza el permiso de notificaciones y
+  las cuatro últimas cierran el onboarding con acciones reales dentro de la
+  app —crear categorías, registrar un ingreso y un gasto— y un mensaje final.
 - No ampliar más allá sin una decisión explícita de producto.
 - Una idea principal por pantalla.
+- Todo el recorrido, incluido Acceso y sus formularios, usa siempre el tema
+  claro aunque el dispositivo o la preferencia guardada estén en modo oscuro.
 
 ---
 
-# 3. Pantalla 3 — Simplicidad
-
-## Objetivo
-
-Explicar qué hace Juntos y dejar claro que no es una aplicación financiera complicada.
-
-## Concepto visual
-
-Mostrar una interfaz limpia con:
-
-- Balance.
-- Gastos del mes.
-- Uno o dos movimientos.
-- Acciones para crear gasto o ingreso.
-
-## Opciones de título
-
-1. **Tu dinero, sin complicaciones**
-2. **Tus finanzas claras**
-3. **Entiende tu dinero de un vistazo**
-4. **Organizar tu dinero puede ser sencillo**
-5. **Todo lo importante, sin el ruido**
-6. **Menos cuentas. Más claridad.**
-7. **Tu dinero, más fácil de entender**
-8. **Finanzas personales para la vida real**
-
-## Opciones de subtítulo
-
-1. Registra ingresos y gastos en segundos y entiende cuánto tienes disponible.
-2. Lleva el control de tu dinero sin hojas de cálculo ni pantallas complicadas.
-3. Consulta tus movimientos, categorías y balance desde una experiencia simple.
-4. Añade lo que gastas y recibes. Nosotros te ayudamos a verlo con claridad.
-5. Organiza tu día a día financiero de una forma rápida y natural.
-6. Todo lo que necesitas para entender tu dinero, sin funciones que estorben.
-
-## Combinaciones recomendadas
-
-### Opción A
-
-**Tu dinero, sin complicaciones**  
-Registra ingresos y gastos en segundos y entiende cuánto tienes disponible.
-
-### Opción B
-
-**Entiende tu dinero de un vistazo**  
-Consulta tus movimientos, categorías y balance desde una experiencia simple.
-
-### Opción C
-
-**Todo lo importante, sin el ruido**  
-Lleva el control de tu dinero sin hojas de cálculo ni pantallas complicadas.
-
----
-
-# 4. Pantalla 2 — País y moneda
+# 3. Pantalla 2 — País y moneda
 
 ## Objetivo
 
@@ -135,65 +80,7 @@ Escribe el nombre de tu país y te mostraremos opciones similares.
 
 ---
 
-# 5. Pantalla 4 — Calendario y mapa financiero
-
-## Objetivo
-
-Presentar uno de los principales diferenciadores de Juntos: visualizar los movimientos en el tiempo.
-
-## Concepto visual
-
-Una ilustración estática (calendario con un día marcado, monedas y una marca
-de verificación), del mismo tamaño y en el mismo lugar que la ilustración de
-las láminas anteriores. No se muestra una vista previa funcional del
-calendario real: esa exploración ocurre después, dentro de la aplicación
-(Mapa).
-
-## Combinación implementada
-
-**Tu mes tiene mucho que contarte**
-Mira en tu Mapa cómo se ha movido tu dinero a lo largo de los días.
-
-## Opciones de título
-
-1. **Mira cómo se mueve tu dinero**
-2. **Tu dinero también tiene una historia**
-3. **Cada movimiento, en su momento**
-4. **Ve tus finanzas en el tiempo**
-5. **Un calendario para entender tu dinero**
-6. **Descubre tus hábitos día a día**
-7. **Tus movimientos, justo donde ocurrieron**
-8. **Todo tu mes, más fácil de leer**
-
-## Opciones de subtítulo
-
-1. Consulta tus gastos e ingresos por día, semana o mes.
-2. Usa el calendario para reconocer hábitos y encontrar movimientos rápidamente.
-3. Cada punto representa algo que gastaste o recibiste.
-4. Cambia entre la vista mensual y semanal para entender mejor tu actividad.
-5. Observa cuándo gastas, cuándo recibes y cómo cambia tu mes.
-6. Encuentra tus movimientos sin perderte entre listas interminables.
-
-## Combinaciones recomendadas
-
-### Opción A
-
-**Mira cómo se mueve tu dinero**  
-Consulta tus gastos e ingresos por día, semana o mes.
-
-### Opción B
-
-**Un calendario para entender tu dinero**  
-Observa cuándo gastas, cuándo recibes y cómo cambia tu mes.
-
-### Opción C
-
-**Tus movimientos, justo donde ocurrieron**  
-Encuentra tus gastos e ingresos sin perderte entre listas interminables.
-
----
-
-# 6. Pantalla 5 — Personal y compartido
+# 4. Pantalla 3 — Personal y compartido
 
 ## Objetivo
 
@@ -249,7 +136,7 @@ Cambia de espacio cuando quieras y consulta únicamente la información correspo
 
 ---
 
-# 6.1 Pantalla 6 — Permiso de notificaciones
+# 4.1 Pantalla 4 — Permiso de notificaciones
 
 ## Objetivo
 
@@ -278,7 +165,7 @@ bloquea el paso a las primeras categorías.
 
 ---
 
-# 6.2 Pantalla 7 — Crear las primeras categorías
+# 4.2 Pantalla 5 — Crear las primeras categorías
 
 ## Objetivo
 
@@ -314,20 +201,20 @@ El usuario debe crear al menos tres categorías, de plantilla o personalizadas.
 Cuando abre el selector de plantillas desde el onboarding, el botón Guardar
 permanece deshabilitado hasta seleccionar tres categorías; esta restricción no
 se aplica al selector usado fuera del onboarding. Solo al alcanzar ese mínimo
-se completa el paso y continúa el flujo hacia la Pantalla 8 (añadir el primer
+se completa el paso y continúa el flujo hacia la Pantalla 6 (añadir el primer
 ingreso).
 
 ---
 
-# 6.3 Pantalla 8 — Añadir el primer ingreso
+# 4.3 Pantalla 6 — Añadir el primer ingreso
 
 ## Objetivo
 
-Continuar la acción real iniciada en la Pantalla 7: con al menos tres categorías ya creadas, registrar el primer movimiento del espacio.
+Continuar la acción real iniciada en la Pantalla 5: con al menos tres categorías ya creadas, registrar el primer movimiento del espacio.
 
 ## Concepto visual
 
-Ilustración `7 Bien.png`, igual estructura que la Pantalla 7.
+Ilustración `7 Bien.png`, igual estructura que la Pantalla 5.
 
 ## Título y subtítulo
 
@@ -337,11 +224,11 @@ Registra el primer dinero que entra a tu espacio personal.
 
 ## Botón principal
 
-**Añadir ingreso**. Abre el mismo `CreateTransactionModal` que usa el resto de la aplicación para crear un movimiento, con dos diferencias exclusivas de este paso del onboarding: el selector de tipo (gasto/ingreso) no aparece —se muestra una insignia fija «Ingreso»— y el botón de guardar se tiñe de verde (`colors.income`) en vez de tomar el color de la categoría elegida. El resto del formulario —importe, calculadora, categoría (con acceso al mismo `CategoryPickerModal`/`CreateCategoryModal` de la Pantalla 7), fecha, recurrencia— es idéntico al de la app ya autenticada. Guardar el movimiento completa el paso y continúa hacia la Pantalla 9.
+**Añadir ingreso**. Abre el mismo `CreateTransactionModal` que usa el resto de la aplicación para crear un movimiento, con dos diferencias exclusivas de este paso del onboarding: el selector de tipo (gasto/ingreso) no aparece —se muestra una insignia fija «Ingreso»— y el botón de guardar se tiñe de verde (`colors.income`) en vez de tomar el color de la categoría elegida. El resto del formulario —importe, calculadora, categoría (con acceso al mismo `CategoryPickerModal`/`CreateCategoryModal` de la Pantalla 5), fecha, recurrencia— es idéntico al de la app ya autenticada. Guardar el movimiento completa el paso y continúa hacia la Pantalla 7.
 
 ---
 
-# 6.4 Pantalla 9 — Añadir el primer gasto
+# 4.4 Pantalla 7 — Añadir el primer gasto
 
 ## Objetivo
 
@@ -360,11 +247,11 @@ Registrando tus gastos tendrás un mejor panorama de tus finanzas.
 
 ## Botón principal
 
-**Añadir gasto**. Mismo mecanismo que la Pantalla 8, con la insignia fija en «Gasto» y el botón de guardar en rojo (`colors.expense`) en vez de «Ingreso»/verde. Guardar el movimiento completa el paso y continúa hacia la Pantalla 10.
+**Añadir gasto**. Mismo mecanismo que la Pantalla 6, con la insignia fija en «Gasto» y el botón de guardar en rojo (`colors.expense`) en vez de «Ingreso»/verde. Guardar el movimiento completa el paso y continúa hacia la Pantalla 8.
 
 ---
 
-# 6.5 Pantalla 10 — Cierre: listo para explorar
+# 4.5 Pantalla 8 — Cierre: listo para explorar
 
 ## Objetivo
 
@@ -396,42 +283,40 @@ Cada pantalla debe incluir:
 - Botón principal.
 - Botón secundario `Atrás`, justo a la izquierda del botón principal y de
   menor jerarquía visual, a partir de la segunda pantalla y en cada lámina
-  posterior, incluida la lámina de bienvenida/simplicidad. Solo la primera
+  posterior. Solo la primera
   pantalla (captura de nombre) no lo muestra, porque no hay nada anterior a
   donde volver.
-- Opción **Omitir** en la esquina superior derecha únicamente en las pantallas
-  3, 4 y 5. Desde cualquiera lleva a la Pantalla 6, para preguntar por las
-  notificaciones antes de continuar con la configuración.
+- La pantalla 3 no muestra botón `Omitir` en la cabecera; avanza directamente con `Continuar` hacia la Pantalla 4 (notificaciones).
 
 ## Textos recomendados
 
-Pantallas 1 a 5:
+Pantallas 1 a 3:
 
 - **Continuar**
 - Siguiente
 - Ver cómo funciona
 
-Pantalla 6:
+Pantalla 4:
 
 - **Activar notificaciones**.
 - **Ahora no**.
 
-Pantallas 7 a 9, cada una con una acción real que reemplaza a `Continuar` y que también avanza el flujo al completarse:
+Pantallas 5 a 7, cada una con una acción real que reemplaza a `Continuar` y que también avanza el flujo al completarse:
 
-- Pantalla 7: **Crear categoría**, hasta completar al menos tres.
-- Pantalla 8: **Añadir ingreso**.
-- Pantalla 9: **Añadir gasto**.
+- Pantalla 5: **Crear categoría**, hasta completar al menos tres.
+- Pantalla 6: **Añadir ingreso**.
+- Pantalla 7: **Añadir gasto**.
 
-Pantalla 10 (última antes de Acceso, cierra la configuración local):
+Pantalla 8 (última antes de Acceso, cierra la configuración local):
 
 - **Empezar**
 
 Recomendación final:
 
-- `Continuar` en las pantallas 1 a 5.
-- La decisión de notificaciones en la pantalla 6.
-- La acción real correspondiente (`Crear categoría` hasta completar al menos tres / `Añadir ingreso` / `Añadir gasto`) en las pantallas 7 a 9.
-- `Empezar` en la 10.
+- `Continuar` en las pantallas 1 a 3.
+- La decisión de notificaciones en la pantalla 4.
+- La acción real correspondiente (`Crear categoría` hasta completar al menos tres / `Añadir ingreso` / `Añadir gasto`) en las pantallas 5 a 7.
+- `Empezar` en la 8.
 
 ---
 
@@ -455,13 +340,10 @@ Permitir:
 
 ## Estructura
 
-La entrada de acceso es la undécima lámina del onboarding y se dibuja con
-`OnboardingScreenLayout`, igual que las diez anteriores: no declara medidas
-propias de ilustración, tipografía ni botones. De ahí toma el indicador de
-progreso (paso 11 de 11), la ilustración `10_loginicon.png` a tamaño estándar,
-el titular y el subtítulo con la misma revelación, y la altura de acción del
-resto del flujo. `Iniciar sesión` ocupa la ranura de acción secundaria, justo
-encima de `Crear cuenta`, que es la acción principal al pie.
+La entrada de acceso es la novena pantalla del recorrido y reutiliza
+`AccessScreen`; no existe una copia específica para onboarding. El acceso y
+todos sus formularios se mantienen en tema claro hasta que haya una sesión
+verificada.
 
 Los pasos siguientes (crear cuenta, inicio de sesión, OTP, recuperación) sí
 conservan su propio andamiaje con scroll, porque son formularios que conviven
@@ -803,14 +685,18 @@ No enviar:
 
 ---
 
-# 22. Tres propuestas completas
+# 22. Referencias de tono
+
+Estas propuestas solo sirven como referencia de voz. El orden y el contenido
+vigentes del flujo son los definidos en las secciones 2 a 8; ninguna propuesta
+puede añadir láminas informativas.
 
 ## Propuesta A — Directa
 
 ### Pantalla 1
 
-**Tu dinero, sin complicaciones**  
-Registra ingresos y gastos en segundos y entiende cuánto tienes disponible.
+**¿Cómo quieres que te llamemos?**
+Usaremos tu nombre para personalizar la experiencia.
 
 ### Pantalla 2
 
@@ -819,13 +705,13 @@ Escribe tu país y elige una de las sugerencias para configurar tu moneda princi
 
 ### Pantalla 3
 
-**Mira cómo se mueve tu dinero**  
-Consulta tus gastos e ingresos por día, semana o mes.
+**Un espacio para ti. Otro para los dos.**
+Mantén tus finanzas personales separadas y organiza los gastos compartidos con tu pareja.
 
 ### Pantalla 4
 
-**Un espacio para ti. Otro para los dos.**  
-Mantén tus finanzas personales separadas y organiza los gastos compartidos con tu pareja.
+**¿Quieres activar las notificaciones?**
+Recibe recordatorios que activas y avisos de invitaciones.
 
 ### Acceso
 
@@ -845,8 +731,8 @@ Verifica tu correo para proteger y sincronizar tus datos.
 
 ### Pantalla 1
 
-**Tus finanzas claras**  
-Añade lo que gastas y recibes. Nosotros te ayudamos a verlo con claridad.
+**Antes de empezar, dinos tu nombre**
+Hagamos Juntos un poco más tuyo.
 
 ### Pantalla 2
 
@@ -855,13 +741,13 @@ Elige tu país para que cada importe tenga sentido desde el primer movimiento.
 
 ### Pantalla 3
 
-**Tu dinero también tiene una historia**  
-Observa cuándo gastas, cuándo recibes y cómo cambia tu mes.
+**Comparte únicamente lo que decidas**
+Tus movimientos personales permanecen separados de los compartidos.
 
 ### Pantalla 4
 
-**Comparte únicamente lo que decidas**  
-Tus movimientos personales permanecen separados de los compartidos.
+**Activa solo los avisos que te ayuden**
+Puedes cambiar esta decisión más adelante.
 
 ### Acceso
 
@@ -882,8 +768,8 @@ Prueba la aplicación antes de registrarte.
 
 ### Pantalla 1
 
-**Menos ruido. Más claridad.**  
-Tus gastos, ingresos y balance en un solo lugar.
+**¿Cuál es tu nombre?**
+Empezamos por lo esencial.
 
 ### Pantalla 2
 
@@ -892,13 +778,13 @@ Configura la moneda principal en un momento.
 
 ### Pantalla 3
 
-**Todo tu mes, más fácil de leer**  
-Encuentra cada movimiento en el calendario.
+**Solo o en pareja**
+Cambia de espacio sin mezclar tus finanzas.
 
 ### Pantalla 4
 
-**Solo o en pareja**  
-Cambia de espacio sin mezclar tus finanzas.
+**Notificaciones a tu ritmo**
+Puedes activarlas ahora o continuar sin ellas.
 
 ### Acceso
 
@@ -917,8 +803,8 @@ Tu correo se verifica antes de entrar a la aplicación.
 
 ## Pantalla 1
 
-**Menos dudas, más control sobre tu dinero.**
-Guarda cada gasto e ingreso y mantén una visión clara de tu dinero.
+**Primero que nada… ¿Cómo te llamas?**
+Nosotros nos llamamos Juntos, y queremos conocerte.
 
 ## Pantalla 2
 
@@ -927,13 +813,13 @@ Escribe el nombre de tu país y te mostraremos opciones similares.
 
 ## Pantalla 3
 
-**Tu mes tiene mucho que contarte**
-Mira en tu Mapa cómo se ha movido tu dinero a lo largo de los días.
+**Juntos pero no revueltos**
+Comparte gastos con tu pareja y conserva lo personal en tu propio espacio.
 
 ## Pantalla 4
 
-**Juntos pero no revueltos**
-Comparte gastos con tu pareja y conserva lo personal en tu propio espacio.
+**¿Quieres activar las notificaciones?**
+Recibe recordatorios que activas y avisos cuando alguien te invite a un espacio.
 
 ## Pantalla de acceso
 
@@ -942,8 +828,8 @@ Crea una cuenta para guardar y sincronizar tu información.
 
 Acciones:
 
-- **Crear cuenta**
-- **Ya tengo cuenta**
+- **Iniciar sesión** (botón principal con fondo morado / CTA)
+- **Crear cuenta** (botón secundario con fondo gris / surface)
 
 Microtexto:
 
@@ -954,7 +840,8 @@ Microtexto:
 # 24. Checklist para agentes
 
 - [ ] Leer este documento.
-- [ ] Mantener las diez pantallas previas a Acceso en este orden: nombre, país y moneda, bienvenida, calendario, uso compartido, permiso de notificaciones, al menos tres categorías, primer ingreso, primer gasto, cierre.
+- [ ] Mantener las ocho pantallas previas a Acceso en este orden: nombre, país y moneda, uso compartido, permiso de notificaciones, al menos tres categorías, primer ingreso, primer gasto y cierre.
+- [ ] Mantener todo el recorrido previo a una sesión verificada en tema claro.
 - [ ] Mantener una sola idea principal por pantalla.
 - [ ] No habilitar navegación de datos antes de verificar el correo.
 - [ ] Mantener claros los mensajes de error y reenvío de OTP.

@@ -1,14 +1,12 @@
 #!/usr/bin/env sh
-# Arranca Expo Go con tunel ngrok para compartir la app fuera de la red local.
-#
-# El tunel gratuito de Expo es compartido entre todos sus usuarios y a veces
-# rechaza la conexion con "failed to start tunnel / remote gone away". Ese fallo
-# es transitorio, asi que aqui se libera el puerto y se reintenta.
+# Arranca Expo Go con el tunel WebSocket de Expo para compartir la app fuera de
+# la red local. El tunel ngrok heredado falla de forma intermitente con
+# "failed to start tunnel / remote gone away".
 set -u
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_ROOT=$(dirname "${SCRIPT_DIR}")
-PORT="${RCT_METRO_PORT:-8081}"
+PORT=8081
 ATTEMPTS="${TUNNEL_ATTEMPTS:-5}"
 RETRY_DELAY="${TUNNEL_RETRY_DELAY:-8}"
 # Un fallo del tunel ocurre al arrancar. Si Expo vivio mas que esto, la sesion
@@ -38,8 +36,7 @@ while [ "${attempt}" -le "${ATTEMPTS}" ]; do
   started_at=$(date +%s)
   (
     cd "${PROJECT_ROOT}" || exit 1
-    NODE_OPTIONS="--require=./scripts/expo-ngrok-guard.cjs${NODE_OPTIONS:+ ${NODE_OPTIONS}}" \
-      npx expo start --go --tunnel --port "${PORT}"
+    EXPO_UNSTABLE_TUNNEL_V2=1 npx expo start --go --tunnel --port "${PORT}"
   ) && exit 0
   status=$?
   elapsed=$(($(date +%s) - started_at))
@@ -54,6 +51,6 @@ while [ "${attempt}" -le "${ATTEMPTS}" ]; do
 done
 
 echo "" >&2
-echo "El tunel de ngrok no arranco tras ${ATTEMPTS} intentos." >&2
-echo "Revisa https://status.ngrok.com/ o usa 'npm run start:lan' en la misma wifi." >&2
+echo "El tunel de Expo no arranco tras ${ATTEMPTS} intentos." >&2
+echo "Revisa https://status.expo.dev/ o usa 'npm run start:lan' en la misma wifi." >&2
 exit 1

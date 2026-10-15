@@ -94,6 +94,7 @@ async function performSessionInitialization(
   const { spaces } = await loadSpaces();
 
   let needsFinalRestore = false;
+  let firstSpaceSyncFailure: { error: unknown } | null = null;
   for (const space of spaces) {
     try {
       // `local_only` son las filas que nunca llegaron a subirse, típicamente
@@ -108,6 +109,7 @@ async function performSessionInitialization(
     } catch (spaceSyncError) {
       // El servidor pudo aceptar el lote y perderse solo la respuesta.
       needsFinalRestore = true;
+      firstSpaceSyncFailure ??= { error: spaceSyncError };
       console.error(
         `[sessionInitialization] Error sincronizando espacio ${space.id}:`,
         spaceSyncError,
@@ -117,4 +119,9 @@ async function performSessionInitialization(
 
   // Sin subidas, el primer snapshot ya es la versión que debe mostrarse.
   if (needsFinalRestore) await restoreRemoteAccountForCurrentSession();
+
+  // El snapshot y la caché ya son utilizables, pero la inicialización no fue
+  // exitosa: propagar el rechazo permite mostrar el aviso y evita que el
+  // polling repita automáticamente un lote inválido.
+  if (firstSpaceSyncFailure) throw firstSpaceSyncFailure.error;
 }

@@ -71,3 +71,21 @@ export function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
     pressed: { opacity: 0.72 },
   });
 }
+
+export const periodModalLabels = {
+  total: {
+    income: 'Total de ingresos',
+    expense: 'Total de gastos',
+    balance: 'Balance del periodo',
+  },
+  add: {
+    income: 'Añadir ingreso',
+    expense: 'Añadir gasto',
+    balance: 'Añadir movimiento',
+  },
+  title: {
+    income: 'Ingresos',
+    expense: 'Gastos',
+    balance: 'Balance',
+  },
+} as const;

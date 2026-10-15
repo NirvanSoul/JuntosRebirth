@@ -62,4 +62,45 @@ describe('useBetterAuthSession', () => {
       session: null,
     });
   });
+
+  it('mantiene listo el acceso durante un refresco sin sesión al volver a primer plano', async () => {
+    mockUseSession.mockReturnValue({
+      data: null,
+      error: null,
+      isPending: true,
+    });
+
+    const { rerender, result } = await renderHook(
+      ({ renderKey }: { renderKey: number }) => {
+        void renderKey;
+        return useBetterAuthSession();
+      },
+      { initialProps: { renderKey: 0 } },
+    );
+    expect(result.current.isReady).toBe(false);
+
+    mockUseSession.mockReturnValue({
+      data: null,
+      error: null,
+      isPending: false,
+    });
+    await rerender({ renderKey: 1 });
+    expect(result.current.isReady).toBe(true);
+
+    // iOS pasa por inactive/active al autorizar el autocompletado con Face ID.
+    // Better Auth refresca entonces una sesión todavía anónima y no debe
+    // desmontar el formulario que acaba de recibir las credenciales.
+    mockUseSession.mockReturnValue({
+      data: null,
+      error: null,
+      isPending: true,
+    });
+    await rerender({ renderKey: 2 });
+
+    expect(result.current).toEqual({
+      error: null,
+      isReady: true,
+      session: null,
+    });
+  });
 });

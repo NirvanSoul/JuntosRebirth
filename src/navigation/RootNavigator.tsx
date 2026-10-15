@@ -1,4 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -12,15 +13,15 @@ import { OnboardingRestartContext } from '@/features/onboarding/context/Onboardi
 import { useNameScreenIllustrationReady } from '@/features/onboarding/hooks/useNameScreenIllustrationReady';
 import { useOnboardingCompletion } from '@/features/onboarding/hooks/useOnboardingCompletion';
 import type { ColorTokens } from '@/theme/types';
+import { lightColors } from '@/theme/colors';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 import { useTheme } from '@/theme/useTheme';
-import { useThemedStyles } from '@/theme/useThemedStyles';
 import { fontFamily } from '@/theme/fonts';
 import { markStartup } from '@/lib/diagnostics/startupTrace';
 import { CurrencySymbolPreferenceProvider } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   const { colors, isDark, isReady: isThemeReady } = useTheme();
-  const styles = useThemedStyles(createStyles);
   const { isReady: isAuthReady, session } = useBetterAuthSession();
   const {
     complete: completeOnboarding,
@@ -38,6 +39,14 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   }, [isAuthReady]);
 
   const hasVerifiedSession = session?.user.emailVerified === true;
+  const forceLightTheme =
+    !hasCompletedOnboarding || (isAuthReady && !hasVerifiedSession);
+  const navigationColors = forceLightTheme ? lightColors : colors;
+  const navigationIsDark = forceLightTheme ? false : isDark;
+  const styles = useMemo(
+    () => createStyles(navigationColors),
+    [navigationColors],
+  );
 
   useEffect(() => {
     if (hasVerifiedSession && !hasCompletedOnboarding) {
@@ -47,14 +56,14 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
 
   const navigationTheme = useMemo(
     () => ({
-      dark: isDark,
+      dark: navigationIsDark,
       colors: {
-        primary: colors.brand,
-        background: colors.background,
-        card: colors.surface,
-        text: colors.textPrimary,
-        border: colors.border,
-        notification: colors.expense,
+        primary: navigationColors.brand,
+        background: navigationColors.background,
+        card: navigationColors.surface,
+        text: navigationColors.textPrimary,
+        border: navigationColors.border,
+        notification: navigationColors.expense,
       },
       fonts: {
         regular: { fontFamily: fontFamily.regular, fontWeight: '400' as const },
@@ -63,7 +72,7 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
         heavy: { fontFamily: fontFamily.bold, fontWeight: '700' as const },
       },
     }),
-    [colors, isDark],
+    [navigationColors, navigationIsDark],
   );
 
   // La apariencia guardada se lee de AsyncStorage en paralelo con las fuentes;
@@ -82,6 +91,7 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   ) {
     return (
       <View style={styles.root} testID="root-navigator-backdrop">
+        <StatusBar style={navigationIsDark ? 'light' : 'dark'} />
         <LoadingState />
       </View>
     );
@@ -99,6 +109,11 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   ) : (
     <AccessScreen />
   );
+  const themedContent = forceLightTheme ? (
+    <ThemeProvider initialAppearance="light">{content}</ThemeProvider>
+  ) : (
+    content
+  );
 
   // El fondo del root nativo es blanco. Las escenas del drawer y de las pestañas
   // son transparentes y las pestañas se cruzan con `animation: 'fade'`, así que
@@ -106,6 +121,7 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   // transición: imperceptible en claro, evidente en oscuro.
   return (
     <View style={styles.root} testID="root-navigator-backdrop">
+      <StatusBar style={navigationIsDark ? 'light' : 'dark'} />
       {/* Mientras `linking` resuelve la URL inicial no hay hijos montados; la
           misma barra ocupa ese hueco para que su avance continúe sin reinicio. */}
       <OnboardingRestartContext.Provider value={resetOnboarding}>
@@ -114,7 +130,7 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
           linking={linking}
           theme={navigationTheme}
         >
-          {content}
+          {themedContent}
         </NavigationContainer>
       </OnboardingRestartContext.Provider>
     </View>

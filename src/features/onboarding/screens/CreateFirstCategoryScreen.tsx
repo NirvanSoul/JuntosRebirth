@@ -167,7 +167,7 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
           />
         }
         onBack={() => navigation.goBack()}
-        currentStep={7}
+        currentStep={5}
         illustrationAspectRatio={categoryIllustrationAspectRatio}
         illustrationSource={require('../../../../assets/Onboarding/6_Crea_tu_categoria.png')}
         subtitle="Crea al menos 3 categorías para organizar tus gastos e ingresos y entender mejor en qué usas tu dinero."

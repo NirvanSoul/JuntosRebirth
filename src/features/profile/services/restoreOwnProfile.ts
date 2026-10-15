@@ -6,6 +6,8 @@ import {
 } from '@/features/profile/repositories/localProfileRepository';
 import { restoreOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { apiClient } from '@/services/api/juntossApiClient';
+import { currencyPreferencesForCountry } from '@/state/appPreferences/currencyPreferences';
+import { saveCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 
 type RemoteOwnProfile = {
   avatarPath?: unknown;
@@ -50,6 +52,14 @@ export async function restoreOwnProfile(): Promise<string | null> {
     const localProfile = await getLocalProfile();
     if (localProfile.countryCode !== normalizedCountry) {
       await saveLocalProfileCountry(normalizedCountry);
+    }
+    // Las preferencias de moneda viven en AsyncStorage y sobreviven al cierre
+    // de sesión. Al entrar en una cuenta VE no deben conservar el EUR de la
+    // cuenta anterior: el contrato venezolano solo permite USD/VES.
+    if (normalizedCountry === 'VE') {
+      await saveCurrencyPreferences(
+        currencyPreferencesForCountry(normalizedCountry),
+      );
     }
     return normalizedCountry;
   }

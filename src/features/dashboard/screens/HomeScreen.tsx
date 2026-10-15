@@ -108,6 +108,12 @@ export function HomeScreen({
   const [isIncomeModalVisible, setIncomeModalVisible] = useState(false);
   const [isExpenseModalVisible, setExpenseModalVisible] = useState(false);
   const [isBalanceModalVisible, setBalanceModalVisible] = useState(false);
+  const handleOpenTransactionDetail = (transactionId: string) => {
+    setBalanceModalVisible(false);
+    setIncomeModalVisible(false);
+    setExpenseModalVisible(false);
+    onOpenTransactionDetail?.(transactionId);
+  };
   const transactionsThroughCurrentMonth = useMemo(
     () => listTransactionsThroughCurrentMonth(transactions),
     [transactions],
@@ -342,45 +348,39 @@ export function HomeScreen({
       </Screen>
       <TransactionPeriodModal
         categories={categories}
+        chainActionsAfterDismiss
         onAdd={() => {
           setBalanceModalVisible(false);
           onCreateMovement?.();
         }}
         onClose={() => setBalanceModalVisible(false)}
-        onOpenTransactionDetail={(transactionId) => {
-          setBalanceModalVisible(false);
-          onOpenTransactionDetail?.(transactionId);
-        }}
+        onOpenTransactionDetail={handleOpenTransactionDetail}
         transactions={transactions}
         type="balance"
         visible={isBalanceModalVisible}
       />
       <TransactionPeriodModal
         categories={categories}
+        chainActionsAfterDismiss
         onAdd={() => {
           setIncomeModalVisible(false);
           onCreateIncome?.();
         }}
         onClose={() => setIncomeModalVisible(false)}
-        onOpenTransactionDetail={(transactionId) => {
-          setIncomeModalVisible(false);
-          onOpenTransactionDetail?.(transactionId);
-        }}
+        onOpenTransactionDetail={handleOpenTransactionDetail}
         transactions={transactions}
         type="income"
         visible={isIncomeModalVisible}
       />
       <TransactionPeriodModal
         categories={categories}
+        chainActionsAfterDismiss
         onAdd={() => {
           setExpenseModalVisible(false);
           onCreateExpense?.();
         }}
         onClose={() => setExpenseModalVisible(false)}
-        onOpenTransactionDetail={(transactionId) => {
-          setExpenseModalVisible(false);
-          onOpenTransactionDetail?.(transactionId);
-        }}
+        onOpenTransactionDetail={handleOpenTransactionDetail}
         transactions={transactions}
         type="expense"
         visible={isExpenseModalVisible}

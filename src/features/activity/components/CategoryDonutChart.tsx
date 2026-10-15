@@ -71,7 +71,9 @@ export function CategoryDonutChart({
       onSlicePress={onOpenCategoryDetail}
       resetKey={resetKey}
       slicePressHint="Abre el detalle de la categoría"
+      size={195}
       slices={slices}
+      strokeWidth={12}
     />
   );
 }

@@ -17,7 +17,7 @@ type IncomeExpenseArcProps = {
 };
 
 const arcWidth = 280;
-const arcStrokeWidth = 18;
+const arcStrokeWidth = 12;
 const arcRadius = (arcWidth - arcStrokeWidth) / 2;
 const arcHeight = arcRadius + arcStrokeWidth;
 const arcCenterY = arcRadius + arcStrokeWidth / 2;

@@ -59,7 +59,10 @@ tipo Android con el package `com.juntoss.app` y su SHA-1 correspondiente.
   la acción explícita de reintento sobre la caché ya visible. Un fallo de
   red (`NETWORK_ERROR`) se distingue como "sin conexión" y, además del
   botón, se reintenta una vez al recuperar la red (`expo-network`). Un `401`
-  cierra sesión sin aviso adicional (`classifySyncFailure`).
+  cierra sesión sin aviso adicional (`classifySyncFailure`). El refresco
+  periódico solo se habilita después de que esa inicialización completa termine
+  correctamente; un lote rechazado con `400` conserva el snapshot restaurado y
+  espera el reintento explícito en vez de repetir la misma escritura.
 - La sincronización de un espacio usa `POST /v1/spaces/:spaceId/sync` e
   incluye siempre categorías, cuentas, recurrencias y transacciones.
 - Al cerrar sesión, la aplicación vuelve al acceso autenticado, oculta la
@@ -70,6 +73,13 @@ tipo Android con el package `com.juntoss.app` y su SHA-1 correspondiente.
   otro `user_id` sirve de prueba. Sin ninguna de las dos, la caché se adopta:
   puede ser trabajo sin conexión que todavía no llegó a subirse, y descartarlo
   lo perdería para siempre.
+- Esa adopción no mezcla contextos monetarios incompatibles. Si el perfil remoto
+  es VE y el espacio provisional `personal` contiene movimientos pendientes en
+  una moneda distinta de USD/VES, el snapshot usa el UUID remoto como espacio
+  local y deja el provisional aislado, sin borrarlo ni subirlo a Venezuela. Un
+  enlace VE→`personal` creado por un intento anterior se repara del mismo modo.
+  Al restaurar el perfil VE también se sustituyen preferencias heredadas de otra
+  sesión por USD/VES antes de permitir nuevas entradas.
 - Por eso la sincronización de inicio de sesión sí incluye las filas
   `local_only`: son las creadas sin conexión y su única vía de subida.
   `GET /v1/sync/snapshot` solo sobrescribe filas locales en `synced`, así que lo

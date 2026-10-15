@@ -13,7 +13,7 @@ export function ReadyToExploreScreen({ navigation }: Props) {
       actionLabel="Empezar"
       onAction={() => navigation.navigate('OnboardingLogin')}
       onBack={() => navigation.goBack()}
-      currentStep={10}
+      currentStep={8}
       illustrationAspectRatio={readyIllustrationAspectRatio}
       illustrationScale={readyIllustrationScale}
       illustrationSource={require('../../../../assets/Onboarding/9_Abrazo.png')}

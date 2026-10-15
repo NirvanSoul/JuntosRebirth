@@ -74,6 +74,16 @@ describe('CategoryDonutChart', () => {
     // Total en USD: 50 $ (5000 minor)
     expect(screen.getByText(/50/)).toBeTruthy();
     expect(screen.getByText(/\$/)).toBeTruthy();
+    expect(
+      screen.getByTestId('category-donut-svg', {
+        includeHiddenElements: true,
+      }).props,
+    ).toMatchObject({ height: 195, width: 195 });
+    expect(
+      screen.getByTestId('category-donut-segment-food', {
+        includeHiddenElements: true,
+      }).props.strokeWidth,
+    ).toBe(12);
   });
 
   it('formatea el total y filtra los segmentos en la moneda especificada (VES)', async () => {

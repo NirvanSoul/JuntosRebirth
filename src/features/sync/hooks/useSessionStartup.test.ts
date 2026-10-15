@@ -20,9 +20,13 @@ jest.mock(
   () => ({ listLocalNotificationRules: jest.fn(async () => []) }),
 );
 
-const session = {
+type TestSession = NonNullable<
+  Parameters<typeof useSessionStartup>[0]['session']
+>;
+
+const session: TestSession = {
   user: { id: 'user-1', email: 'ana@ejemplo.com', emailVerified: true },
-} as unknown as Parameters<typeof useSessionStartup>[0]['session'];
+} as unknown as TestSession;
 
 function startupInput() {
   return {
@@ -109,5 +113,29 @@ describe('useSessionStartup', () => {
       result.current.dismissSyncIssue(result.current.syncIssue!.id),
     );
     expect(result.current.syncIssue).toBeNull();
+  });
+
+  it('no reinicializa si cambia la referencia de la misma cuenta', async () => {
+    const input = startupInput();
+    const { rerender } = await renderHook<
+      ReturnType<typeof useSessionStartup>,
+      { currentSession: TestSession }
+    >(
+      ({ currentSession }) =>
+        useSessionStartup({ ...input, session: currentSession }),
+      { initialProps: { currentSession: session } },
+    );
+    await waitFor(() =>
+      expect(initializeAuthenticatedSession).toHaveBeenCalledTimes(1),
+    );
+
+    await rerender({
+      currentSession: {
+        ...session,
+        user: { ...session!.user },
+      },
+    });
+
+    expect(initializeAuthenticatedSession).toHaveBeenCalledTimes(1);
   });
 });

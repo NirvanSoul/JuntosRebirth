@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
 import { Text } from '@/components/ui/Text/Text';
 import { renderWithTheme } from '@/test/renderWithTheme';
+import { darkColors } from '@/theme/colors';
 
 it('monta el contenido solo al estar listo, sin esperar al final de la animación', async () => {
   const onMount = jest.fn();
@@ -60,4 +61,26 @@ it('monta el contenido solo al estar listo, sin esperar al final de la animació
   );
   expect(screen.queryByText('Tu espacio')).toBeNull();
   expect(onUnmount).toHaveBeenCalledTimes(1);
+});
+
+it('pinta el logo de carga en blanco solo con el modo oscuro', async () => {
+  const darkScreen = await renderWithTheme(<LoadingState />, {
+    appearance: 'dark',
+  });
+  expect(
+    darkScreen.getByTestId('app-loading-logo-image', {
+      includeHiddenElements: true,
+    }).props.color,
+  ).toBe(darkColors.onBrand);
+  await darkScreen.unmount();
+
+  const lightScreen = await renderWithTheme(<LoadingState />, {
+    appearance: 'light',
+  });
+  expect(
+    lightScreen.getByTestId('app-loading-logo-image', {
+      includeHiddenElements: true,
+    }).props.color,
+  ).toBeUndefined();
+  await lightScreen.unmount();
 });

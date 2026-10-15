@@ -56,16 +56,38 @@ jest.mock('@/navigation/MainTabsNavigator', () => {
 });
 
 jest.mock('@/features/onboarding/OnboardingNavigator', () => {
-  const { Text: RNText } = jest.requireActual('react-native');
+  const { Text: RNText, View: RNView } = jest.requireActual('react-native');
+  const { useTheme } = jest.requireActual('@/theme/useTheme');
   return {
-    OnboardingNavigator: () => <RNText>onboarding</RNText>,
+    OnboardingNavigator: () => {
+      const { colors } = useTheme();
+      return (
+        <RNView
+          style={{ backgroundColor: colors.background }}
+          testID="onboarding-theme"
+        >
+          <RNText>onboarding</RNText>
+        </RNView>
+      );
+    },
   };
 });
 
 jest.mock('@/features/access/screens/AccessScreen', () => {
-  const { Text: RNText } = jest.requireActual('react-native');
+  const { Text: RNText, View: RNView } = jest.requireActual('react-native');
+  const { useTheme } = jest.requireActual('@/theme/useTheme');
   return {
-    AccessScreen: () => <RNText>acceso</RNText>,
+    AccessScreen: () => {
+      const { colors } = useTheme();
+      return (
+        <RNView
+          style={{ backgroundColor: colors.background }}
+          testID="access-theme"
+        >
+          <RNText>acceso</RNText>
+        </RNView>
+      );
+    },
   };
 });
 
@@ -220,6 +242,27 @@ describe('RootNavigator', () => {
     expect(screen.queryByText('pestañas')).toBeNull();
   });
 
+  it('fuerza el tema claro durante el onboarding aunque la preferencia sea oscura', async () => {
+    mockOnboardingCompleted = false;
+    mockSession = null;
+
+    const screen = await renderWithTheme(<RootNavigator />, {
+      appearance: 'dark',
+    });
+
+    expect(await screen.findByText('onboarding')).toBeTruthy();
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('root-navigator-backdrop').props.style,
+      ),
+    ).toBe(lightColors.background);
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('onboarding-theme').props.style,
+      ),
+    ).toBe(lightColors.background);
+  });
+
   it('conserva el onboarding mientras Better Auth refresca la sesión tras el alta', async () => {
     mockOnboardingCompleted = false;
     mockSession = null;
@@ -264,9 +307,19 @@ describe('RootNavigator', () => {
   it('después de cerrar sesión no muestra las pestañas de la cuenta anterior', async () => {
     mockSession = null;
 
-    const screen = await renderWithTheme(<RootNavigator />);
+    const screen = await renderWithTheme(<RootNavigator />, {
+      appearance: 'dark',
+    });
 
     expect(await screen.findByText('acceso')).toBeTruthy();
     expect(screen.queryByText('pestañas')).toBeNull();
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('root-navigator-backdrop').props.style,
+      ),
+    ).toBe(lightColors.background);
+    expect(
+      backdropBackgroundColor(screen.getByTestId('access-theme').props.style),
+    ).toBe(lightColors.background);
   });
 });

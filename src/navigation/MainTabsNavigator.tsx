@@ -11,6 +11,7 @@ import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCrea
 import { ActivityTabContent } from '@/navigation/components/ActivityTabContent';
 import { HomeTabContent } from '@/navigation/components/HomeTabContent';
 import { MainFloatingActions } from '@/navigation/components/MainFloatingActions';
+import { useTransactionDetailModal } from '@/navigation/useTransactionDetailModal';
 import {
   getHomeCurrencyButtonLabel,
   resolveHomeCurrencies,
@@ -85,6 +86,7 @@ import type {
 } from '@/features/transactions/types';
 import {
   archiveLocalTransaction,
+  listLocalTransactions,
   updateLocalTransactionNote,
 } from '@/features/transactions/repositories/localTransactionRepository';
 import {
@@ -233,9 +235,6 @@ export function MainTabsNavigator() {
     useState<CategoryDetailRequest | null>(null);
   /** La solicitud se conserva mientras la hoja termina de cerrarse. */
   const [isCategoryDetailVisible, setCategoryDetailVisible] = useState(false);
-  const [detailTransactionId, setDetailTransactionId] = useState<string | null>(
-    null,
-  );
   const [detailTransactionReminder, setDetailTransactionReminder] =
     useState<TransactionReminder | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<
@@ -283,6 +282,23 @@ export function MainTabsNavigator() {
       setTransactions((current) => [...created, ...current]),
     transactions,
   });
+  const {
+    category: detailTransactionCategory,
+    close: closeTransactionDetail,
+    closeThenRun: closeTransactionDetailThenRun,
+    handleDismissed: handleTransactionDetailDismissed,
+    moneyAccount: detailTransactionMoneyAccount,
+    moneyAccountOptions: detailMoneyAccountOptions,
+    open: openTransactionDetail,
+    setTransactionId: setDetailTransactionId,
+    transaction: detailTransaction,
+    visible: isTransactionDetailVisible,
+  } = useTransactionDetailModal({
+    assignableMoneyAccounts: moneyAccountsController.activeSpaceMoneyAccounts,
+    categories: spaceCategories,
+    moneyAccounts: moneyAccountsController.spaceMoneyAccounts,
+    transactions: activeSpaceTransactions,
+  });
   const { setMoneyAccounts } = moneyAccountsController;
   const activeSpaceDataCurrencies = useMemo(() => {
     const set = new Set<CurrencyCode>();
@@ -329,19 +345,10 @@ export function MainTabsNavigator() {
         (category) => category.id === detailRequest.categoryId,
       ) ?? null)
     : null;
-  const detailTransaction = resolveTransactionForDetail(
-    activeSpaceTransactions,
-    detailTransactionId,
-  );
   const editingTransaction = resolveTransactionForDetail(
     activeSpaceTransactions,
     editingTransactionId,
   );
-  const detailTransactionCategory = detailTransaction
-    ? (spaceCategories.find(
-        (category) => category.id === detailTransaction.categoryId,
-      ) ?? null)
-    : null;
   const shareTargets = spaces
     .filter((space) => space.id !== activeSpace.id)
     .map((space) => ({ id: space.id, name: space.name }));
@@ -354,11 +361,6 @@ export function MainTabsNavigator() {
       setTransactions,
       spaceTransactions: activeSpaceTransactions,
     });
-  const detailTransactionMoneyAccount = detailTransaction
-    ? (moneyAccountsController.spaceMoneyAccounts.find(
-        (account) => account.id === detailTransaction.moneyAccountId,
-      ) ?? null)
-    : null;
   /** Al abrir la cuenta desde detalle, conserva la regla de no cambiar moneda. */
   const transactionMoneyAccountOptions =
     transactionInitialEditor === 'money-account' && editingTransaction
@@ -366,12 +368,6 @@ export function MainTabsNavigator() {
           moneyAccountSupportsCurrency(account, editingTransaction.currency),
         )
       : moneyAccountsController.activeSpaceMoneyAccounts;
-  /** Misma regla para el selector que el detalle abre sobre sí mismo. */
-  const detailMoneyAccountOptions = detailTransaction
-    ? moneyAccountsController.activeSpaceMoneyAccounts.filter((account) =>
-        moneyAccountSupportsCurrency(account, detailTransaction.currency),
-      )
-    : [];
   const {
     copyCategory: handleShareCategory,
     copyTransaction: handleCopyTransaction,
@@ -657,14 +653,9 @@ export function MainTabsNavigator() {
   const handleDeleteTransaction = async (transactionId: string) => {
     try {
       await archiveLocalTransaction(transactionId, activeSpace.id);
-      let nextTransactions: SessionTransaction[] = [];
-      setTransactions((current) => {
-        nextTransactions = current.filter(
-          (transaction) => transaction.id !== transactionId,
-        );
-        return nextTransactions;
-      });
-      setDetailTransactionId(null);
+      const nextTransactions = await listLocalTransactions();
+      setTransactions(() => nextTransactions);
+      closeTransactionDetail();
       setDetailTransactionReminder(null);
       void cancelTransactionReminder(transactionId).catch(() => undefined);
       void reconcileNotificationRules({
@@ -945,7 +936,7 @@ export function MainTabsNavigator() {
                       onOpenMoneyAccountDetail={
                         moneyAccountsController.openDetail
                       }
-                      onOpenTransactionDetail={setDetailTransactionId}
+                      onOpenTransactionDetail={openTransactionDetail}
                       onAcceptPendingInvitation={handleAcceptPendingInvitation}
                       onRefreshCoupleSpaceAndData={refreshCoupleSpaceAndData}
                       onRequestInvitePartner={() =>
@@ -989,7 +980,7 @@ export function MainTabsNavigator() {
                       onOpenMoneyAccountDetail={
                         moneyAccountsController.openDetail
                       }
-                      onOpenTransactionDetail={setDetailTransactionId}
+                      onOpenTransactionDetail={openTransactionDetail}
                       onScrollDirectionChange={handleScrollDirectionChange}
                       onSummaryPinnedChange={setActivitySummaryPinned}
                       preference={activitySections.preference}
@@ -1020,7 +1011,7 @@ export function MainTabsNavigator() {
                       onAddTransaction={(date, type) =>
                         openTransactionCreation({ date, type })
                       }
-                      onOpenTransactionDetail={setDetailTransactionId}
+                      onOpenTransactionDetail={openTransactionDetail}
                       ref={mapScreenRef}
                       transactions={activeSpaceTransactions}
                     />
@@ -1036,6 +1027,7 @@ export function MainTabsNavigator() {
                 }
               />
               <QuickCreateMenu
+                chainSelectionAfterDismiss
                 onClose={() => setCreateMenuVisible(false)}
                 onSelect={handleCreateAction}
                 showCurrencyExchange={venezuelaCurrencyMode}
@@ -1145,7 +1137,7 @@ export function MainTabsNavigator() {
                   setCategoryInitialEditor(initialEditor);
                   setCustomCategoryVisible(true);
                 }}
-                onOpenTransactionDetail={setDetailTransactionId}
+                onOpenTransactionDetail={openTransactionDetail}
                 onSaveBudget={handleSaveCategoryBudget}
                 onSaveNote={handleSaveCategoryNote}
                 onShare={handleShareCategory}
@@ -1161,7 +1153,7 @@ export function MainTabsNavigator() {
                 onAddTransaction={(moneyAccountId) =>
                   openTransactionCreation({ moneyAccountId })
                 }
-                onOpenTransactionDetail={setDetailTransactionId}
+                onOpenTransactionDetail={openTransactionDetail}
                 spaceId={activeSpace.id}
                 spaceCurrency={activeSpace.currency}
                 spaceName={activeSpace.name}
@@ -1171,7 +1163,7 @@ export function MainTabsNavigator() {
                 assignableMoneyAccounts={detailMoneyAccountOptions}
                 category={detailTransactionCategory}
                 moneyAccount={detailTransactionMoneyAccount}
-                onClose={() => setDetailTransactionId(null)}
+                onClose={closeTransactionDetail}
                 onCreateMoneyAccount={moneyAccountsController.openCreation}
                 onCopy={handleCopyTransaction}
                 onDelete={handleDeleteTransaction}
@@ -1181,17 +1173,20 @@ export function MainTabsNavigator() {
                     transactionId,
                   );
                   if (!transaction) return;
-                  setDetailTransactionId(null);
-                  openTransactionCreation({
-                    categoryId: transaction.categoryId,
-                    type: transaction.type,
+                  closeTransactionDetailThenRun(() => {
+                    openTransactionCreation({
+                      categoryId: transaction.categoryId,
+                      type: transaction.type,
+                    });
+                    setEditingTransactionId(transaction.id);
+                    setTransactionInitialEditor(initialEditor);
                   });
-                  setEditingTransactionId(transaction.id);
-                  setTransactionInitialEditor(initialEditor);
                 }}
                 onOpenCategoryDetail={(categoryId) => {
                   if (!detailTransaction) return;
-                  openCategoryDetail(categoryId, detailTransaction.currency);
+                  closeTransactionDetailThenRun(() =>
+                    openCategoryDetail(categoryId, detailTransaction.currency),
+                  );
                 }}
                 onQuickEdit={quickEditTransaction}
                 onRemoveReminder={handleRemoveTransactionReminder}
@@ -1201,7 +1196,8 @@ export function MainTabsNavigator() {
                 shareTargets={shareTargets}
                 transaction={detailTransaction}
                 transactions={activeSpaceTransactions}
-                visible={detailTransaction !== null}
+                visible={isTransactionDetailVisible}
+                onDismissed={handleTransactionDetailDismissed}
               />
               <NoticeToast
                 notice={copySuccessNotice}

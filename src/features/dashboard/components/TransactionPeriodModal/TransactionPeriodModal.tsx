@@ -7,6 +7,7 @@ import {
   AppModal,
   useAppModalBottomInset,
 } from '@/components/overlays/AppModal/AppModal';
+import { useModalChainedAction } from '@/components/overlays/AppModal/useModalChainedAction';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
@@ -50,12 +51,16 @@ import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { iconSize } from '@/theme/layout';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
-import { createStyles } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal.styles';
+import {
+  createStyles,
+  periodModalLabels,
+} from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal.styles';
 
 export type TransactionPeriodModalType = TransactionType | 'balance';
 
 type TransactionPeriodModalProps = {
   categories: readonly Category[];
+  chainActionsAfterDismiss?: boolean;
   initialCurrency?: CurrencyCode;
   initialDate?: Date;
   onAdd: () => void;
@@ -68,6 +73,7 @@ type TransactionPeriodModalProps = {
 
 export function TransactionPeriodModal({
   categories,
+  chainActionsAfterDismiss = false,
   initialCurrency,
   initialDate,
   onAdd,
@@ -81,6 +87,9 @@ export function TransactionPeriodModal({
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const { venezuelaCurrencyMode } = useCurrencyCapabilities();
+  const { closeThenRun, handleDismissed } = useModalChainedAction(onClose);
+  const runAction = (action: () => void) =>
+    chainActionsAfterDismiss ? closeThenRun(action) : action();
   const [period, setPeriod] = useState<TransactionPeriod>('month');
   const [selectedDate, setSelectedDate] = useState(() =>
     initialDate ? new Date(initialDate) : new Date(),
@@ -134,10 +143,9 @@ export function TransactionPeriodModal({
   );
   const availableCurrencies = useMemo(() => {
     const currencies = getAvailableCurrencies(typeTransactions);
-    if (!initialCurrency || currencies.includes(initialCurrency)) {
-      return currencies;
-    }
-    return [initialCurrency, ...currencies];
+    return !initialCurrency || currencies.includes(initialCurrency)
+      ? currencies
+      : [initialCurrency, ...currencies];
   }, [initialCurrency, typeTransactions]);
   const hasMultipleCurrencies = availableCurrencies.length > 1;
   const effectiveCurrency: CurrencyCode = pickEffectiveCurrency(
@@ -224,13 +232,7 @@ export function TransactionPeriodModal({
   const comparison = calculatePeriodComparison(totalMinor, previousTotalMinor);
   const comparisonTone: 'balance' | 'expense' | 'income' =
     type === 'balance' ? 'balance' : type;
-  const totalLabel =
-    type === 'income'
-      ? 'Total de ingresos'
-      : type === 'expense'
-        ? 'Total de gastos'
-        : 'Balance del periodo';
-
+  const totalLabel = periodModalLabels.total[type];
   const displayedCurrency = venezuelaCurrencyMode
     ? periodValuation.currency
     : effectiveCurrency;
@@ -239,14 +241,8 @@ export function TransactionPeriodModal({
     ? filteredTransactions
     : currencyTransactions;
 
-  const title =
-    type === 'income' ? 'Ingresos' : type === 'expense' ? 'Gastos' : 'Balance';
-  const addLabel =
-    type === 'income'
-      ? 'Añadir ingreso'
-      : type === 'expense'
-        ? 'Añadir gasto'
-        : 'Añadir movimiento';
+  const title = periodModalLabels.title[type];
+  const addLabel = periodModalLabels.add[type];
 
   if (
     useDepsChanged([visible, initialCurrency, initialDate?.getTime()]) &&
@@ -280,6 +276,7 @@ export function TransactionPeriodModal({
         containsScrollable
         extendContentIntoBottomInset
         onClose={onClose}
+        onDismissed={chainActionsAfterDismiss ? handleDismissed : undefined}
         testID={`${type}-period-modal`}
         variant="expanded"
         visible={visible}
@@ -397,7 +394,9 @@ export function TransactionPeriodModal({
                 <TransactionPreviewList
                   categories={categories}
                   groupingTransactions={transactions}
-                  onOpenTransactionDetail={onOpenTransactionDetail}
+                  onOpenTransactionDetail={(transactionId) =>
+                    runAction(() => onOpenTransactionDetail?.(transactionId))
+                  }
                   testID={`${type}-period-transaction-list`}
                   transactions={displayedTransactions}
                 />
@@ -439,7 +438,7 @@ export function TransactionPeriodModal({
               }
               gradientTestID={`${type}-period-add-gradient`}
               label={addLabel}
-              onPress={onAdd}
+              onPress={() => runAction(onAdd)}
               style={styles.addAction}
             />
           </BottomSheetScrollView>

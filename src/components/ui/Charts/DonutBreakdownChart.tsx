@@ -52,17 +52,17 @@ type DonutBreakdownChartProps = {
   resetKey?: number;
   /** Pista de cada badge: «Abre el detalle de la cuenta». */
   slicePressHint?: string;
+  /** Diámetro exterior del donut en píxeles lógicos. */
+  size?: number;
   /** Sin ordenar: la gráfica descarta los ceros y ordena de mayor a menor. */
   slices: readonly DonutBreakdownSlice[];
+  /** Grosor del anillo; mantiene el valor compartido salvo variantes explícitas. */
+  strokeWidth?: number;
 };
 
-const chartSize = 236;
-const chartRadius = (chartSize - chartStrokeWidth) / 2;
-const chartCircumference = 2 * Math.PI * chartRadius;
+const defaultChartSize = 236;
 const segmentVisibleGap = spacing.md;
 const minimumDashLength = 1;
-const minimumSegmentAllocation =
-  chartStrokeWidth + segmentVisibleGap + minimumDashLength;
 const legendDotSize = 10;
 const segmentedControlWidth = 216;
 
@@ -90,10 +90,16 @@ export function DonutBreakdownChart({
   onSlicePress,
   resetKey,
   slicePressHint,
+  size = defaultChartSize,
   slices,
+  strokeWidth = chartStrokeWidth,
 }: DonutBreakdownChartProps) {
   const { formatCurrency } = useCurrencySymbolPreference();
   const styles = useThemedStyles(createStyles);
+  const chartRadius = (size - strokeWidth) / 2;
+  const chartCircumference = 2 * Math.PI * chartRadius;
+  const minimumSegmentAllocation =
+    strokeWidth + segmentVisibleGap + minimumDashLength;
   const data = useMemo(() => {
     const items = slices
       .filter((slice) => slice.valueMinor > 0)
@@ -113,7 +119,7 @@ export function DonutBreakdownChart({
         chartCircumference,
         minimumSegmentAllocation,
       ),
-    [data.items],
+    [chartCircumference, data.items, minimumSegmentAllocation],
   );
   const modeLabel = mode === 'expense' ? 'gastado' : 'ingresado';
   const motionDirection: MotionDirection = mode === 'expense' ? -1 : 1;
@@ -164,19 +170,19 @@ export function DonutBreakdownChart({
                 .join(', ')}`
         }
         accessible
-        style={styles.chartArea}
+        style={[styles.chartArea, { height: size, width: size }]}
       >
         <Svg
           accessibilityElementsHidden
-          height={chartSize}
+          height={size}
           importantForAccessibility="no-hide-descendants"
           testID={`${idPrefix}-donut-svg`}
-          width={chartSize}
+          width={size}
         >
           {data.items.map((slice, index) => {
             const segmentLength = segmentLengths[index]!;
             const dashLength = Math.max(
-              segmentLength - chartStrokeWidth - segmentVisibleGap,
+              segmentLength - strokeWidth - segmentVisibleGap,
               minimumDashLength,
             );
             const dashOffset = -dashOffsets[index]!;
@@ -186,15 +192,15 @@ export function DonutBreakdownChart({
                 animationKey={`${animationKey}-${resetKey ?? 0}`}
                 circumference={chartCircumference}
                 color={slice.color}
-                cx={chartSize / 2}
-                cy={chartSize / 2}
+                cx={size / 2}
+                cy={size / 2}
                 dashLength={dashLength}
                 dashOffset={dashOffset}
                 index={index}
                 key={slice.id}
                 radius={chartRadius}
                 rotation={-90}
-                strokeWidth={chartStrokeWidth}
+                strokeWidth={strokeWidth}
                 testID={`${idPrefix}-donut-segment-${slice.id}`}
               />
             );
@@ -205,7 +211,7 @@ export function DonutBreakdownChart({
           exiting={getChartContentExiting(motionDirection)}
           key={`${animationKey}-${data.items.length > 0 ? 'total' : 'empty'}`}
           pointerEvents="none"
-          style={styles.chartCenter}
+          style={[styles.chartCenter, { width: size - strokeWidth * 3 }]}
           testID={`${idPrefix}-chart-center-content`}
         >
           {data.items.length > 0 ? (
@@ -296,15 +302,12 @@ function createStyles(colors: ColorTokens) {
       width: segmentedControlWidth,
     },
     chartArea: {
-      width: chartSize,
-      height: chartSize,
       alignItems: 'center',
       justifyContent: 'center',
       marginVertical: spacing.lg,
     },
     chartCenter: {
       position: 'absolute',
-      width: chartSize - chartStrokeWidth * 3,
       alignItems: 'center',
     },
     total: {

@@ -104,6 +104,9 @@ describe('OnboardingScreenLayout con ilustración a sangre', () => {
     const image = StyleSheet.flatten(
       screen.getByTestId('lamina-illustration').props.style,
     );
+    expect(screen.getByTestId('lamina-illustration').props.fadeDuration).toBe(
+      0,
+    );
     expect(image.width).toBe(Math.round(width));
     expect(image.height).toBe(Math.round(width / 2));
     expect(image.flexShrink).toBe(0);

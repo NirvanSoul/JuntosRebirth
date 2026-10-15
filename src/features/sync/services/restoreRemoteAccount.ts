@@ -13,7 +13,8 @@ import {
   type RemoteChangesCursor,
   writeRemoteChangesCursor,
 } from '@/features/sync/repositories/localSyncCursorRepository';
-import { loadRemoteEntityLinks } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
+import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
+import { preparePersonalSpaceLink } from '@/features/sync/services/preparePersonalSpaceLink';
 import {
   getSpacesCatalogueRevision,
   updateSpaces,
@@ -51,8 +52,6 @@ type InFlightRestore = {
 const restoreInFlightByUserId = new Map<string, InFlightRestore>();
 
 const CURSOR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const provisionalPersonalSpaceId = 'personal';
-
 /**
  * Un snapshot completo solo recupera incoherencias de catálogo o de datos.
  * Repetirlo cuando el transporte acaba de cortarse duplica tráfico y hace más
@@ -72,21 +71,10 @@ function shouldRetryDeltaWithoutFullRestore(error: unknown): boolean {
   );
 }
 
-async function hasLocalOnlyPersonalTransactions(
-  database: Awaited<ReturnType<typeof getLocalDatabase>>,
-): Promise<boolean> {
-  const row = await database.getFirstAsync<{ id: string }>(
-    `SELECT id FROM transactions
-      WHERE space_id = ? AND sync_status = 'local_only'
-      LIMIT 1`,
-    provisionalPersonalSpaceId,
-  );
-  return row !== null && row !== undefined;
-}
-
 export async function restoreRemoteAccount(input: {
   userId: string;
   snapshot: RemoteAccountSnapshot;
+  countryCode?: string | null;
   expectedSpacesCatalogueRevision?: number;
 }): Promise<RestoredRemoteAccount> {
   const catalogueRevision =
@@ -95,18 +83,16 @@ export async function restoreRemoteAccount(input: {
   const personalRemoteId = input.snapshot.spaces.find(
     (space) => space.type === 'personal',
   )?.remoteId;
-  const existingSpaceLinks = await loadRemoteEntityLinks({
-    executor: database,
-    userId: input.userId,
-    entityType: 'space',
-  });
+  const { existingSpaceLinks, shouldKeepProvisionalPersonalSpace } =
+    await preparePersonalSpaceLink({
+      countryCode: input.countryCode,
+      database,
+      personalRemoteId,
+      userId: input.userId,
+    });
   // Los importes introducidos antes de iniciar sesión pertenecen al espacio
   // provisional `personal`. En la primera restauración, enlazar ese espacio
   // con su UUID remoto evita que queden fuera de la subida posterior.
-  const shouldKeepProvisionalPersonalSpace =
-    existingSpaceLinks.size === 0 &&
-    personalRemoteId !== undefined &&
-    (await hasLocalOnlyPersonalTransactions(database));
   const localSpaceIdByRemoteId = new Map<string, string>();
   const remoteSpaces: Space[] = [];
 
@@ -119,7 +105,7 @@ export async function restoreRemoteAccount(input: {
       shouldKeepProvisionalPersonalSpace &&
       existingLinks.size === 0 &&
       remoteId === personalRemoteId
-        ? provisionalPersonalSpaceId
+        ? 'personal'
         : remoteId,
   });
   for (const remoteSpace of input.snapshot.spaces) {
@@ -397,9 +383,11 @@ export async function restoreRemoteAccountForCurrentSession(options?: {
       fetchRemoteAccountSnapshot(),
       fetchRemoteImportReviews(),
     ]);
+    const { countryCode } = await getLocalProfile();
     const restored = await restoreRemoteAccount({
       userId,
       snapshot,
+      countryCode,
       expectedSpacesCatalogueRevision: catalogueRevision,
     });
     await restoreRemoteImportReviews({ reviews, restored });

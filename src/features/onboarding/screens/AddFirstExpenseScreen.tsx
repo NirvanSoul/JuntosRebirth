@@ -16,7 +16,7 @@ export function AddFirstExpenseScreen({ navigation }: Props) {
 
   return (
     <AddFirstTransactionStep
-      currentStep={9}
+      currentStep={7}
       illustrationAspectRatio={expenseIllustrationAspectRatio}
       illustrationScale={1.2}
       illustrationSource={require('../../../../assets/Onboarding/8_Gastos.png')}

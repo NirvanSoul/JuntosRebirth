@@ -16,8 +16,6 @@ export const nameScreenIllustration: number = require('../../../../assets/Onboar
  */
 export const deferredIllustrations: number[] = [
   require('../../../../assets/Onboarding/2_Pais.png'),
-  require('../../../../assets/Onboarding/3_Menos_dudas.png'),
-  require('../../../../assets/Onboarding/4_Tu_mes.png'),
   require('../../../../assets/Onboarding/5_Juntos.png'),
   require('../../../../assets/Onboarding/5.5_Notificaciones.png'),
   require('../../../../assets/Onboarding/6_Crea_tu_categoria.png'),

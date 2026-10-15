@@ -13,8 +13,7 @@ export function JuntosScreen({ navigation }: Props) {
       actionLabel="Continuar"
       onAction={() => navigation.navigate('NotificationsPermission')}
       onBack={() => navigation.goBack()}
-      onSkip={() => navigation.navigate('NotificationsPermission')}
-      currentStep={5}
+      currentStep={3}
       illustrationAspectRatio={puzzleIllustrationAspectRatio}
       illustrationFullBleed
       illustrationSource={require('../../../../assets/Onboarding/5_Juntos.png')}

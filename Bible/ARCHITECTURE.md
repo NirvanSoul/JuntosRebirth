@@ -109,6 +109,11 @@ de sesión, de la apariencia guardada y de la marca de onboarding empieza en
 paralelo. La navegación espera esas condiciones cuando el onboarding ya está
 completado; en una instalación nueva muestra el onboarding tan pronto como
 este y la apariencia están listos, porque la sesión no decide ese destino.
+`RootNavigator` mantiene la preferencia de apariencia únicamente para una
+sesión verificada. Todo el árbol previo a la sesión —onboarding y acceso con
+sus formularios— se monta dentro de un proveedor claro, y el fondo de
+navegación y la barra de estado usan ese mismo esquema para que cerrar sesión
+no conserve visualmente el modo oscuro de la cuenta anterior.
 Así, un refresco de sesión durante el alta no desmonta el formulario OTP. La
 navegación conserva la exigencia de correo verificado. La sesión cuenta
 como lista en cuanto el cliente Expo de Better Auth la hidrata desde

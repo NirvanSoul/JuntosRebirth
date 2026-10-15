@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
+import { useModalChainedAction } from '@/components/overlays/AppModal/useModalChainedAction';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { Text } from '@/components/ui/Text/Text';
 import type { CreateActionType } from '@/navigation/createActions';
@@ -13,6 +14,7 @@ import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type QuickCreateMenuProps = {
+  chainSelectionAfterDismiss?: boolean;
   /** Acciones que se muestran para enseñar el menú, pero aún no se pueden usar. */
   disabledActionTypes?: readonly CreateActionType[];
   /**
@@ -85,6 +87,7 @@ function createActions(
 }
 
 export function QuickCreateMenu({
+  chainSelectionAfterDismiss = false,
   disabledActionTypes = [],
   showCurrencyExchange = false,
   visible,
@@ -94,11 +97,20 @@ export function QuickCreateMenu({
   const { colors, colorScheme, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const actions = createActions(colors, showCurrencyExchange);
+  const { closeThenRun, handleDismissed } = useModalChainedAction(onClose);
+  const selectAction = (action: CreateActionType) => {
+    if (chainSelectionAfterDismiss) {
+      closeThenRun(() => onSelect(action));
+      return;
+    }
+    onSelect(action);
+  };
 
   return (
     <AppModal
       backgroundVariant="background"
       onClose={onClose}
+      onDismissed={chainSelectionAfterDismiss ? handleDismissed : undefined}
       visible={visible}
     >
       <View style={styles.header}>
@@ -126,7 +138,7 @@ export function QuickCreateMenu({
             }}
             disabled={disabledActionTypes.includes(action.type)}
             key={action.type}
-            onPress={() => onSelect(action.type)}
+            onPress={() => selectAction(action.type)}
             testID={`quick-create-${action.type}`}
             style={({ pressed }) => [
               styles.action,

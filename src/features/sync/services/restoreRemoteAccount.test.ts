@@ -55,6 +55,9 @@ jest.mock('@/features/import/gateways/juntossImportReviewGateway', () => ({
 jest.mock('@/features/sync/services/restoreRemoteImportReviews', () => ({
   restoreRemoteImportReviews: jest.fn(),
 }));
+jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
+  getLocalProfile: jest.fn(async () => ({ countryCode: null })),
+}));
 
 describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
   const mockGetLocalDatabase = getLocalDatabase as unknown as jest.Mock;
@@ -726,6 +729,77 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
         },
       ],
     });
+  });
+
+  it('aísla el espacio provisional con EUR al restaurar una cuenta VE y repara su enlace previo', async () => {
+    const getAllAsync = jest
+      .fn()
+      .mockResolvedValueOnce([
+        { remote_id: 'personal-ve', local_id: 'personal' },
+      ])
+      .mockResolvedValue([]);
+    const database = {
+      getAllAsync,
+      getFirstAsync: jest.fn().mockResolvedValueOnce({ id: 'eur-local' }),
+      runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
+      withExclusiveTransactionAsync: jest
+        .fn()
+        .mockImplementation(
+          async (callback: (tx: SQLiteDatabase) => Promise<void>) =>
+            callback(database),
+        ),
+    } as unknown as SQLiteDatabase;
+    mockGetLocalDatabase.mockResolvedValue(database);
+
+    await restoreRemoteAccount({
+      userId: 'test-user-id',
+      countryCode: 'VE',
+      snapshot: {
+        serverTime: null,
+        activeFinancialContextId: 'context-ve',
+        spaces: [
+          {
+            remoteId: 'personal-ve',
+            name: 'Personal',
+            type: 'personal',
+            currency: 'USD',
+            activatedAt: null,
+          },
+        ],
+        categories: [],
+        moneyAccounts: [],
+        recurringSeries: [],
+        transactions: [],
+      },
+    });
+
+    expect(database.getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining("currency NOT IN ('USD', 'VES')"),
+      'personal',
+    );
+    expect(database.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('local_id = excluded.local_id'),
+      'test-user-id',
+      'space',
+      'personal-ve',
+      'personal-ve',
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(mockSaveSpaces).toHaveBeenCalledWith({
+      activeSpaceId: 'personal-ve',
+      spaces: [
+        {
+          id: 'personal-ve',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'USD',
+        },
+      ],
+    });
+    expect(database.runAsync).not.toHaveBeenCalledWith(
+      expect.stringMatching(/DELETE FROM transactions/i),
+    );
   });
 
   it('comparte el snapshot en curso de la misma sesión', async () => {

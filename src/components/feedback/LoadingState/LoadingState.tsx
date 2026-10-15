@@ -16,6 +16,7 @@ import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const TRACK_WIDTH = 200;
@@ -36,6 +37,7 @@ export function LoadingState({
   label = 'Cargando Juntos',
   testID = 'app-loading',
 }: LoadingStateProps) {
+  const { colors, isDark } = useTheme();
   const styles = useThemedStyles(createStyles);
   const { progress, begin, complete, release } = useLoadingProgress();
   const opacity = useSharedValue(loading ? 1 : 0);
@@ -91,7 +93,11 @@ export function LoadingState({
             />
           </View>
           <View testID={`${testID}-logo`}>
-            <JuntosLogo testID={`${testID}-logo-image`} width={LOGO_WIDTH} />
+            <JuntosLogo
+              color={isDark ? colors.onBrand : undefined}
+              testID={`${testID}-logo-image`}
+              width={LOGO_WIDTH}
+            />
           </View>
         </View>
       </Animated.View>

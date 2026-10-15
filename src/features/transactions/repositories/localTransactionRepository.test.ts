@@ -260,23 +260,23 @@ describe('localTransactionRepository', () => {
   });
 
   it('materializa sin duplicar el origen de una serie quincenal migrada', async () => {
-    getAllAsync.mockResolvedValueOnce([
-      {
-        id: 'series-id',
-        space_id: 'personal',
-        category_id: 'category-id',
-        money_account_id: null,
-        created_by: 'installation-id',
-        type: 'expense',
-        amount_minor: 1250,
-        currency: 'EUR',
-        title: 'Compra',
-        frequency: 'biweekly',
-        starts_on: '2026-07-03',
-        generated_occurrences: 0,
-        next_occurrence_on: '2026-07-03',
-      },
-    ]);
+    const series = {
+      id: 'series-id',
+      space_id: 'personal',
+      category_id: 'category-id',
+      money_account_id: null,
+      created_by: 'installation-id',
+      type: 'expense',
+      amount_minor: 1250,
+      currency: 'EUR',
+      title: 'Compra',
+      frequency: 'biweekly',
+      starts_on: '2026-07-03',
+      generated_occurrences: 0,
+      next_occurrence_on: '2026-07-03',
+    };
+    getAllAsync.mockResolvedValueOnce([series]);
+    getFirstAsync.mockResolvedValueOnce(series);
     mockRandomUUID
       .mockReturnValueOnce('original-ignored')
       .mockReturnValueOnce('occurrence-2')
@@ -289,6 +289,45 @@ describe('localTransactionRepository', () => {
       expect.stringContaining('UPDATE recurring_transaction_series'),
       3,
       '2026-08-17',
+      expect.any(String),
+      'series-id',
+    );
+  });
+
+  it('relee la serie dentro de la transacción antes de avanzarla', async () => {
+    const staleSeries = {
+      id: 'series-id',
+      space_id: 'personal',
+      category_id: 'category-id',
+      money_account_id: null,
+      created_by: 'installation-id',
+      type: 'expense',
+      amount_minor: 1250,
+      currency: 'EUR',
+      title: 'Compra',
+      frequency: 'biweekly',
+      starts_on: '2026-08-01',
+      generated_occurrences: 1,
+      next_occurrence_on: '2026-08-16',
+    };
+    getAllAsync.mockResolvedValueOnce([staleSeries]);
+    getFirstAsync.mockResolvedValueOnce({
+      ...staleSeries,
+      generated_occurrences: 2,
+      next_occurrence_on: '2026-08-31',
+    });
+
+    await materializeDueRecurringTransactions(database, '2026-08-31');
+
+    expect(
+      runAsync.mock.calls.filter((call) =>
+        String(call[0]).includes('INSERT OR IGNORE INTO transactions'),
+      ),
+    ).toHaveLength(1);
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('UPDATE recurring_transaction_series'),
+      3,
+      '2026-09-15',
       expect.any(String),
       'series-id',
     );
@@ -329,6 +368,58 @@ describe('localTransactionRepository', () => {
       expect.any(String),
       'transaction-id',
       'personal',
+    );
+  });
+
+  it('materializa y archiva solo la ocurrencia futura elegida de una serie', async () => {
+    getFirstAsync.mockImplementation(async (query: string) => {
+      if (query.includes('FROM recurring_transaction_series')) {
+        return {
+          id: 'monthly-series',
+          space_id: 'personal',
+          category_id: 'category-id',
+          money_account_id: null,
+          created_by: 'installation-id',
+          type: 'expense',
+          amount_minor: 4500,
+          currency: 'EUR',
+          title: 'Ropa',
+          frequency: 'biweekly',
+          starts_on: '2026-08-01',
+          generated_occurrences: 1,
+          next_occurrence_on: '2026-08-16',
+        };
+      }
+      return undefined;
+    });
+
+    await archiveLocalTransaction(
+      'projected-occurrence:monthly-series:2026-08-31',
+      'personal',
+    );
+
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('SET is_archived = 1'),
+      expect.any(String),
+      expect.any(String),
+      'monthly-series',
+      '2026-08-31',
+      'personal',
+    );
+    expect(withExclusiveTransactionAsync).toHaveBeenCalledTimes(1);
+    expect(
+      runAsync.mock.calls.filter((call) =>
+        String(call[0]).includes('SET is_archived = 1'),
+      ),
+    ).toHaveLength(1);
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /UPDATE recurring_transaction_series[\s\S]*ELSE 'pending'/,
+      ),
+      3,
+      '2026-09-15',
+      expect.any(String),
+      'monthly-series',
     );
   });
 
@@ -886,23 +977,23 @@ describe('localTransactionRepository', () => {
     });
 
     it('hereda la cuenta de la serie en cada ocurrencia materializada', async () => {
-      getAllAsync.mockResolvedValueOnce([
-        {
-          id: 'series-id',
-          space_id: 'personal',
-          category_id: 'category-id',
-          money_account_id: 'account-1',
-          created_by: 'installation-id',
-          type: 'expense',
-          amount_minor: 1250,
-          currency: 'EUR',
-          title: 'Compra',
-          frequency: 'monthly',
-          starts_on: '2026-06-01',
-          generated_occurrences: 1,
-          next_occurrence_on: '2026-07-01',
-        },
-      ]);
+      const series = {
+        id: 'series-id',
+        space_id: 'personal',
+        category_id: 'category-id',
+        money_account_id: 'account-1',
+        created_by: 'installation-id',
+        type: 'expense',
+        amount_minor: 1250,
+        currency: 'EUR',
+        title: 'Compra',
+        frequency: 'monthly',
+        starts_on: '2026-06-01',
+        generated_occurrences: 1,
+        next_occurrence_on: '2026-07-01',
+      };
+      getAllAsync.mockResolvedValueOnce([series]);
+      getFirstAsync.mockResolvedValueOnce(series);
 
       await materializeDueRecurringTransactions(database, '2026-07-01');
 

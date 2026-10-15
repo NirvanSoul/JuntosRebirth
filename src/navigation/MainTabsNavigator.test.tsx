@@ -1636,6 +1636,9 @@ describe('MainTabsNavigator', () => {
     );
 
     expect(await screen.findByTestId('home-empty-activity')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    expect(await screen.findByLabelText('Crear gasto')).toBeTruthy();
   });
 
   describe('sincronización y registro de errores (Tarea 1)', () => {
@@ -1866,6 +1869,42 @@ describe('MainTabsNavigator', () => {
         ),
       );
       expect(expired.queryByTestId('sync-issue-toast')).toBeNull();
+    });
+
+    it('no activa el polling si la inicialización termina con un rechazo recuperable', async () => {
+      jest.useFakeTimers();
+      try {
+        localCatalog();
+        (initializeAuthenticatedSession as jest.Mock).mockRejectedValueOnce(
+          new ApiError({
+            status: 400,
+            code: 'INVALID_REQUEST',
+            message: 'x',
+          }),
+        );
+
+        const screen = await renderNavigator();
+
+        expect(await screen.findByTestId('sync-issue-toast')).toBeTruthy();
+        expect(screen.queryByTestId('spaces-loading')).toBeNull();
+        const uploadCallsBeforePolling =
+          mockSyncCoupleSpaceData.mock.calls.length;
+        const restoreCallsBeforePolling =
+          mockRestoreRemoteAccount.mock.calls.length;
+
+        await act(async () => {
+          jest.advanceTimersByTime(sharedDataRefreshIntervalMs * 4);
+        });
+
+        expect(mockSyncCoupleSpaceData).toHaveBeenCalledTimes(
+          uploadCallsBeforePolling,
+        );
+        expect(mockRestoreRemoteAccount).toHaveBeenCalledTimes(
+          restoreCallsBeforePolling,
+        );
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('no repite el snapshot al abrir y tolera el fallo del refresco periódico sin romper la interfaz', async () => {

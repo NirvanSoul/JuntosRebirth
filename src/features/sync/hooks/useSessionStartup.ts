@@ -75,6 +75,7 @@ export function useSessionStartup(
   // refresco periódico ya no compite con el snapshot inicial.
   const [isSessionSynced, setSessionSynced] = useState(false);
   const [syncIssue, setSyncIssue] = useState<SyncIssue | null>(null);
+  const sessionUserId = session?.user.id ?? null;
   const nextIssueId = useRef(0);
   // El efecto de apertura registra aquí cómo relanzarse; así el reintento
   // explícito y el de reconexión reutilizan la misma secuencia.
@@ -83,6 +84,7 @@ export function useSessionStartup(
 
   const retrySession = useCallback(() => {
     setSyncIssue(null);
+    setSessionSynced(false);
     runOpenSessionRef.current();
   }, []);
   const dismissSyncIssue = useCallback((issueId: number) => {
@@ -104,7 +106,7 @@ export function useSessionStartup(
 
     const openSession = async () => {
       try {
-        if (session?.user) {
+        if (sessionUserId) {
           await initializeAuthenticatedSession({
             onLocalCacheReady: (preparation) => {
               // Una caché descartada era de otra cuenta: no hay nada que
@@ -133,6 +135,10 @@ export function useSessionStartup(
 
     const runOpenSession = () =>
       openSession()
+        .then(() => {
+          if (!isMounted) return;
+          setSessionSynced(true);
+        })
         .catch((error: unknown) => {
           console.error(
             '[MainTabsNavigator] Error al sincronizar sesión:',
@@ -151,7 +157,6 @@ export function useSessionStartup(
         .finally(() => {
           if (!isMounted) return;
           setFinanceReady(true);
-          setSessionSynced(true);
           markStartup('init_done');
         });
 
@@ -162,7 +167,7 @@ export function useSessionStartup(
       isMounted = false;
       runOpenSessionRef.current = () => undefined;
     };
-  }, [reloadLocalFinance, reloadSpaces, session?.user, setNotificationRules]);
+  }, [reloadLocalFinance, reloadSpaces, sessionUserId, setNotificationRules]);
 
   // Recuperar la red es el momento natural de reintentar sin pedirlo.
   const wasOfflineRef = useRef(isOffline);

@@ -205,23 +205,21 @@ Objetivo financiero individual o compartido. Su implementación completa no form
 
 ### Objetivo
 
-Explicar el valor en tres láminas (bienvenida, calendario y uso compartido),
-preguntar si se permiten las notificaciones y completar el flujo con nombre,
-país, al menos tres categorías, primer ingreso, primer gasto, cierre y acceso.
+Explicar el uso personal y compartido en una única lámina, preguntar si se
+permiten las notificaciones y completar el flujo con nombre, país, al menos
+tres categorías, primer ingreso, primer gasto, cierre y acceso.
 
 ### Flujo propuesto
 
 1. Captura del nombre.
 2. Elección de país y moneda principal.
-3. Bienvenida: simplicidad y control diario.
-4. Calendario y mapa financiero.
-5. Uso personal y compartido.
-6. Activación opcional del permiso de notificaciones.
-7. Creación de al menos tres categorías.
-8. Primer ingreso.
-9. Primer gasto.
-10. Cierre y listo para explorar.
-11. Acceso: iniciar sesión o crear cuenta.
+3. Uso personal y compartido.
+4. Activación opcional del permiso de notificaciones.
+5. Creación de al menos tres categorías.
+6. Primer ingreso.
+7. Primer gasto.
+8. Cierre y listo para explorar.
+9. Acceso: iniciar sesión o crear cuenta.
 
 El acceso a la aplicación requiere una cuenta con correo verificado.
 
@@ -234,20 +232,20 @@ El acceso a la aplicación requiere una cuenta con correo verificado.
 
 ### Reglas
 
-- Once pantallas en total; la última reutiliza el flujo real de Acceso.
+- Nueve pantallas en total; la última reutiliza el flujo real de Acceso.
+- Todo el recorrido previo a una sesión verificada, incluidos onboarding,
+  acceso, registro, inicio de sesión, OTP y recuperación, usa siempre el tema
+  claro aunque la preferencia guardada o la del sistema sea oscura.
 - El onboarding es la primera pantalla de una instalación nueva y se marca
   como completado al llegar a Acceso, aunque la autenticación ocurra después.
 - Tras cerrar sesión, no se repite: el usuario vuelve directamente a Acceso.
-- Tras guardar nombre y país, `Omitir` aparece únicamente en las tres láminas
-  de valor (control diario, calendario y uso compartido). Desde cualquiera de
-  ellas lleva a la pregunta de notificaciones; no salta la configuración
-  restante ni el acceso.
+- La lámina de uso personal y compartido («Juntos, pero no revueltos») avanza mediante «Continuar» hacia la pregunta de notificaciones, sin botón de omitir.
 - La lámina de notificaciones explica que los avisos sirven para recordatorios
   activados e invitaciones. `Activar notificaciones` solicita el permiso nativo
   y `Ahora no` continúa sin solicitarlo. Conceder o denegar nunca bloquea el
   paso a categorías.
 - Pedir un primer ingreso y un primer gasto al final, para dejar el espacio local con datos reales.
-- En los pasos 7, 8 y 9, enseñar la creación con el mismo botón flotante y el
+- En los pasos 5, 6 y 7, enseñar la creación con el mismo botón flotante y el
   mismo menú de opciones de la app; las acciones ajenas al paso permanecen
   visibles pero deshabilitadas.
 - No hay transición de pantalla entre láminas: el indicador de progreso se
@@ -757,6 +755,11 @@ Semanal, quincenal y mensual crean una serie sin fecha final. La recurrencia
 quincenal avanza cada 15 días desde la fecha económica elegida. Las ocurrencias
 se registran al alcanzar su fecha y, si la aplicación permaneció cerrada, se
 recuperan juntas la próxima vez que se cargan los movimientos.
+Una ocurrencia distinta del movimiento inicial se puede eliminar de forma
+individual, incluida una futura que todavía solo esté proyectada: se omite
+únicamente esa fecha y la serie continúa sin alterar sus demás ocurrencias. La
+eliminación del movimiento inicial conserva el comportamiento general de la
+serie ya establecido.
 Al editar una ocurrencia de una serie automática sin cambiar su frecuencia, el
 cambio se aplica a esa ocurrencia y a las posteriores, incluidas las que ya se
 hubieran materializado. Las ocurrencias anteriores conservan sus valores

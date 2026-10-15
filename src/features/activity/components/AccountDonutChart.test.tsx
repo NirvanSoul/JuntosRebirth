@@ -95,6 +95,11 @@ describe('AccountDonutChart', () => {
     expect(within(chart).getByText('Cuenta nómina · 75%')).toBeTruthy();
     expect(within(chart).getByText('Efectivo · 25%')).toBeTruthy();
     expect(
+      within(chart).getByTestId('account-donut-svg', {
+        includeHiddenElements: true,
+      }).props,
+    ).toMatchObject({ height: 236, width: 236 });
+    expect(
       within(chart).getByTestId('account-donut-segment-bank', {
         includeHiddenElements: true,
       }),

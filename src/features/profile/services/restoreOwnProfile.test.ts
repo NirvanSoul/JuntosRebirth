@@ -5,6 +5,7 @@ import {
 import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
 import { restoreOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { apiClient } from '@/services/api/juntossApiClient';
+import { saveCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
 
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
   getLocalProfile: jest.fn(async () => ({ countryCode: null })),
@@ -19,6 +20,9 @@ jest.mock('@/features/profile/services/syncOwnAvatar', () => ({
 }));
 jest.mock('@/services/api/juntossApiClient', () => ({
   apiClient: { get: jest.fn() },
+}));
+jest.mock('@/state/appPreferences/currencyPreferencesRepository', () => ({
+  saveCurrencyPreferences: jest.fn(),
 }));
 
 describe('restoreOwnProfile', () => {
@@ -42,6 +46,9 @@ describe('restoreOwnProfile', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/v1/me');
     expect(restoreRemoteProfileDisplayName).toHaveBeenCalledWith('Ana nueva');
     expect(saveLocalProfileCountry).toHaveBeenCalledWith('VE');
+    expect(saveCurrencyPreferences).toHaveBeenCalledWith({
+      currencies: ['USD', 'VES'],
+    });
     expect(restoreOwnAvatar).toHaveBeenCalledWith({
       userId: 'uuid-ana',
       avatarPath: 'uuid-ana/avatar.jpg',
@@ -58,6 +65,7 @@ describe('restoreOwnProfile', () => {
 
     expect(saveLocalProfileCountry).not.toHaveBeenCalled();
     expect(restoreRemoteProfileDisplayName).not.toHaveBeenCalled();
+    expect(saveCurrencyPreferences).not.toHaveBeenCalled();
   });
 
   it('refleja también la eliminación remota de nombre y avatar', async () => {
