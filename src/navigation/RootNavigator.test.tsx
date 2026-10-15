@@ -263,6 +263,35 @@ describe('RootNavigator', () => {
     ).toBe(lightColors.background);
   });
 
+  it('cambia a tema claro al reiniciar el onboarding desde una sesión oscura', async () => {
+    const screen = await renderWithTheme(<RootNavigator />, {
+      appearance: 'dark',
+    });
+
+    expect(await screen.findByText('pestañas')).toBeTruthy();
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('root-navigator-backdrop').props.style,
+      ),
+    ).toBe(darkColors.background);
+
+    mockSession = null;
+    mockOnboardingCompleted = false;
+    await screen.rerender(<RootNavigator />);
+
+    expect(await screen.findByText('onboarding')).toBeTruthy();
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('root-navigator-backdrop').props.style,
+      ),
+    ).toBe(lightColors.background);
+    expect(
+      backdropBackgroundColor(
+        screen.getByTestId('onboarding-theme').props.style,
+      ),
+    ).toBe(lightColors.background);
+  });
+
   it('conserva el onboarding mientras Better Auth refresca la sesión tras el alta', async () => {
     mockOnboardingCompleted = false;
     mockSession = null;

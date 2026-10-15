@@ -102,14 +102,19 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
     };
   }, [activeSpace.id]);
 
-  const finishWithCategories = (created: readonly Category[]) => {
+  const finishWithCategories = (
+    created: readonly Category[],
+    keepPickerOpen = false,
+  ) => {
     const nextCategories = appendMissingCategories(categories, created);
     setCategories(nextCategories);
     setCustomVisible(false);
-    setPickerVisible(false);
 
     if (nextCategories.length >= minimumOnboardingCategories) {
+      setPickerVisible(false);
       navigation.navigate('AddFirstIncome');
+    } else if (!keepPickerOpen) {
+      setPickerVisible(false);
     }
   };
 
@@ -151,7 +156,10 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
         colorToken: input.colorToken,
         isDefault: false,
       });
-      finishWithCategories([created]);
+      // La categoría cuenta inmediatamente para el mínimo, pero el selector
+      // queda debajo del formulario para conservar las plantillas que el
+      // usuario ya había marcado.
+      finishWithCategories([created], true);
     } catch {
       setError('No pudimos crear la categoría. Inténtalo de nuevo.');
     }
@@ -208,7 +216,7 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
       <CategoryPickerModal
         categories={categories}
         mode="create"
-        minimumTemplateSelections={minimumOnboardingCategories}
+        minimumTemplateSelections={Math.max(1, remainingCategories)}
         onClose={() => setPickerVisible(false)}
         onCreateCategory={() => setCustomVisible(true)}
         onCreateTemplates={(definitions) =>

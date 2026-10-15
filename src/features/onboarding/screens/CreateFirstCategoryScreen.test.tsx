@@ -210,6 +210,51 @@ describe('CreateFirstCategoryScreen', () => {
     });
   });
 
+  it('conserva las plantillas seleccionadas al crear una categoría personalizada', async () => {
+    mockCreateLocalCategory.mockImplementation(
+      async (input: Record<string, unknown>) => ({
+        ...input,
+        id: 'category-custom',
+        isArchived: false,
+      }),
+    );
+    const screen = await renderWithTheme(
+      <CreateFirstCategoryScreen navigation={navigation} route={route} />,
+    );
+
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+    await fireEvent.press(screen.getByLabelText('Salario'));
+    await fireEvent.press(screen.getByLabelText('Supermercado'));
+    await fireEvent.press(screen.getByLabelText('Crear otra categoría'));
+    await fireEvent.changeText(
+      screen.getByLabelText('Nombre de la categoría'),
+      'Jardinería',
+    );
+    await fireEvent.press(screen.getByLabelText('Continuar personalización'));
+    await fireEvent.press(screen.getByLabelText('Crear categoría'));
+
+    await waitFor(() => {
+      expect(mockCreateLocalCategory).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'personal', name: 'Jardinería' }),
+      );
+    });
+    expect(screen.getByText('Nueva categoría')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Guardar categorías').props.accessibilityState,
+    ).toMatchObject({ disabled: false });
+
+    await fireEvent.press(screen.getByLabelText('Guardar categorías'));
+
+    await waitFor(() => {
+      expect(mockCreateLocalCategories).toHaveBeenCalledWith([
+        expect.objectContaining({ spaceId: 'personal', name: 'Salario' }),
+        expect.objectContaining({ spaceId: 'personal', name: 'Supermercado' }),
+      ]);
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('AddFirstIncome');
+    });
+  });
+
   it('no permite volver a crear una categoría de plantilla que ya existe en el espacio', async () => {
     // Simula volver a esta lámina con «Atrás» tras haber creado «Salario»
     // en una visita anterior: ya existe en la base de datos aunque el

@@ -199,10 +199,12 @@ No dice «Continuar». Dice **Crear categoría** y, al tocarlo, abre el mismo se
 
 El usuario debe crear al menos tres categorías, de plantilla o personalizadas.
 Cuando abre el selector de plantillas desde el onboarding, el botón Guardar
-permanece deshabilitado hasta seleccionar tres categorías; esta restricción no
-se aplica al selector usado fuera del onboarding. Solo al alcanzar ese mínimo
-se completa el paso y continúa el flujo hacia la Pantalla 6 (añadir el primer
-ingreso).
+permanece deshabilitado hasta que las selecciones pendientes completen las tres
+categorías requeridas; esta restricción no se aplica al selector usado fuera
+del onboarding. Si abre el formulario personalizado desde ese selector, la
+categoría creada cuenta para el mínimo y se conservan las plantillas que ya
+había marcado. Solo al alcanzar ese mínimo se completa el paso y continúa el
+flujo hacia la Pantalla 6 (añadir el primer ingreso).
 
 ---
 
