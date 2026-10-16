@@ -124,10 +124,12 @@ describe('HomeScreen', () => {
     expect(screen.getAllByText(/^0\s*€$/)).toHaveLength(3);
     expect(screen.getByText('Crea una categoría')).toBeTruthy();
     expect(screen.getByText('Crea un movimiento')).toBeTruthy();
-    expect(screen.getByText('Crea una cuenta')).toBeTruthy();
+    expect(screen.getByText('Crear cuenta')).toBeTruthy();
+    expect(screen.queryByText('Crea una cuenta')).toBeNull();
     expect(
       StyleSheet.flatten(
-        screen.getByTestId('home-empty-accounts-icon').props.style,
+        screen.getByTestId('home-account-create-badge-icon-background').props
+          .style,
       ).backgroundColor,
     ).toBe(colors.cta);
     expect(screen.getByText('Movimientos Recientes')).toBeTruthy();
@@ -941,6 +943,19 @@ describe('HomeScreen', () => {
           </ThemeProvider>
         </SafeAreaProvider>,
       );
+
+    it('usa el CTA compacto para crear la primera cuenta', async () => {
+      const onCreateMoneyAccount = jest.fn();
+      const screen = await renderHome({
+        moneyAccounts: [],
+        onCreateMoneyAccount,
+      });
+
+      expect(screen.queryByTestId('home-empty-accounts')).toBeNull();
+      await fireEvent.press(screen.getByTestId('home-account-create-badge'));
+
+      expect(onCreateMoneyAccount).toHaveBeenCalledTimes(1);
+    });
 
     it('muestra solo las tarjetas, sin la lista de Actividad', async () => {
       const screen = await renderHome({ moneyAccounts: [account] });

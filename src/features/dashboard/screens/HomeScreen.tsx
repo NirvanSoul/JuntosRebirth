@@ -304,13 +304,12 @@ export function HomeScreen({
               testID="home-account-scroller"
             />
           ) : (
-            <EmptyState
+            <CreatePreviewBadge
               accessibilityLabel="Crear primera cuenta"
-              icon="wallet-outline"
-              iconBackgroundColor={colors.cta}
+              bordered
+              label="Crear cuenta"
               onPress={onCreateMoneyAccount}
-              testID="home-empty-accounts"
-              title="Crea una cuenta"
+              testID="home-account-create-badge"
             />
           )}
 
