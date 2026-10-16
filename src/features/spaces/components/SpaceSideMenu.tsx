@@ -67,9 +67,9 @@ export function SpaceSideMenu({
 
   const selectSpace = (spaceId: string) => {
     setError(null);
-    return Promise.resolve(onSelectSpace(spaceId))
-      .then(onClose)
-      .catch(showSelectionError);
+    const selection = Promise.resolve(onSelectSpace(spaceId));
+    onClose();
+    return selection.catch(showSelectionError);
   };
 
   return (

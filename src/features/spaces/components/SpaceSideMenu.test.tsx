@@ -68,6 +68,24 @@ describe('SpaceSideMenu', () => {
     expect(props.onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('cierra el menú sin esperar a que termine de persistirse la selección', async () => {
+    let finishSelection: (() => void) | undefined;
+    const onSelectSpace = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSelection = resolve;
+        }),
+    );
+    const { props, screen } = await renderMenu({ onSelectSpace });
+
+    fireEvent.press(screen.getByLabelText('Seleccionar espacio Juntos'));
+
+    expect(onSelectSpace).toHaveBeenCalledWith('juntos');
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+
+    finishSelection?.();
+  });
+
   it('mantiene Personal primero y Juntos después aunque cambie el orden recibido', async () => {
     const { screen } = await renderMenu({
       activeSpaceId: 'juntos',

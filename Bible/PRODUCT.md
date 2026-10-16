@@ -541,15 +541,14 @@ estados visuales diferenciados.
 
 El selector fijo del mes conserva además una separación
 superior amplia para no quedar cubierto por el selector flotante de espacio. Al
-alejarse seis meses o más del mes actual aparece, a la izquierda de la acción
-global de creación, el botón `Volver a hoy`: usa doble flecha hacia arriba al
+alejarse seis meses o más del mes actual aparece, sobre la navegación flotante,
+el botón `Volver a hoy`: usa doble flecha hacia arriba al
 recorrer meses futuros y hacia abajo al recorrer meses antiguos. El botón se
-alinea verticalmente con la acción `+` y usa un borde gris sutil. Al pulsarlo,
+mantiene cerca de la acción `+` y usa un borde gris sutil. Al pulsarlo,
 la superficie del calendario desaparece durante 200 ms, la vista semanal se
 reinicia localmente con hoy como ancla y la superficie reaparece
 durante 300 ms. El retorno no recorre los periodos intermedios ni muestra texto,
-loader o estado direccional. Dentro del contenedor de Mapa, el botón compensa 32
-pt hacia abajo la diferencia respecto al nivel global de la acción `+`.
+loader o estado direccional.
 
 Los espacios no ocupan una pestaña.
 
@@ -650,8 +649,14 @@ Los límites deben centralizarse como capacidades.
 ### Acceso
 
 La acción debe ser prominente, mediante botones de gasto e ingreso, botón
-flotante o acción central. El botón flotante global de creación permanece
-visible al desplazarse y al cambiar entre las pestañas principales.
+flotante o acción central. La navegación principal se presenta como un menú
+flotante: Inicio, Actividad y Mapa comparten una cápsula, y el botón morado `+`
+permanece separado a su lado en la misma línea. La franja que contiene ambos es
+transparente y se superpone al contenido; la cápsula conserva su superficie y
+la pestaña seleccionada usa una forma completamente redondeada. El conjunto
+permanece visible al desplazarse y al cambiar entre las pestañas principales.
+No queda disponible mientras hay un modal o el menú lateral abierto y no
+aparece en Ajustes.
 
 ### Modal
 

@@ -17,7 +17,6 @@ type ActivityTabContentProps = {
   onOpenCategoryDetail: (categoryId: string, currency?: CurrencyCode) => void;
   onOpenMoneyAccountDetail: (moneyAccountId: string) => void;
   onOpenTransactionDetail: (transactionId: string) => void;
-  onScrollDirectionChange: (direction: 'down' | 'up') => void;
   onSummaryPinnedChange: (pinned: boolean) => void;
   preference: ActivitySectionsPreference;
   savePreference: (preference: ActivitySectionsPreference) => void;
@@ -39,7 +38,6 @@ export function ActivityTabContent({
   onOpenCategoryDetail,
   onOpenMoneyAccountDetail,
   onOpenTransactionDetail,
-  onScrollDirectionChange,
   onSummaryPinnedChange,
   preference,
   savePreference,
@@ -76,7 +74,6 @@ export function ActivityTabContent({
       onOpenCategoryDetail={onOpenCategoryDetail}
       onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
       onOpenTransactionDetail={onOpenTransactionDetail}
-      onScrollDirectionChange={onScrollDirectionChange}
       onSummaryPinnedChange={onSummaryPinnedChange}
       spaceCurrency={spaceCurrency}
       summaryPinned={summaryPinned}

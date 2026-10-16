@@ -483,7 +483,7 @@ describe('MapScreen', () => {
         screen.getByTestId('map-return-today-container').props.style,
       ),
     ).toMatchObject({
-      bottom: 34 + layout.floatingActionTabOffset - spacing.xxl,
+      bottom: 34 + layout.floatingActionSize + spacing.md,
       right: mapReturnToTodayRight,
       height: layout.floatingActionSize,
     });

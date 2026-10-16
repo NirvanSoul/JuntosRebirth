@@ -58,8 +58,6 @@ export const layout = {
   floatingActionClearance: 148,
   /** Diámetro del botón flotante global de creación. */
   floatingActionSize: 60,
-  /** Distancia desde la safe area inferior hasta las acciones sobre las pestañas. */
-  floatingActionTabOffset: 78,
 } as const;
 
 /**

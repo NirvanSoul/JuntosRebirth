@@ -21,7 +21,6 @@ type HomeTabContentProps = {
   effectiveHomeCurrency: CurrencyCode;
   focusResetKey: number;
   handleCreateAction: (action: CreateActionType) => void;
-  handleScrollDirectionChange: (direction: 'down' | 'up') => void;
   isAwaitingPartner: boolean;
   isInvitePartnerVisible: boolean;
   moneyAccounts: readonly MoneyAccount[];
@@ -50,7 +49,6 @@ export function HomeTabContent({
   effectiveHomeCurrency,
   focusResetKey,
   handleCreateAction,
-  handleScrollDirectionChange,
   isAwaitingPartner,
   isInvitePartnerVisible,
   moneyAccounts,
@@ -98,7 +96,6 @@ export function HomeTabContent({
       onOpenCategoryDetail={onOpenCategoryDetail}
       onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
       onOpenTransactionDetail={onOpenTransactionDetail}
-      onScrollDirectionChange={handleScrollDirectionChange}
       onViewAccounts={() => navigateToActivitySection('accounts')}
       onViewCategories={() => navigateToActivitySection('categories')}
       onViewMovements={() => navigateToActivitySection('movements')}

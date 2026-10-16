@@ -30,34 +30,29 @@ describe('HomeEntrance', () => {
     expect(queryByText('Bloque B')).toBeNull();
   });
 
-  it('remounts each block when revealKey changes so the entrance replays', async () => {
+  it('keeps mounted blocks when their content updates', async () => {
     const onMount = jest.fn();
-    function Block() {
+    function Block({ label }: { label: string }) {
       useEffect(() => {
         onMount();
       }, []);
-      return <Text>Bloque</Text>;
+      return <Text>{label}</Text>;
     }
 
-    const { rerender } = await render(
-      <HomeEntrance revealKey="personal:USD">
-        <Block />
+    const { getByText, rerender } = await render(
+      <HomeEntrance>
+        <Block label="Personal" />
       </HomeEntrance>,
     );
     expect(onMount).toHaveBeenCalledTimes(1);
+    expect(getByText('Personal')).toBeTruthy();
 
     await rerender(
-      <HomeEntrance revealKey="personal:USD">
-        <Block />
+      <HomeEntrance>
+        <Block label="Juntos" />
       </HomeEntrance>,
     );
     expect(onMount).toHaveBeenCalledTimes(1);
-
-    await rerender(
-      <HomeEntrance revealKey="personal:EUR">
-        <Block />
-      </HomeEntrance>,
-    );
-    expect(onMount).toHaveBeenCalledTimes(2);
+    expect(getByText('Juntos')).toBeTruthy();
   });
 });

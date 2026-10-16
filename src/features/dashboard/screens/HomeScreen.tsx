@@ -67,8 +67,8 @@ type HomeScreenProps = {
   /** Cambia al reenfocar la pantalla para reiniciar el arco de balance. */
   focusResetKey?: number;
   /**
-   * Cambia al cambiar de espacio o de moneda para que todos los bloques
-   * repitan la animación de entrada en lugar de saltar de golpe.
+   * Identifica el contexto mostrado sin remontar los bloques de Inicio.
+   * Se conserva en la API para que el cambio de datos sea inmediato.
    */
   revealKey?: string;
   topContent?: ReactNode;
@@ -94,7 +94,6 @@ export function HomeScreen({
   onViewAccounts,
   onViewCategories,
   onViewMovements,
-  revealKey,
   showComparisonIndicators = false,
   spaceCurrency = defaultCurrencyCode,
   topContent,
@@ -190,7 +189,7 @@ export function HomeScreen({
         scrollRef={scrollRef}
         testID="home-screen"
       >
-        <HomeEntrance revealKey={revealKey}>
+        <HomeEntrance>
           {topContent}
           <IncomeExpenseArc
             expenseMinor={summary.monthExpenseMinor}

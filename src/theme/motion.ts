@@ -3,6 +3,8 @@ export const motion = {
   loadingBarCrawlDuration: 4000,
   loadingCompletionDuration: 160,
   loadingTransitionDuration: 260,
+  /** Transición ligera de icono y píldora al cambiar la pestaña activa. */
+  mainTabSelectionDuration: 180,
   startupRevealDuration: 480,
   startupRevealStagger: 36,
   startupRevealMaxDelay: 216,
@@ -49,11 +51,6 @@ export const motion = {
   stepProgressFillDuration: 540,
   stickyHeaderTransitionDuration: 240,
   stickySummaryPulseDuration: 90,
-  tabIconSelectSpring: {
-    damping: 14,
-    mass: 0.4,
-    stiffness: 260,
-  },
   transactionTypeSpring: {
     damping: 14,
     mass: 0.55,

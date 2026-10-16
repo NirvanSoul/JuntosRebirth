@@ -78,7 +78,7 @@ describe('CategoryDonutChart', () => {
       screen.getByTestId('category-donut-svg', {
         includeHiddenElements: true,
       }).props,
-    ).toMatchObject({ height: 195, width: 195 });
+    ).toMatchObject({ height: 205, width: 205 });
     expect(
       screen.getByTestId('category-donut-segment-food', {
         includeHiddenElements: true,

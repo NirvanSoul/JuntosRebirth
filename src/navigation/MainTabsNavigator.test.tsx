@@ -691,7 +691,7 @@ describe('MainTabsNavigator', () => {
     expect(
       StyleSheet.flatten(screen.getByTestId('app-tab-item-Home').props.style)
         .backgroundColor,
-    ).toBe(colors.background);
+    ).toBe('rgba(242, 242, 247, 1)');
     expect(
       StyleSheet.flatten(within(homeTab).getByText('Inicio').props.style).color,
     ).toBe(colors.textPrimary);
@@ -699,11 +699,15 @@ describe('MainTabsNavigator', () => {
       within(homeTab).getByTestId('phosphor-react-native-house-fill'),
     ).toBeTruthy();
     expect(
-      StyleSheet.flatten(screen.getByTestId('app-tab-bar').props.style),
+      StyleSheet.flatten(screen.getByTestId('app-tab-bar-tabs').props.style),
     ).toMatchObject(shadows.mainMenu);
 
     await fireEvent.press(screen.getByRole('tab', { name: 'Actividad' }));
     await fireEvent.press(screen.getByLabelText('Espacio Personal'));
+    expect(
+      screen.getByTestId('app-tab-bar', { includeHiddenElements: true }).props
+        .pointerEvents,
+    ).toBe('none');
     expect(
       await screen.findByText('Espacios', { includeHiddenElements: true }),
     ).toBeTruthy();
@@ -729,11 +733,6 @@ describe('MainTabsNavigator', () => {
     expect(screen.getByTestId('persistent-app-header')).toBeTruthy();
     expect(screen.getByLabelText('Espacio Personal')).toBeTruthy();
     const activityTab = screen.getByRole('tab', { name: 'Actividad' });
-    expect(
-      StyleSheet.flatten(
-        screen.getByTestId('app-tab-item-Activity').props.style,
-      ).backgroundColor,
-    ).toBe(colors.background);
     expect(
       StyleSheet.flatten(within(activityTab).getByText('Actividad').props.style)
         .color,
@@ -1264,9 +1263,15 @@ describe('MainTabsNavigator', () => {
     expect(StyleSheet.flatten(screen.getByText('+').props.style).color).toBe(
       colors.textPrimary,
     );
+
+    await fireEvent.press(screen.getByLabelText('Cerrar'));
+    await waitFor(() =>
+      expect(screen.queryByLabelText('Título del movimiento')).toBeNull(),
+    );
+    expect(await screen.findByTestId('floating-create-button')).toBeTruthy();
   });
 
-  it('aparta el botón flotante al bajar y lo recupera al subir', async () => {
+  it('mantiene el menú flotante disponible al bajar y al subir', async () => {
     const screen = await render(
       <SafeAreaProvider
         initialMetrics={{
@@ -1288,10 +1293,9 @@ describe('MainTabsNavigator', () => {
     });
     await waitFor(() =>
       expect(
-        screen.getByTestId('floating-create-button-container', {
-          includeHiddenElements: true,
-        }).props.pointerEvents,
-      ).toBe('none'),
+        screen.getByTestId('floating-create-button-container').props
+          .pointerEvents,
+      ).toBe('auto'),
     );
 
     fireEvent.scroll(scrollView, {

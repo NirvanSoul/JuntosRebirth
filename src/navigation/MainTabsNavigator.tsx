@@ -5,12 +5,11 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
 import { ActiveSpaceHeader } from '@/components/navigation/ActiveSpaceHeader/ActiveSpaceHeader';
-import { AppTabBar } from '@/components/navigation/AppTabBar/AppTabBar';
 import { NoticeToast } from '@/components/overlays/NoticeToast/NoticeToast';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { ActivityTabContent } from '@/navigation/components/ActivityTabContent';
 import { HomeTabContent } from '@/navigation/components/HomeTabContent';
-import { MainFloatingActions } from '@/navigation/components/MainFloatingActions';
+import { MainAppTabBar } from '@/navigation/components/MainAppTabBar';
 import { useTransactionDetailModal } from '@/navigation/useTransactionDetailModal';
 import {
   getHomeCurrencyButtonLabel,
@@ -195,8 +194,6 @@ export function MainTabsNavigator() {
   const [activityChartResetKey, setActivityChartResetKey] = useState(0);
   const [isHomeCurrencyPickerVisible, setHomeCurrencyPickerVisible] =
     useState(false);
-  const [isFloatingCreateButtonVisible, setFloatingCreateButtonVisible] =
-    useState(true);
   const [isActivitySummaryPinned, setActivitySummaryPinned] = useState(false);
   const [isCreateMenuVisible, setCreateMenuVisible] = useState(false);
   const [isImportVisible, setImportVisible] = useState(false);
@@ -244,12 +241,6 @@ export function MainTabsNavigator() {
     useState<CategoryCreationContext | null>(null);
   const activityRequestId = useRef(0);
   const mapScreenRef = useRef<MapScreenHandle>(null);
-  const handleScrollDirectionChange = useCallback(
-    (direction: 'down' | 'up') => {
-      setFloatingCreateButtonVisible(direction === 'up');
-    },
-    [],
-  );
   const activeSpaceCategories = useMemo(
     () => listCategoriesBySpace(categories, activeSpace.id),
     [activeSpace.id, categories],
@@ -810,7 +801,6 @@ export function MainTabsNavigator() {
               setActiveMainTab('Home');
               setActivitySummaryPinned(false);
               setCreateMenuVisible(false);
-              setFloatingCreateButtonVisible(true);
               setInvitePartnerVisible(true);
               navigation.navigate('Main', { screen: 'Home' });
             }}
@@ -825,7 +815,6 @@ export function MainTabsNavigator() {
                 setActiveMainTab('Home');
                 setActivitySummaryPinned(false);
                 setCreateMenuVisible(false);
-                setFloatingCreateButtonVisible(true);
                 navigation.navigate('Main', { screen: 'Home' });
               }
               await selectSpace(spaceId);
@@ -882,11 +871,10 @@ export function MainTabsNavigator() {
                 }
                 screenOptions={{ headerShown: false, animation: 'fade' }}
                 tabBar={(props) => (
-                  <AppTabBar
+                  <MainAppTabBar
                     {...props}
-                    disabledRoutes={
-                      areSpaceActionsBlocked ? ['Activity', 'Map'] : undefined
-                    }
+                    createDisabled={areSpaceActionsBlocked}
+                    onCreatePress={() => setCreateMenuVisible(true)}
                   />
                 )}
               >
@@ -909,7 +897,6 @@ export function MainTabsNavigator() {
                       effectiveHomeCurrency={effectiveHomeCurrency}
                       focusResetKey={homeChartResetKey}
                       handleCreateAction={handleCreateAction}
-                      handleScrollDirectionChange={handleScrollDirectionChange}
                       isAwaitingPartner={isAwaitingPartner}
                       isInvitePartnerVisible={isInvitePartnerVisible}
                       moneyAccounts={
@@ -983,7 +970,6 @@ export function MainTabsNavigator() {
                         moneyAccountsController.openDetail
                       }
                       onOpenTransactionDetail={openTransactionDetail}
-                      onScrollDirectionChange={handleScrollDirectionChange}
                       onSummaryPinnedChange={setActivitySummaryPinned}
                       preference={activitySections.preference}
                       savePreference={(preference) =>
@@ -1021,13 +1007,6 @@ export function MainTabsNavigator() {
                 </Tabs.Screen>
               </Tabs.Navigator>
 
-              <MainFloatingActions
-                areSpaceActionsBlocked={areSpaceActionsBlocked}
-                isCreateButtonVisible={isFloatingCreateButtonVisible}
-                onCreatePress={() =>
-                  setCreateMenuVisible(!areSpaceActionsBlocked)
-                }
-              />
               <QuickCreateMenu
                 chainSelectionAfterDismiss
                 onClose={() => setCreateMenuVisible(false)}

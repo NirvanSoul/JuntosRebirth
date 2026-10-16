@@ -87,7 +87,6 @@ function getProjectionRange(monthKey: string): {
 
 const distantMonthThreshold = 6;
 const calendarResetFocusGuardDuration = 1000;
-const returnButtonVerticalAdjustment = spacing.xxl;
 
 export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
   function MapScreen(
@@ -375,11 +374,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
 
           {returnDirection ? (
             <MapReturnToToday
-              bottom={
-                insets.bottom +
-                layout.floatingActionTabOffset -
-                returnButtonVerticalAdjustment
-              }
+              bottom={insets.bottom + layout.floatingActionSize + spacing.md}
               direction={returnDirection}
               disabled={isCalendarResetting}
               onPress={handleReturnToToday}
