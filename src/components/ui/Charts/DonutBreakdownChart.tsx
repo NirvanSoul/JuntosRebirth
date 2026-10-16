@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   LinearTransition,
@@ -37,8 +37,6 @@ export type DonutBreakdownSlice = {
 
 type DonutBreakdownChartProps = {
   currency: CurrencyCode;
-  /** Sustituye al total cuando el mes y el modo elegidos no tienen importes. */
-  emptyMessage: string;
   /** Identifica la variante y prefija sus testID: `category`, `account`. */
   idPrefix: string;
   /** Bloquea la navegación hacia meses futuros. */
@@ -47,6 +45,7 @@ type DonutBreakdownChartProps = {
   monthLabel: string;
   onModeChange: (mode: DonutBreakdownMode) => void;
   onMonthChange: (offset: -1 | 1) => void;
+  onDataAvailabilityChange?: (hasData: boolean) => void;
   onSlicePress?: (id: string) => void;
   /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
   resetKey?: number;
@@ -80,13 +79,13 @@ const chartLayoutTransition = LinearTransition.springify()
  */
 export function DonutBreakdownChart({
   currency,
-  emptyMessage,
   idPrefix,
   isCurrentMonth,
   mode,
   monthLabel,
   onModeChange,
   onMonthChange,
+  onDataAvailabilityChange,
   onSlicePress,
   resetKey,
   slicePressHint,
@@ -122,6 +121,12 @@ export function DonutBreakdownChart({
     [chartCircumference, data.items, minimumSegmentAllocation],
   );
   const modeLabel = mode === 'expense' ? 'gastado' : 'ingresado';
+  const hasData = data.items.length > 0;
+
+  useEffect(() => {
+    onDataAvailabilityChange?.(hasData);
+  }, [hasData, onDataAvailabilityChange]);
+
   const motionDirection: MotionDirection = mode === 'expense' ? -1 : 1;
   const animationKey = `${mode}-${monthLabel}`;
   const dashOffsets = useMemo(
@@ -158,8 +163,8 @@ export function DonutBreakdownChart({
 
       <View
         accessibilityLabel={
-          data.items.length === 0
-            ? emptyMessage
+          !hasData
+            ? `Sin datos de ${modeLabel} en ${monthLabel}`
             : `Total ${modeLabel}: ${formattedTotal}. ${data.items
                 .map((slice) => {
                   const percentage = Math.round(
@@ -209,12 +214,12 @@ export function DonutBreakdownChart({
         <Animated.View
           entering={getChartContentEntering(motionDirection)}
           exiting={getChartContentExiting(motionDirection)}
-          key={`${animationKey}-${data.items.length > 0 ? 'total' : 'empty'}`}
+          key={`${animationKey}-${hasData ? 'total' : 'empty'}`}
           pointerEvents="none"
           style={[styles.chartCenter, { width: size - strokeWidth * 3 }]}
           testID={`${idPrefix}-chart-center-content`}
         >
-          {data.items.length > 0 ? (
+          {hasData ? (
             <>
               <Text tone="secondary" variant="footnote">
                 Total {modeLabel}
@@ -228,11 +233,7 @@ export function DonutBreakdownChart({
                 {formattedTotal}
               </Text>
             </>
-          ) : (
-            <Text align="center" tone="secondary" variant="footnote">
-              {emptyMessage}
-            </Text>
-          )}
+          ) : null}
         </Animated.View>
       </View>
 

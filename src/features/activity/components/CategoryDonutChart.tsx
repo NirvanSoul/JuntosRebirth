@@ -19,6 +19,7 @@ import { categoryColors } from '@/theme/categoryColors';
 type CategoryDonutChartProps = {
   categories: readonly Category[];
   currency: CurrencyCode;
+  onDataAvailabilityChange?: (hasData: boolean) => void;
   onOpenCategoryDetail?: (categoryId: string) => void;
   /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
   resetKey?: number;
@@ -29,6 +30,7 @@ type CategoryDonutChartProps = {
 export function CategoryDonutChart({
   categories,
   currency,
+  onDataAvailabilityChange,
   onOpenCategoryDetail,
   resetKey,
   transactions,
@@ -55,16 +57,12 @@ export function CategoryDonutChart({
   return (
     <DonutBreakdownChart
       currency={currency}
-      emptyMessage={`Para ver ${
-        mode === 'expense' ? 'gastos' : 'ingresos'
-      } por categoría, registra un ${
-        mode === 'expense' ? 'gasto' : 'ingreso'
-      } y asócialo a una categoría.`}
       idPrefix="category"
       isCurrentMonth={monthKey === currentMonthKey}
       mode={mode}
       monthLabel={formatMonthKey(monthKey)}
       onModeChange={setMode}
+      onDataAvailabilityChange={onDataAvailabilityChange}
       onMonthChange={(offset) =>
         setMonthKey((current) => shiftMonthKey(current, offset))
       }

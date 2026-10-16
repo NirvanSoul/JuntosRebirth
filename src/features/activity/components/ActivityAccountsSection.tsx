@@ -11,7 +11,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
 import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountCarousel } from '@/features/accounts/components/MoneyAccountCarousel/MoneyAccountCarousel';
@@ -39,6 +38,7 @@ type ActivityAccountsSectionProps = {
   currency: CurrencyCode;
   expanded: boolean;
   onCreateMoneyAccount?: () => void;
+  onCreateMovement?: () => void;
   onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   onToggle: () => void;
   resetKey?: number;
@@ -63,6 +63,7 @@ export function ActivityAccountsSection({
   currency,
   expanded,
   onCreateMoneyAccount,
+  onCreateMovement,
   onOpenMoneyAccountDetail,
   onToggle,
   resetKey,
@@ -71,6 +72,7 @@ export function ActivityAccountsSection({
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const [accountView, setAccountView] = useState<AccountView>('list');
+  const [hasBreakdownData, setHasBreakdownData] = useState(false);
   const [displayedAccountView, setDisplayedAccountView] =
     useState<AccountView>('list');
   const entryOffset = useRef<number | null>(null);
@@ -146,6 +148,7 @@ export function ActivityAccountsSection({
           <AccountDonutChart
             accounts={accounts}
             currency={currency}
+            onDataAvailabilityChange={setHasBreakdownData}
             onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
             resetKey={resetKey}
             transactions={transactions}
@@ -222,23 +225,28 @@ export function ActivityAccountsSection({
 
           <View style={styles.createAccountBadge}>
             <CreatePreviewBadge
-              accessibilityLabel="Crear cuenta"
+              accessibilityLabel={
+                hasBreakdownData ? 'Crear cuenta' : 'Crear movimiento'
+              }
               bordered
-              label="Crear cuenta"
-              onPress={onCreateMoneyAccount}
+              label={hasBreakdownData ? 'Crear cuenta' : 'Crear movimiento'}
+              onPress={
+                hasBreakdownData ? onCreateMoneyAccount : onCreateMovement
+              }
               testID="activity-add-money-account"
             />
           </View>
         </>
       ) : (
-        <EmptyState
-          accessibilityLabel="Crear primera cuenta"
-          icon="wallet-outline"
-          iconBackgroundColor={colors.cta}
-          onPress={onCreateMoneyAccount}
-          testID="activity-empty-accounts"
-          title="Crea una cuenta"
-        />
+        <View style={styles.createAccountBadge}>
+          <CreatePreviewBadge
+            accessibilityLabel="Crear primera cuenta"
+            bordered
+            label="Crear cuenta"
+            onPress={onCreateMoneyAccount}
+            testID="activity-add-money-account"
+          />
+        </View>
       )}
     </ActivityCollapsibleSection>
   );

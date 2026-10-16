@@ -527,7 +527,8 @@ describe('ActivityScreen', () => {
     ).toMatchObject({ disabled: false });
   });
 
-  it('orienta el estado vacío a asociar un movimiento con una categoría', async () => {
+  it('ofrece crear un movimiento cuando la categoría no tiene datos', async () => {
+    const onCreateMovement = jest.fn();
     const screen = await render(
       <SafeAreaProvider
         initialMetrics={{
@@ -536,27 +537,29 @@ describe('ActivityScreen', () => {
         }}
       >
         <ThemeProvider initialAppearance="light">
-          <ActivityScreen categories={categories} transactions={[]} />
+          <ActivityScreen
+            categories={categories}
+            onCreateMovement={onCreateMovement}
+            transactions={[]}
+          />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
     const chart = screen.getByTestId('category-donut-chart');
 
     expect(
-      within(chart).getByText(
-        'Para ver gastos por categoría, registra un gasto y asócialo a una categoría.',
-      ),
-    ).toBeTruthy();
+      within(chart).queryByText(/Para ver gastos por categoría/),
+    ).toBeNull();
     expect(within(chart).queryByText('Total gastado')).toBeNull();
     expect(within(chart).queryByText(/0,00/)).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Crear movimiento'));
+    expect(onCreateMovement).toHaveBeenCalledTimes(1);
 
     await fireEvent.press(within(chart).getByRole('tab', { name: 'Ingresos' }));
 
     expect(
-      within(chart).getByText(
-        'Para ver ingresos por categoría, registra un ingreso y asócialo a una categoría.',
-      ),
-    ).toBeTruthy();
+      within(chart).queryByText(/Para ver ingresos por categoría/),
+    ).toBeNull();
     expect(within(chart).queryByText('Total ingresado')).toBeNull();
     expect(within(chart).queryByText(/0,00/)).toBeNull();
   });
@@ -582,7 +585,8 @@ describe('ActivityScreen', () => {
       </SafeAreaProvider>,
     );
 
-    expect(screen.getByTestId('activity-empty-categories-arrow')).toBeTruthy();
+    expect(screen.getByTestId('activity-add-category')).toBeTruthy();
+    expect(screen.queryByText('Aún no hay categorías')).toBeNull();
     expect(screen.getByTestId('activity-empty-movements-arrow')).toBeTruthy();
 
     await fireEvent.press(screen.getByLabelText('Crear primera categoría'));
@@ -1550,11 +1554,24 @@ describe('ActivityScreen', () => {
       expect(onOpenMoneyAccountDetail).toHaveBeenCalledWith('account-1');
     });
 
-    it('ofrece añadir otra cuenta cuando ya existe alguna', async () => {
+    it('ofrece crear un movimiento cuando la cuenta aún no tiene datos', async () => {
+      const onCreateMovement = jest.fn();
+      const screen = await renderWithAccounts({
+        moneyAccounts: [account],
+        onCreateMovement,
+      });
+
+      await fireEvent.press(screen.getByLabelText('Crear movimiento'));
+
+      expect(onCreateMovement).toHaveBeenCalled();
+    });
+
+    it('ofrece añadir otra cuenta cuando ya existe alguna con movimientos', async () => {
       const onCreateMoneyAccount = jest.fn();
       const screen = await renderWithAccounts({
         moneyAccounts: [account],
         onCreateMoneyAccount,
+        transactions: [{ ...transactions[0], moneyAccountId: 'account-1' }],
       });
 
       await fireEvent.press(screen.getByLabelText('Crear cuenta'));
@@ -1566,7 +1583,7 @@ describe('ActivityScreen', () => {
       const onCreateMoneyAccount = jest.fn();
       const screen = await renderWithAccounts({ onCreateMoneyAccount });
 
-      expect(screen.getByText('Crea una cuenta')).toBeTruthy();
+      expect(screen.queryByText('Crea una cuenta')).toBeNull();
       await fireEvent.press(screen.getByLabelText('Crear primera cuenta'));
 
       expect(onCreateMoneyAccount).toHaveBeenCalled();

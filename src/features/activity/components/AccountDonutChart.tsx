@@ -19,6 +19,7 @@ import { categoryColors } from '@/theme/categoryColors';
 type AccountDonutChartProps = {
   accounts: readonly MoneyAccount[];
   currency: CurrencyCode;
+  onDataAvailabilityChange?: (hasData: boolean) => void;
   onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
   resetKey?: number;
@@ -33,6 +34,7 @@ type AccountDonutChartProps = {
 export function AccountDonutChart({
   accounts,
   currency,
+  onDataAvailabilityChange,
   onOpenMoneyAccountDetail,
   resetKey,
   transactions,
@@ -59,16 +61,12 @@ export function AccountDonutChart({
   return (
     <DonutBreakdownChart
       currency={currency}
-      emptyMessage={`Para ver ${
-        mode === 'expense' ? 'gastos' : 'ingresos'
-      } por cuenta, registra un ${
-        mode === 'expense' ? 'gasto' : 'ingreso'
-      } y asócialo a una cuenta.`}
       idPrefix="account"
       isCurrentMonth={monthKey === currentMonthKey}
       mode={mode}
       monthLabel={formatMonthKey(monthKey)}
       onModeChange={setMode}
+      onDataAvailabilityChange={onDataAvailabilityChange}
       onMonthChange={(offset) =>
         setMonthKey((current) => shiftMonthKey(current, offset))
       }

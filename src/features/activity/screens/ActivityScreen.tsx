@@ -135,6 +135,8 @@ export function ActivityScreen({
   const summaryPulse = useSharedValue(1);
   const [movementsOffset, setMovementsOffset] = useState(0);
   const [accountsOffset, setAccountsOffset] = useState(0);
+  const [hasCategoryBreakdownData, setHasCategoryBreakdownData] =
+    useState(false);
   const [areCategoriesExpanded, setCategoriesExpanded] = useState(
     categoriesExpanded ?? true,
   );
@@ -401,21 +403,26 @@ export function ActivityScreen({
           testID="categories-section"
           title="Categorías"
         >
-          <CategoryDonutChart
-            categories={categories}
-            currency={effectiveCurrency}
-            onOpenCategoryDetail={(categoryId) =>
-              onOpenCategoryDetail?.(categoryId, effectiveCurrency)
-            }
-            resetKey={focusResetKey}
-            transactions={currencyTransactionsThroughCurrentMonth}
-          />
+          {categories.length > 0 ? (
+            <CategoryDonutChart
+              categories={categories}
+              currency={effectiveCurrency}
+              onDataAvailabilityChange={setHasCategoryBreakdownData}
+              onOpenCategoryDetail={(categoryId) =>
+                onOpenCategoryDetail?.(categoryId, effectiveCurrency)
+              }
+              resetKey={focusResetKey}
+              transactions={currencyTransactionsThroughCurrentMonth}
+            />
+          ) : null}
           <ActivityCategoryDetail
             budgetExpenseByCategoryId={budgetExpenseByCategoryId}
             categories={categorySummaries}
             categoryView={categoryView}
             currency={effectiveCurrency}
+            hasBreakdownData={hasCategoryBreakdownData}
             onCreateCategory={onCreateCategory}
+            onCreateMovement={onCreateMovement}
             onOpenCategoryDetail={onOpenCategoryDetail}
             onCategoryViewChange={onCategoryViewChange}
             spaceCurrency={spaceCurrency}
@@ -435,6 +442,7 @@ export function ActivityScreen({
             currency={effectiveCurrency}
             expanded={areAccountsExpanded}
             onCreateMoneyAccount={onCreateMoneyAccount}
+            onCreateMovement={onCreateMovement}
             onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
             onToggle={handleAccountsToggle}
             resetKey={focusResetKey}

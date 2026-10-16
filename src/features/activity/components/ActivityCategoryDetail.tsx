@@ -11,7 +11,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
 import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { Text } from '@/components/ui/Text/Text';
 import { getActivityLayoutTransition } from '@/features/activity/components/ActivityCollapsibleSection';
@@ -32,7 +31,9 @@ type ActivityCategoryDetailProps = {
   categories: readonly CategorySummary[];
   categoryView: 'grid' | 'list';
   currency: CurrencyCode;
+  hasBreakdownData: boolean;
   onCreateCategory?: () => void;
+  onCreateMovement?: () => void;
   onCategoryViewChange?: (view: 'grid' | 'list') => void;
   onOpenCategoryDetail?: (categoryId: string, currency: CurrencyCode) => void;
   spaceCurrency: CurrencyCode;
@@ -51,7 +52,9 @@ export function ActivityCategoryDetail({
   categories,
   categoryView,
   currency,
+  hasBreakdownData,
   onCreateCategory,
+  onCreateMovement,
   onCategoryViewChange,
   onOpenCategoryDetail,
   spaceCurrency,
@@ -238,24 +241,26 @@ export function ActivityCategoryDetail({
           </Animated.View>
           <View style={styles.createCategoryBadge}>
             <CreatePreviewBadge
-              accessibilityLabel="Crear categoría"
+              accessibilityLabel={
+                hasBreakdownData ? 'Crear categoría' : 'Crear movimiento'
+              }
               bordered
-              label="Crear categoría"
-              onPress={onCreateCategory}
+              label={hasBreakdownData ? 'Crear categoría' : 'Crear movimiento'}
+              onPress={hasBreakdownData ? onCreateCategory : onCreateMovement}
               testID="activity-add-category"
             />
           </View>
         </>
       ) : (
-        <EmptyState
-          accessibilityLabel="Crear primera categoría"
-          description="Crea una categoría para organizar tus movimientos."
-          icon="pie-chart-outline"
-          iconBackgroundColor={colors.categoryAction}
-          onPress={onCreateCategory}
-          testID="activity-empty-categories"
-          title="Aún no hay categorías"
-        />
+        <View style={styles.createCategoryBadge}>
+          <CreatePreviewBadge
+            accessibilityLabel="Crear primera categoría"
+            bordered
+            label="Crear categoría"
+            onPress={onCreateCategory}
+            testID="activity-add-category"
+          />
+        </View>
       )}
     </Animated.View>
   );

@@ -131,17 +131,15 @@ describe('AccountDonutChart', () => {
   });
 
   it('al retroceder de mes deja de repartir los movimientos del mes actual', async () => {
-    const screen = await renderChart();
+    const onDataAvailabilityChange = jest.fn();
+    const screen = await renderChart({ onDataAvailabilityChange });
     const chart = screen.getByTestId('account-donut-chart');
 
     await fireEvent.press(
       within(chart).getByRole('button', { name: 'Ver mes anterior' }),
     );
 
-    expect(
-      within(chart).getByText(
-        'Para ver gastos por cuenta, registra un gasto y asócialo a una cuenta.',
-      ),
-    ).toBeTruthy();
+    expect(within(chart).queryByText(/Para ver gastos por cuenta/)).toBeNull();
+    expect(onDataAvailabilityChange).toHaveBeenLastCalledWith(false);
   });
 });
