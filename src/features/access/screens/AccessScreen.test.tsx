@@ -33,12 +33,14 @@ jest.mock('@/features/auth/screens/SignUpScreen', () => ({
   }: {
     onSuccess: (result: { email: string }) => void;
   }) => {
-    const { Pressable } = jest.requireActual('react-native');
+    const { Pressable, View } = jest.requireActual('react-native');
     return (
-      <Pressable
-        onPress={() => onSuccess({ email: 'ana@ejemplo.com' })}
-        testID="signup-complete"
-      />
+      <View testID="signup-content">
+        <Pressable
+          onPress={() => onSuccess({ email: 'ana@ejemplo.com' })}
+          testID="signup-complete"
+        />
+      </View>
     );
   },
   signUpTotalSteps: 4,
@@ -108,7 +110,7 @@ describe('AccessScreen', () => {
       screen.getByTestId('login-logo-image', {
         includeHiddenElements: true,
       }).props.height,
-    ).toBeCloseTo((200 * 1095) / 2803);
+    ).toBeCloseTo((160 * 1095) / 2803);
     expect(logo.parent).toBe(loginContent.parent);
     expect(logo.parent?.children.indexOf(logo)).toBeGreaterThan(
       logo.parent?.children.indexOf(loginContent) ?? Infinity,
@@ -122,6 +124,24 @@ describe('AccessScreen', () => {
         screen.getByTestId('access-screen').props.contentContainerStyle,
       ).paddingBottom,
     ).toBe(16);
+  });
+
+  it('muestra el mismo logo reducido después del contenido de crear cuenta', async () => {
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    fireEvent.press(screen.getByTestId('onboarding-login-action'));
+
+    const logo = await screen.findByTestId('signup-logo');
+    const signUpContent = screen.getByTestId('signup-content');
+    expect(
+      screen.getByTestId('signup-logo-image', {
+        includeHiddenElements: true,
+      }).props.height,
+    ).toBeCloseTo((160 * 1095) / 2803);
+    expect(logo.parent).toBe(signUpContent.parent);
+    expect(logo.parent?.children.indexOf(logo)).toBeGreaterThan(
+      logo.parent?.children.indexOf(signUpContent) ?? Infinity,
+    );
   });
 
   it('muestra iniciar sesión con CTA principal y crear cuenta con variante surface', async () => {

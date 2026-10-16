@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ScrollView,
+  type StyleProp,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 
@@ -47,7 +53,27 @@ const stepTitles: Record<AccessStep['screen'], string> = {
 
 /** Ancho ÷ alto real de `10_loginicon.png`, para el tamaño estándar de lámina. */
 const entryIllustrationAspectRatio = 1206 / 1218;
-const loginLogoWidth = 200;
+const authLogoWidth = 160;
+
+function AuthFooterLogo({
+  screen,
+  style,
+}: {
+  screen: 'login' | 'signup';
+  style: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View
+      accessibilityLabel="Juntos"
+      accessibilityRole="image"
+      accessible
+      style={style}
+      testID={`${screen}-logo`}
+    >
+      <JuntosLogo testID={`${screen}-logo-image`} width={authLogoWidth} />
+    </View>
+  );
+}
 
 /** Host único a pantalla completa para los flujos de autenticación. */
 type AccessScreenProps = {
@@ -213,30 +239,21 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
         <Animated.View
           entering={getDisclosureEntering()}
           key={step.screen}
-          style={step.screen === 'login' ? styles.loginContent : undefined}
+          style={
+            step.screen === 'login' || step.screen === 'signup'
+              ? styles.authContent
+              : undefined
+          }
         >
           {step.screen === 'login' ? (
-            <>
-              <LoginScreen
-                onEmailVerificationRequired={(email) =>
-                  setStep({ screen: 'verify-signup', email })
-                }
-                onNavigateToForgotPassword={() => setStep({ screen: 'forgot' })}
-                onNavigateToSignUp={() =>
-                  setStep({ screen: 'signup', step: 1 })
-                }
-                onSuccess={handleAuthenticated}
-              />
-              <View
-                accessibilityLabel="Juntos"
-                accessibilityRole="image"
-                accessible
-                style={styles.loginLogo}
-                testID="login-logo"
-              >
-                <JuntosLogo testID="login-logo-image" width={loginLogoWidth} />
-              </View>
-            </>
+            <LoginScreen
+              onEmailVerificationRequired={(email) =>
+                setStep({ screen: 'verify-signup', email })
+              }
+              onNavigateToForgotPassword={() => setStep({ screen: 'forgot' })}
+              onNavigateToSignUp={() => setStep({ screen: 'signup', step: 1 })}
+              onSuccess={handleAuthenticated}
+            />
           ) : null}
 
           {step.screen === 'signup' ? (
@@ -251,6 +268,10 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
               }
               step={step.step}
             />
+          ) : null}
+
+          {step.screen === 'login' || step.screen === 'signup' ? (
+            <AuthFooterLogo screen={step.screen} style={styles.authLogo} />
           ) : null}
 
           {step.screen === 'verify-signup' ? (
@@ -308,14 +329,14 @@ function createStyles(colors: ColorTokens) {
       paddingBottom: spacing.huge,
     },
     loginScrollContent: { paddingBottom: spacing.lg },
-    loginContent: { flex: 1 },
+    authContent: { flex: 1 },
     header: { gap: spacing.lg },
     inlineHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
     },
-    loginLogo: {
+    authLogo: {
       alignItems: 'center',
       marginTop: 'auto',
       paddingTop: spacing.xl,
