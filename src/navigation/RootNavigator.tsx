@@ -1,10 +1,14 @@
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  useNavigationContainerRef,
+} from '@react-navigation/native';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { linking } from '@/navigation/linking';
+import type { RootDrawerParamList } from '@/navigation/types';
 import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
@@ -20,8 +24,11 @@ import { useTheme } from '@/theme/useTheme';
 import { fontFamily } from '@/theme/fonts';
 import { markStartup } from '@/lib/diagnostics/startupTrace';
 import { CurrencySymbolPreferenceProvider } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
+import { trackClarityScreen } from '@/services/analytics/clarityAnalytics';
 
 export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
+  const navigationRef = useNavigationContainerRef<RootDrawerParamList>();
+  const routeNameRef = useRef<string | undefined>(undefined);
   const { colors, isDark, isReady: isThemeReady } = useTheme();
   const { isReady: isAuthReady, session } = useBetterAuthSession();
   const {
@@ -32,6 +39,14 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     setHasCompleted: setOnboardingCompleted,
   } = useOnboardingCompletion();
   const isNameIllustrationReady = useNameScreenIllustrationReady();
+
+  const trackCurrentScreen = useCallback(() => {
+    const routeName = navigationRef.getCurrentRoute()?.name;
+    if (!routeName || routeName === routeNameRef.current) return;
+
+    routeNameRef.current = routeName;
+    void trackClarityScreen(routeName);
+  }, [navigationRef]);
 
   useEffect(() => {
     if (isAuthReady) {
@@ -115,6 +130,9 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
       <NavigationContainer
         fallback={<LoadingState />}
         linking={linking}
+        onReady={trackCurrentScreen}
+        onStateChange={trackCurrentScreen}
+        ref={navigationRef}
         theme={navigationTheme}
       >
         {content}

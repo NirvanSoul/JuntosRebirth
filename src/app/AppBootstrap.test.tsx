@@ -17,6 +17,9 @@ jest.mock('@/lib/notifications/InvitationPushRegistration', () => ({
 jest.mock('@/features/onboarding/utils/preloadOnboardingIllustrations', () => ({
   preloadAppIllustrations: jest.fn(),
 }));
+jest.mock('@/features/legal/services/analyticsPreferenceService', () => ({
+  restoreAnalyticsPreference: jest.fn(async () => true),
+}));
 jest.mock('@/navigation/RootNavigator', () => ({
   RootNavigator: ({ fontsReady }: { fontsReady: boolean }) => {
     mockUseSession(fontsReady);

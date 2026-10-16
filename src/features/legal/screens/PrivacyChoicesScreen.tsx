@@ -12,6 +12,10 @@ import {
   getShowAmountsInNotifications,
   setShowAmountsInNotifications,
 } from '@/features/transactions/repositories/notificationPrivacyPreferenceRepository';
+import {
+  restoreAnalyticsPreference,
+  updateAnalyticsPreference,
+} from '@/features/legal/services/analyticsPreferenceService';
 import { categoryColors } from '@/theme/categoryColors';
 import { spacing } from '@/theme/spacing';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -38,15 +42,22 @@ export function PrivacyChoicesScreen({
     }),
   );
   const [showAmounts, setShowAmounts] = useState(true);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     void getShowAmountsInNotifications().then(setShowAmounts);
+    void restoreAnalyticsPreference().then(setAnalyticsEnabled);
   }, [visible]);
 
   const handleToggle = (next: boolean) => {
     setShowAmounts(next);
     void setShowAmountsInNotifications(next);
+  };
+
+  const handleAnalyticsToggle = (next: boolean) => {
+    setAnalyticsEnabled(next);
+    void updateAnalyticsPreference(next);
   };
 
   return (
@@ -83,9 +94,22 @@ export function PrivacyChoicesScreen({
               testID="show-amounts-in-notifications-toggle"
             />
           </SettingsSection>
+          <SettingsSection icon="analytics-outline" title="Analítica">
+            <SettingsToggleRow
+              description="Comparte pantallas, interacción y rendimiento sin enviar tu cuenta"
+              enabled={analyticsEnabled}
+              icon="pulse-outline"
+              iconBackgroundColor={categoryColors.violet}
+              label="Ayudar a mejorar Juntos"
+              onToggle={handleAnalyticsToggle}
+              testID="analytics-enabled-toggle"
+            />
+          </SettingsSection>
           <Text tone="secondary" variant="footnote">
-            Juntos no muestra anuncios todavía. Cuando incorporemos publicidad,
-            las preferencias de anuncios personalizados aparecerán aquí.
+            Microsoft Clarity procesa estos datos para crear métricas, mapas de
+            interacción y reproducciones técnicas. Juntos no envía tu correo ni
+            identificador de cuenta; Clarity genera un identificador técnico del
+            dispositivo. Puedes retirar el consentimiento en cualquier momento.
           </Text>
         </View>
       </View>

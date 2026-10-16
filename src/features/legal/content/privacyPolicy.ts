@@ -6,9 +6,9 @@ import type { LegalDocumentContent } from '@/features/legal/model/types';
  */
 export const privacyPolicy: LegalDocumentContent = {
   documentId: 'privacy-policy',
-  version: '2026.1',
+  version: '2026.2',
   effectiveDate: 'Fecha de publicación de la app en las tiendas',
-  lastUpdated: '2026-08-07',
+  lastUpdated: '2026-10-16',
   locale: 'es-ES',
   title: 'Política de privacidad de Juntos',
   intro: [
@@ -36,13 +36,14 @@ export const privacyPolicy: LegalDocumentContent = {
         'Datos de espacios compartidos: qué miembros pertenecen a un espacio y quién es autor de cada movimiento dentro de él.',
         'Preferencias de la aplicación: moneda, apariencia, reglas de recordatorio y si quieres ver importes en las notificaciones.',
         'Identificador local de instalación, usado para mantener la sincronización y evitar duplicados de operaciones del dispositivo.',
+        'Si activas voluntariamente la analítica, Microsoft Clarity recoge un identificador técnico generado por el SDK, las pantallas visibles de la aplicación, interacciones como pulsaciones y datos técnicos de uso y rendimiento para reconstruir sesiones, generar mapas de interacción y métricas. Juntos no envía a Clarity tu correo ni tu identificador de cuenta.',
         'No recogemos ubicación, contactos, cámara ni fotos: la aplicación no solicita esos permisos porque no los necesita.',
       ],
     },
     {
       heading: '4. De dónde provienen',
       body: [
-        'Todos los datos anteriores los introduces directamente tú al usar la aplicación. Juntos no compra ni obtiene datos de terceros sobre ti.',
+        'Los datos de cuenta, financieros, de espacios y preferencias los introduces directamente tú al usar la aplicación. Si activas la analítica, los datos técnicos y de interacción se generan automáticamente mientras utilizas Juntos. Juntos no compra datos sobre ti.',
       ],
     },
     {
@@ -50,13 +51,14 @@ export const privacyPolicy: LegalDocumentContent = {
       body: [
         'Para ofrecerte las funciones que usas: registrar movimientos, calcular tu balance, mostrar categorías, gestionar espacios compartidos y enviarte recordatorios locales que tú mismo activas.',
         'Para mantener tu cuenta y sincronizar tus datos entre dispositivos, cuando decides registrarte.',
-        'No usamos tus datos financieros para publicidad ni analítica. Actualmente Juntos no muestra anuncios ni usa herramientas de analítica o seguimiento (ver sección 14).',
+        'Si das tu consentimiento, usamos Microsoft Clarity para comprender el uso, detectar fricciones y mejorar la estabilidad y el rendimiento. No enviamos eventos personalizados, tu correo ni tu identificador de cuenta, y no usamos la analítica para publicidad.',
       ],
     },
     {
       heading: '6. Base jurídica',
       body: [
         'Tratamos los datos necesarios para prestarte el servicio sobre la base de la ejecución de un contrato contigo (los términos de servicio) y, cuando corresponda, tu consentimiento explícito para funciones opcionales.',
+        'La analítica de Microsoft Clarity permanece desactivada hasta que la activas y se basa en tu consentimiento. Puedes retirarlo en cualquier momento desde Preferencias de privacidad.',
         'Cuando el Reglamento General de Protección de Datos de la Unión Europea (RGPD) resulta aplicable, seguimos los principios que describe la Comisión Europea en https://commission.europa.eu/law/law-topic/data-protection_en.',
       ],
     },
@@ -64,19 +66,21 @@ export const privacyPolicy: LegalDocumentContent = {
       heading: '7. Terceros y encargados',
       body: [
         'La API de Juntos procesa la autenticación y los datos de cuenta cuando te registras. Antes del lanzamiento definitivo confirmaremos en esta política los encargados de infraestructura y la región aplicable.',
-        'No usamos actualmente proveedores de analítica, publicidad ni informes de fallos. Si en el futuro integramos Google AdMob para mostrar anuncios, esta política se actualizará antes de activarlos y seguiremos las políticas de consentimiento de anuncios de Google (https://support.google.com/admob/answer/13554116), incluyendo una plataforma de consentimiento certificada en el Espacio Económico Europeo, Reino Unido y Suiza (https://support.google.com/admob/answer/16918505).',
+        'Microsoft Clarity presta la analítica opcional de interacción y rendimiento. Cuando la activas, Microsoft recibe y procesa los datos descritos en la sección 3 conforme a sus términos (https://clarity.microsoft.com/terms) y a la Declaración de privacidad de Microsoft (https://privacy.microsoft.com/privacystatement).',
+        'No usamos proveedores de publicidad ni informes de fallos. Si en el futuro integramos Google AdMob para mostrar anuncios, esta política se actualizará antes de activarlos y seguiremos las políticas de consentimiento de anuncios de Google (https://support.google.com/admob/answer/13554116), incluyendo una plataforma de consentimiento certificada en el Espacio Económico Europeo, Reino Unido y Suiza (https://support.google.com/admob/answer/16918505).',
       ],
     },
     {
       heading: '8. Transferencias internacionales',
       body: [
-        'Si nuestra infraestructura transfiere datos fuera de tu país, aplicamos las garantías que exige la normativa de protección de datos aplicable, como las cláusulas contractuales tipo aprobadas por la Comisión Europea cuando corresponda (https://commission.europa.eu/law/law-topic/data-protection_en).',
+        'Nuestra infraestructura o Microsoft Clarity pueden procesar datos fuera de tu país. Aplicamos las garantías que exige la normativa de protección de datos aplicable, como las cláusulas contractuales tipo aprobadas por la Comisión Europea cuando corresponda (https://commission.europa.eu/law/law-topic/data-protection_en).',
       ],
     },
     {
       heading: '9. Retención',
       body: [
         'Conservamos tus datos mientras mantengas tu cuenta o tus datos locales. Al eliminar tu cuenta, tus datos personales se borran o anonimizan de inmediato según se describe en la sección 13; las copias de seguridad técnicas se sobrescriben conforme al ciclo habitual de nuestro proveedor de infraestructura.',
+        'Los datos enviados a Microsoft Clarity se conservan conforme a la configuración del proyecto y a sus términos. Retirar el consentimiento detiene futuras capturas en ese dispositivo, pero no borra automáticamente sesiones enviadas con anterioridad; puedes solicitar su revisión o eliminación mediante los canales de contacto de esta política.',
       ],
     },
     {
@@ -96,7 +100,7 @@ export const privacyPolicy: LegalDocumentContent = {
     {
       heading: '12. Retirada del consentimiento',
       body: [
-        'Cuando un tratamiento se base en tu consentimiento (por ejemplo, notificaciones o, en el futuro, publicidad personalizada), puedes retirarlo en cualquier momento desde Preferencias de privacidad, sin que ello afecte a la licitud del tratamiento previo.',
+        'Cuando un tratamiento se base en tu consentimiento, puedes retirarlo en cualquier momento desde Preferencias de privacidad, sin que ello afecte a la licitud del tratamiento previo. Al desactivar “Ayudar a mejorar Juntos”, la captura de Microsoft Clarity se pausa y se comunica la retirada del consentimiento al SDK.',
       ],
     },
     {
@@ -110,7 +114,7 @@ export const privacyPolicy: LegalDocumentContent = {
     {
       heading: '14. Publicidad y seguimiento',
       body: [
-        'Hoy Juntos no muestra anuncios ni usa herramientas de seguimiento entre aplicaciones o sitios web.',
+        'Hoy Juntos no muestra anuncios ni usa herramientas de seguimiento entre aplicaciones o sitios web. Microsoft Clarity se usa únicamente como analítica opcional dentro de Juntos y no se activa sin tu consentimiento.',
         'Si en el futuro integramos publicidad (previsiblemente Google AdMob), lo anunciaremos, actualizaremos esta política, y mostraremos un mensaje de consentimiento (CMP) certificado antes de solicitar anuncios personalizados donde la ley lo exija.',
       ],
     },

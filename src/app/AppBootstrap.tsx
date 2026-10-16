@@ -9,6 +9,7 @@ import { fontAssets } from '@/theme/fonts';
 import { markStartup } from '@/lib/diagnostics/startupTrace';
 import { preloadAppIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
 import { warmUpAuthSession } from '@/features/auth/services/googleAuth';
+import { restoreAnalyticsPreference } from '@/features/legal/services/analyticsPreferenceService';
 
 export function AppBootstrap() {
   const [fontsLoaded, fontError] = useFonts(fontAssets);
@@ -16,6 +17,7 @@ export function AppBootstrap() {
   useEffect(() => {
     void ensureNotificationHandlerRegistered();
     void preloadAppIllustrations();
+    void restoreAnalyticsPreference();
     warmUpAuthSession();
   }, []);
 
