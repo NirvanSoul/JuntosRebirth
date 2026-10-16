@@ -132,7 +132,11 @@ describe('AccountDonutChart', () => {
 
   it('al retroceder de mes deja de repartir los movimientos del mes actual', async () => {
     const onDataAvailabilityChange = jest.fn();
-    const screen = await renderChart({ onDataAvailabilityChange });
+    const onCreateMovement = jest.fn();
+    const screen = await renderChart({
+      onCreateMovement,
+      onDataAvailabilityChange,
+    });
     const chart = screen.getByTestId('account-donut-chart');
 
     await fireEvent.press(
@@ -140,6 +144,9 @@ describe('AccountDonutChart', () => {
     );
 
     expect(within(chart).queryByText(/Para ver gastos por cuenta/)).toBeNull();
+    expect(within(chart).queryByTestId('account-donut-svg')).toBeNull();
+    await fireEvent.press(within(chart).getByLabelText('Crear movimiento'));
+    expect(onCreateMovement).toHaveBeenCalledTimes(1);
     expect(onDataAvailabilityChange).toHaveBeenLastCalledWith(false);
   });
 });

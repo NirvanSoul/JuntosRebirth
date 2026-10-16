@@ -4,6 +4,7 @@ import {
   DonutBreakdownChart,
   type DonutBreakdownMode,
 } from '@/components/ui/Charts/DonutBreakdownChart';
+import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import type { Category } from '@/features/categories/types';
 import {
   formatMonthKey,
@@ -19,6 +20,7 @@ import { categoryColors } from '@/theme/categoryColors';
 type CategoryDonutChartProps = {
   categories: readonly Category[];
   currency: CurrencyCode;
+  onCreateMovement?: () => void;
   onDataAvailabilityChange?: (hasData: boolean) => void;
   onOpenCategoryDetail?: (categoryId: string) => void;
   /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
@@ -30,6 +32,7 @@ type CategoryDonutChartProps = {
 export function CategoryDonutChart({
   categories,
   currency,
+  onCreateMovement,
   onDataAvailabilityChange,
   onOpenCategoryDetail,
   resetKey,
@@ -57,6 +60,15 @@ export function CategoryDonutChart({
   return (
     <DonutBreakdownChart
       currency={currency}
+      emptyContent={
+        <CreatePreviewBadge
+          accessibilityLabel="Crear movimiento"
+          bordered
+          label="Crear movimiento"
+          onPress={onCreateMovement}
+          testID="activity-add-category"
+        />
+      }
       idPrefix="category"
       isCurrentMonth={monthKey === currentMonthKey}
       mode={mode}

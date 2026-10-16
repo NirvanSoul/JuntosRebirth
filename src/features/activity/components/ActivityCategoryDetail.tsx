@@ -33,7 +33,6 @@ type ActivityCategoryDetailProps = {
   currency: CurrencyCode;
   hasBreakdownData: boolean;
   onCreateCategory?: () => void;
-  onCreateMovement?: () => void;
   onCategoryViewChange?: (view: 'grid' | 'list') => void;
   onOpenCategoryDetail?: (categoryId: string, currency: CurrencyCode) => void;
   spaceCurrency: CurrencyCode;
@@ -54,7 +53,6 @@ export function ActivityCategoryDetail({
   currency,
   hasBreakdownData,
   onCreateCategory,
-  onCreateMovement,
   onCategoryViewChange,
   onOpenCategoryDetail,
   spaceCurrency,
@@ -239,17 +237,17 @@ export function ActivityCategoryDetail({
               )}
             </View>
           </Animated.View>
-          <View style={styles.createCategoryBadge}>
-            <CreatePreviewBadge
-              accessibilityLabel={
-                hasBreakdownData ? 'Crear categoría' : 'Crear movimiento'
-              }
-              bordered
-              label={hasBreakdownData ? 'Crear categoría' : 'Crear movimiento'}
-              onPress={hasBreakdownData ? onCreateCategory : onCreateMovement}
-              testID="activity-add-category"
-            />
-          </View>
+          {hasBreakdownData ? (
+            <View style={styles.createCategoryBadge}>
+              <CreatePreviewBadge
+                accessibilityLabel="Crear categoría"
+                bordered
+                label="Crear categoría"
+                onPress={onCreateCategory}
+                testID="activity-add-category"
+              />
+            </View>
+          ) : null}
         </>
       ) : (
         <View style={styles.createCategoryBadge}>

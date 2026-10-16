@@ -148,6 +148,7 @@ export function ActivityAccountsSection({
           <AccountDonutChart
             accounts={accounts}
             currency={currency}
+            onCreateMovement={onCreateMovement}
             onDataAvailabilityChange={setHasBreakdownData}
             onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
             resetKey={resetKey}
@@ -223,19 +224,17 @@ export function ActivityAccountsSection({
             )}
           </Animated.View>
 
-          <View style={styles.createAccountBadge}>
-            <CreatePreviewBadge
-              accessibilityLabel={
-                hasBreakdownData ? 'Crear cuenta' : 'Crear movimiento'
-              }
-              bordered
-              label={hasBreakdownData ? 'Crear cuenta' : 'Crear movimiento'}
-              onPress={
-                hasBreakdownData ? onCreateMoneyAccount : onCreateMovement
-              }
-              testID="activity-add-money-account"
-            />
-          </View>
+          {hasBreakdownData ? (
+            <View style={styles.createAccountBadge}>
+              <CreatePreviewBadge
+                accessibilityLabel="Crear cuenta"
+                bordered
+                label="Crear cuenta"
+                onPress={onCreateMoneyAccount}
+                testID="activity-add-money-account"
+              />
+            </View>
+          ) : null}
         </>
       ) : (
         <View style={styles.createAccountBadge}>

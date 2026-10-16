@@ -4,6 +4,7 @@ import {
   DonutBreakdownChart,
   type DonutBreakdownMode,
 } from '@/components/ui/Charts/DonutBreakdownChart';
+import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import type { MoneyAccount } from '@/features/accounts/types';
 import { summarizeMoneyAccountTotals } from '@/features/accounts/utils/moneyAccountSummary';
 import {
@@ -19,6 +20,7 @@ import { categoryColors } from '@/theme/categoryColors';
 type AccountDonutChartProps = {
   accounts: readonly MoneyAccount[];
   currency: CurrencyCode;
+  onCreateMovement?: () => void;
   onDataAvailabilityChange?: (hasData: boolean) => void;
   onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
   /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
@@ -34,6 +36,7 @@ type AccountDonutChartProps = {
 export function AccountDonutChart({
   accounts,
   currency,
+  onCreateMovement,
   onDataAvailabilityChange,
   onOpenMoneyAccountDetail,
   resetKey,
@@ -61,6 +64,15 @@ export function AccountDonutChart({
   return (
     <DonutBreakdownChart
       currency={currency}
+      emptyContent={
+        <CreatePreviewBadge
+          accessibilityLabel="Crear movimiento"
+          bordered
+          label="Crear movimiento"
+          onPress={onCreateMovement}
+          testID="activity-add-money-account"
+        />
+      }
       idPrefix="account"
       isCurrentMonth={monthKey === currentMonthKey}
       mode={mode}

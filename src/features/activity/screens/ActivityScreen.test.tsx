@@ -552,7 +552,13 @@ describe('ActivityScreen', () => {
     ).toBeNull();
     expect(within(chart).queryByText('Total gastado')).toBeNull();
     expect(within(chart).queryByText(/0,00/)).toBeNull();
-    await fireEvent.press(screen.getByLabelText('Crear movimiento'));
+    expect(within(chart).queryByTestId('category-donut-svg')).toBeNull();
+    expect(
+      within(screen.getByTestId('activity-category-detail')).queryByTestId(
+        'activity-add-category',
+      ),
+    ).toBeNull();
+    await fireEvent.press(within(chart).getByLabelText('Crear movimiento'));
     expect(onCreateMovement).toHaveBeenCalledTimes(1);
 
     await fireEvent.press(within(chart).getByRole('tab', { name: 'Ingresos' }));
@@ -1561,7 +1567,12 @@ describe('ActivityScreen', () => {
         onCreateMovement,
       });
 
-      await fireEvent.press(screen.getByLabelText('Crear movimiento'));
+      const chart = screen.getByTestId('account-donut-chart');
+      expect(within(chart).queryByTestId('account-donut-svg')).toBeNull();
+      expect(screen.getAllByTestId('activity-add-money-account')).toHaveLength(
+        1,
+      );
+      await fireEvent.press(within(chart).getByLabelText('Crear movimiento'));
 
       expect(onCreateMovement).toHaveBeenCalled();
     });

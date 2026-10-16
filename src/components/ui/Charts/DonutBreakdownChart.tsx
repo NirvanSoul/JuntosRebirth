@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { type ReactNode, useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   LinearTransition,
@@ -37,6 +37,8 @@ export type DonutBreakdownSlice = {
 
 type DonutBreakdownChartProps = {
   currency: CurrencyCode;
+  /** Acción compacta que sustituye al donut cuando no hay datos que dibujar. */
+  emptyContent?: ReactNode;
   /** Identifica la variante y prefija sus testID: `category`, `account`. */
   idPrefix: string;
   /** Bloquea la navegación hacia meses futuros. */
@@ -79,6 +81,7 @@ const chartLayoutTransition = LinearTransition.springify()
  */
 export function DonutBreakdownChart({
   currency,
+  emptyContent,
   idPrefix,
   isCurrentMonth,
   mode,
@@ -161,81 +164,85 @@ export function DonutBreakdownChart({
         testID={`${idPrefix}-mode-control`}
       />
 
-      <View
-        accessibilityLabel={
-          !hasData
-            ? `Sin datos de ${modeLabel} en ${monthLabel}`
-            : `Total ${modeLabel}: ${formattedTotal}. ${data.items
-                .map((slice) => {
-                  const percentage = Math.round(
-                    (slice.valueMinor / data.totalMinor) * 100,
-                  );
-                  return `${slice.label}: ${percentage}%`;
-                })
-                .join(', ')}`
-        }
-        accessible
-        style={[styles.chartArea, { height: size, width: size }]}
-      >
-        <Svg
-          accessibilityElementsHidden
-          height={size}
-          importantForAccessibility="no-hide-descendants"
-          testID={`${idPrefix}-donut-svg`}
-          width={size}
+      {hasData ? (
+        <View
+          accessibilityLabel={`Total ${modeLabel}: ${formattedTotal}. ${data.items
+            .map((slice) => {
+              const percentage = Math.round(
+                (slice.valueMinor / data.totalMinor) * 100,
+              );
+              return `${slice.label}: ${percentage}%`;
+            })
+            .join(', ')}`}
+          accessible
+          style={[styles.chartArea, { height: size, width: size }]}
         >
-          {data.items.map((slice, index) => {
-            const segmentLength = segmentLengths[index]!;
-            const dashLength = Math.max(
-              segmentLength - strokeWidth - segmentVisibleGap,
-              minimumDashLength,
-            );
-            const dashOffset = -dashOffsets[index]!;
+          <Svg
+            accessibilityElementsHidden
+            height={size}
+            importantForAccessibility="no-hide-descendants"
+            testID={`${idPrefix}-donut-svg`}
+            width={size}
+          >
+            {data.items.map((slice, index) => {
+              const segmentLength = segmentLengths[index]!;
+              const dashLength = Math.max(
+                segmentLength - strokeWidth - segmentVisibleGap,
+                minimumDashLength,
+              );
+              const dashOffset = -dashOffsets[index]!;
 
-            return (
-              <AnimatedArcSegment
-                animationKey={`${animationKey}-${resetKey ?? 0}`}
-                circumference={chartCircumference}
-                color={slice.color}
-                cx={size / 2}
-                cy={size / 2}
-                dashLength={dashLength}
-                dashOffset={dashOffset}
-                index={index}
-                key={slice.id}
-                radius={chartRadius}
-                rotation={-90}
-                strokeWidth={strokeWidth}
-                testID={`${idPrefix}-donut-segment-${slice.id}`}
-              />
-            );
-          })}
-        </Svg>
+              return (
+                <AnimatedArcSegment
+                  animationKey={`${animationKey}-${resetKey ?? 0}`}
+                  circumference={chartCircumference}
+                  color={slice.color}
+                  cx={size / 2}
+                  cy={size / 2}
+                  dashLength={dashLength}
+                  dashOffset={dashOffset}
+                  index={index}
+                  key={slice.id}
+                  radius={chartRadius}
+                  rotation={-90}
+                  strokeWidth={strokeWidth}
+                  testID={`${idPrefix}-donut-segment-${slice.id}`}
+                />
+              );
+            })}
+          </Svg>
+          <Animated.View
+            entering={getChartContentEntering(motionDirection)}
+            exiting={getChartContentExiting(motionDirection)}
+            key={`${animationKey}-total`}
+            pointerEvents="none"
+            style={[styles.chartCenter, { width: size - strokeWidth * 3 }]}
+            testID={`${idPrefix}-chart-center-content`}
+          >
+            <Text tone="secondary" variant="footnote">
+              Total {modeLabel}
+            </Text>
+            <Text
+              adjustsFontSizeToFit
+              numberOfLines={1}
+              style={styles.total}
+              variant="amount"
+            >
+              {formattedTotal}
+            </Text>
+          </Animated.View>
+        </View>
+      ) : (
         <Animated.View
           entering={getChartContentEntering(motionDirection)}
           exiting={getChartContentExiting(motionDirection)}
-          key={`${animationKey}-${hasData ? 'total' : 'empty'}`}
-          pointerEvents="none"
-          style={[styles.chartCenter, { width: size - strokeWidth * 3 }]}
-          testID={`${idPrefix}-chart-center-content`}
+          key={`${animationKey}-empty-action`}
+          style={styles.emptyAction}
+          testID={`${idPrefix}-empty-action`}
         >
-          {hasData ? (
-            <>
-              <Text tone="secondary" variant="footnote">
-                Total {modeLabel}
-              </Text>
-              <Text
-                adjustsFontSizeToFit
-                numberOfLines={1}
-                style={styles.total}
-                variant="amount"
-              >
-                {formattedTotal}
-              </Text>
-            </>
-          ) : null}
+          {emptyContent}
         </Animated.View>
-      </View>
+      )}
 
       {data.items.length > 0 && (
         <Animated.View
@@ -310,6 +317,9 @@ function createStyles(colors: ColorTokens) {
     chartCenter: {
       position: 'absolute',
       alignItems: 'center',
+    },
+    emptyAction: {
+      marginVertical: spacing.lg,
     },
     total: {
       width: '100%',

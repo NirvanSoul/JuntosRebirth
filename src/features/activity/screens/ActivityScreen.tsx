@@ -407,6 +407,7 @@ export function ActivityScreen({
             <CategoryDonutChart
               categories={categories}
               currency={effectiveCurrency}
+              onCreateMovement={onCreateMovement}
               onDataAvailabilityChange={setHasCategoryBreakdownData}
               onOpenCategoryDetail={(categoryId) =>
                 onOpenCategoryDetail?.(categoryId, effectiveCurrency)
@@ -422,7 +423,6 @@ export function ActivityScreen({
             currency={effectiveCurrency}
             hasBreakdownData={hasCategoryBreakdownData}
             onCreateCategory={onCreateCategory}
-            onCreateMovement={onCreateMovement}
             onOpenCategoryDetail={onOpenCategoryDetail}
             onCategoryViewChange={onCategoryViewChange}
             spaceCurrency={spaceCurrency}
