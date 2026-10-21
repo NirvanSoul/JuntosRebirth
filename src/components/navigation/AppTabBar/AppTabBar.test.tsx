@@ -16,6 +16,7 @@ function createTabBarProps() {
     { key: 'Home-key', name: 'Home' },
     { key: 'Activity-key', name: 'Activity' },
     { key: 'Map-key', name: 'Map' },
+    { key: 'ComingSoon-key', name: 'ComingSoon' },
   ];
   const props = {
     state: {
@@ -61,6 +62,8 @@ describe('AppTabBar', () => {
     fireEvent.press(mapTab);
 
     expect(navigate).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('Pronto'));
+    expect(navigate).toHaveBeenCalledWith('ComingSoon', undefined);
   });
 
   it('mantiene las rutas navegables cuando el espacio está listo', async () => {
@@ -74,7 +77,7 @@ describe('AppTabBar', () => {
     expect(navigate).toHaveBeenCalledWith('Activity', undefined);
   });
 
-  it('presenta las tres pestañas en una cápsula y el botón morado separado en la misma línea', async () => {
+  it('presenta las cuatro pestañas en una cápsula y el botón morado separado en la misma línea', async () => {
     const { onCreatePress, props } = createTabBarProps();
     const screen = await renderWithTheme(
       <AppTabBar {...props} onCreatePress={onCreatePress} />,

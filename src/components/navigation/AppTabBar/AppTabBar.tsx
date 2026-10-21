@@ -3,6 +3,7 @@ import type { Icon } from 'phosphor-react-native';
 import { CalendarDots } from 'phosphor-react-native/src/icons/CalendarDots';
 import { House } from 'phosphor-react-native/src/icons/House';
 import { Receipt } from 'phosphor-react-native/src/icons/Receipt';
+import { Sparkle } from 'phosphor-react-native/src/icons/Sparkle';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -40,6 +41,7 @@ type TabPresentation = { icon: Icon; label: string };
 
 const tabPresentation: Record<TabRouteName, TabPresentation> = {
   Home: { label: 'Inicio', icon: House },
+  ComingSoon: { label: 'Pronto', icon: Sparkle },
   Activity: {
     label: 'Actividad',
     icon: Receipt,
@@ -277,10 +279,11 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       justifyContent: 'center',
     },
     itemInner: {
+      width: '100%',
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing.xs,
-      paddingHorizontal: spacing.lg,
+      paddingHorizontal: spacing.xxs,
       paddingVertical: spacing.xs,
       borderRadius: radii.round,
     },

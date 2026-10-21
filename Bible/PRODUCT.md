@@ -650,13 +650,23 @@ Los límites deben centralizarse como capacidades.
 
 La acción debe ser prominente, mediante botones de gasto e ingreso, botón
 flotante o acción central. La navegación principal se presenta como un menú
-flotante: Inicio, Actividad y Mapa comparten una cápsula, y el botón morado `+`
+flotante: Inicio, Actividad, Mapa y Pronto comparten una cápsula, y el botón morado `+`
 permanece separado a su lado en la misma línea. La franja que contiene ambos es
 transparente y se superpone al contenido; la cápsula conserva su superficie y
 la pestaña seleccionada usa una forma completamente redondeada. El conjunto
 permanece visible al desplazarse y al cambiar entre las pestañas principales.
 No queda disponible mientras hay un modal o el menú lateral abierto y no
 aparece en Ajustes.
+
+### Pronto
+
+Pantalla informativa accesible desde la pestaña Pronto, también durante la
+espera de una invitación de pareja. Conserva el encabezado del espacio activo
+y muestra el titular centrado «Lo que viene lo construiremos juntos.».
+Debajo presenta seis tarjetas con iconos y la indicación «Próximamente»:
+Ahorros, Metas, Lista de deseos, Espacios familiares, Planes y Préstamos.
+Las tarjetas no son acciones ni habilitan esas funcionalidades; no muestran
+fechas de lanzamiento. Reutilizan los tokens visuales de las previews.
 
 ### Modal
 
@@ -933,8 +943,9 @@ Principios:
   El primer espacio de pareja y su invitación se confirman juntos al pulsar
   enviar; hasta ese éxito, Personal conserva el espacio activo y nunca muestra
   una espera falsa.
-- Mientras la invitación confirmada no haya sido aceptada, ese espacio solo
-  permite Inicio con la pantalla de espera: Actividad y Mapa permanecen
+- Mientras la invitación confirmada no haya sido aceptada, ese espacio
+  permite Inicio con la pantalla de espera y la pantalla informativa Pronto:
+  Actividad y Mapa permanecen
   deshabilitados y no exponen datos ni acciones del espacio pendiente.
 - La invitación guardada y visible dentro de la app es la fuente de verdad. El
   push es un aviso inmediato adicional cuando el dispositivo tiene permisos.

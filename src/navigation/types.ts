@@ -1,4 +1,10 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+
+export type CategoryDetailRequest = {
+  categoryId: string;
+  displayCurrency: CurrencyCode;
+};
 
 export type MainTabParamList = {
   Home: undefined;
@@ -9,6 +15,7 @@ export type MainTabParamList = {
       }
     | undefined;
   Map: undefined;
+  ComingSoon: undefined;
 };
 
 export type RootDrawerParamList = {

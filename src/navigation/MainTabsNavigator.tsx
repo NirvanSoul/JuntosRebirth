@@ -10,6 +10,7 @@ import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCrea
 import { ActivityTabContent } from '@/navigation/components/ActivityTabContent';
 import { HomeTabContent } from '@/navigation/components/HomeTabContent';
 import { MainAppTabBar } from '@/navigation/components/MainAppTabBar';
+import { ComingSoonScreen } from '@/features/comingSoon/ComingSoonScreen';
 import { useTransactionDetailModal } from '@/navigation/useTransactionDetailModal';
 import {
   getHomeCurrencyButtonLabel,
@@ -111,19 +112,15 @@ import {
 } from '@/lib/currency/currencyCatalog';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import type { CreateActionType } from '@/navigation/createActions';
-import type { MainTabParamList, RootDrawerParamList } from '@/navigation/types';
+import type * as Routes from '@/navigation/types';
 import { useTheme } from '@/theme/useTheme';
 
-const Tabs = createBottomTabNavigator<MainTabParamList>();
-const Drawer = createDrawerNavigator<RootDrawerParamList>();
+const Tabs = createBottomTabNavigator<Routes.MainTabParamList>();
+const Drawer = createDrawerNavigator<Routes.RootDrawerParamList>();
 const drawerWidthRatio = 0.88,
   drawerMaxWidth = 380;
 
 type CategoryCreationContext = 'quick' | 'transaction';
-type CategoryDetailRequest = {
-  categoryId: string;
-  displayCurrency: CurrencyCode;
-};
 
 export function MainTabsNavigator() {
   const { width } = useWindowDimensions();
@@ -187,9 +184,8 @@ export function MainTabsNavigator() {
     setEnabled: setShowHomeComparisonIndicators,
   } = useHomeComparisonIndicatorsPreference();
   const activitySections = useActivitySectionsPreference();
-  const [activeMainTab, setActiveMainTab] = useState<
-    'Home' | 'Activity' | 'Map'
-  >('Home');
+  const [activeMainTab, setActiveMainTab] =
+    useState<keyof Routes.MainTabParamList>('Home');
   const [homeChartResetKey, setHomeChartResetKey] = useState(0);
   const [activityChartResetKey, setActivityChartResetKey] = useState(0);
   const [isHomeCurrencyPickerVisible, setHomeCurrencyPickerVisible] =
@@ -229,7 +225,7 @@ export function MainTabsNavigator() {
     CategoryEditorTarget | undefined
   >();
   const [detailRequest, setDetailRequest] =
-    useState<CategoryDetailRequest | null>(null);
+    useState<Routes.CategoryDetailRequest | null>(null);
   /** La solicitud se conserva mientras la hoja termina de cerrarse. */
   const [isCategoryDetailVisible, setCategoryDetailVisible] = useState(false);
   const [detailTransactionReminder, setDetailTransactionReminder] =
@@ -1005,6 +1001,11 @@ export function MainTabsNavigator() {
                     />
                   )}
                 </Tabs.Screen>
+                <Tabs.Screen
+                  component={ComingSoonScreen}
+                  listeners={{ focus: () => setActiveMainTab('ComingSoon') }}
+                  name="ComingSoon"
+                />
               </Tabs.Navigator>
 
               <QuickCreateMenu
