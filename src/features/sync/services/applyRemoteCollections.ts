@@ -40,8 +40,9 @@ export async function createLinkResolver(input: {
     if (resolveOnly) {
       return existing ?? null;
     }
-    const localId =
-      existing ?? localIdForUnlinkedRemote?.(remoteId, links) ?? remoteId;
+    // Reescribir un enlace existente solo tocaba su `updated_at`, que nadie lee.
+    if (existing) return existing;
+    const localId = localIdForUnlinkedRemote?.(remoteId, links) ?? remoteId;
     await upsertRemoteEntityLink({
       executor,
       userId,
@@ -113,9 +114,8 @@ export async function applyRemoteCollections(
 
   const localCategoryIdByRemoteId = new Map<string, string>();
   const localMoneyAccountIdByRemoteId = new Map<string, string>();
-  // Un movimiento que este dispositivo acaba de subir vuelve en el siguiente
-  // delta con el mismo `updatedAt`: el servidor guarda el que le enviamos.
-  // Contarlo como cambio recargaba toda la caché ~2 s después de cada guardado.
+  // Lo que este dispositivo subió vuelve en el delta con su mismo `updatedAt`
+  // (el servidor guarda el enviado): no es un cambio que recargar.
   let echoedTransactions = 0;
 
   for (const remoteCategory of input.collections.categories) {

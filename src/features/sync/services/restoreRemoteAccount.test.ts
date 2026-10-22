@@ -355,8 +355,8 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
         typeof sql === 'string' &&
         sql.includes('INSERT INTO remote_entity_links'),
     );
+    // Solo se escribe el enlace nuevo: el existente ya apunta a su id local.
     expect(linkWrites.map((call) => [call[2], call[3], call[4]])).toEqual([
-      ['space', 'personal-remote', 'personal'],
       ['space', 'couple-remote', 'couple-remote'],
     ]);
   });

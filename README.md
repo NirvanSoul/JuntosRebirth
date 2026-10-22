@@ -51,7 +51,7 @@ El comando genera `ios/` mediante Expo CNG cuando hace falta, instala los pods, 
 npm run start:dev-client
 ```
 
-`ios/` es un resultado generado y no se versiona: cambia `app.json` o las dependencias nativas y vuelve a ejecutar `npm run prebuild:ios` (o `npm run ios:device`). No edites manualmente los archivos generados.
+`ios/` y `android/` son resultados generados y no se versionan: cambia `app.json` o las dependencias nativas y vuelve a ejecutar `npm run prebuild:ios` o `npm run prebuild:android` (o `npm run ios:device` / `npm run android:device`). No edites manualmente los archivos generados.
 
 ## Comandos
 
@@ -67,6 +67,9 @@ npm run start:dev-client # servidor Metro para la development build propia
 npm run prebuild:ios # genera el proyecto iOS de Xcode mediante Expo CNG
 npm run ios:dev      # compila y abre la development build en un simulador
 npm run ios:device   # compila e instala la development build en un iPhone conectado
+npm run prebuild:android # genera el proyecto Android mediante Expo CNG
+npm run android:dev      # compila y abre la development build en un emulador Android
+npm run android:device   # compila e instala la development build en un Android conectado
 npm run typecheck
 npm run lint
 npm run format:check
