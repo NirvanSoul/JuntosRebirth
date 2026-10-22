@@ -337,21 +337,40 @@ export function useMoneyAccounts({
     [activeSpaceId, moneyAccounts],
   );
 
-  return {
-    activeSpaceMoneyAccounts,
-    archive,
-    closeModal,
-    detailAccount,
-    ensureCurrency,
-    editingAccount,
-    isCurrencyLocked,
-    isModalVisible,
-    moneyAccounts,
-    openCreation,
-    openDetail: setDetailId,
-    setMoneyAccounts,
-    spaceMoneyAccounts,
-    startEditing,
-    submit,
-  };
+  // Un objeto estable evita repintar las hojas de cuentas cuando el navegador
+  // cambia por otra hoja.
+  return useMemo(
+    () => ({
+      activeSpaceMoneyAccounts,
+      archive,
+      closeModal,
+      detailAccount,
+      ensureCurrency,
+      editingAccount,
+      isCurrencyLocked,
+      isModalVisible,
+      moneyAccounts,
+      openCreation,
+      openDetail: setDetailId,
+      setMoneyAccounts,
+      spaceMoneyAccounts,
+      startEditing,
+      submit,
+    }),
+    [
+      activeSpaceMoneyAccounts,
+      archive,
+      closeModal,
+      detailAccount,
+      ensureCurrency,
+      editingAccount,
+      isCurrencyLocked,
+      isModalVisible,
+      moneyAccounts,
+      openCreation,
+      spaceMoneyAccounts,
+      startEditing,
+      submit,
+    ],
+  );
 }

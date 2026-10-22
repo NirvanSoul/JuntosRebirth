@@ -28,6 +28,7 @@ import {
   isCurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { loadCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
+import { isDemoSessionActive } from '@/state/demoSession/demoSessionStore';
 
 const maxSpaceNameLength = 40;
 const defaultCoupleSpaceName = 'Juntos';
@@ -149,7 +150,9 @@ export function useSpaces(): SpacesController {
   }, []);
 
   const refreshCoupleSpace = useCallback(async (): Promise<void> => {
-    if (!userId) return;
+    // El espacio juntos del demo no existe en el servidor: consultarlo lo
+    // retiraría del catálogo local.
+    if (!userId || isDemoSessionActive()) return;
 
     const catalogueRevision = getSpacesCatalogueRevision();
     let remoteSpace: Space | null;

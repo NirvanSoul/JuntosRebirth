@@ -3,6 +3,7 @@ import { cacheMemberAvatars } from '@/features/profile/services/cacheMemberAvata
 import { restoreOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { replaceSpaceMemberProfiles } from '@/features/profile/repositories/localSpaceMemberProfileRepository';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
+import { isDemoSessionActive } from '@/state/demoSession/demoSessionStore';
 
 const pendingProfileSyncs = new Map<string, Promise<boolean>>();
 
@@ -30,7 +31,8 @@ async function syncSpaceMemberProfilesForSpace(
   spaceId: string,
 ): Promise<boolean> {
   const userId = await getAuthenticatedUserId();
-  if (!userId) return false;
+  // El censo del demo es ficticio y local: no hay servidor que lo refresque.
+  if (!userId || isDemoSessionActive()) return false;
 
   const profiles = await fetchSpaceMemberProfiles(spaceId);
   await replaceSpaceMemberProfiles(spaceId, profiles);

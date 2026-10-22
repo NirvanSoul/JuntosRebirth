@@ -38,12 +38,14 @@ export function shiftMonthKey(monthKey: string, offset: number): string {
   return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}`;
 }
 
+const monthYearFormatter = new Intl.DateTimeFormat('es-ES', {
+  month: 'long',
+  year: 'numeric',
+});
+
 export function formatMonthKey(monthKey: string): string {
   const [year, month] = parseMonthKey(monthKey);
-  const label = new Intl.DateTimeFormat('es-ES', {
-    month: 'long',
-    year: 'numeric',
-  })
+  const label = monthYearFormatter
     .format(new Date(year, month - 1, 1))
     .replace(' de ', ' ');
 
@@ -102,4 +104,37 @@ export function summarizeCategories(
   );
 
   return Array.from(summaries.values());
+}
+
+/**
+ * Gasto que consume el presupuesto de cada categoría: el presupuesto es
+ * mensual, así que solo cuentan los gastos del mes en curso en `currency`,
+ * incluidos los recurrentes programados dentro de ese mes.
+ */
+export function summarizeMonthlyBudgetExpenses(
+  transactions: readonly SessionTransaction[],
+  currency: CurrencyCode,
+  referenceDate = new Date(),
+): ReadonlyMap<string, number> {
+  const monthPrefix = `${getCurrentMonthKey(referenceDate)}-`;
+  const expenses = new Map<string, number>();
+
+  listTransactionsThroughCurrentMonth(transactions, referenceDate).forEach(
+    (transaction) => {
+      if (
+        transaction.type !== 'expense' ||
+        transaction.currency !== currency ||
+        !transaction.occurredOn.startsWith(monthPrefix)
+      ) {
+        return;
+      }
+
+      expenses.set(
+        transaction.categoryId,
+        (expenses.get(transaction.categoryId) ?? 0) + transaction.amountMinor,
+      );
+    },
+  );
+
+  return expenses;
 }

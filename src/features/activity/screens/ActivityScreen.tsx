@@ -36,7 +36,10 @@ import {
   type TransactionDateFilter,
 } from '@/features/activity/utils/transactionDateFilter';
 import type { Category } from '@/features/categories/types';
-import { summarizeCategories } from '@/features/categories/utils/categorySummary';
+import {
+  summarizeCategories,
+  summarizeMonthlyBudgetExpenses,
+} from '@/features/categories/utils/categorySummary';
 import {
   TransactionPeriodModal,
   type TransactionPeriodModalType,
@@ -58,6 +61,7 @@ import {
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
 import { createStyles } from '@/features/activity/screens/ActivityScreen.styles';
+import { useIncrementalLimit } from '@/hooks/useIncrementalLimit';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
@@ -94,6 +98,9 @@ type ActivityScreenProps = {
   targetSection?: 'accounts' | 'categories' | 'movements';
   transactions?: readonly SessionTransaction[];
 };
+
+/** Grupos de movimientos que se montan por tanda al desplazarse. */
+const movementPageSize = 40;
 
 export function ActivityScreen({
   categories = [],
@@ -153,6 +160,13 @@ export function ActivityScreen({
     null,
   );
   const [isFiltersModalVisible, setFiltersModalVisible] = useState(false);
+  const movementPages = useIncrementalLimit(movementPageSize, [
+    transactionFilter,
+    categoryFilter,
+    recurrenceFilter,
+    dateFilter,
+    selectedCurrency,
+  ]);
   const [periodModalType, setPeriodModalType] =
     useState<TransactionPeriodModalType | null>(null);
   const [prevCategoriesExpandedProp, setPrevCategoriesExpandedProp] =
@@ -214,26 +228,13 @@ export function ActivityScreen({
       ),
     [categories, effectiveCurrency, transactionsThroughCurrentMonth],
   );
-  const budgetSummaries = useMemo(
-    () =>
-      effectiveCurrency === spaceCurrency
-        ? categorySummaries
-        : summarizeCategories(
-            categories,
-            transactionsThroughCurrentMonth,
-            spaceCurrency,
-          ),
-    [
-      categories,
-      categorySummaries,
-      effectiveCurrency,
-      spaceCurrency,
-      transactionsThroughCurrentMonth,
-    ],
-  );
   const budgetExpenseByCategoryId = useMemo(
-    () => new Map(budgetSummaries.map((item) => [item.id, item.expenseMinor])),
-    [budgetSummaries],
+    () =>
+      summarizeMonthlyBudgetExpenses(
+        transactionsThroughCurrentMonth,
+        spaceCurrency,
+      ),
+    [spaceCurrency, transactionsThroughCurrentMonth],
   );
   // Cada tarjeta lleva su propia moneda, así que la selección de moneda de
   // los movimientos no filtra las cuentas ni mezcla divisas en un saldo.
@@ -392,6 +393,7 @@ export function ActivityScreen({
           updateSummaryPinnedState(offset);
         }}
         onScrollDirectionChange={onScrollDirectionChange}
+        onEndReached={movementPages.showMore}
         scrollRef={scrollRef}
         stickyHeaderIndices={[3]}
         testID="activity-screen"
@@ -508,6 +510,7 @@ export function ActivityScreen({
             <TransactionPreviewList
               categories={categories}
               groupingTransactions={transactions}
+              limit={movementPages.limit}
               onOpenTransactionDetail={onOpenTransactionDetail}
               testID="activity-transaction-preview-list"
               transactions={filteredTransactions}

@@ -1,9 +1,12 @@
+import { type ReactNode, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
+
+import Animated, { FadeOutUp, ReduceMotion } from 'react-native-reanimated';
 
 import { MonthNavigator } from '@/components/ui/MonthNavigator/MonthNavigator';
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
@@ -15,8 +18,14 @@ import {
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
+import { getDisclosureEntering } from '@/theme/transitions';
 
 type TransactionPeriodSelectorProps = {
+  /**
+   * Oculta las opciones hasta pulsar el periodo central; se despliegan de arriba
+   * abajo y se pliegan al elegir una.
+   */
+  collapsible?: boolean;
   includeAllOption?: boolean;
   includeCustomOption?: boolean;
   customLabel?: string;
@@ -34,6 +43,7 @@ type TransactionPeriodSelectorProps = {
 };
 
 export function TransactionPeriodSelector({
+  collapsible = false,
   includeAllOption = false,
   includeCustomOption = false,
   customLabel,
@@ -52,6 +62,25 @@ export function TransactionPeriodSelector({
   const { width } = useWindowDimensions();
   const gutter = layout.screenGutter[density];
   const displayedPeriod = period ?? 'month';
+  const allSelected = includeAllOption && period === null && !customSelected;
+  const [optionsVisible, setOptionsVisible] = useState(!collapsible);
+  const select = (action: (() => void) | undefined) => () => {
+    action?.();
+    if (collapsible) setOptionsVisible(false);
+  };
+  const renderOptions = (options: ReactNode) =>
+    collapsible ? (
+      optionsVisible ? (
+        <Animated.View
+          entering={getDisclosureEntering()}
+          exiting={FadeOutUp.duration(160).reduceMotion(ReduceMotion.System)}
+        >
+          {options}
+        </Animated.View>
+      ) : null
+    ) : (
+      options
+    );
 
   return (
     <View testID={testID}>
@@ -59,7 +88,20 @@ export function TransactionPeriodSelector({
         label={
           customSelected && customLabel
             ? customLabel
-            : formatTransactionPeriod(displayedPeriod, selectedDate)
+            : allSelected
+              ? 'Desde el inicio'
+              : formatTransactionPeriod(displayedPeriod, selectedDate)
+        }
+        labelAccessibilityHint={
+          collapsible
+            ? `${optionsVisible ? 'Oculta' : 'Muestra'} los periodos disponibles`
+            : undefined
+        }
+        labelExpanded={collapsible ? optionsVisible : undefined}
+        onLabelPress={
+          collapsible
+            ? () => setOptionsVisible((visible) => !visible)
+            : undefined
         }
         nextAccessibilityLabel="Ver periodo siguiente"
         onNext={onNext}
@@ -90,6 +132,7 @@ export function TransactionPeriodSelector({
                 indicatorTestID={
                   testID ? `${testID}-${option.value}-indicator` : undefined
                 }
+                indicator={false}
                 key={option.value}
                 label={option.label}
                 onPress={() => onSelectPeriod(option.value)}
@@ -100,57 +143,62 @@ export function TransactionPeriodSelector({
           })}
         </ScrollView>
       ) : (
-        <ScrollView
-          accessibilityRole="radiogroup"
-          contentContainerStyle={[
-            styles.periods,
-            { paddingHorizontal: gutter },
-          ]}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={[styles.optionsScroll, { width, marginLeft: -gutter }]}
-          testID={testID ? `${testID}-options-scroll` : undefined}
-        >
-          {includeAllOption ? (
-            <SelectableOption
-              accessibilityLabel="Periodo: Todos"
-              indicatorTestID={testID ? `${testID}-all-indicator` : undefined}
-              label="Todos"
-              onPress={() => onSelectAll?.()}
-              selected={period === null && !customSelected}
-              testID={testID ? `${testID}-all` : undefined}
-            />
-          ) : null}
-          {transactionPeriodOptions.map((option) => {
-            const selected = option.value === period;
-
-            return (
+        renderOptions(
+          <ScrollView
+            accessibilityRole="radiogroup"
+            contentContainerStyle={[
+              styles.periods,
+              { paddingHorizontal: gutter },
+            ]}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={[styles.optionsScroll, { width, marginLeft: -gutter }]}
+            testID={testID ? `${testID}-options-scroll` : undefined}
+          >
+            {includeAllOption ? (
               <SelectableOption
-                accessibilityLabel={`Periodo: ${option.label}`}
-                indicatorTestID={
-                  testID ? `${testID}-${option.value}-indicator` : undefined
-                }
-                key={option.value}
-                label={option.label}
-                onPress={() => onSelectPeriod(option.value)}
-                selected={selected}
-                testID={testID ? `${testID}-${option.value}` : undefined}
+                accessibilityLabel="Periodo: Todos"
+                indicatorTestID={testID ? `${testID}-all-indicator` : undefined}
+                indicator={false}
+                label="Todos"
+                onPress={select(onSelectAll)}
+                selected={allSelected}
+                testID={testID ? `${testID}-all` : undefined}
               />
-            );
-          })}
-          {includeCustomOption ? (
-            <SelectableOption
-              accessibilityLabel="Periodo: Personalizada"
-              indicatorTestID={
-                testID ? `${testID}-custom-indicator` : undefined
-              }
-              label="Personalizada"
-              onPress={() => onSelectCustom?.()}
-              selected={customSelected}
-              testID={testID ? `${testID}-custom` : undefined}
-            />
-          ) : null}
-        </ScrollView>
+            ) : null}
+            {transactionPeriodOptions.map((option) => {
+              const selected = option.value === period;
+
+              return (
+                <SelectableOption
+                  accessibilityLabel={`Periodo: ${option.label}`}
+                  indicatorTestID={
+                    testID ? `${testID}-${option.value}-indicator` : undefined
+                  }
+                  indicator={false}
+                  key={option.value}
+                  label={option.label}
+                  onPress={select(() => onSelectPeriod(option.value))}
+                  selected={selected}
+                  testID={testID ? `${testID}-${option.value}` : undefined}
+                />
+              );
+            })}
+            {includeCustomOption ? (
+              <SelectableOption
+                accessibilityLabel="Periodo: Personalizada"
+                indicatorTestID={
+                  testID ? `${testID}-custom-indicator` : undefined
+                }
+                indicator={false}
+                label="Personalizada"
+                onPress={select(onSelectCustom)}
+                selected={customSelected}
+                testID={testID ? `${testID}-custom` : undefined}
+              />
+            ) : null}
+          </ScrollView>,
+        )
       )}
     </View>
   );
@@ -159,16 +207,15 @@ export function TransactionPeriodSelector({
 const styles = StyleSheet.create({
   navigator: { marginBottom: spacing.md },
   periods: {
-    height: 116,
-    flexDirection: 'column',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    gap: spacing.xs + spacing.xxs,
     overflow: 'visible',
   },
   periodsSingleRow: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
-    gap: spacing.xs,
+    gap: spacing.xs + spacing.xxs,
     overflow: 'visible',
     paddingVertical: spacing.sm,
   },

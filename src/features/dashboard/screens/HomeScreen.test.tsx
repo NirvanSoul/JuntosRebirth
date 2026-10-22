@@ -551,6 +551,12 @@ describe('HomeScreen', () => {
       screen.getByRole('button', { name: /Ingresos de este mes/ }),
     );
     const incomeModal = await screen.findByTestId('income-period-modal');
+    // Las opciones se despliegan al pulsar el periodo, como en Categoría.
+    await fireEvent.press(
+      screen.getByRole('button', {
+        name: formatTransactionPeriod('month', new Date()),
+      }),
+    );
     const monthlyFilter = screen.getByRole('radio', {
       name: 'Periodo: Mensual',
     });
@@ -559,7 +565,7 @@ describe('HomeScreen', () => {
     });
     expect(StyleSheet.flatten(monthlyFilter.props.style)).toMatchObject({
       backgroundColor: colors.surface,
-      borderColor: colors.border,
+      borderColor: colors.cta,
       ...shadows.none,
     });
     expect(StyleSheet.flatten(monthlyFilter.props.style)).not.toHaveProperty(
@@ -572,9 +578,8 @@ describe('HomeScreen', () => {
     ).toBe('visible');
     expect(
       StyleSheet.flatten(
-        screen.getByTestId('income-period-selector-month-indicator').props
-          .style,
-      ).color,
+        screen.getByTestId('income-period-selector-month').props.style,
+      ).borderColor,
     ).toBe(colors.cta);
     expect(
       screen.getByText(formatTransactionPeriod('month', new Date())),
@@ -633,19 +638,40 @@ describe('HomeScreen', () => {
       '500',
     );
     await fireEvent.press(
+      screen.getByRole('button', {
+        name: formatTransactionPeriod('month', new Date()),
+      }),
+    );
+    await fireEvent.press(
       screen.getByRole('radio', { name: 'Periodo: Quincenal' }),
     );
     expect(
       screen.getByText(formatTransactionPeriod('fortnight', new Date())),
     ).toBeTruthy();
     await fireEvent.press(
+      screen.getByRole('button', {
+        name: formatTransactionPeriod('fortnight', new Date()),
+      }),
+    );
+    await fireEvent.press(
       screen.getByRole('radio', { name: 'Periodo: Anual' }),
+    );
+    await fireEvent.press(
+      screen.getByRole('button', { name: String(new Date().getFullYear()) }),
     );
     expect(
       screen.getByRole('radio', { name: 'Periodo: Anual' }).props
         .accessibilityState,
     ).toMatchObject({ checked: true });
     expect(screen.getByText(String(new Date().getFullYear()))).toBeTruthy();
+    await fireEvent.press(
+      screen.getByRole('radio', { name: 'Periodo: Todos' }),
+    );
+    expect(screen.getByText('Desde el inicio')).toBeTruthy();
+    expect(screen.getByTestId('expense-period-total').props.children).toContain(
+      '500',
+    );
+    expect(screen.queryByTestId('expense-period-comparison')).toBeNull();
     expect(
       StyleSheet.flatten(
         screen.getByTestId('expense-period-add-gradient').props.style,

@@ -84,3 +84,39 @@ it('pinta el logo de carga en blanco solo con el modo oscuro', async () => {
   ).toBeUndefined();
   await lightScreen.unmount();
 });
+
+it('como capa cubre el contenido sin desmontarlo y lo devuelve al terminar', async () => {
+  const onUnmount = jest.fn();
+  function Content() {
+    useEffect(() => onUnmount, []);
+    return <Text variant="body">Tu espacio</Text>;
+  }
+
+  const screen = await renderWithTheme(
+    <LoadingState loading={false} overlay>
+      <Content />
+    </LoadingState>,
+  );
+  expect(screen.getByText('Tu espacio')).toBeTruthy();
+
+  await screen.rerender(
+    <LoadingState loading overlay>
+      <Content />
+    </LoadingState>,
+  );
+  expect(screen.getByRole('progressbar')).toBeTruthy();
+  expect(screen.getByTestId('app-loading').props.pointerEvents).toBe('auto');
+  // Sigue montado, pero oculto para lectores de pantalla mientras carga.
+  expect(screen.queryByText('Tu espacio')).toBeNull();
+  expect(
+    screen.getByText('Tu espacio', { includeHiddenElements: true }),
+  ).toBeTruthy();
+
+  await screen.rerender(
+    <LoadingState loading={false} overlay>
+      <Content />
+    </LoadingState>,
+  );
+  expect(screen.getByText('Tu espacio')).toBeTruthy();
+  expect(onUnmount).not.toHaveBeenCalled();
+});

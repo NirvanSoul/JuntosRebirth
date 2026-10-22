@@ -7,7 +7,10 @@ import {
 import { restoreOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { apiClient } from '@/services/api/juntossApiClient';
 import { currencyPreferencesForCountry } from '@/state/appPreferences/currencyPreferences';
-import { saveCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
+import {
+  loadCurrencyPreferences,
+  saveCurrencyPreferences,
+} from '@/state/appPreferences/currencyPreferencesRepository';
 
 type RemoteOwnProfile = {
   avatarPath?: unknown;
@@ -57,9 +60,13 @@ export async function restoreOwnProfile(): Promise<string | null> {
     // de sesión. Al entrar en una cuenta VE no deben conservar el EUR de la
     // cuenta anterior: el contrato venezolano solo permite USD/VES.
     if (normalizedCountry === 'VE') {
-      await saveCurrencyPreferences(
-        currencyPreferencesForCountry(normalizedCountry),
-      );
+      const venezuelaPreferences =
+        currencyPreferencesForCountry(normalizedCountry);
+      const stored = await loadCurrencyPreferences();
+      // Se restaura en cada refresco: solo se escribe si hace falta.
+      if (stored.currencies.join() !== venezuelaPreferences.currencies.join()) {
+        await saveCurrencyPreferences(venezuelaPreferences);
+      }
     }
     return normalizedCountry;
   }

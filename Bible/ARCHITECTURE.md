@@ -164,9 +164,15 @@ recuperar la red, y un 401 cierra sesión sin aviso.
 
 ### Diagnóstico de arranque y optimización de bundle
 
-Para medir el rendimiento del arranque en desarrollo, `src/lib/diagnostics/startupTrace.ts` registra marcas temporales clave (`bundle_evaluated`, `fonts_ready`, `session_ready`, `local_finance_ready`, `init_done`) e imprime una tabla diagnóstica en `console.info` al completarse la inicialización (no-op en producción).
+Para medir el rendimiento del arranque en desarrollo, `src/lib/diagnostics/startupTrace.ts` registra marcas temporales clave (`bundle_evaluated`, `fonts_ready`, `session_ready`, `local_db_ready` al terminar de abrir y migrar SQLite, `local_finance_ready` cuando la caché local ya está cargada en memoria, `init_done`) e imprime una tabla diagnóstica en `console.info` al completarse la inicialización (no-op en producción).
 
 La configuración de Metro (`metro.config.js`) activa `inlineRequires: true` para diferir la evaluación de módulos hasta su primer uso, acelerando la llegada a la primera pintura y a `local_finance_ready`. Los efectos de módulo secundarios (como `ensureNotificationHandlerRegistered`) se ejecutan dentro del ciclo de vida de React (`useEffect` en `AppBootstrap`) para evitar efectos colaterales prematuros.
+
+React Compiler (`experiments.reactCompiler` en `app.json`) se adopta por carpetas: `babel.config.js` lista los directorios compilados (hoy `src/navigation/`, `src/components/`, `src/theme/`, las features `activity`, `dashboard` y `map`, y los `components/` de `accounts`, `categories`, `exchangeRates` y `transactions`) y se amplía fase a fase tras comprobar que el compilador no abandona sus funciones y que las pruebas pasan con él activo. Los tests no se compilan. Dos reglas acompañan esta adopción en `MainTabsNavigator`:
+
+- Las pestañas y las hojas globales se construyen como elementos en el cuerpo del componente, no dentro de la función `children` de `Drawer.Screen`: el compilador no memoiza lo que se crea dentro de esas funciones, y abrir una hoja repintaba todas las pestañas y las demás hojas.
+- Los `SharedValue` de Reanimated se escriben con `.set()`, no asignando `.value`: el compilador no admite mutar un valor devuelto por un hook y abandonaría el componente entero.
+- Los manejadores que llegan de hooks que el compilador no puede compilar (por ejemplo, con `try/catch` que contienen condicionales) se fijan con `useStableCallback` (`src/hooks/`), y los objetos que devuelven se memoizan en el propio hook.
 
 ---
 
@@ -324,6 +330,8 @@ No debe:
 - Duplicar diseño.
 - Mezclar cientos de líneas de lógica y presentación.
 
+Una lista que puede crecer con el historial (como los movimientos de Actividad) no se monta entera: `useIncrementalLimit` (`src/hooks/`) monta una tanda y añade otra con `onEndReached` de `Screen`, y solo vuelve a la primera tanda al cambiar los filtros. Las filas de `TransactionPreviewList` se memoizan comparando lo que pintan, de modo que una recarga con los mismos datos no las repinta.
+
 ---
 
 ## 9. Modales
@@ -351,6 +359,13 @@ El modal de movimiento reutiliza:
 - Teclado.
 - Animaciones.
 - Accesibilidad.
+
+Reglas de rendimiento de las hojas:
+
+- Una hoja que abre otra lo hace con `useModalChainedAction`, cuando la primera termina de cerrarse; nunca en el mismo commit.
+- Una hoja de detalle conserva su entidad hasta `onDismissed`, para animar el cierre en lugar de desmontarse de golpe.
+- Las listas de movimientos dentro de hojas usan `TransactionPreviewList` con `progressive`: la hoja se monta con las primeras filas y el resto llega en un render diferido.
+- En iOS, `AppModal` usa `motion.sheetSpring`, que da el cierre por terminado cuando falta ~1 px, para que `onDismissed` no llegue cientos de milisegundos después de que la hoja dejó de verse.
 
 ---
 
@@ -582,6 +597,58 @@ La frontera remota vive en `src/services/api/` y la coordinación de migración
 en `src/features/sync/`. La UI no importa el cliente: una vez exista sesión,
 llama al caso de uso autenticado, que prepara el lote SQLite, lo envía mediante
 un gateway y confirma localmente los conteos.
+
+### 16.1 Usuario demo de desarrollo
+
+Para grabar demos y material de marketing sin rellenar la app a mano, Iniciar
+sesión muestra en builds de desarrollo (`__DEV__`) la acción «Crear usuario
+demo». Pide una moneda (`features/demo/constants/demoCurrencyProfiles.ts`) y
+crea en el dispositivo:
+
+- Un espacio personal y un espacio juntos activo con dos personas ficticias
+  (p. ej. Angélica y Manuel); quien usa el demo es una de ellas y los
+  movimientos del espacio juntos se reparten entre ambas.
+- Cuentas, categorías predeterminadas y personalizadas, presupuestos, notas y
+  unos cinco meses de historia más dos de planes futuros, con movimientos
+  únicos, semanales, quincenales, mensuales y personalizados.
+
+El guion (`features/demo/scenario/`) es puro y reproducible con una semilla.
+Está escrito en euros para una pareja de clase media en España, con el reparto
+de gasto de la Encuesta de Presupuestos Familiares del INE, y cada moneda lo
+escala por su coste de vida, no por su tipo de cambio.
+
+Venezuela se elige con el bolívar y sigue el modelo de
+`JUNTOSS_VENEZUELA_CURRENCY_PLAN.md` §0.1: país `VE`, monedas activas USD y
+VES, y cuentas y espacios solo en USD. Los gastos fijos van en dólares; las
+compras pequeñas (café, panadería, farmacia, luz, gas) se registran en
+bolívares y sin cuenta. Como el demo no habla con el servidor,
+`features/demo/utils/demoVenezuelaRates.ts` hace sus veces con tasas BCV y EUR
+**ficticias** y deterministas por fecha:
+
+- La siembra congela en cada movimiento `accounting_amount_minor_usd` y
+  `exchange_snapshot_json`, igual que haría el servidor al sincronizar.
+- Con el demo activo, `juntossExchangeRateGateway` responde la tasa vigente y
+  el preview desde ese módulo, y `listCustomExchangeRates` devuelve una lista
+  vacía. Crear una tasa personalizada falla, porque vive en el servidor.
+- Las ocurrencias recurrentes que se materialicen después de la siembra no
+  tienen snapshot, igual que un movimiento real aún no sincronizado.
+
+La siembra usa los repositorios locales de siempre, parte de una caché vacía y
+marca `local_sync_account` con el id demo. Solo al terminar guarda la sesión
+en `state/demoSession/demoSessionStore.ts` (AsyncStorage), y
+`useBetterAuthSession` la presenta como una sesión verificada sintética. Con
+ella:
+
+- `juntossApiClient` rechaza toda petición con `DEMO_SESSION` antes de llegar a
+  `fetch`. Es la guarda de último recurso.
+- La apertura de sesión, el polling, el refresco del espacio de pareja, el
+  censo, la subida de avatar y el registro push no llegan a llamar a la red.
+- Ajustes sustituye «Cerrar sesión» por «Eliminar usuario demo», que cierra la
+  sesión demo, borra la caché como un cierre de sesión normal
+  (`discardBackedLocalSessionCache`, que también cierra el demo) y devuelve las
+  preferencias de moneda previas.
+
+Una build de release nunca abre un demo, aunque quede uno guardado.
 
 ---
 

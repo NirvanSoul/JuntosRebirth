@@ -25,6 +25,8 @@ import {
 import { VerifyCodeScreen } from '@/features/auth/screens/VerifyCodeScreen';
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
 import { loadPendingEmailVerification } from '@/features/auth/services/pendingEmailVerification';
+import { LegalConsentCheckbox } from '@/features/legal/components/LegalConsentCheckbox';
+import { recordAccessLegalAcceptance } from '@/features/legal/services/legalAcceptanceService';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
 import { getDisclosureEntering } from '@/theme/transitions';
@@ -91,6 +93,7 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
       ? { screen: 'verify-signup', email: pendingVerificationEmail }
       : { screen: 'entry' },
   );
+  const [hasAcceptedLegal, setHasAcceptedLegal] = useState(false);
 
   // Si el alta acaba de crear una sesión sin verificar, RootNavigator vuelve a
   // montar esta pantalla. Recuperamos el OTP desde la sesión, no desde memoria
@@ -151,6 +154,11 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
   };
 
   const handleAuthenticated = () => {
+    // La evidencia no bloquea la entrada: la casilla ya se marcó en la app y
+    // un fallo de red no debe dejar fuera a quien acaba de autenticarse.
+    void recordAccessLegalAcceptance().catch((error: unknown) => {
+      console.error('[access] No se pudo registrar la aceptación legal', error);
+    });
     if (!onAuthenticated) return;
     void onAuthenticated().catch((error: unknown) => {
       console.error('[access] No se pudo completar el onboarding', error);
@@ -165,6 +173,7 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
   if (step.screen === 'entry') {
     return (
       <OnboardingScreenLayout
+        actionDisabled={!hasAcceptedLegal}
         actionLabel="Crear cuenta"
         actionStyle={styles.onboardingCreateAccountAction}
         actionVariant="surface"
@@ -173,13 +182,20 @@ export function AccessScreen({ onAuthenticated }: AccessScreenProps) {
         illustrationSource={require('../../../../assets/Onboarding/10_loginicon.png')}
         onAction={() => setStep({ screen: 'signup', step: 1 })}
         secondaryAction={
-          <ModalPrimaryAction
-            accessibilityLabel="Iniciar sesión"
-            label="Iniciar sesión"
-            onPress={() => setStep({ screen: 'login' })}
-            testID="onboarding-login-open-login"
-            variant="cta"
-          />
+          <>
+            <LegalConsentCheckbox
+              accepted={hasAcceptedLegal}
+              onChange={setHasAcceptedLegal}
+            />
+            <ModalPrimaryAction
+              accessibilityLabel="Iniciar sesión"
+              disabled={!hasAcceptedLegal}
+              label="Iniciar sesión"
+              onPress={() => setStep({ screen: 'login' })}
+              testID="onboarding-login-open-login"
+              variant="cta"
+            />
+          </>
         }
         subtitle="Inicia sesión fácilmente o crea una cuenta, para empezar a mejorar tus finanzas."
         testID="onboarding-login"

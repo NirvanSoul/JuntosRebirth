@@ -17,13 +17,15 @@ type CategoryDetailTransactions = {
   authorFilteredTransactions: readonly SessionTransaction[];
   /** Movimientos de la categoría hasta el mes en curso. */
   categoryTransactions: readonly SessionTransaction[];
+  /** Movimientos pasados y futuros de la categoría dentro del periodo elegido. */
+  periodCategoryTransactions: readonly SessionTransaction[];
   pastCategoryTransactions: readonly SessionTransaction[];
   upcomingCategoryTransactions: readonly SessionTransaction[];
 };
 
 /**
  * Selecciona los movimientos que muestra el detalle de una categoría: filtra
- * por autor, moneda y fecha, y separa los pasados de los futuros.
+ * por autor, moneda y periodo, y separa los pasados de los futuros.
  */
 export function useCategoryDetailTransactions({
   category,
@@ -99,10 +101,15 @@ export function useCategoryDetailTransactions({
       left.occurredOn.localeCompare(right.occurredOn),
     );
   }, [allCategoryTransactions, categoryTransactions, filters.date, todayKey]);
+  const periodCategoryTransactions = useMemo(
+    () => [...pastCategoryTransactions, ...upcomingCategoryTransactions],
+    [pastCategoryTransactions, upcomingCategoryTransactions],
+  );
 
   return {
     authorFilteredTransactions,
     categoryTransactions,
+    periodCategoryTransactions,
     pastCategoryTransactions,
     upcomingCategoryTransactions,
   };

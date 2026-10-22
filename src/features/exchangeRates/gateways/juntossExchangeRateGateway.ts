@@ -6,7 +6,13 @@ import type {
   VenezuelaCurrencyCode,
   VenezuelaExchangeRateSource,
 } from '@/features/exchangeRates/types';
+import {
+  getDemoCurrentExchangeRates,
+  getDemoExchangePreview,
+} from '@/features/demo/utils/demoVenezuelaRates';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 import { apiClient } from '@/services/api/juntossApiClient';
+import { loadDemoSession } from '@/state/demoSession/demoSessionStore';
 
 /**
  * `/v1/exchange/*` usa strings decimales de moneda mayor. Esta es la única
@@ -93,6 +99,10 @@ function mapConversion(
 }
 
 export async function getCurrentExchangeRates(): Promise<CurrentExchangeRates> {
+  // El usuario demo venezolano usa tasas ficticias locales: no hay API.
+  if (await loadDemoSession()) {
+    return getDemoCurrentExchangeRates(getLocalTodayKey());
+  }
   const response = await apiClient.get<{
     data: {
       rates: Record<VenezuelaExchangeRateSource, RawCurrentExchangeRate>;
@@ -119,6 +129,13 @@ export async function previewExchangeRate({
   amountMinor: number;
   fromCurrency: VenezuelaCurrencyCode;
 }): Promise<ExchangeRatePreview> {
+  if (await loadDemoSession()) {
+    return getDemoExchangePreview({
+      amountMinor,
+      fromCurrency,
+      today: getLocalTodayKey(),
+    });
+  }
   const response = await apiClient.post<{ data: RawExchangeRatePreview }>(
     '/v1/exchange/preview',
     {

@@ -17,6 +17,14 @@ import { syncSpaceDataForCurrentSession } from '@/features/sync/services/syncCou
 import { listLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
 import { reconcileNotificationRules } from '@/features/transactions/services/notificationRuleService';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { isDemoSessionActive } from '@/state/demoSession/demoSessionStore';
+
+/**
+ * El sondeo de datos corre cada 2 s, pero nombres y fotos cambian muy de vez en
+ * cuando: refrescarlos en cada vuelta suponía `GET /v1/me`, el censo y varias
+ * escrituras locales cada 2 s. Las acciones explícitas los refrescan siempre.
+ */
+export const memberProfilesPollingIntervalMs = 30_000;
 
 type FinanceSyncInput = {
   refreshCoupleSpace: () => Promise<void>;
@@ -63,6 +71,7 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
   } = input;
   // Evita que un 401 tardío de una sesión desmontada cierre la sesión nueva.
   const isMountedRef = useRef(true);
+  const lastPolledProfilesAtRef = useRef<number | null>(null);
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
@@ -144,7 +153,7 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
       spaceId?: string,
       options?: { mode?: 'full' | 'delta'; propagateFailure?: boolean },
     ): Promise<void> => {
-      if (!session) return;
+      if (!session || isDemoSessionActive()) return;
 
       const uploadFailures: unknown[] = [];
       if (spaceId) {
@@ -174,7 +183,7 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
         if (restored.outcome.catalogueChanged) {
           await reloadSpaces();
         }
-        if (mode === 'full' || restored.outcome.receivedRows > 0) {
+        if (mode === 'full' || restored.outcome.changedRows > 0) {
           await reloadLocalFinance();
         }
       } catch (error) {
@@ -188,7 +197,16 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
         // y siguen mostrando la caché local.
         console.error('[sync] Restauración remota falló:', error);
       }
-      await refreshMemberProfiles(spaceId);
+      const now = Date.now();
+      const isPolling = options?.mode === 'delta';
+      if (
+        !isPolling ||
+        lastPolledProfilesAtRef.current === null ||
+        now - lastPolledProfilesAtRef.current >= memberProfilesPollingIntervalMs
+      ) {
+        if (isPolling) lastPolledProfilesAtRef.current = now;
+        await refreshMemberProfiles(spaceId);
+      }
       // La caché y la descarga remota siguen funcionando aunque una subida
       // falle. Pero ocultar el rechazo al polling lo hacía interpretar como
       // éxito y repetir el POST cada dos segundos indefinidamente.

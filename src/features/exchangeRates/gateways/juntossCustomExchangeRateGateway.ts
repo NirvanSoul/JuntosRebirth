@@ -1,4 +1,5 @@
 import { apiClient } from '@/services/api/juntossApiClient';
+import { loadDemoSession } from '@/state/demoSession/demoSessionStore';
 
 export type CustomExchangeRate = {
   id: string;
@@ -35,6 +36,8 @@ function mapRate(raw: RawCustomExchangeRate): CustomExchangeRate {
 export async function listCustomExchangeRates(): Promise<
   readonly CustomExchangeRate[]
 > {
+  // Las tasas personalizadas viven en el servidor; el demo no tiene ninguna.
+  if (await loadDemoSession()) return [];
   const response = await apiClient.get<{
     data: { rates: RawCustomExchangeRate[] };
   }>('/v1/exchange/custom-rates');

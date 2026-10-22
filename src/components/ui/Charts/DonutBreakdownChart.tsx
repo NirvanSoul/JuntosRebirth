@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   LinearTransition,
@@ -16,12 +16,14 @@ import {
 import { MonthNavigator } from '@/components/ui/MonthNavigator/MonthNavigator';
 import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
+import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
+import { getTypographyStyle } from '@/theme/typography';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import { distributeDonutSegmentLengths } from '@/utils/donutGeometry';
 
@@ -66,6 +68,9 @@ const segmentVisibleGap = spacing.md;
 const minimumDashLength = 1;
 const legendDotSize = 10;
 const segmentedControlWidth = 216;
+const minimumTotalFontScale = 0.6;
+/** Ancho de sobra para medir el total en una línea sin que nada lo recorte. */
+const totalMeasureWidth = 1000;
 
 const chartLayoutTransition = LinearTransition.springify()
   .damping(motion.chartModeSpring.damping)
@@ -98,6 +103,10 @@ export function DonutBreakdownChart({
 }: DonutBreakdownChartProps) {
   const { formatCurrency } = useCurrencySymbolPreference();
   const styles = useThemedStyles(createStyles);
+  const density = useLayoutDensity();
+  const [totalNaturalWidth, setTotalNaturalWidth] = useState<number | null>(
+    null,
+  );
   const chartRadius = (size - strokeWidth) / 2;
   const chartCircumference = 2 * Math.PI * chartRadius;
   const minimumSegmentAllocation =
@@ -123,6 +132,25 @@ export function DonutBreakdownChart({
       ),
     [chartCircumference, data.items, minimumSegmentAllocation],
   );
+  const totalWidth = size - strokeWidth * 3;
+  const totalStyle = useMemo(() => {
+    if (!totalNaturalWidth || totalNaturalWidth <= totalWidth) return null;
+
+    // `adjustsFontSizeToFit` de iOS encoge el texto según su marco nativo, que
+    // las animaciones de entrada y reordenamiento alteran mientras la sección
+    // se monta, y no vuelve a crecer. Escalamos con la medida de layout.
+    const scale = Math.max(
+      totalWidth / totalNaturalWidth,
+      minimumTotalFontScale,
+    );
+    const base = StyleSheet.flatten(getTypographyStyle('amount', density));
+
+    return {
+      fontSize: Math.floor((base.fontSize ?? 0) * scale),
+      letterSpacing: (base.letterSpacing ?? 0) * scale,
+      lineHeight: base.lineHeight ? base.lineHeight * scale : undefined,
+    };
+  }, [density, totalNaturalWidth, totalWidth]);
   const modeLabel = mode === 'expense' ? 'gastado' : 'ingresado';
   const hasData = data.items.length > 0;
 
@@ -131,7 +159,7 @@ export function DonutBreakdownChart({
   }, [hasData, onDataAvailabilityChange]);
 
   const motionDirection: MotionDirection = mode === 'expense' ? -1 : 1;
-  const animationKey = `${mode}-${monthLabel}`;
+  const animationKey = `${currency}-${mode}-${monthLabel}`;
   const dashOffsets = useMemo(
     () =>
       segmentLengths.map((_, index) =>
@@ -216,21 +244,38 @@ export function DonutBreakdownChart({
             exiting={getChartContentExiting(motionDirection)}
             key={`${animationKey}-total`}
             pointerEvents="none"
-            style={[styles.chartCenter, { width: size - strokeWidth * 3 }]}
+            style={[styles.chartCenter, { width: totalWidth }]}
             testID={`${idPrefix}-chart-center-content`}
           >
             <Text tone="secondary" variant="footnote">
               Total {modeLabel}
             </Text>
             <Text
-              adjustsFontSizeToFit
               numberOfLines={1}
-              style={styles.total}
+              style={[styles.total, totalStyle]}
+              testID={`${idPrefix}-chart-total`}
               variant="amount"
             >
               {formattedTotal}
             </Text>
           </Animated.View>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            pointerEvents="none"
+            style={styles.totalMeasure}
+          >
+            <Text
+              numberOfLines={1}
+              onLayout={({ nativeEvent }) =>
+                setTotalNaturalWidth(nativeEvent.layout.width)
+              }
+              testID={`${idPrefix}-chart-total-measure`}
+              variant="amount"
+            >
+              {formattedTotal}
+            </Text>
+          </View>
         </View>
       ) : (
         <Animated.View
@@ -317,6 +362,12 @@ function createStyles(colors: ColorTokens) {
     chartCenter: {
       position: 'absolute',
       alignItems: 'center',
+    },
+    totalMeasure: {
+      position: 'absolute',
+      width: totalMeasureWidth,
+      alignItems: 'flex-start',
+      opacity: 0,
     },
     emptyAction: {
       marginVertical: spacing.lg,

@@ -5,7 +5,10 @@ import {
 import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
 import { restoreOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
 import { apiClient } from '@/services/api/juntossApiClient';
-import { saveCurrencyPreferences } from '@/state/appPreferences/currencyPreferencesRepository';
+import {
+  loadCurrencyPreferences,
+  saveCurrencyPreferences,
+} from '@/state/appPreferences/currencyPreferencesRepository';
 
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
   getLocalProfile: jest.fn(async () => ({ countryCode: null })),
@@ -22,6 +25,7 @@ jest.mock('@/services/api/juntossApiClient', () => ({
   apiClient: { get: jest.fn() },
 }));
 jest.mock('@/state/appPreferences/currencyPreferencesRepository', () => ({
+  loadCurrencyPreferences: jest.fn(async () => ({ currencies: ['EUR'] })),
   saveCurrencyPreferences: jest.fn(),
 }));
 
@@ -54,6 +58,19 @@ describe('restoreOwnProfile', () => {
       avatarPath: 'uuid-ana/avatar.jpg',
       avatarUpdatedAt: '2026-09-16T12:30:45.123Z',
     });
+  });
+
+  it('no reescribe las monedas de Venezuela si ya están guardadas', async () => {
+    jest
+      .mocked(loadCurrencyPreferences)
+      .mockResolvedValueOnce({ currencies: ['USD', 'VES'] });
+    jest.mocked(apiClient.get).mockResolvedValue({
+      data: { profile: { countryCode: 'VE' } },
+    } as never);
+
+    await restoreOwnProfile();
+
+    expect(saveCurrencyPreferences).not.toHaveBeenCalled();
   });
 
   it('conserva la caché si el backend todavía no entrega país', async () => {

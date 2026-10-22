@@ -17,7 +17,10 @@ import {
 } from '@/features/dashboard/components/HomeSectionHeader/HomeSectionHeader';
 import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
-import { summarizeCategories } from '@/features/categories/utils/categorySummary';
+import {
+  summarizeCategories,
+  summarizeMonthlyBudgetExpenses,
+} from '@/features/categories/utils/categorySummary';
 import { HomeEntrance } from '@/features/dashboard/components/HomeEntrance';
 import { IncomeExpenseArc } from '@/features/dashboard/components/IncomeExpenseArc/IncomeExpenseArc';
 import { TransactionPeriodModal } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal';
@@ -158,16 +161,9 @@ export function HomeScreen({
     () => summarizeCategories(categories, transactions, currency),
     [categories, currency, transactions],
   );
-  const budgetSummaries = useMemo(
-    () =>
-      currency === spaceCurrency
-        ? categorySummaries
-        : summarizeCategories(categories, transactions, spaceCurrency),
-    [categories, categorySummaries, currency, spaceCurrency, transactions],
-  );
   const budgetExpenseByCategoryId = useMemo(
-    () => new Map(budgetSummaries.map((item) => [item.id, item.expenseMinor])),
-    [budgetSummaries],
+    () => summarizeMonthlyBudgetExpenses(transactions, spaceCurrency),
+    [spaceCurrency, transactions],
   );
   // Cada tarjeta muestra el saldo en la moneda de su propia cuenta, así que
   // el selector de moneda del encabezado no las filtra: un saldo nunca mezcla

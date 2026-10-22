@@ -1,5 +1,6 @@
 import type { LegalDocumentId } from '@/features/legal/model/types';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
+import { getLegalDocument } from '@/features/legal/services/legalDocumentService';
 import { apiClient } from '@/services/api/juntossApiClient';
 
 const appVersion = '0.1.0';
@@ -38,4 +39,23 @@ export async function recordLegalAcceptance(
       `No pudimos registrar la aceptación: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+/**
+ * Registra la aceptación de Términos y Política de privacidad en sus
+ * versiones vigentes. Se llama al autenticar desde Acceso, donde la casilla
+ * de consentimiento es obligatoria para crear cuenta o iniciar sesión.
+ */
+export async function recordAccessLegalAcceptance(): Promise<void> {
+  await Promise.all(
+    (['terms-of-service', 'privacy-policy'] as const).map((documentId) => {
+      const document = getLegalDocument(documentId);
+      return recordLegalAcceptance({
+        documentId,
+        documentVersion: document.version,
+        locale: document.locale,
+        source: 'access',
+      });
+    }),
+  );
 }

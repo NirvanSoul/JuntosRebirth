@@ -8,10 +8,39 @@ export type FormatCurrencyOptions = {
   showCurrencySymbol?: boolean;
 };
 
+// Crear un `Intl.NumberFormat` es caro en Hermes y estas funciones se llaman
+// por cada fila en cada render: se reutiliza uno por locale y decimales.
+const numberFormatters = new Map<string, Intl.NumberFormat>();
+const groupingSeparators = new Map<string, string>();
+
+function getNumberFormatter(
+  locale: string,
+  fractionDigits: number,
+): Intl.NumberFormat {
+  const key = `${locale}:${fractionDigits}`;
+  let formatter = numberFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, {
+      useGrouping: true,
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    });
+    numberFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
 function getGroupingSeparator(locale: string): string {
-  const formattedMillion = new Intl.NumberFormat(locale, {
-    useGrouping: true,
-  }).format(1_000_000);
+  let separator = groupingSeparators.get(locale);
+  if (separator === undefined) {
+    separator = resolveGroupingSeparator(locale);
+    groupingSeparators.set(locale, separator);
+  }
+  return separator;
+}
+
+function resolveGroupingSeparator(locale: string): string {
+  const formattedMillion = getNumberFormatter(locale, 0).format(1_000_000);
   const digitIndexes = Array.from(formattedMillion.matchAll(/\d/g), (match) =>
     Number(match.index),
   );
@@ -79,14 +108,8 @@ export function formatCurrency(
   const omitDecimals = omitZeroDecimals && amountMinor % 100 === 0;
   const fractionDigits = omitDecimals ? 0 : 2;
 
-  const formatter = new Intl.NumberFormat(locale, {
-    useGrouping: true,
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  });
-
   const groupedAmount = enforceGrouping(
-    formatter.format(amountMinor / 100),
+    getNumberFormatter(locale, fractionDigits).format(amountMinor / 100),
     fractionDigits,
     locale,
   );
@@ -116,13 +139,11 @@ export function formatExchangeRate(
     throw new Error('La tasa debe ser un número válido');
   }
 
-  const formatter = new Intl.NumberFormat(locale, {
-    useGrouping: true,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-  const groupedRate = enforceGrouping(formatter.format(rateValue), 2, locale);
+  const groupedRate = enforceGrouping(
+    getNumberFormatter(locale, 2).format(rateValue),
+    2,
+    locale,
+  );
 
   if (options.showCurrencySymbol === false) return groupedRate;
 

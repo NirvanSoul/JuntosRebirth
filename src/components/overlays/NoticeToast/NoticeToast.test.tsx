@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { act, fireEvent } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   NoticeToast,
@@ -8,6 +8,7 @@ import {
 } from '@/components/overlays/NoticeToast/NoticeToast';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import { colors } from '@/theme/colors';
+import { layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 
 function renderToast(notice: ToastNotice | null, onDismiss = jest.fn()) {
@@ -57,6 +58,28 @@ describe('NoticeToast', () => {
     expect(
       screen.getByText('Recordatorios y alertas actualizados.'),
     ).toBeTruthy();
+  });
+
+  it('flota abajo sobre el menú principal con un icono propio a la izquierda', async () => {
+    const screen = await renderToast({
+      id: 3,
+      leading: <View testID="custom-leading" />,
+      message: 'Movimiento copiado',
+      placement: 'bottom',
+    });
+
+    const style = StyleSheet.flatten(
+      screen.getByTestId('notice-toast').props.style,
+    );
+    expect(style.top).toBeUndefined();
+    expect(style.bottom).toBeGreaterThan(layout.floatingActionSize);
+    expect(screen.getByTestId('custom-leading')).toBeTruthy();
+    expect(
+      screen.queryByTestId('notice-toast-icon', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+    expect(screen.getByLabelText('Movimiento copiado')).toBeTruthy();
   });
 
   it('desaparece y notifica su cierre automáticamente', async () => {

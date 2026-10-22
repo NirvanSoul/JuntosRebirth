@@ -1,81 +1,111 @@
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/layout/Screen/Screen';
 import { Text } from '@/components/ui/Text/Text';
-import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
-import type { CategoryIconName } from '@/features/categories/types';
-import { useLayoutDensity } from '@/hooks/useLayoutDensity';
+import { JuntosLogo } from '@/components/icons/JuntosLogo';
+import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
+import { UpcomingFeatureIcon } from '@/features/comingSoon/UpcomingFeatureIcon';
 import {
-  categoryColors,
-  type CategoryColorToken,
-} from '@/theme/categoryColors';
+  upcomingFeatures,
+  type UpcomingFeature,
+} from '@/features/comingSoon/upcomingFeatures';
+import {
+  UpcomingFeatureModal,
+  openFeatureFeedback,
+} from '@/features/comingSoon/UpcomingFeatureModal';
+import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { layout } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 
-const upcomingFeatures = [
-  { name: 'Ahorros', icon: 'piggy-bank', color: 'forest' },
-  { name: 'Metas', icon: 'plant', color: 'violet' },
-  { name: 'Lista de deseos', icon: 'heart', color: 'pink' },
-  { name: 'Espacios familiares', icon: 'users-three', color: 'blue' },
-  { name: 'Planes', icon: 'compass', color: 'orange' },
-  { name: 'Préstamos', icon: 'hand-coins', color: 'teal' },
-] as const satisfies readonly {
-  name: string;
-  icon: CategoryIconName;
-  color: CategoryColorToken;
-}[];
+const headlineLogoWidth = { compact: 132, regular: 152 };
 
 export function ComingSoonScreen() {
-  const { colors, shadows } = useTheme();
+  const { colors, shadows, isDark } = useTheme();
   const density = useLayoutDensity();
+  const [selectedFeature, setSelectedFeature] =
+    useState<UpcomingFeature | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false);
 
   return (
     <Screen contentContainerStyle={styles.content} testID="coming-soon-screen">
-      <Text
+      <View
+        accessible
         accessibilityRole="header"
-        align="center"
-        variant="title"
-        weight="bold"
+        accessibilityLabel="Lo que viene lo construiremos Juntos."
+        style={styles.headline}
       >
-        Lo que viene lo construiremos juntos.
-      </Text>
-      <View style={[styles.grid, { gap: layout.stackGap[density] }]}>
-        {upcomingFeatures.map(({ name, icon, color }) => (
-          <View
-            accessible
-            accessibilityLabel={`${name}. Próximamente`}
-            key={name}
-            style={[
-              styles.card,
-              shadows.subtle,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View
-              style={[styles.icon, { backgroundColor: categoryColors[color] }]}
-            >
-              <CategoryIcon
-                color={colors.onBrand}
-                name={icon}
-                size={previewCardLayout.glyphSize}
-              />
-            </View>
-            <Text align="center" variant="label" weight="semibold">
-              {name}
-            </Text>
-            <Text align="center" tone="secondary" variant="caption">
-              Próximamente
-            </Text>
-          </View>
-        ))}
+        <Text align="center" variant="title" weight="bold">
+          Lo que viene lo construiremos
+        </Text>
+        <JuntosLogo
+          color={isDark ? colors.textPrimary : undefined}
+          width={headlineLogoWidth[density]}
+          testID="coming-soon-logo"
+        />
       </View>
+      <View style={[styles.grid, { gap: layout.stackGap[density] }]}>
+        {upcomingFeatures.map((feature) => {
+          const { name } = feature;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityHint="Descubre cómo imaginamos esta función y comparte tus ideas"
+              onPress={() => {
+                setSelectedFeature(feature);
+                setDetailVisible(true);
+              }}
+              accessibilityLabel={`${name}. Próximamente`}
+              key={name}
+              style={({ pressed }) => [
+                styles.card,
+                pressed && styles.pressed,
+                shadows.subtle,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <UpcomingFeatureIcon feature={feature} />
+              <Text align="center" variant="label" weight="semibold">
+                {name}
+              </Text>
+              <Text align="center" tone="secondary" variant="caption">
+                Próximamente
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={styles.feedback}>
+        <Text align="center" variant="subheading" weight="semibold">
+          Tu idea también cuenta
+        </Text>
+        <Text align="center" tone="secondary" variant="body">
+          Cuéntanos qué te gustaría encontrar en la app o cómo mejorarías estas
+          funciones.
+        </Text>
+        <ModalPrimaryAction
+          accessibilityLabel="Compartir una idea por correo"
+          label="Compartir mi idea"
+          icon="mail-outline"
+          iconColor={colors.onBrand}
+          onPress={() => {
+            void openFeatureFeedback('nuevas funciones');
+          }}
+        />
+      </View>
+      <UpcomingFeatureModal
+        feature={selectedFeature}
+        visible={detailVisible}
+        onClose={() => setDetailVisible(false)}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  pressed: { opacity: 0.64 },
   content: { justifyContent: 'center', gap: spacing.xxl },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   card: {
@@ -88,11 +118,6 @@ const styles = StyleSheet.create({
     borderRadius: previewCardLayout.borderRadius,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  icon: {
-    width: previewCardLayout.iconSize,
-    height: previewCardLayout.iconSize,
-    borderRadius: previewCardLayout.iconRadius,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  headline: { alignItems: 'center', gap: spacing.sm },
+  feedback: { gap: spacing.md, paddingTop: spacing.sm },
 });

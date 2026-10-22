@@ -1,10 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Portal } from '@gorhom/portal';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeInDown,
+  FadeInUp,
+  FadeOutDown,
   FadeOutUp,
   ReduceMotion,
 } from 'react-native-reanimated';
@@ -22,6 +24,8 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 export type ToastTone = 'success' | 'warning' | 'info';
 
+export type ToastPlacement = 'top' | 'bottom';
+
 export type ToastNotice = {
   /** Cambia con cada aviso; repetir el mismo texto vuelve a mostrarlo. */
   id: number;
@@ -32,6 +36,10 @@ export type ToastNotice = {
   /** Con acción, la tarjeta captura el toque y permanece más tiempo. */
   action?: { label: string; onPress: () => void };
   durationMs?: number;
+  /** Abajo flota sobre el menú principal; por defecto, arriba. */
+  placement?: ToastPlacement;
+  /** Sustituye al icono del tono, por ejemplo con el de una categoría. */
+  leading?: ReactNode;
 };
 
 type NoticeToastProps = {
@@ -40,12 +48,25 @@ type NoticeToastProps = {
   testID?: string;
 };
 
-const toastEntering = FadeInDown.duration(motion.toastTransitionDuration)
-  .easing(Easing.inOut(Easing.cubic))
-  .reduceMotion(ReduceMotion.System);
-const toastExiting = FadeOutUp.duration(motion.toastTransitionDuration)
-  .easing(Easing.inOut(Easing.cubic))
-  .reduceMotion(ReduceMotion.System);
+// Cada tarjeta entra desde su borde de pantalla y sale hacia él.
+const toastTransitions = {
+  top: {
+    entering: FadeInDown.duration(motion.toastTransitionDuration)
+      .easing(Easing.inOut(Easing.cubic))
+      .reduceMotion(ReduceMotion.System),
+    exiting: FadeOutUp.duration(motion.toastTransitionDuration)
+      .easing(Easing.inOut(Easing.cubic))
+      .reduceMotion(ReduceMotion.System),
+  },
+  bottom: {
+    entering: FadeInUp.duration(motion.toastTransitionDuration)
+      .easing(Easing.inOut(Easing.cubic))
+      .reduceMotion(ReduceMotion.System),
+    exiting: FadeOutDown.duration(motion.toastTransitionDuration)
+      .easing(Easing.inOut(Easing.cubic))
+      .reduceMotion(ReduceMotion.System),
+  },
+} as const;
 
 const toneIcon: Record<ToastTone, keyof typeof Ionicons.glyphMap> = {
   success: 'checkmark-circle',
@@ -120,6 +141,7 @@ export function NoticeToast({
   if (!notice) return null;
 
   const tone = notice.tone ?? 'success';
+  const placement = notice.placement ?? 'top';
   const accessibilityLabel = notice.emphasis
     ? `${notice.message}${notice.emphasis}`
     : notice.message;
@@ -132,8 +154,8 @@ export function NoticeToast({
             accessible={!notice.action}
             accessibilityLabel={notice.action ? undefined : accessibilityLabel}
             accessibilityLiveRegion="polite"
-            entering={toastEntering}
-            exiting={toastExiting}
+            entering={toastTransitions[placement].entering}
+            exiting={toastTransitions[placement].exiting}
             pointerEvents={notice.action ? 'auto' : 'none'}
             role="alert"
             style={[
@@ -141,19 +163,29 @@ export function NoticeToast({
               {
                 left: layout.screenGutter[density],
                 right: layout.screenGutter[density],
-                top: insets.top + spacing.md,
               },
+              placement === 'top'
+                ? { top: insets.top + spacing.md }
+                : {
+                    // Por encima del menú flotante principal.
+                    bottom:
+                      Math.max(insets.bottom, spacing.sm) +
+                      layout.floatingActionSize +
+                      spacing.md,
+                  },
             ]}
             testID={testID}
           >
-            <Ionicons
-              accessibilityElementsHidden
-              color={resolveToneColor(tone, colors)}
-              importantForAccessibility="no-hide-descendants"
-              name={toneIcon[tone]}
-              size={iconSize.md}
-              testID={`${testID}-icon`}
-            />
+            {notice.leading ?? (
+              <Ionicons
+                accessibilityElementsHidden
+                color={resolveToneColor(tone, colors)}
+                importantForAccessibility="no-hide-descendants"
+                name={toneIcon[tone]}
+                size={iconSize.md}
+                testID={`${testID}-icon`}
+              />
+            )}
             <Text
               accessibilityLabel={
                 notice.action ? accessibilityLabel : undefined

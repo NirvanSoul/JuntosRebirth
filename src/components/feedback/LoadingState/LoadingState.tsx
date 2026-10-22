@@ -27,6 +27,11 @@ type LoadingStateProps = {
   loading?: boolean;
   /** Etiqueta para lectores de pantalla; no se muestra texto visual. */
   label?: string;
+  /**
+   * Cubre el contenido sin desmontarlo, para cargas sobre una pantalla que
+   * ya existe (como cambiar de espacio) sin perder su estado ni navegación.
+   */
+  overlay?: boolean;
   testID?: string;
 };
 
@@ -35,6 +40,7 @@ export function LoadingState({
   children,
   loading = true,
   label = 'Cargando Juntos',
+  overlay = false,
   testID = 'app-loading',
 }: LoadingStateProps) {
   const { colors, isDark } = useTheme();
@@ -72,8 +78,18 @@ export function LoadingState({
   const overlayStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
-    <View style={styles.root}>
-      {!loading && <View style={styles.content}>{children}</View>}
+    <View style={overlay ? styles.content : styles.root}>
+      {overlay ? (
+        <View
+          accessibilityElementsHidden={loading}
+          importantForAccessibility={loading ? 'no-hide-descendants' : 'auto'}
+          style={styles.content}
+        >
+          {children}
+        </View>
+      ) : (
+        !loading && <View style={styles.content}>{children}</View>
+      )}
       <Animated.View
         accessible={loading}
         accessibilityElementsHidden={!loading}
@@ -81,7 +97,8 @@ export function LoadingState({
         accessibilityRole={loading ? 'progressbar' : undefined}
         accessibilityState={{ busy: loading }}
         importantForAccessibility={loading ? 'yes' : 'no-hide-descendants'}
-        pointerEvents="none"
+        // Como capa, mientras carga, evita tocar el contenido que hay debajo.
+        pointerEvents={overlay && loading ? 'auto' : 'none'}
         style={[styles.loading, overlayStyle]}
         testID={loading ? testID : undefined}
       >

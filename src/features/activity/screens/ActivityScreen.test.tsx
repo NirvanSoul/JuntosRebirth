@@ -80,6 +80,41 @@ describe('ActivityScreen', () => {
     jest.useRealTimers();
   });
 
+  it('monta los movimientos por tandas al acercarse al final', async () => {
+    const manyTransactions = Array.from({ length: 50 }, (_, index) => ({
+      ...transactions[0]!,
+      id: `bulk-${index}`,
+      title: `Compra ${index}`,
+    }));
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            transactions={manyTransactions}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(40);
+
+    await fireEvent.scroll(screen.getByTestId('activity-screen-scroll-view'), {
+      nativeEvent: {
+        contentOffset: { y: 3000 },
+        contentSize: { height: 4000, width: 390 },
+        layoutMeasurement: { height: 844, width: 390 },
+      },
+    });
+
+    expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(50);
+  });
+
   it('muestra previews de movimientos y agrega la categoría', async () => {
     const screen = await render(
       <SafeAreaProvider
@@ -1071,7 +1106,7 @@ describe('ActivityScreen', () => {
       ),
     ).toMatchObject({
       backgroundColor: colors.surface,
-      borderColor: colors.border,
+      borderColor: colors.cta,
       minHeight: 56,
     });
     expect(
@@ -1087,9 +1122,8 @@ describe('ActivityScreen', () => {
           .contentContainerStyle,
       ),
     ).toMatchObject({
-      height: 116,
-      flexDirection: 'column',
-      flexWrap: 'wrap',
+      flexDirection: 'row',
+      flexWrap: 'nowrap',
     });
 
     await fireEvent.press(typeToggle);
@@ -1104,7 +1138,7 @@ describe('ActivityScreen', () => {
     expect(StyleSheet.flatten(allType.props.style)).toMatchObject({
       minHeight: 56,
       backgroundColor: colors.surface,
-      borderColor: colors.border,
+      borderColor: colors.cta,
       borderWidth: 1,
       ...shadows.none,
     });
@@ -1123,20 +1157,12 @@ describe('ActivityScreen', () => {
     expect(
       StyleSheet.flatten(within(allType).getByText('Todos').props.style).color,
     ).toBe(colors.cta);
-    expect(
-      StyleSheet.flatten(
-        within(allType).getByTestId('type-filter-all-indicator').props.style,
-      ).color,
-    ).toBe(colors.cta);
     expect(StyleSheet.flatten(incomeType.props.style).borderColor).toBe(
       colors.border,
     );
     expect(
-      StyleSheet.flatten(
-        within(incomeType).getByTestId('type-filter-income-indicator').props
-          .style,
-      ).color,
-    ).toBe(colors.textMuted);
+      within(incomeType).queryByTestId('type-filter-income-indicator'),
+    ).toBeNull();
     await fireEvent.press(categoryToggle);
     expect(typeToggle.props.accessibilityState).toMatchObject({
       expanded: false,
@@ -1184,7 +1210,7 @@ describe('ActivityScreen', () => {
       ),
     ).toMatchObject({
       backgroundColor: colors.surface,
-      borderColor: colors.border,
+      borderColor: colors.cta,
     });
     expect(
       StyleSheet.flatten(
@@ -1197,9 +1223,7 @@ describe('ActivityScreen', () => {
           .contentContainerStyle,
       ),
     ).toMatchObject({
-      height: 120,
-      flexDirection: 'column',
-      flexWrap: 'wrap',
+      flexDirection: 'row',
     });
 
     await fireEvent.press(dateToggle);
@@ -1239,14 +1263,8 @@ describe('ActivityScreen', () => {
     expect(StyleSheet.flatten(reopenedIncomeType.props.style)).toMatchObject({
       minHeight: 56,
       backgroundColor: colors.surface,
-      borderColor: colors.border,
+      borderColor: colors.cta,
     });
-    expect(
-      StyleSheet.flatten(
-        within(reopenedIncomeType).getByTestId('type-filter-income-indicator')
-          .props.style,
-      ).color,
-    ).toBe(colors.cta);
     expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(2);
 
     await fireEvent.press(screen.getByLabelText('Tipo: Gastos'));
@@ -1254,14 +1272,8 @@ describe('ActivityScreen', () => {
     expect(StyleSheet.flatten(expenseType.props.style)).toMatchObject({
       minHeight: 56,
       backgroundColor: colors.surface,
-      borderColor: colors.border,
+      borderColor: colors.cta,
     });
-    expect(
-      StyleSheet.flatten(
-        within(expenseType).getByTestId('type-filter-expense-indicator').props
-          .style,
-      ).color,
-    ).toBe(colors.cta);
 
     await fireEvent.press(typeToggle);
     expect(typeToggle.props.accessibilityState).toMatchObject({

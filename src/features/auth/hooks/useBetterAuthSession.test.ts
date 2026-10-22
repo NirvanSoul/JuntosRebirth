@@ -1,6 +1,10 @@
 import { renderHook } from '@testing-library/react-native';
 
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
+import {
+  resetDemoSessionStoreForTests,
+  saveDemoSession,
+} from '@/state/demoSession/demoSessionStore';
 
 const mockUseSession = jest.fn();
 
@@ -102,5 +106,36 @@ describe('useBetterAuthSession', () => {
       isReady: true,
       session: null,
     });
+  });
+
+  it('abre la sesión verificada del usuario demo en lugar de la real', async () => {
+    mockUseSession.mockReturnValue({
+      data: null,
+      error: null,
+      isPending: false,
+    });
+    await saveDemoSession({
+      userId: 'demo-self',
+      displayName: 'Angélica',
+      email: 'angelica@demo.juntoss.invalid',
+      partnerUserId: 'demo-partner',
+      partnerDisplayName: 'Manuel',
+      currency: 'EUR',
+      createdAt: '2026-10-17T10:00:00.000Z',
+      previousCurrencyPreferences: null,
+    });
+
+    try {
+      const { result } = await renderHook(() => useBetterAuthSession());
+
+      expect(result.current.isReady).toBe(true);
+      expect(result.current.session?.user).toMatchObject({
+        id: 'demo-self',
+        emailVerified: true,
+        name: 'Angélica',
+      });
+    } finally {
+      resetDemoSessionStoreForTests();
+    }
   });
 });

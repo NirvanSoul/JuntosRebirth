@@ -20,7 +20,14 @@ Google Sign-In nativo solicita el ID token con el cliente OAuth de tipo Web
 declarado en `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`. Ese identificador debe
 coincidir con `GOOGLE_CLIENT_ID` en Better Auth. El cliente OAuth de iOS se
 mantiene separado, y Android autoriza cada firma mediante un cliente propio de
-tipo Android con el package `com.juntoss.app` y su SHA-1 correspondiente.
+tipo Android con el package `com.juntosapp.finance` y su SHA-1 correspondiente.
+El cliente distingue una cancelación, Google Play Services no disponible, los
+rechazos `SOCIAL_ACCOUNT_NOT_LINKED` e `INVALID_SOCIAL_TOKEN` del servidor y el
+`DEVELOPER_ERROR` 10 de Android. Este último se
+presenta como una instalación no autorizada y se registra solo con etapa y
+código, nunca con el correo ni el ID token. Si Better Auth acepta el token pero
+la sesión no se hidrata en 15 segundos, el botón vuelve a habilitarse para
+permitir un reintento.
 
 ## Sesión y restauración
 
@@ -40,8 +47,14 @@ tipo Android con el package `com.juntoss.app` y su SHA-1 correspondiente.
   Tras la inicialización o al haber cursor previo guardado en `local_sync_cursor`,
   los refrescos periódicos usan `GET /v1/sync/changes?since=...` para descargar
   únicamente las modificaciones incrementales sin transferir colecciones completas.
-- El mismo refresco periódico actualiza el censo de los espacios compartidos
-  mediante `GET /v1/spaces/:spaceId/members`. Los cambios de nombre y de foto
+  Un movimiento que vuelve con el mismo `updatedAt` que su fila local ya
+  sincronizada es el eco de la subida propia (el backend guarda el `updatedAt`
+  recibido) y no provoca una recarga de la caché.
+- Un refresco periódico de cada 30 s (no cada tick de 2 s del delta; las
+  acciones explícitas lo hacen siempre) restaura el perfil propio con
+  `GET /v1/me` y actualiza el censo de los espacios compartidos mediante
+  `GET /v1/spaces/:spaceId/members`. Un censo o un perfil sin cambios no se
+  reescriben en SQLite ni se publican a la interfaz. Los cambios de nombre y de foto
   actualizan la caché local y se publican a la interfaz activa sin remontar la
   navegación; las fotos solo se descargan cuando cambia `avatarUpdatedAt`. Un
   nombre propio cuya publicación falla queda pendiente y se reintenta en ese
@@ -206,6 +219,12 @@ lee esos valores históricos; no los recalcula con la tasa vigente.
 La API es la autoridad de permisos y datos remotos. Una sesión no verificada
 debe recibir `403 EMAIL_NOT_VERIFIED` y no puede leer ni escribir datos. No se
 usa Supabase ni SQL versionado dentro de este repositorio.
+
+El usuario demo de desarrollo (`ARCHITECTURE.md` §16.1) no existe en la API:
+mientras está activo, `juntossApiClient` rechaza cualquier petición con
+`ApiError` `DEMO_SESSION` sin llegar a enviarla. Las tasas de Venezuela
+(`/v1/exchange/rates` y `/v1/exchange/preview`) se responden entonces con
+valores ficticios locales.
 
 Los contratos completos se mantienen en el repositorio de la API:
 <https://github.com/NirvanSoul/JuntosRebirthAPI>.

@@ -2,6 +2,7 @@ export type StartupMark =
   | 'bundle_evaluated'
   | 'fonts_ready'
   | 'session_ready'
+  | 'local_db_ready'
   | 'local_finance_ready'
   | 'init_done';
 

@@ -118,9 +118,6 @@ export function QuickCreateMenu({
           <Text accessibilityRole="header" variant="subheading">
             ¿Qué quieres crear?
           </Text>
-          <Text style={styles.subtitle} tone="secondary" variant="footnote">
-            Elige una opción para continuar
-          </Text>
         </View>
         <ModalCloseButton
           onPress={onClose}
@@ -185,15 +182,12 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
   return StyleSheet.create({
     header: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       justifyContent: 'space-between',
       gap: spacing.lg,
     },
     headerText: {
       flex: 1,
-    },
-    subtitle: {
-      marginTop: spacing.xs,
     },
     actions: {
       marginTop: spacing.xl,

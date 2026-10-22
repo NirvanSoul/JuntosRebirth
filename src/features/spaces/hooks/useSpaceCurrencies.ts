@@ -1,13 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { listSpaceMemberProfiles } from '@/features/profile/repositories/localSpaceMemberProfileRepository';
+import type { SpaceMemberProfile } from '@/features/profile/types';
 import type { Space } from '@/features/spaces/types';
 import { listSpaceCurrencies } from '@/features/spaces/utils/spaceCurrencies';
-import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+import {
+  isCurrencyCode,
+  type CurrencyCode,
+} from '@/lib/currency/currencyCatalog';
+
+type SpaceCurrencyTransaction = {
+  createdBy: string;
+  currency: string;
+};
 
 /**
- * Monedas que ofrece el espacio activo: la suya, las de quien usa el móvil y
- * las de los demás miembros.
+ * Monedas que muestra el espacio activo: las activas de quien usa el móvil y,
+ * en un espacio compartido, las de los demás miembros y las de los movimientos
+ * que ellos registran.
+ *
+ * El censo incluye también a quien usa el móvil, con la moneda principal de su
+ * última sincronización. Se descarta: si no, una moneda recién quitada en
+ * Ajustes volvía por su propio perfil. Del mismo modo, solo cuentan como
+ * ajenos los movimientos de un miembro conocido del censo; lo registrado antes
+ * de iniciar sesión lleva el id de instalación y es propio.
  *
  * Lee el censo local directamente en vez de consumir `SpaceMembershipContext`
  * porque se usa desde `MainTabsNavigator`, por encima del proveedor, donde ese
@@ -19,10 +35,11 @@ import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 export function useSpaceCurrencies(
   space: Space,
   ownCurrencies: readonly CurrencyCode[],
-  extraCurrencies: readonly (CurrencyCode | null | undefined)[] = [],
+  ownUserId: string | null,
+  spaceTransactions: readonly SpaceCurrencyTransaction[],
 ): readonly CurrencyCode[] {
-  const [memberCurrencies, setMemberCurrencies] = useState<
-    readonly (CurrencyCode | null)[]
+  const [memberProfiles, setMemberProfiles] = useState<
+    readonly SpaceMemberProfile[]
   >([]);
   const spaceId = space.id;
   const isShared = space.type !== 'personal';
@@ -34,7 +51,7 @@ export function useSpaceCurrencies(
       // Rama del mismo efecto que hace I/O (censo) en el caso compartido;
       // limpiar aquí evita arrastrar monedas del espacio anterior.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMemberCurrencies([]);
+      setMemberProfiles([]);
       return () => {
         isMounted = false;
       };
@@ -42,15 +59,11 @@ export function useSpaceCurrencies(
 
     void listSpaceMemberProfiles(spaceId)
       .then((profiles) => {
-        if (isMounted) {
-          setMemberCurrencies(
-            profiles.map((profile) => profile.defaultCurrency),
-          );
-        }
+        if (isMounted) setMemberProfiles(profiles);
       })
       .catch((error: unknown) => {
-        // Sin el censo se cae a las monedas propias más la del espacio, que
-        // sigue siendo utilizable: no merece romper la pantalla.
+        // Sin el censo se cae a las monedas propias, que siguen siendo
+        // utilizables: no merece romper la pantalla.
         console.error('[spaces] no se pudieron leer las monedas del espacio', {
           spaceId,
           error,
@@ -62,14 +75,26 @@ export function useSpaceCurrencies(
     };
   }, [isShared, spaceId]);
 
-  return useMemo(
-    () =>
-      listSpaceCurrencies(
-        space.currency,
-        ownCurrencies,
-        memberCurrencies,
-        extraCurrencies,
-      ),
-    [space.currency, ownCurrencies, memberCurrencies, extraCurrencies],
-  );
+  return useMemo(() => {
+    if (!isShared) return listSpaceCurrencies(ownCurrencies);
+
+    const otherMembers = memberProfiles.filter(
+      (profile) => profile.userId !== ownUserId,
+    );
+    const otherMemberIds = new Set(
+      otherMembers.map((profile) => profile.userId),
+    );
+    const otherMembersDataCurrencies = spaceTransactions.flatMap(
+      (transaction) =>
+        otherMemberIds.has(transaction.createdBy) &&
+        isCurrencyCode(transaction.currency)
+          ? [transaction.currency]
+          : [],
+    );
+
+    return listSpaceCurrencies(ownCurrencies, [
+      ...otherMembers.map((profile) => profile.defaultCurrency),
+      ...otherMembersDataCurrencies,
+    ]);
+  }, [isShared, memberProfiles, ownCurrencies, ownUserId, spaceTransactions]);
 }

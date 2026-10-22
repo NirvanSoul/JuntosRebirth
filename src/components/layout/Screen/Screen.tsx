@@ -22,6 +22,8 @@ type ScreenProps = PropsWithChildren<{
   contentContainerStyle?: ViewStyle;
   onScrollOffsetChange?: (offsetY: number) => void;
   onScrollDirectionChange?: (direction: 'down' | 'up') => void;
+  /** A menos de una pantalla del final; una vez por cada altura de contenido. */
+  onEndReached?: () => void;
   scrollRef?: RefObject<ScrollView | null>;
   scrollable?: boolean;
   stickyHeaderIndices?: number[];
@@ -53,6 +55,7 @@ export function Screen({
   contentContainerStyle,
   onScrollOffsetChange,
   onScrollDirectionChange,
+  onEndReached,
   scrollRef,
   scrollable = true,
   stickyHeaderIndices,
@@ -64,10 +67,22 @@ export function Screen({
   const styles = useThemedStyles(createScreenStyles);
   const lastScrollOffset = useRef(0);
   const accumulatedScrollDistance = useRef(0);
+  const endReachedContentHeight = useRef<number | null>(null);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const currentOffset = Math.max(event.nativeEvent.contentOffset.y, 0);
     onScrollOffsetChange?.(currentOffset);
+
+    const { contentSize, layoutMeasurement } = event.nativeEvent;
+    if (
+      onEndReached &&
+      contentSize.height - currentOffset - layoutMeasurement.height <
+        layoutMeasurement.height &&
+      endReachedContentHeight.current !== contentSize.height
+    ) {
+      endReachedContentHeight.current = contentSize.height;
+      onEndReached();
+    }
 
     if (!onScrollDirectionChange) {
       return;

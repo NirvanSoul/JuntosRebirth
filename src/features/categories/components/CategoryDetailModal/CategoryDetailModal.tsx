@@ -29,7 +29,11 @@ import { CategoryBudgetProgress } from '@/features/categories/components/Categor
 import { createStyles } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal.styles';
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
 import { CategoryTransactionMetrics } from '@/features/categories/components/CategoryDetailModal/CategoryTransactionMetrics';
-import { getCategoryDetailAuthorOptions } from '@/features/categories/components/CategoryDetailModal/categoryDetailFilters';
+import { CategoryDetailPeriodFilter } from '@/features/categories/components/CategoryDetailModal/CategoryDetailPeriodFilter';
+import {
+  createInitialFilters,
+  getCategoryDetailAuthorOptions,
+} from '@/features/categories/components/CategoryDetailModal/categoryDetailFilters';
 import { useCategoryDetailTransactions } from '@/features/categories/components/CategoryDetailModal/useCategoryDetailTransactions';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import type {
@@ -37,19 +41,22 @@ import type {
   CategoryEditorTarget,
   CategoryShareTarget,
 } from '@/features/categories/types';
-import { summarizeCategories } from '@/features/categories/utils/categorySummary';
+import {
+  summarizeCategories,
+  summarizeMonthlyBudgetExpenses,
+} from '@/features/categories/utils/categorySummary';
 import { computeCategoryMetrics } from '@/features/categories/utils/categoryValuation';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { useSpaceMembership } from '@/features/profile/state/SpaceMembershipContext';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type { SessionTransaction } from '@/features/transactions/types';
-import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { categoryColors } from '@/theme/categoryColors';
-import { iconSize } from '@/theme/layout';
+import { useLayoutDensity } from '@/hooks/useLayoutDensity';
+import { iconSize, layout } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -97,17 +104,15 @@ export function CategoryDetailModal({
   const currencyCapabilities = useCurrencyCapabilities();
   const isVenezuela = currencyCapabilities.venezuelaCurrencyMode;
   const showRates = currencyCapabilities.multiRateMovementDisplay;
-  const styles = useThemedStyles((palette) => createStyles(palette, shadows));
+  const gutter = layout.screenGutter[useLayoutDensity()];
+  const styles = useThemedStyles((palette) =>
+    createStyles(palette, shadows, gutter),
+  );
   const membership = useSpaceMembership();
   const [panel, setPanel] = useState<DetailPanel>(null);
-  const [filters, setFilters] = useState<TransactionFilters>({
-    author: 'all',
-    category: [],
-    currency: displayCurrency,
-    date: 'all',
-    recurrence: 'all',
-    type: 'all',
-  });
+  const [filters, setFilters] = useState<TransactionFilters>(() =>
+    createInitialFilters(displayCurrency),
+  );
   const [isFiltersModalVisible, setFiltersModalVisible] = useState(false);
   const [isBudgetModalVisible, setBudgetModalVisible] = useState(false);
   const [isNoteModalVisible, setNoteModalVisible] = useState(false);
@@ -118,6 +123,8 @@ export function CategoryDetailModal({
     useState<VenezuelaDisplayMode>('USD');
   const modalBottomInset = useAppModalBottomInset();
   const { closeThenRun, handleDismissed } = useModalChainedAction(onClose);
+  const openTransactionAfterClose = (transactionId: string) =>
+    closeThenRun(() => onOpenTransactionDetail(transactionId));
   const detailCurrencies = useMemo<readonly CurrencyCode[]>(() => {
     if (!category) return [];
 
@@ -132,6 +139,7 @@ export function CategoryDetailModal({
   const {
     authorFilteredTransactions,
     categoryTransactions,
+    periodCategoryTransactions,
     pastCategoryTransactions,
     upcomingCategoryTransactions,
   } = useCategoryDetailTransactions({
@@ -178,17 +186,15 @@ export function CategoryDetailModal({
     ? Number(apiRates.EURO.rate)
     : fallbackRates.eurRate;
 
-  const budgetExpenseMinor = useMemo(() => {
-    if (!category) return 0;
-    return listTransactionsThroughCurrentMonth(transactions)
-      .filter(
-        (t) =>
-          t.categoryId === category.id &&
-          t.currency === spaceCurrency &&
-          t.type === 'expense',
-      )
-      .reduce((total, t) => total + t.amountMinor, 0);
-  }, [category, spaceCurrency, transactions]);
+  const budgetExpenseMinor = useMemo(
+    () =>
+      category
+        ? (summarizeMonthlyBudgetExpenses(transactions, spaceCurrency).get(
+            category.id,
+          ) ?? 0)
+        : 0,
+    [category, spaceCurrency, transactions],
+  );
 
   if (
     useDepsChanged([visible, category, detailCurrencies, displayCurrency]) &&
@@ -198,14 +204,7 @@ export function CategoryDetailModal({
     setBudgetModalVisible(false);
     setNoteModalVisible(false);
     setSpacePickerVisible(false);
-    setFilters({
-      author: 'all',
-      category: [],
-      currency: displayCurrency,
-      date: 'all',
-      recurrence: 'all',
-      type: 'all',
-    });
+    setFilters(createInitialFilters(displayCurrency));
     setFiltersModalVisible(false);
     setSelectedCurrency(
       detailCurrencies.includes(displayCurrency)
@@ -228,7 +227,7 @@ export function CategoryDetailModal({
     eurRate,
     mode: valuationMode,
     selectedCurrency,
-    transactions: categoryTransactions,
+    transactions: periodCategoryTransactions,
     venezuelaCurrencyMode: isVenezuela,
   });
   const expense = formatCurrency(
@@ -361,6 +360,14 @@ export function CategoryDetailModal({
               />
             ) : null}
 
+            <CategoryDetailPeriodFilter
+              filter={filters.date}
+              onChange={(date) =>
+                setFilters((current) => ({ ...current, date }))
+              }
+              style={styles.periodFilter}
+            />
+
             <CategoryTransactionMetrics
               expense={expense}
               expenseMinor={metrics.expenseMinor}
@@ -472,10 +479,7 @@ export function CategoryDetailModal({
                 </Text>
                 {membership.isSharedSpace ? (
                   <TransactionFilterButton
-                    activeFilterCount={
-                      Number(filters.date !== 'all') +
-                      Number(filters.author !== 'all')
-                    }
+                    activeFilterCount={Number(filters.author !== 'all')}
                     onPress={() => setFiltersModalVisible(true)}
                     testID="category-detail-filter-button"
                   />
@@ -486,10 +490,9 @@ export function CategoryDetailModal({
               <TransactionPreviewList
                 categories={[category]}
                 groupingTransactions={authorFilteredTransactions}
-                onOpenTransactionDetail={(transactionId) =>
-                  closeThenRun(() => onOpenTransactionDetail(transactionId))
-                }
+                onOpenTransactionDetail={openTransactionAfterClose}
                 showAuthorName={membership.isSharedSpace}
+                progressive
                 testID="category-detail-transaction-list"
                 transactions={pastCategoryTransactions}
               />
@@ -501,7 +504,9 @@ export function CategoryDetailModal({
                   size={iconSize.lg}
                 />
                 <Text align="center" tone="secondary" variant="footnote">
-                  Aún no hay movimientos asociados a esta categoría.
+                  {filters.date === 'all'
+                    ? 'Aún no hay movimientos asociados a esta categoría.'
+                    : 'No hay movimientos de esta categoría en este periodo.'}
                 </Text>
               </View>
             )}
@@ -522,10 +527,9 @@ export function CategoryDetailModal({
                 <TransactionPreviewList
                   categories={[category]}
                   groupingTransactions={authorFilteredTransactions}
-                  onOpenTransactionDetail={(transactionId) =>
-                    closeThenRun(() => onOpenTransactionDetail(transactionId))
-                  }
+                  onOpenTransactionDetail={openTransactionAfterClose}
                   showAuthorName={membership.isSharedSpace}
+                  progressive
                   testID="category-detail-upcoming-transaction-list"
                   transactions={upcomingCategoryTransactions}
                 />
@@ -545,7 +549,7 @@ export function CategoryDetailModal({
             setFiltersModalVisible(false);
           }}
           onClose={() => setFiltersModalVisible(false)}
-          variant="date-and-author"
+          variant="author"
           visible={isFiltersModalVisible}
         />
       ) : null}

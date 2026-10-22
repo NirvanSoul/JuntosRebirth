@@ -116,6 +116,28 @@ const defaultMoneyAccounts: readonly MoneyAccount[] = [];
 const amountHeroMaxLength = 9;
 const amountMaxLength = 13;
 
+/**
+ * Identidad por contenido del borrador inicial. El padre puede entregar el
+ * mismo movimiento como un objeto nuevo en cada render (ocurrencias
+ * recurrentes proyectadas, sincronización); comparar por referencia
+ * reiniciaba el formulario y devolvía el importe original mientras se editaba.
+ */
+function getDraftResetKey(draft: CreateTransactionDraft | undefined) {
+  if (!draft) return undefined;
+  return JSON.stringify([
+    draft.spaceId,
+    draft.type,
+    draft.amountMinor,
+    draft.currency,
+    draft.title,
+    draft.categoryId,
+    draft.moneyAccountId,
+    draft.occurredOn,
+    draft.recurrence,
+    draft.customOccurrenceDates,
+  ]);
+}
+
 export function CreateTransactionModal({
   activeSpaceId,
   availableCurrencies = defaultAvailableCurrencies,
@@ -282,7 +304,7 @@ export function CreateTransactionModal({
     useDepsChanged([
       activeSpaceId,
       initialDate,
-      initialDraft,
+      getDraftResetKey(initialDraft),
       initialMoneyAccountId,
       spaceCurrency,
       visible,
@@ -355,23 +377,24 @@ export function CreateTransactionModal({
   }));
 
   useEffect(() => {
+    // `set` en lugar de asignar `.value`: React Compiler no admite mutar un
+    // valor devuelto por un hook y abandonaría todo el componente.
     if (!visible || !isAmountEmpty) {
-      // Los `SharedValue` de Reanimated son mutables por diseño; el linter
-      // de React Compiler no distingue esta API de un valor de React.
-      // eslint-disable-next-line react-hooks/immutability
-      amountCursorOpacity.value = 1;
+      amountCursorOpacity.set(1);
       return;
     }
 
-    amountCursorOpacity.value = withRepeat(
-      withTiming(0.24, {
-        duration: 680,
-        reduceMotion: ReduceMotion.System,
-      }),
-      -1,
-      true,
-      undefined,
-      ReduceMotion.System,
+    amountCursorOpacity.set(
+      withRepeat(
+        withTiming(0.24, {
+          duration: 680,
+          reduceMotion: ReduceMotion.System,
+        }),
+        -1,
+        true,
+        undefined,
+        ReduceMotion.System,
+      ),
     );
   }, [amountCursorOpacity, isAmountEmpty, visible]);
 
@@ -416,9 +439,13 @@ export function CreateTransactionModal({
       return;
     }
 
-    setAmountInput((current) =>
-      current.length <= 1 ? '0' : current.slice(0, -1),
-    );
+    const nextAmountInput =
+      amountInput.length <= 1 ? '0' : amountInput.slice(0, -1);
+    setAmountInput(nextAmountInput);
+    // Borrar todo el importe vuelve al estado vacío, también al editar.
+    if (nextAmountInput === '0' && pendingOperations.length === 0) {
+      setHasEnteredAmount(false);
+    }
     pulseAmount();
   };
 

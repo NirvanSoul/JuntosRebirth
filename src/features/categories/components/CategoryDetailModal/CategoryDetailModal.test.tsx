@@ -134,6 +134,15 @@ function ClosableDetail({
 }
 
 describe('CategoryDetailModal', () => {
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-07-30T12:00:00'));
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     jest.mocked(useExchangeRates).mockReturnValue({ status: 'loading' });
     jest.mocked(useCurrencyCapabilities).mockReturnValue({
@@ -246,12 +255,9 @@ describe('CategoryDetailModal', () => {
       within(detail).getByTestId('category-detail-filter-button'),
     );
     const filtersModal = screen.getByTestId('transaction-filters-modal');
-    expect(within(filtersModal).getByText('Fecha')).toBeTruthy();
+    expect(within(filtersModal).queryByText('Fecha')).toBeNull();
     expect(within(filtersModal).getByText('Autor')).toBeTruthy();
     expect(within(filtersModal).queryByText('Tipo de movimiento')).toBeNull();
-    await fireEvent.press(
-      within(filtersModal).getByRole('button', { name: 'Autor' }),
-    );
     await fireEvent.press(
       within(filtersModal).getByRole('radio', { name: 'Autor: Beto' }),
     );
@@ -813,6 +819,98 @@ describe('CategoryDetailModal', () => {
     expect(screen.queryByTestId('category-expense-metric')).toBeNull();
   });
 
+  it('abre en el mes en curso y recalcula los totales al cambiar de periodo', async () => {
+    const juneTransaction: SessionTransaction = {
+      ...transaction,
+      id: 'june-dinner',
+      title: 'Cena de junio',
+      amountMinor: 1000,
+      occurredOn: '2026-06-10',
+      updatedAt: '2026-06-10T12:00:00.000Z',
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={category}
+            displayCurrency="EUR"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={jest.fn()}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            spaceCurrency="EUR"
+            transactions={[transaction, juneTransaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+    const detail = screen.getByTestId('category-detail-modal');
+    const expenseMetric = () =>
+      within(detail).getByTestId('category-expense-metric');
+
+    // Las opciones esperan plegadas hasta pulsar el periodo central.
+    expect(
+      within(detail).queryByRole('radio', { name: 'Periodo: Mensual' }),
+    ).toBeNull();
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Julio 2026' }),
+    );
+    expect(
+      within(detail).getByRole('radio', { name: 'Periodo: Mensual' }).props
+        .accessibilityState,
+    ).toMatchObject({ checked: true });
+    expect(within(detail).getByText('Julio 2026')).toBeTruthy();
+    expect(within(expenseMetric()).getByText(/18,90/)).toBeTruthy();
+    expect(within(detail).queryByText('Cena de junio')).toBeNull();
+
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Ver periodo anterior' }),
+    );
+    expect(within(detail).getByText('Junio 2026')).toBeTruthy();
+    expect(within(expenseMetric()).getByText(/^10\s*€$/)).toBeTruthy();
+    expect(within(detail).getByText('Cena de junio')).toBeTruthy();
+
+    await fireEvent.press(
+      within(detail).getByRole('radio', { name: 'Periodo: Todos' }),
+    );
+    expect(within(expenseMetric()).getByText(/28,90/)).toBeTruthy();
+    expect(
+      within(detail).queryByRole('radio', { name: 'Periodo: Todos' }),
+    ).toBeNull();
+
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Ver periodo siguiente' }),
+    );
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Agosto 2026' }),
+    );
+    await fireEvent.press(
+      within(detail).getByRole('radio', { name: 'Periodo: Semanal' }),
+    );
+    expect(within(expenseMetric()).getByText(/18,90/)).toBeTruthy();
+
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Ver periodo siguiente' }),
+    );
+    expect(within(detail).queryByTestId('category-expense-metric')).toBeNull();
+    expect(
+      within(detail).getByText(
+        'No hay movimientos de esta categoría en este periodo.',
+      ),
+    ).toBeTruthy();
+  });
+
   it('separa los movimientos futuros del resto en su propia sección', async () => {
     const futureTransaction: SessionTransaction = {
       ...transaction,
@@ -850,6 +948,17 @@ describe('CategoryDetailModal', () => {
     );
 
     const detail = screen.getByTestId('category-detail-modal');
+    // El mes en curso no alcanza el movimiento programado: hay que ampliar.
+    expect(
+      within(detail).queryByTestId('category-detail-upcoming-transaction-list'),
+    ).toBeNull();
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Julio 2026' }),
+    );
+    await fireEvent.press(
+      within(detail).getByRole('radio', { name: 'Periodo: Todos' }),
+    );
+
     const pastList = within(detail).getByTestId(
       'category-detail-transaction-list',
     );
@@ -860,6 +969,12 @@ describe('CategoryDetailModal', () => {
     expect(within(pastList).getByText('Almuerzo')).toBeTruthy();
     expect(within(pastList).queryByText('Compra programada')).toBeNull();
     expect(within(upcomingList).getByText('Compra programada')).toBeTruthy();
+    // Los totales del periodo suman también lo programado.
+    expect(
+      within(within(detail).getByTestId('category-expense-metric')).getByText(
+        /37,80/,
+      ),
+    ).toBeTruthy();
     expect(within(upcomingList).queryByText('Almuerzo')).toBeNull();
     expect(within(detail).getByText('Movimientos futuros')).toBeTruthy();
   });

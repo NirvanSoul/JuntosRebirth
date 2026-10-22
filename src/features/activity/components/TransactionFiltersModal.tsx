@@ -65,7 +65,8 @@ type TransactionFiltersModalProps = {
   filters: TransactionFilters;
   onApply: (filters: TransactionFilters) => void;
   onClose: () => void;
-  variant?: 'all' | 'date-and-author';
+  /** `author` deja solo el filtro de autor: el periodo vive fuera del modal. */
+  variant?: 'all' | 'author';
   visible: boolean;
 };
 
@@ -102,7 +103,6 @@ const allCategoriesOption = {
 
 const filterGridRows = 2;
 const filterCategoryColumns = 3;
-const selectableOptionHeight = 56;
 
 export function TransactionFiltersModal({
   authorOptions,
@@ -120,7 +120,7 @@ export function TransactionFiltersModal({
   const [dateAnchor, setDateAnchor] = useState(() => new Date());
   const [dateRangePickerVisible, setDateRangePickerVisible] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<FilterGroup | null>(
-    'date',
+    variant === 'author' ? 'author' : 'date',
   );
   const gutter = layout.screenGutter[density];
   const categoryCardWidth =
@@ -128,11 +128,11 @@ export function TransactionFiltersModal({
     filterCategoryColumns;
   const categoryGridHeight =
     categorySelectionCardHeight[density] * filterGridRows + spacing.sm;
-  const recurrenceGridHeight =
-    selectableOptionHeight * filterGridRows + spacing.sm;
   const hasMultipleCurrencies = currencies.length >= 2;
   const isLimitedVariant = variant !== 'all';
-  const hasAuthorFilter = variant === 'date-and-author';
+  const hasAuthorFilter = variant === 'author';
+  const hasDateFilter = !hasAuthorFilter;
+  const initialExpandedGroup: FilterGroup = hasAuthorFilter ? 'author' : 'date';
 
   if (useDepsChanged([visible, filters])) {
     if (visible) {
@@ -142,14 +142,14 @@ export function TransactionFiltersModal({
           ? new Date()
           : filters.date.selectedDate,
       );
-      setExpandedGroup('date');
+      setExpandedGroup(initialExpandedGroup);
     } else {
       setDateRangePickerVisible(false);
     }
   }
 
   const hasDraftFilters =
-    draft.date !== 'all' ||
+    (hasDateFilter && draft.date !== 'all') ||
     (hasAuthorFilter
       ? draft.author !== undefined && draft.author !== 'all'
       : draft.type !== 'all' ||
@@ -162,7 +162,7 @@ export function TransactionFiltersModal({
       category: [],
       currency: current.currency,
       recurrence: 'all',
-      date: 'all',
+      date: hasDateFilter ? 'all' : current.date,
       author: hasAuthorFilter ? 'all' : current.author,
     }));
   };
@@ -221,34 +221,36 @@ export function TransactionFiltersModal({
           </View>
 
           <View style={styles.groups}>
-            <TransactionFilterGroup
-              expanded={expandedGroup === 'date'}
-              icon="calendar-outline"
-              iconTestID="date-filter-group-icon"
-              onToggle={() => toggleGroup('date')}
-              title="Fecha"
-            >
-              <TransactionPeriodSelector
-                includeAllOption
-                includeCustomOption
-                customLabel={customDateLabel}
-                customSelected={Boolean(customDateRange)}
-                onNext={() => shiftDatePeriod(1)}
-                onPrevious={() => shiftDatePeriod(-1)}
-                onSelectAll={() =>
-                  setDraft((current) => ({ ...current, date: 'all' }))
-                }
-                onSelectPeriod={selectDatePeriod}
-                onSelectCustom={() => setDateRangePickerVisible(true)}
-                period={
-                  draft.date === 'all' || draft.date.period === 'custom'
-                    ? null
-                    : draft.date.period
-                }
-                selectedDate={dateAnchor}
-                testID="activity-date-period-selector"
-              />
-            </TransactionFilterGroup>
+            {hasDateFilter ? (
+              <TransactionFilterGroup
+                expanded={expandedGroup === 'date'}
+                icon="calendar-outline"
+                iconTestID="date-filter-group-icon"
+                onToggle={() => toggleGroup('date')}
+                title="Fecha"
+              >
+                <TransactionPeriodSelector
+                  includeAllOption
+                  includeCustomOption
+                  customLabel={customDateLabel}
+                  customSelected={Boolean(customDateRange)}
+                  onNext={() => shiftDatePeriod(1)}
+                  onPrevious={() => shiftDatePeriod(-1)}
+                  onSelectAll={() =>
+                    setDraft((current) => ({ ...current, date: 'all' }))
+                  }
+                  onSelectPeriod={selectDatePeriod}
+                  onSelectCustom={() => setDateRangePickerVisible(true)}
+                  period={
+                    draft.date === 'all' || draft.date.period === 'custom'
+                      ? null
+                      : draft.date.period
+                  }
+                  selectedDate={dateAnchor}
+                  testID="activity-date-period-selector"
+                />
+              </TransactionFilterGroup>
+            ) : null}
 
             {hasAuthorFilter ? (
               <TransactionFilterGroup
@@ -266,6 +268,7 @@ export function TransactionFiltersModal({
                     <SelectableOption
                       accessibilityLabel={`Autor: ${option.label}`}
                       indicatorTestID={`author-filter-${option.value}-indicator`}
+                      indicator={false}
                       key={option.value}
                       label={option.label}
                       onPress={() =>
@@ -298,6 +301,7 @@ export function TransactionFiltersModal({
                     <SelectableOption
                       accessibilityLabel={`Moneda: ${getCurrencyName(code)} (${code})`}
                       indicatorTestID={`currency-filter-${code}-indicator`}
+                      indicator={false}
                       key={code}
                       label={`${getCurrencyFlag(code)}  ${getCurrencyName(code)} · ${code}`}
                       onPress={() =>
@@ -324,6 +328,7 @@ export function TransactionFiltersModal({
                     <SelectableOption
                       accessibilityLabel={`Tipo: ${option.label}`}
                       indicatorTestID={`type-filter-${option.value}-indicator`}
+                      indicator={false}
                       key={option.value}
                       label={option.label}
                       onPress={() =>
@@ -413,11 +418,8 @@ export function TransactionFiltersModal({
                 <ScrollView
                   accessibilityRole="radiogroup"
                   contentContainerStyle={[
-                    styles.twoRowGrid,
-                    {
-                      height: recurrenceGridHeight,
-                      paddingHorizontal: gutter,
-                    },
+                    styles.singleRow,
+                    { paddingHorizontal: gutter },
                   ]}
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -428,6 +430,7 @@ export function TransactionFiltersModal({
                     <SelectableOption
                       accessibilityLabel={`Recurrencia: ${option.label}`}
                       indicatorTestID={`recurrence-filter-${option.value}-indicator`}
+                      indicator={false}
                       key={option.value}
                       label={option.label}
                       onPress={() =>
@@ -509,6 +512,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,
+  },
+  singleRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    overflow: 'visible',
   },
   twoRowGrid: {
     flexDirection: 'column',

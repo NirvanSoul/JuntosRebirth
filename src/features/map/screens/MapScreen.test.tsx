@@ -468,6 +468,25 @@ describe('MapScreen', () => {
     );
   });
 
+  it('mantiene las ocurrencias proyectadas al cambiar el mes enfocado', async () => {
+    const screen = await renderMap();
+    const readDates = () =>
+      JSON.parse(
+        screen.getByTestId('map-weekly-dates').props.children as string,
+      ) as string[];
+    const initialDates = readDates();
+
+    expect(initialDates).toEqual(
+      expect.arrayContaining(['2026-01-31', '2026-02-28', '2026-08-31']),
+    );
+
+    await fireEvent.press(screen.getByTestId('focus-future-month'));
+    expect(readDates()).toEqual(initialDates);
+
+    await fireEvent.press(screen.getByTestId('focus-current-month'));
+    expect(readDates()).toEqual(initialDates);
+  });
+
   it('permite volver a hoy al alejarse seis meses del mes actual', async () => {
     const screen = await renderMap();
 

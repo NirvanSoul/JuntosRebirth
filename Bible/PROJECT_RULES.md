@@ -422,6 +422,9 @@ Reglas:
   restaurar la siguiente cuenta.
 - El dispositivo puede conservar un identificador técnico para idempotencia o
   diagnóstico, pero nunca es identidad, autorización ni propietario de datos.
+- Única excepción, aprobada por el responsable el 2026-10-17: el usuario demo
+  de desarrollo (`__DEV__`), con datos ficticios que nunca salen del
+  dispositivo. Su contrato vive en `ARCHITECTURE.md` §16.1.
 
 ---
 

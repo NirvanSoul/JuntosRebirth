@@ -51,7 +51,7 @@ import {
   maximumCalendarDate,
   minimumCalendarDate,
 } from '@/lib/date/monthDistance';
-import { getLocalTodayKey, toLocalDateKey } from '@/lib/date/localDate';
+import { getLocalTodayKey } from '@/lib/date/localDate';
 import { type CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
@@ -71,19 +71,6 @@ type MapScreenProps = {
 export type MapScreenHandle = {
   resetToToday: () => void;
 };
-
-function getProjectionRange(monthKey: string): {
-  endOn: string;
-  startOn: string;
-} {
-  const year = Number(monthKey.slice(0, 4));
-  const month = Number(monthKey.slice(5, 7));
-
-  return {
-    startOn: toLocalDateKey(new Date(year, month - 2, 1, 12)),
-    endOn: toLocalDateKey(new Date(year, month + 1, 0, 12)),
-  };
-}
 
 const distantMonthThreshold = 6;
 const calendarResetFocusGuardDuration = 1000;
@@ -127,10 +114,17 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
       opacity: calendarResetOpacity.value,
       transform: [{ translateY: calendarNavigationTranslateY.value }],
     }));
-    const visibleTransactions = useMemo(() => {
-      const range = getProjectionRange(focusedMonth);
-      return projectRecurringTransactions({ transactions, ...range });
-    }, [focusedMonth, transactions]);
+    // La proyección cubre todo el rango del calendario y no depende del mes
+    // enfocado: si cambiara al hacer scroll, las filas de otros meses ganarían
+    // o perderían tarjetas, su altura cambiaría y la lista saltaría de semana.
+    const visibleTransactions = useMemo(
+      () =>
+        projectRecurringTransactions({
+          transactions,
+          endOn: calendarRangeEndDate,
+        }),
+      [calendarRangeEndDate, transactions],
+    );
     const calendarDays = useMemo(
       () => indexMapCalendarDays(visibleTransactions),
       [visibleTransactions],
@@ -206,23 +200,27 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
         focusedDateRef.current = targetDate;
         setFocusedMonth(targetDate.slice(0, 7));
         calendarRef.current?.scrollToDate(targetDate);
-        calendarNavigationTranslateY.value = spacing.sm;
-        calendarResetOpacity.value = withTiming(
-          1,
-          {
-            duration: motion.calendarMonthNavigationFadeInDuration,
-            easing: Easing.inOut(Easing.cubic),
-            reduceMotion: ReduceMotion.System,
-          },
-          (finished) => {
-            if (finished) runOnJS(finishCalendarReset)();
-          },
+        calendarNavigationTranslateY.set(spacing.sm);
+        calendarResetOpacity.set(
+          withTiming(
+            1,
+            {
+              duration: motion.calendarMonthNavigationFadeInDuration,
+              easing: Easing.inOut(Easing.cubic),
+              reduceMotion: ReduceMotion.System,
+            },
+            (finished) => {
+              if (finished) runOnJS(finishCalendarReset)();
+            },
+          ),
         );
-        calendarNavigationTranslateY.value = withTiming(0, {
-          duration: motion.calendarMonthNavigationFadeInDuration,
-          easing: Easing.out(Easing.cubic),
-          reduceMotion: ReduceMotion.System,
-        });
+        calendarNavigationTranslateY.set(
+          withTiming(0, {
+            duration: motion.calendarMonthNavigationFadeInDuration,
+            easing: Easing.out(Easing.cubic),
+            reduceMotion: ReduceMotion.System,
+          }),
+        );
       },
       [calendarNavigationTranslateY, calendarResetOpacity, finishCalendarReset],
     );
@@ -239,16 +237,18 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
 
         isCalendarResettingRef.current = true;
         setCalendarResetting(true);
-        calendarResetOpacity.value = withTiming(
-          0,
-          {
-            duration: motion.calendarMonthNavigationFadeOutDuration,
-            easing: Easing.inOut(Easing.cubic),
-            reduceMotion: ReduceMotion.System,
-          },
-          (finished) => {
-            if (finished) runOnJS(completeMonthNavigation)(targetDate);
-          },
+        calendarResetOpacity.set(
+          withTiming(
+            0,
+            {
+              duration: motion.calendarMonthNavigationFadeOutDuration,
+              easing: Easing.inOut(Easing.cubic),
+              reduceMotion: ReduceMotion.System,
+            },
+            (finished) => {
+              if (finished) runOnJS(completeMonthNavigation)(targetDate);
+            },
+          ),
         );
       },
       [
@@ -264,24 +264,29 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
         getNextMapCalendarRangeEnd(currentRangeEnd),
       );
     }, []);
-    const calendarLoadMore =
-      calendarRangeEndDate < maximumCalendarDate ? (
-        <MapCalendarLoadMore onPress={handleLoadMoreCalendar} />
-      ) : null;
+    const calendarLoadMore = useMemo(
+      () =>
+        calendarRangeEndDate < maximumCalendarDate ? (
+          <MapCalendarLoadMore onPress={handleLoadMoreCalendar} />
+        ) : null,
+      [calendarRangeEndDate, handleLoadMoreCalendar],
+    );
 
     const revealResetCalendar = useCallback(() => {
       calendarResetFrameRef.current = requestAnimationFrame(() => {
         calendarResetFrameRef.current = null;
-        calendarResetOpacity.value = withTiming(
-          1,
-          {
-            duration: motion.calendarResetFadeInDuration,
-            easing: Easing.inOut(Easing.cubic),
-            reduceMotion: ReduceMotion.System,
-          },
-          (finished) => {
-            if (finished) runOnJS(finishCalendarReset)();
-          },
+        calendarResetOpacity.set(
+          withTiming(
+            1,
+            {
+              duration: motion.calendarResetFadeInDuration,
+              easing: Easing.inOut(Easing.cubic),
+              reduceMotion: ReduceMotion.System,
+            },
+            (finished) => {
+              if (finished) runOnJS(finishCalendarReset)();
+            },
+          ),
         );
       });
     }, [calendarResetOpacity, finishCalendarReset]);
@@ -304,16 +309,18 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
       if (isCalendarResettingRef.current) return;
       isCalendarResettingRef.current = true;
       setCalendarResetting(true);
-      calendarResetOpacity.value = withTiming(
-        0,
-        {
-          duration: motion.calendarResetFadeOutDuration,
-          easing: Easing.inOut(Easing.cubic),
-          reduceMotion: ReduceMotion.System,
-        },
-        (finished) => {
-          if (finished) runOnJS(resetCalendarToToday)();
-        },
+      calendarResetOpacity.set(
+        withTiming(
+          0,
+          {
+            duration: motion.calendarResetFadeOutDuration,
+            easing: Easing.inOut(Easing.cubic),
+            reduceMotion: ReduceMotion.System,
+          },
+          (finished) => {
+            if (finished) runOnJS(resetCalendarToToday)();
+          },
+        ),
       );
     }, [calendarResetOpacity, resetCalendarToToday]);
     const resetToToday = useCallback(() => {

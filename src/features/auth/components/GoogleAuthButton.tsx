@@ -17,6 +17,8 @@ type GoogleAuthButtonProps = {
   testID: string;
 };
 
+const sessionWaitTimeoutMs = 15_000;
+
 /** Reutiliza el mismo OAuth nativo para entrar o crear una cuenta con Google. */
 export function GoogleAuthButton({
   disabled = false,
@@ -46,7 +48,7 @@ export function GoogleAuthButton({
 
       if (result.status === 'unsupported') {
         setError(
-          'No se detectó el módulo nativo de Google. En Xcode, compila la app (Cmd + R) para enlazar los Pods recién instalados.',
+          'Esta instalación no incluye el acceso nativo de Google. Instala una development build actualizada.',
         );
         return;
       }
@@ -79,6 +81,23 @@ export function GoogleAuthButton({
         setError('Iniciaste sesión, pero no pudimos preparar tus espacios.');
       });
   }, [isAwaitingSession, isReady, onSuccess, session]);
+
+  useEffect(() => {
+    if (!isAwaitingSession || session?.user) return;
+
+    const timeout = setTimeout(() => {
+      setAwaitingSession(false);
+      setError(
+        'Google confirmó tu cuenta, pero la sesión no pudo abrirse. Inténtalo de nuevo.',
+      );
+      console.error('[google-auth] La sesión no se hidrató a tiempo', {
+        code: 'session_timeout',
+        stage: 'session',
+      });
+    }, sessionWaitTimeoutMs);
+
+    return () => clearTimeout(timeout);
+  }, [isAwaitingSession, session?.user]);
 
   return (
     <View style={styles.container}>

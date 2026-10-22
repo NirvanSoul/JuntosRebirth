@@ -6,6 +6,7 @@ import { Text } from '@/components/ui/Text/Text';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
 import { GoogleAuthButton } from '@/features/auth/components/GoogleAuthButton';
 import { EmailVerificationRequiredError } from '@/features/auth/gateways/juntossAuthGateway';
+import { DemoUserCreateAction } from '@/features/demo/components/DemoUserCreateAction';
 import { login } from '@/features/auth/services/loginService';
 import { isValidEmail } from '@/features/auth/utils/authValidation';
 import { layout } from '@/theme/layout';
@@ -158,6 +159,8 @@ export function LoginScreen({
         onSuccess={onSuccess}
         testID="login-google"
       />
+
+      {__DEV__ ? <DemoUserCreateAction disabled={isSubmitting} /> : null}
     </View>
   );
 }

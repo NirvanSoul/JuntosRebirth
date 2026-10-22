@@ -8,7 +8,12 @@ import type { ColorTokens, ThemeShadows } from '@/theme/types';
 /** Lado del icono de categoría que encabeza el modal. */
 export const heroIconSize = 76;
 
-export function createStyles(colors: ColorTokens, _shadows: ThemeShadows) {
+/** `gutter` deja el scroll a sangre para no recortar carruseles horizontales. */
+export function createStyles(
+  colors: ColorTokens,
+  _shadows: ThemeShadows,
+  gutter: number,
+) {
   return StyleSheet.create({
     container: { flex: 1 },
     topBar: {
@@ -22,8 +27,9 @@ export function createStyles(colors: ColorTokens, _shadows: ThemeShadows) {
       justifyContent: 'space-between',
       paddingTop: spacing.xl,
     },
-    scroll: { flex: 1 },
+    scroll: { flex: 1, marginHorizontal: -gutter },
     scrollContent: {
+      paddingHorizontal: gutter,
       paddingTop: spacing.xl + layout.minTouchTarget,
     },
     hero: {
@@ -54,6 +60,9 @@ export function createStyles(colors: ColorTokens, _shadows: ThemeShadows) {
     },
     valuationSelector: {
       marginTop: spacing.lg,
+    },
+    periodFilter: {
+      marginTop: spacing.xl,
     },
     noteButton: {
       minHeight: layout.controlHeight.regular,

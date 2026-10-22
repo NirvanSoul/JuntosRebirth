@@ -10,6 +10,7 @@ import {
 import { Text } from '@/components/ui/Text/Text';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
+import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -19,6 +20,10 @@ const monthArrowSize = 40;
 
 type MonthNavigatorProps = {
   label: string;
+  /** Hace pulsable el texto central, p. ej. para desplegar opciones de periodo. */
+  labelAccessibilityHint?: string;
+  labelExpanded?: boolean;
+  onLabelPress?: () => void;
   nextAccessibilityLabel: string;
   nextDisabled?: boolean;
   onNext: () => void;
@@ -60,6 +65,9 @@ export function MonthNavigatorLabel({ label }: { label: string }) {
 
 export function MonthNavigator({
   label,
+  labelAccessibilityHint,
+  labelExpanded,
+  onLabelPress,
   nextAccessibilityLabel,
   nextDisabled = false,
   onNext,
@@ -69,6 +77,8 @@ export function MonthNavigator({
   style,
   testID,
 }: MonthNavigatorProps) {
+  const themedStyles = useThemedStyles(createThemedStyles);
+
   return (
     <View style={[styles.navigator, style]} testID={testID}>
       <Pressable
@@ -81,9 +91,28 @@ export function MonthNavigator({
       >
         <MonthNavigatorArrow direction="left" disabled={previousDisabled} />
       </Pressable>
-      <View style={styles.label}>
-        <MonthNavigatorLabel label={label} />
-      </View>
+      {onLabelPress ? (
+        <Pressable
+          accessibilityHint={labelAccessibilityHint}
+          accessibilityLabel={label}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: labelExpanded }}
+          onPress={onLabelPress}
+          // Mismo fondo que las flechas: sin él, nada indica que el periodo
+          // también se puede pulsar.
+          style={({ pressed }) => [
+            styles.label,
+            themedStyles.labelButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <MonthNavigatorLabel label={label} />
+        </Pressable>
+      ) : (
+        <View style={styles.label}>
+          <MonthNavigatorLabel label={label} />
+        </View>
+      )}
       <Pressable
         accessibilityLabel={nextAccessibilityLabel}
         accessibilityRole="button"
@@ -124,6 +153,13 @@ function createThemedStyles(colors: ColorTokens) {
       height: monthArrowSize,
       alignItems: 'center',
       justifyContent: 'center',
+      borderRadius: radii.round,
+      backgroundColor: colors.keypad,
+    },
+    labelButton: {
+      height: monthArrowSize,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.md,
       borderRadius: radii.round,
       backgroundColor: colors.keypad,
     },

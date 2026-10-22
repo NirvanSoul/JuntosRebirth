@@ -9,27 +9,14 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  View,
-  type ViewToken,
-} from 'react-native';
-import { Text } from '@/components/ui/Text/Text';
-import {
-  CategoryPreviewCard,
-  compactCardHeight,
-} from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
+import { FlatList, StyleSheet, View, type ViewToken } from 'react-native';
+import { compactCardHeight } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
-import {
-  MapWeekdayHeader,
-  mapWeekdayLabels,
-} from '@/features/map/components/MapWeekdayHeader';
+import { MapWeekRow } from '@/features/map/components/MapWeekRow';
+import { MapWeekdayHeader } from '@/features/map/components/MapWeekdayHeader';
 import {
   getMonthSeparatedWeekStart,
   getMonthSeparatedWeeksInCalendarRange,
-  parseCalendarDate,
   startsNewMonthSeparatedWeek,
   type MonthSeparatedCalendarWeek,
 } from '@/features/map/model/calendarPeriods';
@@ -66,7 +53,6 @@ export {
 } from '@/features/map/model/calendarPeriods';
 
 const scrollRetryDelay = 50;
-const emptyTransactions = [] as const;
 
 const dayColumnBaseHeight = layout.minTouchTarget + spacing.sm;
 
@@ -219,6 +205,46 @@ export const WeeklyMovementCalendar = memo(
         [],
       );
 
+      const renderWeek = useCallback(
+        ({
+          index,
+          item: week,
+        }: {
+          index: number;
+          item: MonthSeparatedCalendarWeek;
+        }) => (
+          <MapWeekRow
+            categoriesById={categoriesById}
+            currentDate={
+              calendarToday && week.includes(calendarToday)
+                ? calendarToday
+                : undefined
+            }
+            days={days}
+            hasMonthSeparator={startsNewMonthSeparatedWeek(weeks, index)}
+            onOpenTransactionDetail={onOpenTransactionDetail}
+            onSelectDate={onSelectDate}
+            selectedDate={
+              selectedDate && week.includes(selectedDate)
+                ? selectedDate
+                : undefined
+            }
+            testID={testID}
+            week={week}
+          />
+        ),
+        [
+          calendarToday,
+          categoriesById,
+          days,
+          onOpenTransactionDetail,
+          onSelectDate,
+          selectedDate,
+          testID,
+          weeks,
+        ],
+      );
+
       useEffect(
         () => () => {
           if (scrollRetryTimer.current) {
@@ -278,100 +304,7 @@ export const WeeklyMovementCalendar = memo(
               }, scrollRetryDelay);
             }}
             ref={listRef}
-            renderItem={({ index, item: week }) => {
-              return (
-                <View
-                  style={[
-                    themedStyles.weekBlock,
-                    startsNewMonthSeparatedWeek(weeks, index) &&
-                      styles.monthSeparator,
-                  ]}
-                  testID={`${testID}-week-${getMonthSeparatedWeekStart(week)}`}
-                >
-                  <View style={styles.weekRow}>
-                    {week.map((date, dayIndex) => {
-                      if (!date) {
-                        return (
-                          <View
-                            key={`empty-${dayIndex}`}
-                            style={styles.dayColumn}
-                          />
-                        );
-                      }
-                      const dayTransactions =
-                        days.get(date)?.transactions ?? emptyTransactions;
-                      const selected = selectedDate === date;
-                      const isCurrentDate = calendarToday === date;
-                      return (
-                        <View key={date} style={styles.dayColumn}>
-                          <Pressable
-                            accessibilityLabel={`${mapWeekdayLabels[dayIndex]} ${parseCalendarDate(date).getDate()}`}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected }}
-                            onPress={() => onSelectDate(date)}
-                            style={({ pressed }) => [
-                              styles.dayHeader,
-                              pressed && styles.pressed,
-                            ]}
-                            testID={`${testID}-day-${date}`}
-                          >
-                            <View
-                              style={[
-                                styles.dayNumber,
-                                isCurrentDate &&
-                                  !selected &&
-                                  themedStyles.currentDay,
-                                selected && themedStyles.selectedDay,
-                              ]}
-                            >
-                              <Text
-                                align="center"
-                                tone={selected ? 'onBrand' : 'primary'}
-                                variant="body"
-                              >
-                                {parseCalendarDate(date).getDate()}
-                              </Text>
-                            </View>
-                          </Pressable>
-                          <View style={styles.movementList}>
-                            {dayTransactions.map((transaction) => {
-                              const category = categoriesById.get(
-                                transaction.categoryId,
-                              );
-                              return (
-                                <CategoryPreviewCard
-                                  accessibilityHint="Abre el detalle del movimiento"
-                                  colorToken={category?.colorToken ?? 'slate'}
-                                  expenseMinor={0}
-                                  icon={category?.icon ?? 'receipt'}
-                                  incomeMinor={0}
-                                  key={transaction.id}
-                                  name={
-                                    transaction.title.trim() ||
-                                    category?.name ||
-                                    'Movimiento'
-                                  }
-                                  onPress={
-                                    onOpenTransactionDetail
-                                      ? () =>
-                                          onOpenTransactionDetail(
-                                            transaction.id,
-                                          )
-                                      : undefined
-                                  }
-                                  testID={`${testID}-movement-${transaction.id}`}
-                                  variant="compact"
-                                />
-                              );
-                            })}
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
-              );
-            }}
+            renderItem={renderWeek}
             showsVerticalScrollIndicator={false}
             style={themedStyles.list}
             testID={testID}
@@ -387,31 +320,6 @@ export const WeeklyMovementCalendar = memo(
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  weekRow: {
-    flexDirection: 'row',
-    marginTop: spacing.xl,
-  },
-  dayColumn: {
-    flex: 1,
-    minWidth: 0,
-    gap: spacing.sm,
-    paddingHorizontal: spacing.xxs,
-  },
-  dayHeader: {
-    minHeight: layout.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayNumber: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: spacing.sm,
-  },
-  movementList: { gap: spacing.xs },
-  monthSeparator: { paddingTop: spacing.xxxl },
-  pressed: { opacity: 0.64 },
 });
 
 function createThemedStyles(colors: ColorTokens) {
@@ -421,16 +329,5 @@ function createThemedStyles(colors: ColorTokens) {
       backgroundColor: colors.surface,
       paddingBottom: layout.floatingActionClearance,
     },
-    weekBlock: {
-      backgroundColor: colors.surface,
-      borderBottomColor: colors.categoryPreviewBorder,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      paddingBottom: spacing.xl,
-    },
-    currentDay: {
-      borderColor: colors.cta,
-      borderWidth: 1,
-    },
-    selectedDay: { backgroundColor: colors.cta },
   });
 }

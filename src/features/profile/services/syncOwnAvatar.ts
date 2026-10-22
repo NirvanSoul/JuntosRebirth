@@ -1,4 +1,5 @@
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
+import { isDemoSessionActive } from '@/state/demoSession/demoSessionStore';
 import {
   getLocalAvatarUpload,
   markAvatarUploadResult,
@@ -27,7 +28,8 @@ import { getAvatar, uploadAvatar } from '@/services/api/avatar';
 export async function syncOwnAvatar(): Promise<boolean> {
   const userId = await getAuthenticatedUserId();
   // Si la sesión desaparece durante una tarea de fondo, no se toca la caché.
-  if (!userId) return false;
+  // La foto del usuario demo se queda en el dispositivo.
+  if (!userId || isDemoSessionActive()) return false;
 
   const { localPath, syncStatus } = await getLocalAvatarUpload();
   if (!localPath) return false;

@@ -26,11 +26,20 @@ export function CategoryTransactionMetrics({
   const styles = useThemedStyles(createStyles);
 
   if (expenseMinor <= 0 && incomeMinor <= 0) return null;
+  // Con un solo monto se muestra como el balance del detalle de cuenta; con
+  // ingresos y gastos ambos se reducen para caber uno al lado del otro.
+  const single = expenseMinor <= 0 || incomeMinor <= 0;
+  const amountProps = single
+    ? ({ align: 'center', variant: 'amount' } as const)
+    : ({ variant: 'body', weight: 'semibold' } as const);
 
   return (
     <View style={styles.metrics}>
       {expenseMinor > 0 ? (
-        <View style={styles.metric} testID="category-expense-metric">
+        <View
+          style={[styles.metric, single && styles.singleMetric]}
+          testID="category-expense-metric"
+        >
           <View style={styles.metricHeading}>
             <View style={styles.metricIcon}>
               <View style={styles.diagonalArrow}>
@@ -45,13 +54,16 @@ export function CategoryTransactionMetrics({
               Gastos
             </Text>
           </View>
-          <Text numberOfLines={1} variant="body" weight="semibold">
+          <Text numberOfLines={1} {...amountProps}>
             {expense}
           </Text>
         </View>
       ) : null}
       {incomeMinor > 0 ? (
-        <View style={styles.metric} testID="category-income-metric">
+        <View
+          style={[styles.metric, single && styles.singleMetric]}
+          testID="category-income-metric"
+        >
           <View style={styles.metricHeading}>
             <View style={styles.metricIcon}>
               <View style={styles.diagonalArrow}>
@@ -66,7 +78,7 @@ export function CategoryTransactionMetrics({
               Ingresos
             </Text>
           </View>
-          <Text numberOfLines={1} variant="body" weight="semibold">
+          <Text numberOfLines={1} {...amountProps}>
             {income}
           </Text>
         </View>
@@ -90,6 +102,7 @@ function createStyles(colors: ColorTokens) {
       borderRadius: radii.md,
       padding: spacing.md,
     },
+    singleMetric: { alignItems: 'center' },
     metricHeading: {
       flexDirection: 'row',
       alignItems: 'center',

@@ -1,3 +1,4 @@
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, within } from '@testing-library/react-native';
 
 import type { MoneyAccount } from '@/features/accounts/types';
@@ -100,10 +101,44 @@ describe('AccountDonutChart', () => {
       }).props,
     ).toMatchObject({ height: 236, width: 236 });
     expect(
+      screen.getByTestId('account-donut-segment-bank', {
+        includeHiddenElements: true,
+      }).props.strokeWidth,
+    ).toBe(12);
+    expect(
       within(chart).getByTestId('account-donut-segment-bank', {
         includeHiddenElements: true,
       }),
     ).toBeTruthy();
+  });
+
+  it('ajusta el total al centro con su medida de layout, no con el marco nativo', async () => {
+    const screen = await renderChart();
+    const total = () => screen.getByTestId('account-chart-total');
+
+    expect(total().props.adjustsFontSizeToFit).toBeUndefined();
+    expect(StyleSheet.flatten(total().props.style).fontSize).toBe(40);
+
+    await fireEvent(
+      screen.getByTestId('account-chart-total-measure', {
+        includeHiddenElements: true,
+      }),
+      'layout',
+      { nativeEvent: { layout: { height: 46, width: 300, x: 0, y: 0 } } },
+    );
+
+    // 200 px de hueco (236 - 12 × 3) frente a 300 px de ancho natural.
+    expect(StyleSheet.flatten(total().props.style).fontSize).toBe(26);
+
+    await fireEvent(
+      screen.getByTestId('account-chart-total-measure', {
+        includeHiddenElements: true,
+      }),
+      'layout',
+      { nativeEvent: { layout: { height: 46, width: 120, x: 0, y: 0 } } },
+    );
+
+    expect(StyleSheet.flatten(total().props.style).fontSize).toBe(40);
   });
 
   it('alterna a ingresos y reparte solo las cuentas que ingresaron', async () => {

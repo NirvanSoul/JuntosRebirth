@@ -17,9 +17,13 @@ jest.mock('@/features/auth/hooks/useBetterAuthSession', () => ({
 }));
 
 jest.mock('@/features/auth/screens/LoginScreen', () => ({
-  LoginScreen: () => {
-    const { View } = jest.requireActual('react-native');
-    return <View testID="login-content" />;
+  LoginScreen: ({ onSuccess }: { onSuccess: () => void }) => {
+    const { Pressable, View } = jest.requireActual('react-native');
+    return (
+      <View testID="login-content">
+        <Pressable onPress={onSuccess} testID="login-complete" />
+      </View>
+    );
   },
 }));
 jest.mock('@/features/auth/services/pendingEmailVerification', () => ({
@@ -51,6 +55,13 @@ jest.mock('@/features/auth/screens/VerifyCodeScreen', () => ({
     return <Text testID="verify-signup-email">{email}</Text>;
   },
 }));
+const mockRecordAccessLegalAcceptance = jest.fn(async () => undefined);
+jest.mock('@/features/legal/services/legalAcceptanceService', () => ({
+  recordAccessLegalAcceptance: () => mockRecordAccessLegalAcceptance(),
+}));
+jest.mock('@/features/legal/screens/LegalDocumentScreen', () => ({
+  LegalDocumentScreen: () => null,
+}));
 jest.mock('@/features/auth/screens/ForgotPasswordScreen', () => ({
   ForgotPasswordScreen: () => null,
 }));
@@ -70,10 +81,34 @@ describe('AccessScreen', () => {
     expect(screen.queryByTestId('access-continue-guest')).toBeNull();
   });
 
+  it('exige aceptar términos y privacidad antes de crear cuenta o iniciar sesión', async () => {
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    expect(screen.getByTestId('onboarding-login-action')).toBeDisabled();
+    expect(screen.getByTestId('onboarding-login-open-login')).toBeDisabled();
+
+    await fireEvent.press(screen.getByTestId('legal-consent-checkbox'));
+
+    expect(screen.getByTestId('onboarding-login-action')).toBeEnabled();
+    expect(screen.getByTestId('onboarding-login-open-login')).toBeEnabled();
+  });
+
+  it('registra la aceptación legal al autenticar', async () => {
+    const screen = await renderWithTheme(<AccessScreen />);
+
+    await fireEvent.press(screen.getByTestId('legal-consent-checkbox'));
+    await fireEvent.press(screen.getByTestId('onboarding-login-open-login'));
+    await fireEvent.press(await screen.findByTestId('login-complete'));
+
+    expect(mockRecordAccessLegalAcceptance).toHaveBeenCalledTimes(1);
+  });
+
   it('abre el paso de crear cuenta desde la única entrada de acceso', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('onboarding-login-action'));
+    await fireEvent.press(screen.getByTestId('legal-consent-checkbox'));
+
+    await fireEvent.press(screen.getByTestId('onboarding-login-action'));
 
     expect(screen.getByText('Crear cuenta')).toBeTruthy();
   });
@@ -86,14 +121,18 @@ describe('AccessScreen', () => {
     expect(screen.queryByTestId('onboarding-progress-segment-10')).toBeNull();
     expect(screen.getByText('Empecemos esto\nJuntos.')).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId('onboarding-login-action'));
+    await fireEvent.press(screen.getByTestId('legal-consent-checkbox'));
+
+    await fireEvent.press(screen.getByTestId('onboarding-login-action'));
     expect(screen.getByText('Crear cuenta')).toBeTruthy();
   });
 
   it('muestra una flecha junto al título al abrir iniciar sesión', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('onboarding-login-open-login'));
+    await fireEvent.press(screen.getByTestId('legal-consent-checkbox'));
+
+    await fireEvent.press(screen.getByTestId('onboarding-login-open-login'));
 
     await waitFor(() => expect(screen.getByLabelText('Volver')).toBeTruthy());
     expect(screen.queryByText('Atrás')).toBeNull();
@@ -102,7 +141,9 @@ describe('AccessScreen', () => {
   it('muestra el logo de Juntos después del contenido de inicio de sesión', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('onboarding-login-open-login'));
+    await fireEvent.press(screen.getByTestId('legal-consent-checkbox'));
+
+    await fireEvent.press(screen.getByTestId('onboarding-login-open-login'));
 
     const logo = await screen.findByTestId('login-logo');
     const loginContent = screen.getByTestId('login-content');
@@ -129,7 +170,9 @@ describe('AccessScreen', () => {
   it('muestra el mismo logo reducido después del contenido de crear cuenta', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('onboarding-login-action'));
+    await fireEvent.press(screen.getByTestId('legal-consent-checkbox'));
+
+    await fireEvent.press(screen.getByTestId('onboarding-login-action'));
 
     const logo = await screen.findByTestId('signup-logo');
     const signUpContent = screen.getByTestId('signup-content');
@@ -167,7 +210,9 @@ describe('AccessScreen', () => {
   it('pasa al OTP al terminar el último paso de crear cuenta', async () => {
     const screen = await renderWithTheme(<AccessScreen />);
 
-    fireEvent.press(screen.getByTestId('onboarding-login-action'));
+    await fireEvent.press(screen.getByTestId('legal-consent-checkbox'));
+
+    await fireEvent.press(screen.getByTestId('onboarding-login-action'));
     fireEvent.press(await screen.findByTestId('signup-complete'));
 
     expect(await screen.findByTestId('verify-signup-email')).toHaveTextContent(

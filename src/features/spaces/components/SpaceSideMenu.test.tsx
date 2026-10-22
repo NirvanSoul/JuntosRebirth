@@ -1,10 +1,12 @@
 import type { ComponentProps } from 'react';
 import {
+  act,
   fireEvent,
   render,
   waitFor,
   within,
 } from '@testing-library/react-native';
+import { getAnimatedStyle } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
 
@@ -12,6 +14,7 @@ import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
 import type { Space } from '@/features/spaces/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors, darkColors, lightColors } from '@/theme/colors';
+import { motion } from '@/theme/motion';
 import type { AppearancePreference } from '@/theme/types';
 
 const spaces: Space[] = [
@@ -63,27 +66,82 @@ describe('SpaceSideMenu', () => {
     await waitFor(() =>
       expect(props.onSelectSpace).toHaveBeenCalledWith('home'),
     );
-    expect(props.onClose).toHaveBeenCalled();
+    await waitFor(() => expect(props.onClose).toHaveBeenCalled());
     await fireEvent.press(screen.getByText('Ajustes'));
     expect(props.onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
-  it('cierra el menú sin esperar a que termine de persistirse la selección', async () => {
-    let finishSelection: (() => void) | undefined;
-    const onSelectSpace = jest.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          finishSelection = resolve;
-        }),
+  it('cambia primero el botón y, al terminar, cierra el menú y cambia de espacio', async () => {
+    jest.useFakeTimers();
+    try {
+      let finishSelection: (() => void) | undefined;
+      const onSelectSpace = jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishSelection = resolve;
+          }),
+      );
+      const { props, screen } = await renderMenu({ onSelectSpace });
+
+      await fireEvent.press(
+        screen.getByLabelText('Seleccionar espacio Juntos'),
+      );
+
+      expect(
+        screen.getByLabelText('Seleccionar espacio Juntos').props
+          .accessibilityState?.checked,
+      ).toBe(true);
+      expect(
+        screen.getByLabelText('Seleccionar espacio Personal').props
+          .accessibilityState?.checked,
+      ).toBe(false);
+      expect(onSelectSpace).not.toHaveBeenCalled();
+
+      expect(props.onClose).not.toHaveBeenCalled();
+
+      // Al asentarse la píldora se cierra el menú y empieza el cambio, sin
+      // esperar a que termine de persistirse la selección.
+      await act(async () => {
+        jest.advanceTimersByTime(motion.spaceSelectionDuration);
+      });
+      expect(onSelectSpace).toHaveBeenCalledWith('juntos');
+      expect(props.onClose).toHaveBeenCalledTimes(1);
+
+      finishSelection?.();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('cierra el menú sin transición al tocar el espacio que ya está activo', async () => {
+    const { props, screen } = await renderMenu();
+
+    await fireEvent.press(
+      screen.getByLabelText('Seleccionar espacio Personal'),
     );
-    const { props, screen } = await renderMenu({ onSelectSpace });
 
-    fireEvent.press(screen.getByLabelText('Seleccionar espacio Juntos'));
-
-    expect(onSelectSpace).toHaveBeenCalledWith('juntos');
     expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(props.onSelectSpace).not.toHaveBeenCalled();
+  });
 
-    finishSelection?.();
+  it('vuelve a marcar el espacio anterior si el cambio falla', async () => {
+    const { screen } = await renderMenu({
+      onSelectSpace: jest.fn(async () => {
+        throw new Error('fallo');
+      }),
+    });
+
+    await fireEvent.press(screen.getByLabelText('Seleccionar espacio Casa'));
+
+    expect(
+      await screen.findByText(
+        'No pudimos cambiar de espacio. Inténtalo de nuevo.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Seleccionar espacio Personal').props
+        .accessibilityState?.checked,
+    ).toBe(true);
   });
 
   it('mantiene Personal primero y Juntos después aunque cambie el orden recibido', async () => {
@@ -123,7 +181,8 @@ describe('SpaceSideMenu', () => {
     expect(button.props.accessibilityState?.disabled).not.toBe(true);
 
     await fireEvent.press(button);
-    expect(props.onInvitePartner).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(props.onInvitePartner).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1));
   });
 
   it('el botón "Juntos" se ve como un botón real, con borde propio del tema claro y oscuro', async () => {
@@ -142,7 +201,7 @@ describe('SpaceSideMenu', () => {
     );
     expect(
       StyleSheet.flatten(
-        lightRender.screen.getByLabelText('Seleccionar espacio Juntos').props
+        lightRender.screen.getByTestId('space-icon-invite-juntos-surface').props
           .style,
       ).borderColor,
     ).toBe(lightColors.border);
@@ -162,7 +221,7 @@ describe('SpaceSideMenu', () => {
     );
     expect(
       StyleSheet.flatten(
-        darkRender.screen.getByLabelText('Seleccionar espacio Juntos').props
+        darkRender.screen.getByTestId('space-icon-invite-juntos-surface').props
           .style,
       ).borderColor,
     ).toBe(darkColors.border);
@@ -210,9 +269,12 @@ describe('SpaceSideMenu', () => {
 
     const coupleButton = screen.getByLabelText('Seleccionar espacio Juntos');
     expect(coupleButton.props.accessibilityState?.selected).toBe(true);
-    expect(StyleSheet.flatten(coupleButton.props.style).backgroundColor).toBe(
-      colors.cta,
-    );
+    // La superficie propia del botón se retira para dejar ver la píldora.
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('space-icon-invite-juntos-surface').props.style,
+      ).opacity,
+    ).toBe(0);
     expect(
       StyleSheet.flatten(within(coupleButton).getByText('Juntos').props.style)
         .color,
@@ -226,6 +288,44 @@ describe('SpaceSideMenu', () => {
         screen.getByTestId('space-icon-invite-juntos').props.style,
       ).color,
     ).toBe(colors.onBrand);
+  });
+
+  it('coloca la píldora de marca detrás del espacio activo y la desliza al elegido', async () => {
+    jest.useFakeTimers();
+    try {
+      const { screen } = await renderMenu();
+      const layoutRow = (label: string, y: number) =>
+        fireEvent(screen.getByLabelText(label), 'layout', {
+          nativeEvent: { layout: { x: 0, y, width: 300, height: 64 } },
+        });
+      const pillStyle = () =>
+        getAnimatedStyle(screen.getByTestId('space-selection-pill'));
+      const settle = () =>
+        act(async () => {
+          jest.advanceTimersByTime(1000);
+        });
+
+      await layoutRow('Seleccionar espacio Personal', 0);
+      await layoutRow('Seleccionar espacio Juntos', 72);
+      await layoutRow('Seleccionar espacio Casa', 144);
+      await settle();
+      expect(
+        StyleSheet.flatten(
+          screen.getByTestId('space-selection-pill').props.style,
+        ).backgroundColor,
+      ).toBe(colors.cta);
+      expect(pillStyle()).toMatchObject({
+        height: 64,
+        opacity: 1,
+        transform: [{ translateY: 0 }],
+      });
+
+      await fireEvent.press(screen.getByLabelText('Seleccionar espacio Casa'));
+      await settle();
+      expect(pillStyle().transform).toEqual([{ translateY: 144 }]);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('muestra la foto y el nombre de perfil y abre su editor', async () => {

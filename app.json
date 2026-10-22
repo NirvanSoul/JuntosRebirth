@@ -63,7 +63,7 @@
       }
     },
     "android": {
-      "package": "com.juntoss.app",
+      "package": "com.juntosapp.finance",
       "predictiveBackGestureEnabled": true
     },
     "assetBundlePatterns": ["**/*"],
@@ -91,6 +91,9 @@
         }
       ],
       "./plugins/withIosBuildFixes"
-    ]
+    ],
+    "experiments": {
+      "reactCompiler": true
+    }
   }
 }

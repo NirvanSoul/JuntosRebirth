@@ -4,6 +4,7 @@ import { useCallback, useEffect } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { isDemoSessionActive } from '@/state/demoSession/demoSessionStore';
 import { useAppForeground } from '@/hooks/useAppForeground';
 import { registerCurrentDeviceForInvitationPush } from '@/lib/notifications/invitationPushNotifications';
 import {
@@ -27,7 +28,8 @@ export function InvitationPushRegistration() {
   const isExpoGo = !isNotificationModuleAvailable();
 
   const registerIfAuthorized = useCallback(() => {
-    if (!session || Platform.OS === 'web' || isExpoGo) return;
+    if (!session || isDemoSessionActive() || Platform.OS === 'web' || isExpoGo)
+      return;
     void registerCurrentDeviceForInvitationPush(false).catch(() => undefined);
   }, [isExpoGo, session]);
 
@@ -60,7 +62,8 @@ export function InvitationPushRegistration() {
   }, [isExpoGo]);
 
   useEffect(() => {
-    if (!session || Platform.OS === 'web' || isExpoGo) return;
+    if (!session || isDemoSessionActive() || Platform.OS === 'web' || isExpoGo)
+      return;
     let isMounted = true;
     const promptKey = `${promptKeyPrefix}${session.user.id}`;
 

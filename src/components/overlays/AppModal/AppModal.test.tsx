@@ -14,7 +14,9 @@ import {
 import { saveCurrencySymbolPreference } from '@/state/appPreferences/currencySymbolPreferenceRepository';
 
 let latestOnDismiss: (() => void) | null = null;
+let latestOnChange: ((index: number) => void) | null = null;
 let mockLatestPresent = jest.fn();
+let mockLatestDismiss = jest.fn();
 let latestBackdropDisappearsOnIndex: number | undefined;
 
 jest.mock('@gorhom/bottom-sheet', () => {
@@ -33,21 +35,24 @@ jest.mock('@gorhom/bottom-sheet', () => {
         backdropComponent,
         backgroundStyle,
         children,
+        onChange,
         onDismiss,
       }: {
         backdropComponent?: (props: object) => ReactNode;
         backgroundStyle?: object;
         children?: ReactNode;
+        onChange?: (index: number) => void;
         onDismiss?: () => void;
       },
       ref: React.ForwardedRef<{ present: () => void; dismiss: () => void }>,
     ) => {
       React.useEffect(() => {
         latestOnDismiss = onDismiss ?? null;
+        latestOnChange = onChange ?? null;
       });
       React.useImperativeHandle(ref, () => ({
         present: mockLatestPresent,
-        dismiss: jest.fn(),
+        dismiss: mockLatestDismiss,
       }));
       return (
         <CurrencySymbolPreferenceScope
@@ -131,7 +136,9 @@ function Harness({
 describe('AppModal', () => {
   beforeEach(() => {
     latestOnDismiss = null;
+    latestOnChange = null;
     mockLatestPresent = jest.fn();
+    mockLatestDismiss = jest.fn();
     latestBackdropDisappearsOnIndex = undefined;
     return AsyncStorage.clear();
   });
@@ -203,7 +210,31 @@ describe('AppModal', () => {
 
     expect(onCloseSpy).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Contenido')).toBeTruthy();
+    // Apertura inicial, reapertura inmediata y la repetición tras el cierre.
+    expect(mockLatestPresent).toHaveBeenCalledTimes(3);
+  });
+
+  it('vuelve a abrirse aunque la librería descarte el cierre sin avisar', async () => {
+    const onCloseSpy = jest.fn();
+    const screen = await render(<Harness onCloseSpy={onCloseSpy} />);
+
+    // El cierre pedido por el padre nunca emite `onDismiss`.
+    await fireEvent.press(screen.getByTestId('close'));
+    await fireEvent.press(screen.getByTestId('reopen'));
+
     expect(mockLatestPresent).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      latestOnChange?.(0);
+    });
+    // Un cierre posterior por gesto ya no se confunde con el cierre perdido.
+    await act(async () => {
+      latestOnDismiss?.();
+    });
+
+    expect(onCloseSpy).toHaveBeenCalledTimes(2);
+    expect(mockLatestPresent).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('Contenido')).toBeNull();
   });
 
   it('cierra normalmente cuando no se reabre antes de que termine la animación', async () => {
@@ -222,6 +253,30 @@ describe('AppModal', () => {
     expect(onCloseSpy).toHaveBeenCalledTimes(1);
     expect(onDismissedSpy).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Contenido')).toBeNull();
+  });
+
+  it('vuelve a cerrar la hoja si queda abierta después de que el padre la cerró', async () => {
+    const onCloseSpy = jest.fn();
+    const onDismissedSpy = jest.fn();
+    const screen = await render(
+      <Harness onCloseSpy={onCloseSpy} onDismissedSpy={onDismissedSpy} />,
+    );
+
+    await fireEvent.press(screen.getByTestId('close'));
+    expect(mockLatestDismiss).toHaveBeenCalledTimes(1);
+
+    // El primer cierre se perdió y la hoja terminó de abrirse igualmente.
+    await act(async () => {
+      latestOnChange?.(0);
+    });
+    expect(mockLatestDismiss).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      latestOnDismiss?.();
+    });
+    expect(onCloseSpy).toHaveBeenCalledTimes(1);
+    expect(onDismissedSpy).toHaveBeenCalledTimes(1);
+    expect(mockLatestPresent).toHaveBeenCalledTimes(1);
   });
 
   it('notifica el cierre cuando se cierra por gesto sin que el padre lo pidiera antes', async () => {

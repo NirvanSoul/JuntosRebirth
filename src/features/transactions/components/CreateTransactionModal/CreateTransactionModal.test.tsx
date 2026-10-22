@@ -158,6 +158,48 @@ describe('CreateTransactionModal', () => {
     );
   });
 
+  it('al editar, permite borrar el importe aunque el borrador llegue como objeto nuevo', async () => {
+    const onSubmit = jest.fn();
+    const createDraft = () => ({
+      spaceId: 'personal',
+      type: 'expense' as const,
+      amountMinor: 1250,
+      currency: 'EUR' as const,
+      title: 'Almuerzo',
+      categoryId: category.id,
+      occurredOn: '2026-07-30',
+      recurrence: 'once' as const,
+    });
+    const renderModal = () => (
+      <CreateTransactionModal
+        activeSpaceId="personal"
+        initialDraft={createDraft()}
+        initialType="expense"
+        onClose={jest.fn()}
+        onOpenCategoryPicker={jest.fn()}
+        onSubmit={onSubmit}
+        selectedCategory={category}
+        visible
+      />
+    );
+    const screen = await renderWithTheme(renderModal());
+
+    for (let index = 0; index < 6; index += 1) {
+      await fireEvent.press(screen.getByLabelText('Borrar'));
+    }
+    await screen.rerender(renderModal());
+
+    expect(screen.queryByLabelText('12,5 euros')).toBeNull();
+
+    await fireEvent.press(screen.getByLabelText('8'));
+    await screen.rerender(renderModal());
+    await fireEvent.press(screen.getByLabelText('Guardar cambios'));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ amountMinor: 800 }),
+    );
+  });
+
   it('abre el selector de fecha con la fecha del movimiento al llegar desde el detalle', async () => {
     const screen = await renderWithTheme(
       <CreateTransactionModal

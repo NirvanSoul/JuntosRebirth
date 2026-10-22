@@ -104,15 +104,14 @@ export function ActivityAccountsSection({
     if (incomingOffset === null) return;
 
     entryOffset.current = null;
-    // SharedValue de Reanimated: mutable por diseño.
-    // eslint-disable-next-line react-hooks/immutability
-    opacity.value = 0;
-    // eslint-disable-next-line react-hooks/immutability
-    translateX.value = incomingOffset;
-    opacity.value = withTiming(1, accountViewTiming);
-    translateX.value = withTiming(0, accountViewTiming, (finished) => {
-      if (finished) runOnJS(finishTransition)();
-    });
+    opacity.set(0);
+    translateX.set(incomingOffset);
+    opacity.set(withTiming(1, accountViewTiming));
+    translateX.set(
+      withTiming(0, accountViewTiming, (finished) => {
+        if (finished) runOnJS(finishTransition)();
+      }),
+    );
   }, [displayedAccountView, finishTransition, opacity, translateX]);
 
   const toggleAccountView = () => {
@@ -122,17 +121,13 @@ export function ActivityAccountsSection({
     const outgoingOffset = motion.categoryViewTransitionTravel;
     isTransitioning.current = true;
     setAccountView(nextView);
-    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
-    opacity.value = withTiming(0, accountViewTiming);
-    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
-    translateX.value = withTiming(
-      outgoingOffset,
-      accountViewTiming,
-      (finished) => {
+    opacity.set(withTiming(0, accountViewTiming));
+    translateX.set(
+      withTiming(outgoingOffset, accountViewTiming, (finished) => {
         if (finished) {
           runOnJS(showNextAccountView)(nextView, -outgoingOffset);
         }
-      },
+      }),
     );
   };
 

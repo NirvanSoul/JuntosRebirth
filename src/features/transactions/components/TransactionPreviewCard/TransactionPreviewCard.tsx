@@ -13,6 +13,7 @@ import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { useTransactionAuthor } from '@/features/transactions/hooks/useTransactionAuthor';
 import { formatAuthorName } from '@/features/transactions/utils/transactionAuthor';
+import { formatNumericLocalDate } from '@/lib/date/localDate';
 import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
@@ -60,11 +61,7 @@ export function TransactionPreviewCard({
     transaction.currency,
     'es-ES',
   );
-  const date = new Intl.DateTimeFormat('es-ES', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(new Date(`${transaction.occurredOn}T12:00:00`));
+  const date = formatNumericLocalDate(transaction.occurredOn);
   const title = transaction.title.trim() || category?.name || 'Sin categoría';
   // El círculo del autor es puramente visual: sin esto, quien use un lector de
   // pantalla no tendría forma de saber quién creó el movimiento.

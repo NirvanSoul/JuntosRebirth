@@ -17,6 +17,7 @@ import { markStartup } from '@/lib/diagnostics/startupTrace';
 import { listLocalNotificationRules } from '@/features/transactions/repositories/localTransactionNotificationRuleRepository';
 import type { TransactionNotificationRule } from '@/features/transactions/types';
 import { useNetworkAvailability } from '@/hooks/useNetworkAvailability';
+import { isDemoSessionActive } from '@/state/demoSession/demoSessionStore';
 
 export { sharedDataMaxBackoffMs, sharedDataRefreshIntervalMs };
 
@@ -95,18 +96,18 @@ export function useSessionStartup(
   useEffect(() => {
     let isMounted = true;
 
-    const showLocalFinance = () => {
-      markStartup('local_finance_ready');
-      return reloadLocalFinance()
+    const showLocalFinance = () =>
+      reloadLocalFinance()
         .then(() => {
+          markStartup('local_finance_ready');
           if (isMounted) setFinanceReady(true);
         })
         .catch(() => undefined);
-    };
 
     const openSession = async () => {
       try {
-        if (sessionUserId) {
+        // El usuario demo no tiene cuenta remota: su caché es todo lo que hay.
+        if (sessionUserId && !isDemoSessionActive()) {
           await initializeAuthenticatedSession({
             onLocalCacheReady: (preparation) => {
               // Una caché descartada era de otra cuenta: no hay nada que
@@ -120,8 +121,8 @@ export function useSessionStartup(
         // Un 5xx de bootstrap o snapshot no invalida ni descarta la caché.
         // Mostrarla permite seguir trabajando y deja la recuperación en manos
         // del botón explícito de reintento.
-        markStartup('local_finance_ready');
         await reloadLocalFinance();
+        markStartup('local_finance_ready');
       }
       if (!isMounted) return;
       // Un fallo al cargar reglas no bloquea el acceso a las finanzas.
@@ -180,7 +181,7 @@ export function useSessionStartup(
   }, [isOffline, retrySession, syncIssue?.kind]);
 
   useSharedDataPolling({
-    enabled: isSessionSynced && Boolean(session),
+    enabled: isSessionSynced && Boolean(session) && !isDemoSessionActive(),
     onPoll: () =>
       refreshSharedCoupleData(undefined, {
         mode: 'delta',

@@ -1,4 +1,8 @@
-import { getLocalTodayKey, toLocalDateKey } from '@/lib/date/localDate';
+import {
+  formatNumericLocalDate,
+  getLocalTodayKey,
+  toLocalDateKey,
+} from '@/lib/date/localDate';
 
 describe('toLocalDateKey', () => {
   it('rellena con ceros mes y día de un solo dígito', () => {
@@ -29,5 +33,11 @@ describe('getLocalTodayKey', () => {
   it('devuelve la fecha de hoy en hora local', () => {
     jest.useFakeTimers({ now: new Date(2026, 0, 5, 12, 0) });
     expect(getLocalTodayKey()).toBe('2026-01-05');
+  });
+});
+
+describe('formatNumericLocalDate', () => {
+  it('formatea la fecha como día, mes y año con dos dígitos', () => {
+    expect(formatNumericLocalDate('2026-01-05')).toBe('05/01/2026');
   });
 });

@@ -7,6 +7,7 @@ import type { Category } from '@/features/categories/types';
 import type { ImportedTransactionCandidate } from '@/features/import/types';
 import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { defaultCurrencyCode } from '@/lib/currency/currencyCatalog';
+import { formatNumericLocalDate } from '@/lib/date/localDate';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -26,11 +27,7 @@ const rowIconSize = 40;
 
 function formatDate(occurredOn: string | null): string {
   if (!occurredOn) return 'Sin fecha';
-  return new Intl.DateTimeFormat('es-ES', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(new Date(`${occurredOn}T12:00:00`));
+  return formatNumericLocalDate(occurredOn);
 }
 
 /** Fila de revisión de un candidato de importación (Bible §51-§53). */

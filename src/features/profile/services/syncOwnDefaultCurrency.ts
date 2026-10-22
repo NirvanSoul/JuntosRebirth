@@ -2,6 +2,7 @@ import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedU
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { apiClient } from '@/services/api/juntossApiClient';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
+import { isDemoSessionActive } from '@/state/demoSession/demoSessionStore';
 
 /**
  * Publica la moneda principal de la persona autenticada.
@@ -16,7 +17,9 @@ export async function syncOwnDefaultCurrency(
   currency: CurrencyCode,
 ): Promise<boolean> {
   const userId = await getAuthenticatedUserId();
-  if (!userId) return false;
+  // El usuario demo tiene un id local para comportarse como una sesión real,
+  // pero deliberadamente no existe en la API ni debe iniciar sincronizaciones.
+  if (!userId || isDemoSessionActive()) return false;
 
   try {
     // La preferencia se carga al montar la interfaz y puede adelantarse a la

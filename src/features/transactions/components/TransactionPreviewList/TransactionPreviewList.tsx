@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useDeferredValue, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -26,10 +26,18 @@ type TransactionPreviewListProps = {
   groupingTransactions?: readonly SessionTransaction[];
   limit?: number;
   onOpenTransactionDetail?: (transactionId: string) => void;
+  /**
+   * Pinta primero unas pocas filas y el resto en un render diferido. Para
+   * listas dentro de hojas: así montar la hoja no espera al historial entero.
+   */
+  progressive?: boolean;
   showAuthorName?: boolean;
   testID?: string;
   transactions: readonly SessionTransaction[];
 };
+
+/** Filas que caben en la primera pantalla de una hoja. */
+const progressiveInitialGroups = 12;
 
 type TransactionPreviewGroup = {
   id: string;
@@ -97,6 +105,7 @@ export function TransactionPreviewList({
   groupingTransactions,
   limit,
   onOpenTransactionDetail,
+  progressive = false,
   showAuthorName = false,
   testID,
   transactions,
@@ -133,6 +142,20 @@ export function TransactionPreviewList({
     const grouped = groupTransactionsForPreview(transactions);
     return limit === undefined ? grouped : grouped.slice(0, limit);
   }, [limit, transactions]);
+  const initialGroups = useMemo(
+    () => (progressive ? groups.slice(0, progressiveInitialGroups) : groups),
+    [groups, progressive],
+  );
+  const deferredGroups = useDeferredValue(groups, initialGroups);
+  // Fuera del modo progresivo no se difiere: cada cambio se pintaría dos veces.
+  const renderedGroups = progressive ? deferredGroups : groups;
+  const toggleGroup = (groupId: string) =>
+    setExpandedGroupIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
 
   return (
     <Animated.View
@@ -140,7 +163,7 @@ export function TransactionPreviewList({
       style={styles.list}
       testID={testID}
     >
-      {groups.map((group, index) => {
+      {renderedGroups.map((group, index) => {
         const [primary, ...children] = group.transactions;
         if (!primary) return null;
 
@@ -151,78 +174,176 @@ export function TransactionPreviewList({
             (customGroupSizes.get(primary.recurrenceGroupId) ?? 0) > 1,
           );
         const isExpandable = isCustomFolder && children.length > 0;
-        const isExpanded = isExpandable && expandedGroupIds.has(group.id);
-        const category = categoriesById.get(primary.categoryId) ?? null;
         return (
-          <Animated.View
-            key={group.id}
+          <TransactionPreviewGroupRow
+            categories={group.transactions.map(
+              (transaction) =>
+                categoriesById.get(transaction.categoryId) ?? null,
+            )}
             entering={
               animateEntrance ? getStartupEntering(index + 5) : undefined
             }
-            layout={getDisclosureLayoutTransition()}
-            testID={isCustomFolder ? 'transaction-preview-group' : undefined}
-          >
-            <View style={isCustomFolder ? styles.mainCard : undefined}>
-              <TransactionPreviewCard
-                category={category}
-                expandable={isExpandable}
-                expanded={isExpanded}
-                onPress={
-                  onOpenTransactionDetail
-                    ? () => onOpenTransactionDetail(primary.id)
-                    : undefined
-                }
-                onToggleExpanded={() =>
-                  setExpandedGroupIds((current) => {
-                    const next = new Set(current);
-                    if (next.has(group.id)) next.delete(group.id);
-                    else next.add(group.id);
-                    return next;
-                  })
-                }
-                showAuthorName={showAuthorName}
-                stacked={isCustomFolder}
-                transaction={primary}
-              />
-            </View>
-            {isExpandable ? (
-              <Animated.View
-                layout={getDisclosureLayoutTransition()}
-                style={isExpanded ? styles.tree : undefined}
-                testID={isExpanded ? 'transaction-preview-tree' : undefined}
-              >
-                {isExpanded
-                  ? children.map((transaction, index) => (
-                      <Animated.View
-                        entering={getGroupItemEntering(index)}
-                        exiting={getGroupItemExiting(index)}
-                        key={transaction.id}
-                        layout={getDisclosureLayoutTransition()}
-                        testID="transaction-preview-tree-item"
-                      >
-                        <TransactionPreviewCard
-                          category={
-                            categoriesById.get(transaction.categoryId) ?? null
-                          }
-                          onPress={
-                            onOpenTransactionDetail
-                              ? () => onOpenTransactionDetail(transaction.id)
-                              : undefined
-                          }
-                          showAuthorName={showAuthorName}
-                          transaction={transaction}
-                        />
-                      </Animated.View>
-                    ))
-                  : null}
-              </Animated.View>
-            ) : null}
-          </Animated.View>
+            groupId={group.id}
+            isCustomFolder={isCustomFolder}
+            isExpandable={isExpandable}
+            isExpanded={isExpandable && expandedGroupIds.has(group.id)}
+            key={group.id}
+            onOpenTransactionDetail={onOpenTransactionDetail}
+            onToggleGroup={toggleGroup}
+            showAuthorName={showAuthorName}
+            styles={styles}
+            transactions={group.transactions}
+          />
         );
       })}
     </Animated.View>
   );
 }
+
+type TransactionPreviewGroupRowProps = {
+  /** Categoría de cada movimiento de `transactions`, en el mismo orden. */
+  categories: readonly (Category | null)[];
+  entering: ReturnType<typeof getStartupEntering> | undefined;
+  groupId: string;
+  isCustomFolder: boolean;
+  isExpandable: boolean;
+  isExpanded: boolean;
+  onOpenTransactionDetail?: (transactionId: string) => void;
+  onToggleGroup: (groupId: string) => void;
+  showAuthorName: boolean;
+  styles: ReturnType<typeof createStyles>;
+  transactions: readonly SessionTransaction[];
+};
+
+function isSameDisplayedTransaction(
+  a: SessionTransaction,
+  b: SessionTransaction,
+): boolean {
+  return (
+    a.id === b.id &&
+    a.title === b.title &&
+    a.amountMinor === b.amountMinor &&
+    a.currency === b.currency &&
+    a.type === b.type &&
+    a.occurredOn === b.occurredOn &&
+    a.createdBy === b.createdBy
+  );
+}
+
+function isSameDisplayedCategory(
+  a: Category | null,
+  b: Category | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    a.icon === b.icon &&
+    a.colorToken === b.colorToken
+  );
+}
+
+/**
+ * Compara lo que la fila pinta, no la identidad de los objetos: cada recarga
+ * desde SQLite crea objetos nuevos para todo el historial, y sin esto un solo
+ * movimiento nuevo repintaba todas las filas. `entering` se ignora porque solo
+ * actúa al montar; con él, insertar una fila arriba repintaba las de debajo.
+ */
+function areGroupRowPropsEqual(
+  previous: TransactionPreviewGroupRowProps,
+  next: TransactionPreviewGroupRowProps,
+): boolean {
+  return (
+    previous.groupId === next.groupId &&
+    previous.isCustomFolder === next.isCustomFolder &&
+    previous.isExpandable === next.isExpandable &&
+    previous.isExpanded === next.isExpanded &&
+    previous.onOpenTransactionDetail === next.onOpenTransactionDetail &&
+    previous.onToggleGroup === next.onToggleGroup &&
+    previous.showAuthorName === next.showAuthorName &&
+    previous.styles === next.styles &&
+    previous.transactions.length === next.transactions.length &&
+    previous.transactions.every((transaction, index) =>
+      isSameDisplayedTransaction(transaction, next.transactions[index]!),
+    ) &&
+    previous.categories.every((category, index) =>
+      isSameDisplayedCategory(category, next.categories[index] ?? null),
+    )
+  );
+}
+
+const TransactionPreviewGroupRow = memo(function TransactionPreviewGroupRow({
+  categories,
+  entering,
+  groupId,
+  isCustomFolder,
+  isExpandable,
+  isExpanded,
+  onOpenTransactionDetail,
+  onToggleGroup,
+  showAuthorName,
+  styles,
+  transactions,
+}: TransactionPreviewGroupRowProps) {
+  const [primary, ...children] = transactions;
+  if (!primary) return null;
+
+  return (
+    <Animated.View
+      entering={entering}
+      layout={getDisclosureLayoutTransition()}
+      testID={isCustomFolder ? 'transaction-preview-group' : undefined}
+    >
+      <View style={isCustomFolder ? styles.mainCard : undefined}>
+        <TransactionPreviewCard
+          category={categories[0] ?? null}
+          expandable={isExpandable}
+          expanded={isExpanded}
+          onPress={
+            onOpenTransactionDetail
+              ? () => onOpenTransactionDetail(primary.id)
+              : undefined
+          }
+          onToggleExpanded={() => onToggleGroup(groupId)}
+          showAuthorName={showAuthorName}
+          stacked={isCustomFolder}
+          transaction={primary}
+        />
+      </View>
+      {isExpandable ? (
+        <Animated.View
+          layout={getDisclosureLayoutTransition()}
+          style={isExpanded ? styles.tree : undefined}
+          testID={isExpanded ? 'transaction-preview-tree' : undefined}
+        >
+          {isExpanded
+            ? children.map((transaction, index) => (
+                <Animated.View
+                  entering={getGroupItemEntering(index)}
+                  exiting={getGroupItemExiting(index)}
+                  key={transaction.id}
+                  layout={getDisclosureLayoutTransition()}
+                  testID="transaction-preview-tree-item"
+                >
+                  <TransactionPreviewCard
+                    category={categories[index + 1] ?? null}
+                    onPress={
+                      onOpenTransactionDetail
+                        ? () => onOpenTransactionDetail(transaction.id)
+                        : undefined
+                    }
+                    showAuthorName={showAuthorName}
+                    transaction={transaction}
+                  />
+                </Animated.View>
+              ))
+            : null}
+        </Animated.View>
+      ) : null}
+    </Animated.View>
+  );
+}, areGroupRowPropsEqual);
 
 function createStyles(colors: ColorTokens) {
   return StyleSheet.create({

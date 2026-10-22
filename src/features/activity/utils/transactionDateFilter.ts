@@ -1,9 +1,13 @@
 import {
   describePreviousPeriod,
   getTransactionPeriodRange,
+  listTransactionsByPeriod,
   shiftTransactionPeriod,
   type TransactionPeriod,
 } from '@/features/dashboard/utils/transactionPeriod';
+import type { SessionTransaction } from '@/features/transactions/types';
+import { projectRecurringTransactions } from '@/features/transactions/utils/transactionRecurrence';
+import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import { toLocalDateKey } from '@/lib/date/localDate';
 
 export type TransactionDateFilter =
@@ -91,4 +95,40 @@ export function getPreviousDateFilter(
       -1,
     ),
   };
+}
+
+/**
+ * Movimientos dentro del filtro, con las recurrencias proyectadas y del más
+ * reciente al más antiguo. `'all'` proyecta solo hasta fin del mes en curso,
+ * igual que el detalle de categoría, para no listar series infinitas.
+ */
+export function listTransactionsByDateFilter(
+  transactions: readonly SessionTransaction[],
+  filter: TransactionDateFilter,
+): SessionTransaction[] {
+  if (filter === 'all') {
+    return listTransactionsThroughCurrentMonth(transactions).sort(
+      (left, right) => right.occurredOn.localeCompare(left.occurredOn),
+    );
+  }
+
+  if (filter.period !== 'custom') {
+    return listTransactionsByPeriod(
+      transactions,
+      filter.period,
+      filter.selectedDate,
+    );
+  }
+
+  return projectRecurringTransactions({
+    transactions,
+    startOn: filter.startDate,
+    endOn: filter.endDate,
+  })
+    .filter(
+      (transaction) =>
+        transaction.occurredOn >= filter.startDate &&
+        transaction.occurredOn <= filter.endDate,
+    )
+    .sort((left, right) => right.occurredOn.localeCompare(left.occurredOn));
 }

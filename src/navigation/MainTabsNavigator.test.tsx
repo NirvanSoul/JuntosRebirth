@@ -388,9 +388,12 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(invitePartner);
 
     expect(await screen.findByTestId('invite-partner-email')).toBeTruthy();
-    expect(
-      screen.getByRole('tab', { name: 'Inicio' }).props.accessibilityState,
-    ).toMatchObject({ selected: true });
+    // El menú lateral se cierra cuando la pantalla de invitación ya se ve.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('tab', { name: 'Inicio' }).props.accessibilityState,
+      ).toMatchObject({ selected: true }),
+    );
     expect(screen.getByRole('tab', { name: 'Actividad' })).toHaveProp(
       'accessibilityState',
       expect.objectContaining({ disabled: true }),
@@ -463,7 +466,7 @@ describe('MainTabsNavigator', () => {
     expect(await screen.findByTestId('invite-partner-email')).toBeTruthy();
 
     // El selector en cabecera muestra Juntos
-    await fireEvent.press(screen.getByLabelText('Espacio Juntos'));
+    await fireEvent.press(await screen.findByLabelText('Espacio Juntos'));
 
     // Seleccionamos Personal en el menú lateral
     const selectPersonal = screen.getByLabelText(
@@ -475,8 +478,10 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(selectPersonal);
 
     // Debe salir de la pantalla de invitación y volver al espacio Personal
-    expect(screen.queryByTestId('invite-partner-email')).toBeNull();
-    expect(screen.getByLabelText('Espacio Personal')).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByTestId('invite-partner-email')).toBeNull(),
+    );
+    expect(await screen.findByLabelText('Espacio Personal')).toBeTruthy();
   });
 
   it('navega a Inicio y muestra la pantalla de invitar si se pulsa espacio de pareja desde Actividad', async () => {
@@ -507,10 +512,12 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(invitePartner);
 
     expect(await screen.findByTestId('invite-partner-email')).toBeTruthy();
-    expect(screen.getByLabelText('Espacio Juntos')).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Actividad' })).toHaveProp(
-      'accessibilityState',
-      expect.objectContaining({ disabled: true }),
+    expect(await screen.findByLabelText('Espacio Juntos')).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'Actividad' })).toHaveProp(
+        'accessibilityState',
+        expect.objectContaining({ disabled: true }),
+      ),
     );
   });
 
@@ -641,10 +648,14 @@ describe('MainTabsNavigator', () => {
     });
     await fireEvent.press(coupleRow);
 
-    expect(selectSpaceMock).toHaveBeenCalledWith('couple-space');
-    expect(
-      screen.getByRole('tab', { name: 'Inicio' }).props.accessibilityState,
-    ).toMatchObject({ selected: true });
+    await waitFor(() =>
+      expect(selectSpaceMock).toHaveBeenCalledWith('couple-space'),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('tab', { name: 'Inicio' }).props.accessibilityState,
+      ).toMatchObject({ selected: true }),
+    );
   });
 
   it('mantiene fijo el selector de espacio al cambiar de pantalla', async () => {
@@ -1614,8 +1625,11 @@ describe('MainTabsNavigator', () => {
       screen.getByRole('button', { name: 'Copiar a Pareja' }),
     );
 
+    expect(await screen.findByLabelText('Movimiento copiado')).toBeTruthy();
     expect(
-      await screen.findByLabelText('Salario copiado en Pareja exitosamente.'),
+      screen.getByTestId('copy-notice-category-icon', {
+        includeHiddenElements: true,
+      }),
     ).toBeTruthy();
 
     await fireEvent.press(

@@ -1089,6 +1089,7 @@ describe('restoreRemoteAccount (delta sync y cursor)', () => {
 
     expect(result.outcome).toEqual({
       mode: 'delta',
+      changedRows: 0,
       receivedRows: 0,
       catalogueChanged: false,
     });
@@ -1262,6 +1263,7 @@ describe('restoreRemoteAccount (delta sync y cursor)', () => {
     });
 
     expect(result.outcome.receivedRows).toBe(1);
+    expect(result.outcome.changedRows).toBe(1);
     const linkCategoryInserts = (
       database.runAsync as jest.Mock
     ).mock.calls.filter(
@@ -1271,5 +1273,84 @@ describe('restoreRemoteAccount (delta sync y cursor)', () => {
         params.includes('category'),
     );
     expect(linkCategoryInserts).toHaveLength(0);
+  });
+
+  it('delta no cuenta como cambio el eco de un movimiento ya subido', async () => {
+    const updatedAt = '2026-09-11T11:30:00.000Z';
+    mockReadCursor.mockResolvedValue({
+      serverTime: '2026-09-11T11:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaceRemoteIds: ['space-1'],
+    });
+    (database.getAllAsync as jest.Mock).mockImplementation(
+      async (sql: string, ...params: unknown[]) => {
+        if (
+          typeof sql === 'string' &&
+          sql.includes('FROM remote_entity_links')
+        ) {
+          const entityType = params[1];
+          if (entityType === 'space')
+            return [{ remote_id: 'space-1', local_id: 'personal' }];
+          if (entityType === 'category')
+            return [{ remote_id: 'cat-remota', local_id: 'cat-local' }];
+          if (entityType === 'transaction')
+            return [{ remote_id: 'tx-remota', local_id: 'tx-local' }];
+        }
+        return [];
+      },
+    );
+    // La fila local ya está sincronizada con el mismo sello que llega.
+    (database.getFirstAsync as jest.Mock).mockImplementation(
+      async (sql: string) =>
+        typeof sql === 'string' && sql.includes('SELECT updated_at')
+          ? { updated_at: updatedAt }
+          : null,
+    );
+    mockFetchChanges.mockResolvedValue({
+      serverTime: '2026-09-11T12:00:00.000Z',
+      activeFinancialContextId: 'ctx-1',
+      spaces: [
+        {
+          remoteId: 'space-1',
+          name: 'Personal',
+          type: 'personal',
+          currency: 'EUR',
+          activatedAt: null,
+        },
+      ],
+      categories: [],
+      moneyAccounts: [],
+      recurringSeries: [],
+      transactions: [
+        {
+          remoteId: 'tx-remota',
+          spaceRemoteId: 'space-1',
+          categoryRemoteId: 'cat-remota',
+          moneyAccountRemoteId: null,
+          createdBy: 'user-1',
+          type: 'expense',
+          amountMinor: 100,
+          currency: 'EUR',
+          title: 'Café',
+          occurredOn: '2026-09-11',
+          note: null,
+          recurrence: 'once',
+          recurrenceGroupId: null,
+          recurrenceSeriesRemoteId: null,
+          sourceTransactionId: null,
+          isArchived: false,
+          createdAt: updatedAt,
+          updatedAt,
+          archivedAt: null,
+        },
+      ],
+    });
+
+    const result = await restoreRemoteAccountForCurrentSession({
+      mode: 'delta',
+    });
+
+    expect(result.outcome.receivedRows).toBe(1);
+    expect(result.outcome.changedRows).toBe(0);
   });
 });

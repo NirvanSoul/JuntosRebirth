@@ -17,7 +17,10 @@ describe('googleAuth service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     __resetGoogleSigninForTest();
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
+
+  afterEach(() => jest.restoreAllMocks());
 
   it('inicia sesión nativa correctamente y envía el idToken a Better Auth', async () => {
     jest.mocked(GoogleSignin.signIn).mockResolvedValueOnce({
@@ -74,6 +77,7 @@ describe('googleAuth service', () => {
 
     expect(result).toEqual({
       status: 'error',
+      code: 'missing_token',
       message: 'No se recibió la confirmación de identidad de Google.',
     });
     expect(authClient.signIn.social).not.toHaveBeenCalled();
@@ -82,6 +86,18 @@ describe('googleAuth service', () => {
   it('retorna cancelled cuando el usuario cancela el selector nativo', async () => {
     jest.mocked(GoogleSignin.signIn).mockRejectedValueOnce({
       code: statusCodes.SIGN_IN_CANCELLED,
+    });
+
+    const result = await signInWithGoogleNative();
+
+    expect(result).toEqual({ status: 'cancelled' });
+    expect(authClient.signIn.social).not.toHaveBeenCalled();
+  });
+
+  it('retorna cancelled con el resultado moderno del SDK', async () => {
+    jest.mocked(GoogleSignin.signIn).mockResolvedValueOnce({
+      type: 'cancelled',
+      data: null,
     });
 
     const result = await signInWithGoogleNative();
@@ -99,6 +115,7 @@ describe('googleAuth service', () => {
 
     expect(result).toEqual({
       status: 'error',
+      code: 'in_progress',
       message: 'Ya hay un inicio de sesión con Google en curso.',
     });
   });
@@ -112,9 +129,34 @@ describe('googleAuth service', () => {
 
     expect(result).toEqual({
       status: 'error',
+      code: 'play_services',
       message:
         'Los servicios de Google Play no están disponibles o requieren actualización.',
     });
+  });
+
+  it('identifica DEVELOPER_ERROR de Android como configuración OAuth', async () => {
+    jest.mocked(GoogleSignin.signIn).mockRejectedValueOnce({
+      code: '10',
+      message: 'DEVELOPER_ERROR',
+    });
+
+    const result = await signInWithGoogleNative();
+
+    expect(result).toEqual({
+      status: 'error',
+      code: 'configuration',
+      message:
+        'Esta versión de Juntos no está autorizada correctamente para usar Google. Actualiza la app o contacta con soporte.',
+    });
+    expect(console.error).toHaveBeenCalledWith(
+      '[google-auth] No se pudo completar el acceso',
+      {
+        code: 'configuration',
+        providerCode: '10',
+        stage: 'native',
+      },
+    );
   });
 
   it('retorna error cuando Better Auth responde con fallo', async () => {
@@ -133,7 +175,45 @@ describe('googleAuth service', () => {
 
     expect(result).toEqual({
       status: 'error',
+      code: 'server',
       message: 'No pudimos verificar tu cuenta de Google. Inténtalo de nuevo.',
+    });
+  });
+
+  it('explica cómo entrar cuando el correo ya pertenece a otra cuenta', async () => {
+    jest.mocked(GoogleSignin.signIn).mockResolvedValueOnce({
+      data: { idToken: 'test-valid-id-token' },
+    } as never);
+    jest.mocked(authClient.signIn.social).mockResolvedValueOnce({
+      data: null,
+      error: {
+        error: { code: 'SOCIAL_ACCOUNT_NOT_LINKED' },
+        message: 'Account not linked',
+      },
+    } as never);
+
+    await expect(signInWithGoogleNative()).resolves.toEqual({
+      status: 'error',
+      code: 'account_not_linked',
+      message:
+        'Ya tienes una cuenta con este correo. Entra con tu email y contraseña para vincular Google.',
+    });
+  });
+
+  it('identifica un token social rechazado como problema de configuración', async () => {
+    jest.mocked(GoogleSignin.signIn).mockResolvedValueOnce({
+      data: { idToken: 'test-valid-id-token' },
+    } as never);
+    jest.mocked(authClient.signIn.social).mockResolvedValueOnce({
+      data: null,
+      error: { code: 'INVALID_SOCIAL_TOKEN', message: 'Invalid token' },
+    } as never);
+
+    await expect(signInWithGoogleNative()).resolves.toEqual({
+      status: 'error',
+      code: 'invalid_token',
+      message:
+        'Esta versión de Juntos no pudo validar tu cuenta de Google. Actualiza la app o contacta con soporte.',
     });
   });
 
@@ -146,6 +226,7 @@ describe('googleAuth service', () => {
 
     expect(result).toEqual({
       status: 'error',
+      code: 'provider',
       message: 'No pudimos continuar con Google. Inténtalo de nuevo.',
     });
   });

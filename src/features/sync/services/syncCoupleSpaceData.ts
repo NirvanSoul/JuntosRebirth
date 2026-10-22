@@ -147,7 +147,16 @@ async function syncSpaceData(input: {
     database.getAllAsync<SyncRow>(
       `SELECT id, category_id AS "categoryId",
               money_account_id AS "moneyAccountId", created_by AS "createdBy",
-              type, amount_minor AS "amountMinor", currency, title,
+              type, amount_minor AS "amountMinor", currency,
+              COALESCE(
+                NULLIF(TRIM(recurring_transaction_series.title), ''),
+                (
+                  SELECT categories.name
+                    FROM categories
+                   WHERE categories.id = recurring_transaction_series.category_id
+                ),
+                'Movimiento'
+              ) AS title,
               frequency, starts_on AS "startsOn",
               generated_occurrences AS "generatedOccurrences",
               next_occurrence_on AS "nextOccurrenceOn",

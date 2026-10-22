@@ -241,7 +241,7 @@ function createStyles(colors: ColorTokens) {
       justifyContent: 'center',
       borderRadius: radii.round,
       borderWidth: 2,
-      borderColor: colors.modalBackground,
+      borderColor: colors.background,
       backgroundColor: colors.brand,
     },
     field: {

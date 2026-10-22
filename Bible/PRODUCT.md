@@ -129,9 +129,12 @@ dentro de un único carrusel horizontal. Ninguna categoría de plantilla o perso
 implícitamente en otro espacio. Los iconos de categoría usan siempre su
 variante rellena para mantener una identidad visual consistente.
 
-Una categoría puede tener un presupuesto simple opcional. Cuando existe, las
-vistas previas pueden mostrar el progreso del gasto frente a ese límite; cuando
-no existe, no deben simular ni mostrar un anillo de progreso.
+Una categoría puede tener un presupuesto simple opcional. El presupuesto es
+mensual: se reinicia cada mes y solo lo consumen los gastos del mes en curso en
+la moneda del espacio, incluidos los recurrentes programados dentro de ese mes.
+Cuando existe, las vistas previas pueden mostrar el progreso del gasto del mes
+frente a ese límite; cuando no existe, no deben simular ni mostrar un anillo de
+progreso.
 
 Ejemplo:
 
@@ -239,6 +242,11 @@ El acceso a la aplicación requiere una cuenta con correo verificado.
 - El onboarding es la primera pantalla de una instalación nueva y se marca
   como completado al llegar a Acceso, aunque la autenticación ocurra después.
 - Tras cerrar sesión, no se repite: el usuario vuelve directamente a Acceso.
+- En Acceso, «Crear cuenta» e «Iniciar sesión» (y por tanto Google) quedan
+  desactivados hasta marcar la casilla «Acepto los Términos de servicio y la
+  Política de privacidad»; cada documento se abre dentro de la app. Al
+  autenticar se registra la aceptación de las versiones vigentes en
+  `POST /v1/me/legal-acceptances`; un fallo al registrarla no bloquea la entrada.
 - La lámina de uso personal y compartido («Juntos, pero no revueltos») avanza mediante «Continuar» hacia la pregunta de notificaciones, sin botón de omitir.
 - La lámina de notificaciones explica que los avisos sirven para recordatorios
   activados e invitaciones. `Activar notificaciones` solicita el permiso nativo
@@ -346,7 +354,8 @@ Permite recorrer periodos históricos y futuros. Al avanzar a meses posteriores,
 proyecta en memoria las ocurrencias semanales, quincenales y mensuales de las
 series abiertas sin sumarlas al resumen de Inicio ni persistir filas por
 adelantado. Los filtros reutilizan la opción seleccionable compartida, con
-superficie blanca, check circular y borde violeta al seleccionar. Debajo muestran una tarjeta con el total de ingresos o gastos del
+superficie blanca y, al seleccionar, texto violeta y el mismo borde en violeta
+en lugar de gris, sin check, para que quepan en una sola fila. Debajo muestran una tarjeta con el total de ingresos o gastos del
 periodo seleccionado. Después del listado aparece la acción `Añadir ingreso` en
 verde o `Añadir gasto` en rojo.
 
@@ -482,14 +491,16 @@ aplicar. El grupo de tipo se puede plegar para reducir la altura de la hoja;
 tipo, categoría, recurrencia y fecha forman un acordeón animado que mantiene un
 solo grupo abierto; Moneda se integra en ese mismo acordeón cuando corresponde.
 Todos reutilizan la opción seleccionable del formulario de
-movimiento o la tarjeta existente de categoría, manteniendo un check visible al
-seleccionar.
-Categoría permite seleccionar varias tarjetas existentes y, como Recurrencia,
-usa un catálogo horizontal de dos filas que ocupa todo el ancho de la hoja.
+movimiento o la tarjeta existente de categoría. Las opciones de texto no llevan
+check: la seleccionada se marca con texto violeta y su borde pasa de gris a
+violeta con el mismo grosor. Las tarjetas de categoría conservan su check.
+Categoría permite seleccionar varias tarjetas existentes en un catálogo
+horizontal de dos filas que ocupa todo el ancho de la hoja; Recurrencia usa una
+sola fila horizontal desplazable.
 Fecha aparece como primer grupo y reutiliza el navegador temporal de los
 reportes de Inicio. Todos, Semana, Quincena, Mes, Año y Personalizada comparten
-opciones con check en un catálogo horizontal de dos filas; Personalizada se
-ubica junto a Quincena y permite elegir un rango en el calendario. Los cuatro
+opciones sin check en una sola fila horizontal desplazable; Personalizada se
+ubica al final y permite elegir un rango en el calendario. Los cuatro
 periodos regulares permiten recorrer fechas históricas y futuras. Las acciones inferiores reutilizan las acciones
 comunes de modal y `Aplicar filtros` usa el CTA violeta. Las
 animaciones respetan la preferencia de movimiento reducido. La interfaz interna
@@ -574,6 +585,13 @@ La preferencia «Símbolos de moneda» pertenece al perfil y se conserva en el
 dispositivo. Al desactivarla, todos los importes visibles muestran únicamente
 el número formateado; no cambia la moneda del movimiento, sus cálculos, filtros
 ni datos sincronizados. Está activada por defecto.
+
+Las monedas activas deciden qué divisas muestra la app. Al quitar una, sus
+movimientos y los saldos de cuenta en esa moneda dejan de verse en Inicio,
+Actividad, Mapa y el detalle de categoría, aunque el espacio naciera en ella;
+no se borra nada y todo reaparece al reactivarla. La primera moneda activa es
+la predeterminada. En un espacio compartido siguen visibles las monedas de los
+demás miembros y las de los movimientos que ellos registran.
 
 Mientras una capacidad todavía no esté implementada, su fila permanece visible
 para validar la arquitectura de la pantalla, muestra un punto rojo junto a la
@@ -662,11 +680,20 @@ aparece en Ajustes.
 
 Pantalla informativa accesible desde la pestaña Pronto, también durante la
 espera de una invitación de pareja. Conserva el encabezado del espacio activo
-y muestra el titular centrado «Lo que viene lo construiremos juntos.».
-Debajo presenta seis tarjetas con iconos y la indicación «Próximamente»:
-Ahorros, Metas, Lista de deseos, Espacios familiares, Planes y Préstamos.
-Las tarjetas no son acciones ni habilitan esas funcionalidades; no muestran
-fechas de lanzamiento. Reutilizan los tokens visuales de las previews.
+y muestra el titular centrado «Lo que viene lo construiremos» completado por
+el logo de Juntos, con contraste adaptado al tema.
+Debajo presenta siete tarjetas con iconos y la indicación «Próximamente»:
+Ahorros, Lista de deseos, Espacios familiares, Planes, Préstamos, Escáner de
+facturas y Chat de voz con IA. Cada tarjeta abre un modal con una propuesta
+breve de funcionamiento, sin habilitar la función ni prometer fechas.
+Chat de voz con IA aparece primero con un micrófono clásico. Los modales
+reutilizan el icono de la tarjeta, separan la propuesta en dos párrafos y
+reservan un bloque inferior para compartir ideas. La pantalla también ofrece
+un botón amplio «Compartir mi idea» para sugerencias generales.
+El botón «Compartir mi idea» abre el cliente de correo con destinatario
+`aora.estudio.o@gmail.com` y asunto relativo a la función; el usuario decide
+qué escribir y cuándo enviarlo. Si no se puede abrir, se muestra la dirección
+como alternativa. Se reutilizan los tokens visuales de las previews y el modal global.
 
 ### Modal
 
@@ -828,7 +855,16 @@ Política de trabajo:
 ### Detalle de categoría
 
 El detalle reúne el nombre, icono, totales con actividad y movimientos asociados.
-Un total de ingresos o gastos igual a cero se omite. El presupuesto solo aparece
+Sobre los totales, un selector de periodo decide qué se suma y qué se lista. El
+detalle abre en el mes en curso. Las opciones permanecen plegadas: al pulsar el
+texto del periodo entre las flechas se despliegan de arriba abajo, a todo el
+ancho de la pantalla, y se pliegan al elegir una. El usuario puede cambiar a
+`Todos` (todo el historial), a una semana, quincena, mes o año que recorre con
+las flechas, o a un rango `Personalizado`. Reutiliza el selector de periodo y el
+calendario de rango de Actividad. El periodo filtra los totales, `Movimientos` y
+`Movimientos futuros` por igual: los totales de un periodo suman también sus
+movimientos programados, así que un mes futuro muestra lo que ya está previsto.
+Vuelve al mes en curso cada vez que se abre el detalle. Un total de ingresos o gastos igual a cero se omite. El presupuesto solo aparece
 en el resumen cuando existe y muestra mediante una barra lineal el progreso, el
 importe original y cuánto queda disponible. Desde el mismo modal se puede añadir
 o retirar un presupuesto simple mediante un submodal con teclado numérico propio,
@@ -863,14 +899,16 @@ en el mismo orden y ubicación de siempre. `Movimientos` reúne los que ya
 sucedieron, con fecha económica de hoy o anterior. Cuando existe al menos un
 movimiento con fecha posterior a hoy, aparece debajo una segunda sección
 `Movimientos futuros`, ordenada de la fecha más próxima a la más lejana, sin
-límite mensual: a diferencia de Inicio, un movimiento futuro de este espacio
-es visible aquí en cuanto se crea, sin esperar a que su mes llegue. Ambas
+límite mensual propio: a diferencia de Inicio, un movimiento futuro de este
+espacio es visible aquí en cuanto se crea, sin esperar a que su mes llegue,
+siempre que caiga dentro del periodo elegido (con `Todos`, cualquiera). Ambas
 secciones reutilizan la misma lista de vistas previas y el mismo detalle al
 tocar un movimiento.
 
 En un espacio juntos, a la derecha del número de `Movimientos`, el mismo botón
 de filtros de Actividad abre su hoja modal reutilizada. Esta variante contiene
-solo `Fecha` y `Autor`, para filtrar entre ambos, los movimientos propios o los
+solo `Autor`, porque el periodo ya vive a la vista en el detalle, para filtrar
+entre ambos, los movimientos propios o los
 de la pareja; esta última opción muestra su nombre cuando el censo está disponible.
 
 ### Detalle de movimiento

@@ -107,11 +107,60 @@ export function coolDownAuthSession(): void {
   }
 }
 
+type GoogleAuthFailureCode =
+  | 'account_not_linked'
+  | 'configuration'
+  | 'in_progress'
+  | 'invalid_token'
+  | 'missing_token'
+  | 'play_services'
+  | 'provider'
+  | 'server';
+
 export type NativeGoogleAuthResult =
   | { status: 'success' }
   | { status: 'cancelled' }
   | { status: 'unsupported' }
-  | { status: 'error'; message: string };
+  | {
+      status: 'error';
+      code: GoogleAuthFailureCode;
+      message: string;
+    };
+
+function providerErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' || typeof code === 'number'
+    ? String(code)
+    : null;
+}
+
+function providerErrorMessage(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null;
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : null;
+}
+
+function authErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null;
+  const record = error as Record<string, unknown>;
+  if (typeof record.code === 'string') return record.code;
+  return authErrorCode(record.error);
+}
+
+function reportFailure(
+  stage: 'native' | 'server',
+  code: GoogleAuthFailureCode,
+  providerCode: string | null,
+): void {
+  // Nunca registrar el ID token, el correo ni el objeto original: solo datos
+  // operativos suficientes para distinguir configuración, proveedor y API.
+  console.error('[google-auth] No se pudo completar el acceso', {
+    code,
+    providerCode,
+    stage,
+  });
+}
 
 /**
  * Ejecuta el flujo nativo de Google Sign-In:
@@ -134,6 +183,12 @@ export async function signInWithGoogleNative(): Promise<NativeGoogleAuthResult> 
     await mod.GoogleSignin.hasPlayServices();
     const response = await mod.GoogleSignin.signIn();
 
+    // Desde v16 el SDK convierte la cancelación nativa en un resultado; no
+    // siempre rechaza la promesa con SIGN_IN_CANCELLED.
+    if (response.type === 'cancelled') {
+      return { status: 'cancelled' };
+    }
+
     // En versiones modernas de GoogleSignin el idToken se ubica en data.idToken;
     // se comprueba también la propiedad raíz por compatibilidad defensiva.
     const idToken =
@@ -141,8 +196,10 @@ export async function signInWithGoogleNative(): Promise<NativeGoogleAuthResult> 
       (response as { idToken?: string | null })?.idToken;
 
     if (!idToken) {
+      reportFailure('native', 'missing_token', null);
       return {
         status: 'error',
+        code: 'missing_token',
         message: 'No se recibió la confirmación de identidad de Google.',
       };
     }
@@ -155,8 +212,32 @@ export async function signInWithGoogleNative(): Promise<NativeGoogleAuthResult> 
     });
 
     if (result.error) {
+      const code = authErrorCode(result.error);
+
+      if (code === 'SOCIAL_ACCOUNT_NOT_LINKED') {
+        reportFailure('server', 'account_not_linked', code);
+        return {
+          status: 'error',
+          code: 'account_not_linked',
+          message:
+            'Ya tienes una cuenta con este correo. Entra con tu email y contraseña para vincular Google.',
+        };
+      }
+
+      if (code === 'INVALID_SOCIAL_TOKEN') {
+        reportFailure('server', 'invalid_token', code);
+        return {
+          status: 'error',
+          code: 'invalid_token',
+          message:
+            'Esta versión de Juntos no pudo validar tu cuenta de Google. Actualiza la app o contacta con soporte.',
+        };
+      }
+
+      reportFailure('server', 'server', code);
       return {
         status: 'error',
+        code: 'server',
         message:
           'No pudimos verificar tu cuenta de Google. Inténtalo de nuevo.',
       };
@@ -164,7 +245,8 @@ export async function signInWithGoogleNative(): Promise<NativeGoogleAuthResult> 
 
     return { status: 'success' };
   } catch (error: unknown) {
-    const code = (error as { code?: string })?.code;
+    const code = providerErrorCode(error);
+    const message = providerErrorMessage(error);
     const statusCodes = mod.statusCodes;
     if (code === statusCodes.SIGN_IN_CANCELLED) {
       return { status: 'cancelled' };
@@ -172,19 +254,35 @@ export async function signInWithGoogleNative(): Promise<NativeGoogleAuthResult> 
     if (code === statusCodes.IN_PROGRESS) {
       return {
         status: 'error',
+        code: 'in_progress',
         message: 'Ya hay un inicio de sesión con Google en curso.',
       };
     }
     if (code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
       return {
         status: 'error',
+        code: 'play_services',
         message:
           'Los servicios de Google Play no están disponibles o requieren actualización.',
       };
     }
 
+    // Google Play Services usa el código numérico 10 para DEVELOPER_ERROR:
+    // package y/o SHA-1 no coinciden con un cliente OAuth Android autorizado.
+    if (code === '10' || message?.includes('DEVELOPER_ERROR')) {
+      reportFailure('native', 'configuration', code);
+      return {
+        status: 'error',
+        code: 'configuration',
+        message:
+          'Esta versión de Juntos no está autorizada correctamente para usar Google. Actualiza la app o contacta con soporte.',
+      };
+    }
+
+    reportFailure('native', 'provider', code);
     return {
       status: 'error',
+      code: 'provider',
       message: 'No pudimos continuar con Google. Inténtalo de nuevo.',
     };
   }

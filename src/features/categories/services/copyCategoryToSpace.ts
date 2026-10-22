@@ -45,6 +45,8 @@ export async function copyCategoryToSpace({
 
   const copiedCategory = await createLocalCategory({
     ...source,
+    // La copia es otra fila: con el id del original chocaría con su clave.
+    id: undefined,
     spaceId: targetSpaceId,
     name: validation.name,
     isDefault: false,

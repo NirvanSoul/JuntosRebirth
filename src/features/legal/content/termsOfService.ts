@@ -6,19 +6,19 @@ import type { LegalDocumentContent } from '@/features/legal/model/types';
  */
 export const termsOfService: LegalDocumentContent = {
   documentId: 'terms-of-service',
-  version: '2026.1',
+  version: '2026.2',
   effectiveDate: 'Fecha de publicación de la app en las tiendas',
-  lastUpdated: '2026-08-07',
+  lastUpdated: '2026-10-17',
   locale: 'es-ES',
   title: 'Términos de servicio de Juntos',
   intro: [
-    'Estos términos regulan el uso de Juntos. Al usar la aplicación aceptas estas condiciones.',
+    'Estos términos regulan el uso de Juntos. Para crear una cuenta o iniciar sesión debes aceptarlos expresamente, junto con la Política de privacidad. Puedes leerlos antes de decidir; si no los aceptas, no podrás crear una cuenta.',
   ],
   sections: [
     {
       heading: '1. Proveedor',
       body: [
-        'Juntos es operada por Alan Rios y Alejandro Perez, con residencia en Venezuela y España respectivamente, con contacto en aora.estudio.o@gmail.com.',
+        'Juntos es operada, bajo el nombre Aora Estudio, por Alan Rios y Alejandro Perez, con residencia en Venezuela y España respectivamente, con contacto en aora.estudio.o@gmail.com.',
       ],
     },
     {
@@ -50,6 +50,7 @@ export const termsOfService: LegalDocumentContent = {
       heading: '6. Uso permitido',
       body: [
         'Puedes usar Juntos para registrar y organizar tus finanzas personales y, si lo decides, compartirlas de forma selectiva con otra persona dentro de un espacio compartido.',
+        'Juntos es una herramienta de organización: la información que muestra es la que tú registras o importas desde un archivo que eliges. Juntos no se conecta a tus cuentas bancarias, no solicita tus credenciales bancarias y no accede a tu banco en tu nombre.',
       ],
     },
     {
@@ -110,7 +111,7 @@ export const termsOfService: LegalDocumentContent = {
     {
       heading: '16. No es asesoramiento financiero',
       body: [
-        'Juntos organiza la información que tú introduces; no ofrece asesoramiento financiero, fiscal ni legal, no garantiza resultados sobre tus finanzas, no es una entidad bancaria y, salvo que se indique lo contrario en el futuro, no custodia fondos ni ejecuta pagos en tu nombre.',
+        'Juntos organiza la información que tú introduces; no ofrece asesoramiento financiero, fiscal ni legal, no garantiza resultados sobre tus finanzas, no es una entidad bancaria ni financiera, no concede préstamos ni créditos, no permite invertir ni operar con criptomonedas y, salvo que se indique lo contrario en el futuro, no custodia fondos, no mueve dinero ni ejecuta pagos o transferencias en tu nombre.',
       ],
     },
     {

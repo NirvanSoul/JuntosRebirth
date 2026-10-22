@@ -6,9 +6,9 @@ import type { LegalDocumentContent } from '@/features/legal/model/types';
  */
 export const privacyPolicy: LegalDocumentContent = {
   documentId: 'privacy-policy',
-  version: '2026.2',
+  version: '2026.3',
   effectiveDate: 'Fecha de publicación de la app en las tiendas',
-  lastUpdated: '2026-10-16',
+  lastUpdated: '2026-10-17',
   locale: 'es-ES',
   title: 'Política de privacidad de Juntos',
   intro: [
@@ -19,7 +19,7 @@ export const privacyPolicy: LegalDocumentContent = {
     {
       heading: '1. Identidad del responsable',
       body: [
-        'Juntos es desarrollada y operada por Alan Rios y Alejandro Perez, con residencia en Venezuela y España respectivamente.',
+        'Juntos es desarrollada y operada, bajo el nombre Aora Estudio, por Alan Rios y Alejandro Perez, con residencia en Venezuela y España respectivamente.',
       ],
     },
     {
@@ -33,23 +33,25 @@ export const privacyPolicy: LegalDocumentContent = {
       body: [
         'Datos de cuenta (cuando creas una cuenta): nombre, correo electrónico, identificador de usuario y metadatos técnicos de autenticación gestionados por la API de Juntos.',
         'Datos financieros que introduces tú mismo: importe, tipo (gasto o ingreso), categoría, título o descripción breve, fecha, recurrencia y el espacio (personal o compartido) al que pertenece cada movimiento.',
+        'Si importas movimientos, Juntos lee únicamente el archivo que eliges (por ejemplo, un extracto que descargaste de tu banco) para crear esos movimientos. Juntos no se conecta a tus cuentas bancarias, no solicita tus credenciales bancarias y no accede a tu banco en tu nombre.',
         'Datos de espacios compartidos: qué miembros pertenecen a un espacio y quién es autor de cada movimiento dentro de él.',
         'Preferencias de la aplicación: moneda, apariencia, reglas de recordatorio y si quieres ver importes en las notificaciones.',
         'Identificador local de instalación, usado para mantener la sincronización y evitar duplicados de operaciones del dispositivo.',
         'Si activas voluntariamente la analítica, Microsoft Clarity recoge un identificador técnico generado por el SDK, las pantallas visibles de la aplicación, interacciones como pulsaciones y datos técnicos de uso y rendimiento para reconstruir sesiones, generar mapas de interacción y métricas. Juntos no envía a Clarity tu correo ni tu identificador de cuenta.',
-        'No recogemos ubicación, contactos, cámara ni fotos: la aplicación no solicita esos permisos porque no los necesita.',
+        'Foto de perfil, solo si decides añadirla: puedes tomarla con la cámara o elegirla de tu galería. Juntos pide el permiso de cámara o de fotos únicamente en ese momento y solo usa la imagen que eliges o tomas; no accede al resto de tu galería. La foto se guarda en tu dispositivo y en tu cuenta para mostrarla en tu perfil y a los miembros de tus espacios compartidos. Puedes cambiarla o quitarla cuando quieras.',
+        'No recogemos tu ubicación ni tus contactos: la aplicación no solicita esos permisos porque no los necesita. Tampoco usamos el micrófono.',
       ],
     },
     {
       heading: '4. De dónde provienen',
       body: [
-        'Los datos de cuenta, financieros, de espacios y preferencias los introduces directamente tú al usar la aplicación. Si activas la analítica, los datos técnicos y de interacción se generan automáticamente mientras utilizas Juntos. Juntos no compra datos sobre ti.',
+        'Los datos de cuenta, financieros, de espacios, preferencias y la foto de perfil los introduces directamente tú al usar la aplicación. Si activas la analítica, los datos técnicos y de interacción se generan automáticamente mientras utilizas Juntos. Juntos no compra datos sobre ti.',
       ],
     },
     {
       heading: '5. Para qué se usan',
       body: [
-        'Para ofrecerte las funciones que usas: registrar movimientos, calcular tu balance, mostrar categorías, gestionar espacios compartidos y enviarte recordatorios locales que tú mismo activas.',
+        'Para ofrecerte las funciones que usas: registrar movimientos, calcular tu balance, mostrar categorías, gestionar espacios compartidos, mostrar tu foto de perfil y enviarte recordatorios locales que tú mismo activas.',
         'Para mantener tu cuenta y sincronizar tus datos entre dispositivos, cuando decides registrarte.',
         'Si das tu consentimiento, usamos Microsoft Clarity para comprender el uso, detectar fricciones y mejorar la estabilidad y el rendimiento. No enviamos eventos personalizados, tu correo ni tu identificador de cuenta, y no usamos la analítica para publicidad.',
       ],
@@ -94,7 +96,7 @@ export const privacyPolicy: LegalDocumentContent = {
     {
       heading: '11. Tus derechos',
       body: [
-        'Puedes solicitar el acceso, la corrección, la portabilidad y la eliminación de tus datos, así como oponerte u obtener la limitación de determinados tratamientos, desde Ajustes → Ayuda → Política de privacidad → Tus datos, o escribiendo a aora.estudio.o@gmail.com.',
+        'Puedes solicitar el acceso, la corrección, la portabilidad y la eliminación de tus datos, así como oponerte u obtener la limitación de determinados tratamientos, desde Ajustes → Datos y privacidad → Estado de los datos → Tus datos, o escribiendo a aora.estudio.o@gmail.com.',
       ],
     },
     {
@@ -106,8 +108,8 @@ export const privacyPolicy: LegalDocumentContent = {
     {
       heading: '13. Eliminación de datos y cuenta',
       body: [
-        'Puedes eliminar tus datos sin eliminar tu cuenta desde Ajustes → Datos y privacidad → Estado de los datos → Tus datos → Eliminar mis datos. Borraremos tus datos financieros y de perfil de la nube y de este dispositivo, conservaremos tus credenciales para que puedas volver a usar la aplicación y cerraremos tus sesiones para evitar que otro dispositivo restaure una copia antigua.',
-        'Puedes iniciar la eliminación de tu cuenta y tus datos desde dentro de la aplicación, en Ajustes → Ayuda → Política de privacidad → Tus datos → Eliminar cuenta y datos.',
+        'Puedes eliminar tus datos sin eliminar tu cuenta desde Ajustes → Datos y privacidad → Estado de los datos → Tus datos → Eliminar mis datos. Borraremos tus datos financieros y de perfil, incluida tu foto de perfil, de la nube y de este dispositivo, conservaremos tus credenciales para que puedas volver a usar la aplicación y cerraremos tus sesiones para evitar que otro dispositivo restaure una copia antigua.',
+        'Puedes iniciar la eliminación de tu cuenta y tus datos desde dentro de la aplicación, en Ajustes → Datos y privacidad → Estado de los datos → Tus datos → Eliminar cuenta y datos.',
         'Si tienes cuenta, al confirmar la eliminación: cerramos tu sesión, eliminamos o anonimizamos tus movimientos según si pertenecen a un espacio personal o compartido (para no romper los datos legítimos de la otra persona del espacio), y eliminamos tu cuenta de autenticación. Esto cumple con los requisitos de eliminación de cuenta de Apple (https://developer.apple.com/support/offering-account-deletion-in-your-app/) y Google Play (https://support.google.com/googleplay/android-developer/answer/13327111).',
       ],
     },

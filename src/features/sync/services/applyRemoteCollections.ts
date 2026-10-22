@@ -70,6 +70,8 @@ export async function applyRemoteCollections(
   transaction: LocalSqlExecutor,
   input: ApplyRemoteCollectionsInput,
 ): Promise<{
+  /** Filas que cambian lo guardado: excluye el eco de lo que subió este dispositivo. */
+  changedRows: number;
   receivedRows: number;
   localCategoryIdByRemoteId: Map<string, string>;
 }> {
@@ -111,6 +113,10 @@ export async function applyRemoteCollections(
 
   const localCategoryIdByRemoteId = new Map<string, string>();
   const localMoneyAccountIdByRemoteId = new Map<string, string>();
+  // Un movimiento que este dispositivo acaba de subir vuelve en el siguiente
+  // delta con el mismo `updatedAt`: el servidor guarda el que le enviamos.
+  // Contarlo como cambio recargaba toda la caché ~2 s después de cada guardado.
+  let echoedTransactions = 0;
 
   for (const remoteCategory of input.collections.categories) {
     const spaceId = input.localSpaceIdByRemoteId.get(
@@ -338,6 +344,16 @@ export async function applyRemoteCollections(
         localId: transactionId,
       });
     }
+    if (input.linkMode === 'delta') {
+      const stored = await transaction.getFirstAsync<{ updated_at: string }>(
+        `SELECT updated_at FROM transactions
+          WHERE id = ? AND sync_status = 'synced'`,
+        transactionId,
+      );
+      if (stored?.updated_at === remoteTransaction.updatedAt) {
+        echoedTransactions += 1;
+      }
+    }
     await transaction.runAsync(
       `INSERT INTO transactions (
          id, space_id, category_id, money_account_id, created_by, type,
@@ -394,5 +410,9 @@ export async function applyRemoteCollections(
     input.collections.recurringSeries.length +
     input.collections.transactions.length;
 
-  return { receivedRows, localCategoryIdByRemoteId };
+  return {
+    changedRows: receivedRows - echoedTransactions,
+    receivedRows,
+    localCategoryIdByRemoteId,
+  };
 }

@@ -36,6 +36,11 @@ describe('LoginScreen — Google', () => {
     }));
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
   it('espera session.user antes de cargar los espacios y completar el acceso', async () => {
     const onSuccess = jest.fn();
     jest.mocked(authClient.signIn.social).mockResolvedValue({
@@ -79,6 +84,35 @@ describe('LoginScreen — Google', () => {
     ).toBeTruthy();
     expect(screen.getByTestId('login-google').props.accessibilityState).toEqual(
       expect.objectContaining({ disabled: false }),
+    );
+  });
+
+  it('permite reintentar si Better Auth no hidrata la sesión', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.mocked(authClient.signIn.social).mockResolvedValueOnce({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    } as never);
+
+    await renderWithTheme(<LoginScreen onSuccess={jest.fn()} />);
+    await fireEvent.press(screen.getByTestId('login-google'));
+
+    await act(async () => {
+      jest.advanceTimersByTime(15_000);
+    });
+
+    expect(
+      screen.getByText(
+        'Google confirmó tu cuenta, pero la sesión no pudo abrirse. Inténtalo de nuevo.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByTestId('login-google').props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: false }),
+    );
+    expect(console.error).toHaveBeenCalledWith(
+      '[google-auth] La sesión no se hidrató a tiempo',
+      { code: 'session_timeout', stage: 'session' },
     );
   });
 

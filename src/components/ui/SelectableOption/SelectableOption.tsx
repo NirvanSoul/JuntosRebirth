@@ -16,6 +16,11 @@ type SelectableOptionProps = {
   /** Versión reducida: menor altura, relleno y tipografía, para filas con muchas opciones. */
   compact?: boolean;
   disabled?: boolean;
+  /**
+   * `false` quita el icono de selección: la opción seleccionada se marca solo
+   * con texto y borde en color de acción, y ocupa menos ancho.
+   */
+  indicator?: boolean;
   indicatorTestID?: string;
   label: string;
   onPress: () => void;
@@ -52,6 +57,12 @@ function createSelectableOptionStyles(
     selectedOption: {
       ...shadows.none,
     },
+    outlineOption: {
+      justifyContent: 'center',
+    },
+    selectedOutlineOption: {
+      borderColor: colors.cta,
+    },
     disabledOption: {
       opacity: 0.56,
     },
@@ -75,6 +86,7 @@ export function SelectableOption({
   accessibilityLabel,
   compact = false,
   disabled = false,
+  indicator = true,
   indicatorTestID,
   label,
   onPress,
@@ -98,25 +110,29 @@ export function SelectableOption({
       style={({ pressed }) => [
         styles.option,
         compact ? styles.compactOption : null,
+        indicator ? null : styles.outlineOption,
         selected ? styles.selectedOption : null,
+        selected && !indicator ? styles.selectedOutlineOption : null,
         disabled ? styles.disabledOption : null,
         style,
         pressed && !disabled ? styles.pressed : null,
       ]}
       testID={testID}
     >
-      <Ionicons
-        color={selected ? colors.cta : colors.textMuted}
-        name={
-          selected
-            ? 'checkmark-circle'
-            : role === 'checkbox'
-              ? 'square-outline'
-              : 'ellipse-outline'
-        }
-        size={compact ? iconSize.xs : iconSize.md}
-        testID={indicatorTestID}
-      />
+      {indicator ? (
+        <Ionicons
+          color={selected ? colors.cta : colors.textMuted}
+          name={
+            selected
+              ? 'checkmark-circle'
+              : role === 'checkbox'
+                ? 'square-outline'
+                : 'ellipse-outline'
+          }
+          size={compact ? iconSize.xs : iconSize.md}
+          testID={indicatorTestID}
+        />
+      ) : null}
       <Text
         numberOfLines={1}
         style={[

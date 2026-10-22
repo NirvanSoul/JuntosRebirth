@@ -4,6 +4,7 @@ import {
   listTransactionsByMonth,
   shiftMonthKey,
   summarizeCategories,
+  summarizeMonthlyBudgetExpenses,
 } from '@/features/categories/utils/categorySummary';
 import type { SessionTransaction } from '@/features/transactions/types';
 
@@ -143,5 +144,53 @@ describe('utilidades mensuales de categorías', () => {
       transactions,
     );
     expect(listTransactionsByMonth(transactions, '2026-06')).toEqual([]);
+  });
+});
+
+describe('summarizeMonthlyBudgetExpenses', () => {
+  const expense = (
+    id: string,
+    occurredOn: string,
+    overrides: Partial<SessionTransaction> = {},
+  ): SessionTransaction => ({
+    ...transactions[0]!,
+    id,
+    occurredOn,
+    ...overrides,
+  });
+
+  it('solo cuenta los gastos del mes en curso en la moneda del presupuesto', () => {
+    const expenses = summarizeMonthlyBudgetExpenses(
+      [
+        expense('previous-month', '2026-06-30'),
+        expense('this-month', '2026-07-02', { amountMinor: 700 }),
+        expense('this-month-later', '2026-07-31', { amountMinor: 300 }),
+        expense('next-month', '2026-08-01'),
+        expense('other-currency', '2026-07-10', { currency: 'USD' }),
+        transactions[1]!,
+      ],
+      'EUR',
+      new Date(2026, 6, 15, 12),
+    );
+
+    expect(expenses.get('food')).toBe(1000);
+    expect(expenses.has('salary')).toBe(false);
+  });
+
+  it('incluye las ocurrencias recurrentes programadas dentro del mes', () => {
+    const expenses = summarizeMonthlyBudgetExpenses(
+      [
+        expense('rent', '2026-05-10', {
+          amountMinor: 400,
+          recurrence: 'monthly',
+          recurrenceSeriesId: 'rent-series',
+          nextOccurrenceOn: '2026-06-10',
+        }),
+      ],
+      'EUR',
+      new Date(2026, 6, 1, 12),
+    );
+
+    expect(expenses.get('food')).toBe(400);
   });
 });

@@ -16,6 +16,7 @@ import {
   useCurrencySymbolPreference,
 } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { layout } from '@/theme/layout';
+import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import type { ColorTokens } from '@/theme/types';
 import { useTheme } from '@/theme/useTheme';
@@ -27,7 +28,7 @@ type AppModalProps = PropsWithChildren<{
   /** Se ejecuta cuando la hoja terminó de cerrarse y no va a reabrirse. */
   onDismissed?: () => void;
   variant?: 'compact' | 'catalog' | 'expanded';
-  /** Superficie de la hoja; por defecto conserva el fondo estándar de modal. */
+  /** Superficie de la hoja; por defecto usa el mismo fondo que la app. */
   backgroundVariant?: 'surface' | 'modal' | 'background';
   /** Permite que un scroll interno ocupe el inset y lo añada al final de su contenido. */
   extendContentIntoBottomInset?: boolean;
@@ -140,11 +141,32 @@ export function AppModal({
     // no es un derivado puro de render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setContentVisible(true);
-    if (!dismissRequestedByParentRef.current) {
-      hasPresentedRef.current = true;
-      modalRef.current?.present();
-    }
+    // Se presenta aunque haya un cierre pendiente: si la librería descartó ese
+    // cierre sin animarlo (`forceClose` sale antes de tiempo) nunca llega
+    // `onDismiss` y la hoja quedaría sin volver a abrirse. Si el cierre sí está
+    // en curso, la librería ignora esta llamada y `handleDismiss` la repite.
+    hasPresentedRef.current = true;
+    modalRef.current?.present();
   }, [presentationRequest, visible]);
+
+  /**
+   * La librería puede perder un cierre y dejar la hoja abierta: `present()`
+   * monta en el siguiente frame, así que un `dismiss()` anterior no encuentra
+   * hoja que cerrar, y un reajuste por teclado o contenido puede reabrirla.
+   * La hoja quedaba visible sin responder, porque sus acciones piden un
+   * cierre que el padre ya considera hecho. Al asentarse abierta se reconcilia
+   * con `visible`.
+   */
+  const handleChange = useCallback((index: number) => {
+    if (index < 0) return;
+    if (visibleRef.current) {
+      // Abierta y deseada: un cierre pendiente ya no llegará.
+      dismissRequestedByParentRef.current = false;
+      return;
+    }
+    dismissRequestedByParentRef.current = true;
+    modalRef.current?.dismiss();
+  }, []);
 
   const handleDismiss = useCallback(() => {
     hasPresentedRef.current = false;
@@ -220,11 +242,14 @@ export function AppModal({
   return (
     <BottomSheetModal
       android_keyboardInputMode="adjustResize"
+      animationConfigs={
+        Platform.OS === 'android' ? undefined : motion.sheetSpring
+      }
       backdropComponent={renderBackdrop}
       backgroundStyle={[
         themedStyles.background,
         backgroundVariant === 'surface' && themedStyles.surfaceBackground,
-        backgroundVariant === 'background' && themedStyles.appBackground,
+        backgroundVariant === 'modal' && themedStyles.modalBackground,
       ]}
       containerComponent={ModalLayer}
       enableDynamicSizing={!hasFixedHeight}
@@ -235,6 +260,7 @@ export function AppModal({
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       maxDynamicContentSize={height * 0.86}
+      onChange={handleChange}
       onDismiss={handleDismiss}
       ref={modalRef}
       snapPoints={snapPoints}
@@ -273,11 +299,11 @@ const styles = StyleSheet.create({
 function createThemedStyles(colors: ColorTokens) {
   return StyleSheet.create({
     background: {
-      backgroundColor: colors.modalBackground,
+      backgroundColor: colors.background,
       borderRadius: radii.lg,
     },
     surfaceBackground: { backgroundColor: colors.surface },
-    appBackground: { backgroundColor: colors.background },
+    modalBackground: { backgroundColor: colors.modalBackground },
     handle: {
       width: 42,
       height: 5,

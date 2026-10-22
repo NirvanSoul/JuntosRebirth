@@ -6,6 +6,7 @@ import {
   AppModal,
   useAppModalBottomInset,
 } from '@/components/overlays/AppModal/AppModal';
+import { useModalChainedAction } from '@/components/overlays/AppModal/useModalChainedAction';
 import { DestructiveConfirmationPanel } from '@/components/overlays/DestructiveConfirmationPanel/DestructiveConfirmationPanel';
 import { DetailActionCard } from '@/components/overlays/DetailActionCard/DetailActionCard';
 import { DetailActionMenu } from '@/components/overlays/DetailActionMenu/DetailActionMenu';
@@ -46,6 +47,8 @@ type MoneyAccountDetailModalProps = {
   categories: readonly Category[];
   onAddTransaction?: (moneyAccountId: string) => void;
   onClose: () => void;
+  /** Cuando la hoja termina de cerrarse. */
+  onDismissed?: () => void;
   onDelete: (moneyAccountId: string) => void;
   onEdit: (moneyAccountId: string) => void;
   onOpenTransactionDetail: (transactionId: string) => void;
@@ -58,12 +61,14 @@ export function MoneyAccountDetailModal({
   categories,
   onAddTransaction,
   onClose,
+  onDismissed,
   onDelete,
   onEdit,
   onOpenTransactionDetail,
   transactions,
   visible,
 }: MoneyAccountDetailModalProps) {
+  const { closeThenRun, handleDismissed } = useModalChainedAction(onClose);
   const { formatCurrency } = useCurrencySymbolPreference();
   const { colors } = useTheme();
   const { multiRateMovementDisplay, venezuelaCurrencyMode } =
@@ -184,6 +189,10 @@ export function MoneyAccountDetailModal({
     <AppModal
       containsScrollable
       onClose={onClose}
+      onDismissed={() => {
+        handleDismissed();
+        onDismissed?.();
+      }}
       stackBehavior="push"
       testID="money-account-detail-modal"
       variant="expanded"
@@ -318,7 +327,7 @@ export function MoneyAccountDetailModal({
             <DetailActionCard
               icon="add"
               label="Añadir movimiento"
-              onPress={() => onAddTransaction?.(account.id)}
+              onPress={() => closeThenRun(() => onAddTransaction?.(account.id))}
               testIDPrefix="money-account"
             />
           </View>
@@ -335,7 +344,10 @@ export function MoneyAccountDetailModal({
             <TransactionPreviewList
               categories={categories}
               groupingTransactions={transactions}
-              onOpenTransactionDetail={onOpenTransactionDetail}
+              onOpenTransactionDetail={(transactionId) =>
+                closeThenRun(() => onOpenTransactionDetail(transactionId))
+              }
+              progressive
               testID="money-account-transaction-preview-list"
               transactions={accountTransactions}
             />

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { CreateMoneyAccountModal } from '@/features/accounts/components/CreateMoneyAccountModal/CreateMoneyAccountModal';
 import { MoneyAccountDetailModal } from '@/features/accounts/components/MoneyAccountDetailModal/MoneyAccountDetailModal';
 import type { useMoneyAccounts } from '@/features/accounts/hooks/useMoneyAccounts';
@@ -32,23 +34,26 @@ export function MoneyAccountModals({
 }: MoneyAccountModalsProps) {
   const { accountingCurrency, allowsMultipleAccountCurrencies } =
     useCurrencyCapabilities();
+  // La cuenta se conserva hasta que la hoja termina de cerrarse; sin ella el
+  // detalle se desmontaría de golpe en lugar de animar el cierre.
+  const [closingAccount, setClosingAccount] = useState(
+    controller.detailAccount,
+  );
+  if (controller.detailAccount && controller.detailAccount !== closingAccount) {
+    setClosingAccount(controller.detailAccount);
+  }
 
   return (
     <>
       <MoneyAccountDetailModal
-        account={controller.detailAccount}
+        account={controller.detailAccount ?? closingAccount}
         categories={categories}
-        onAddTransaction={(moneyAccountId) => {
-          controller.openDetail(null);
-          onAddTransaction?.(moneyAccountId);
-        }}
+        onAddTransaction={onAddTransaction}
         onClose={() => controller.openDetail(null)}
+        onDismissed={() => setClosingAccount(null)}
         onDelete={controller.archive}
         onEdit={controller.startEditing}
-        onOpenTransactionDetail={(transactionId) => {
-          controller.openDetail(null);
-          onOpenTransactionDetail(transactionId);
-        }}
+        onOpenTransactionDetail={onOpenTransactionDetail}
         transactions={transactions}
         visible={controller.detailAccount !== null}
       />

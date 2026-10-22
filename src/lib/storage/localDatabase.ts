@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import type { SQLiteBindValue } from 'expo-sqlite';
 
+import { markStartup } from '@/lib/diagnostics/startupTrace';
 import {
   localDatabaseVersion,
   migrateLocalDatabase,
@@ -100,6 +101,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
         });
       }
     }
+    markStartup('local_db_ready');
     return database;
   } catch (error) {
     console.error(

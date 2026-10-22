@@ -1,4 +1,4 @@
-import { fireEvent, within } from '@testing-library/react-native';
+import { act, fireEvent, within } from '@testing-library/react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet } from 'react-native';
 
@@ -15,14 +15,21 @@ import { typography } from '@/theme/typography';
 jest.mock('@/features/profile/hooks/useCurrencyCapabilities');
 jest.mock('@/features/exchangeRates/hooks/useExchangeRates');
 
+/** Simula el final de la animación de cierre de la hoja. */
+const mockSheet: { dismiss?: () => void } = {};
 jest.mock('@/components/overlays/AppModal/AppModal', () => ({
   AppModal: ({
     children,
+    onDismissed,
     visible,
   }: {
     children: React.ReactNode;
+    onDismissed?: () => void;
     visible: boolean;
-  }) => (visible ? children : null),
+  }) => {
+    mockSheet.dismiss = onDismissed;
+    return visible ? children : null;
+  },
   useAppModalBottomInset: () => 0,
 }));
 
@@ -282,11 +289,19 @@ describe('MoneyAccountDetailModal', () => {
 
   it('permite añadir un movimiento a la cuenta desde su detalle', async () => {
     const onAddTransaction = jest.fn();
-    const screen = await renderModal({ onAddTransaction });
+    const onClose = jest.fn();
+    const screen = await renderModal({ onAddTransaction, onClose });
 
     expect(screen.getByText('Añadir movimiento')).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('money-account-action-icon-add'));
+
+    // La hoja nueva se abre cuando esta termina de cerrarse, no en el mismo
+    // commit: `@gorhom/bottom-sheet` no presenta dos hojas a la vez.
+    expect(onClose).toHaveBeenCalled();
+    expect(onAddTransaction).not.toHaveBeenCalled();
+
+    await act(async () => mockSheet.dismiss?.());
 
     expect(onAddTransaction).toHaveBeenCalledWith('account-1');
   });

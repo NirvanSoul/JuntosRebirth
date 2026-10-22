@@ -7,6 +7,11 @@ import { copyTransactionToSpace } from '@/features/transactions/services/copyTra
 import type { SessionTransaction } from '@/features/transactions/types';
 import type { Space } from '@/features/spaces/types';
 
+/** Aviso de copia; los movimientos llevan el icono de su categoría. */
+export type CopyNotice = ToastNotice & {
+  category?: Pick<Category, 'colorToken' | 'icon'>;
+};
+
 type UseCopyToSpaceInput = {
   activeSpaceId: string;
   categories: readonly Category[];
@@ -32,16 +37,11 @@ export function useCopyToSpace({
   spaces,
   transactions,
 }: UseCopyToSpaceInput) {
-  const [notice, setNotice] = useState<ToastNotice | null>(null);
+  const [notice, setNotice] = useState<CopyNotice | null>(null);
   const nextNoticeId = useRef(1);
 
-  const announce = (destinationName: string, itemName: string) => {
-    setNotice({
-      id: nextNoticeId.current,
-      message: `${itemName} copiado en ${destinationName} `,
-      emphasis: 'exitosamente.',
-      tone: 'success',
-    });
+  const announce = (nextNotice: Omit<CopyNotice, 'id'>) => {
+    setNotice({ ...nextNotice, id: nextNoticeId.current });
     nextNoticeId.current += 1;
   };
 
@@ -67,7 +67,11 @@ export function useCopyToSpace({
 
       onCategoryCopied(result.copiedCategory);
       onChangesPublished(targetSpaceId);
-      announce(targetSpace.name, result.itemName);
+      announce({
+        message: `${result.itemName} copiado en ${targetSpace.name} `,
+        emphasis: 'exitosamente.',
+        tone: 'success',
+      });
       return true;
     } catch {
       onError();
@@ -81,6 +85,10 @@ export function useCopyToSpace({
   ): Promise<boolean> => {
     const targetSpace = spaces.find((space) => space.id === targetSpaceId);
     if (!targetSpace) return false;
+    const sourceCategoryId = transactions.find(
+      (transaction) => transaction.id === transactionId,
+    )?.categoryId;
+    const category = categories.find(({ id }) => id === sourceCategoryId);
 
     try {
       const result = await copyTransactionToSpace({
@@ -95,7 +103,12 @@ export function useCopyToSpace({
       if (result.createdCategory) onCategoryCopied(result.createdCategory);
       onTransactionsCopied(result.copiedTransactions);
       onChangesPublished(targetSpaceId);
-      announce(targetSpace.name, result.itemName);
+      announce({
+        category,
+        message: 'Movimiento copiado',
+        placement: 'bottom',
+        tone: 'success',
+      });
       return true;
     } catch {
       onError();

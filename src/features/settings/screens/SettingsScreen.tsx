@@ -42,6 +42,7 @@ import {
 import { Text } from '@/components/ui/Text/Text';
 import { createJuntossAuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
+import { DemoUserSettingsSection } from '@/features/demo/components/DemoUserSettingsSection';
 import { discardBackedLocalSessionCache } from '@/features/auth/services/discardBackedLocalSessionCache';
 import { DataRightsScreen } from '@/features/legal/screens/DataRightsScreen';
 import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScreen';
@@ -66,6 +67,7 @@ import type { TransactionNotificationRule } from '@/features/transactions/types'
 import { getCurrencyName } from '@/lib/currency/currencyCatalog';
 import { getCountryByIso2 } from '@/lib/geography/countryCatalog';
 import type { CurrencyPreferences } from '@/state/appPreferences/currencyPreferences';
+import { useDemoSession } from '@/state/demoSession/demoSessionStore';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -128,6 +130,7 @@ export function SettingsScreen({
   const { colors, isDark, setAppearance, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const { session } = useAuthSession();
+  const { demoSession } = useDemoSession();
   const resetOnboarding = useOnboardingRestart();
   const {
     countryCode,
@@ -512,19 +515,23 @@ export function SettingsScreen({
               onRestartOnboarding={() => void handleSignOut(resetOnboarding)}
             />
 
-            <SettingsSection
-              emphasizeIcon={false}
-              icon="person-circle-outline"
-              title="Cuenta"
-            >
-              <SettingsRow
-                icon="log-out-outline"
-                iconBackgroundColor={categoryColors.blue}
-                label="Cerrar sesión"
-                onPress={handleAccountRowPress}
-                value={session?.user.email ?? undefined}
-              />
-            </SettingsSection>
+            {demoSession ? (
+              <DemoUserSettingsSection demoSession={demoSession} />
+            ) : (
+              <SettingsSection
+                emphasizeIcon={false}
+                icon="person-circle-outline"
+                title="Cuenta"
+              >
+                <SettingsRow
+                  icon="log-out-outline"
+                  iconBackgroundColor={categoryColors.blue}
+                  label="Cerrar sesión"
+                  onPress={handleAccountRowPress}
+                  value={session?.user.email ?? undefined}
+                />
+              </SettingsSection>
+            )}
 
             <Text align="center" tone="muted" variant="caption">
               Juntos 0.1.0

@@ -151,6 +151,11 @@ describe('syncSpaceDataForCurrentSession', () => {
         }),
       ],
     });
+    expect(getAllAsync.mock.calls[4]?.[0]).toEqual(
+      expect.stringContaining(
+        "NULLIF(TRIM(recurring_transaction_series.title), '')",
+      ),
+    );
     expect(getAllAsync.mock.calls[5]?.[0]).toEqual(
       expect.stringContaining("NULLIF(TRIM(transactions.title), '')"),
     );

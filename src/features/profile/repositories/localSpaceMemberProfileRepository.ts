@@ -71,15 +71,38 @@ export async function saveSpaceMemberAvatarCache(
   cachedUri: string | null,
 ): Promise<void> {
   const database = await getLocalDatabase();
-  await database.runAsync(
+  // Se llama en cada refresco aunque la foto ya estuviera cacheada: sin el
+  // `IS NOT`, cada vuelta escribía y avisaba a la interfaz sin cambio alguno.
+  const result = await database.runAsync(
     `UPDATE space_member_profiles
         SET avatar_cached_uri = ?
-      WHERE space_id = ? AND user_id = ?`,
+      WHERE space_id = ? AND user_id = ? AND avatar_cached_uri IS NOT ?`,
     cachedUri,
     spaceId,
     userId,
+    cachedUri,
   );
-  publishSpaceMemberProfiles(spaceId);
+  if (result.changes > 0) publishSpaceMemberProfiles(spaceId);
+}
+
+function isSameCensus(
+  stored: readonly SpaceMemberProfile[],
+  incoming: readonly SpaceMemberProfile[],
+): boolean {
+  if (stored.length !== incoming.length) return false;
+  const storedByUserId = new Map(
+    stored.map((profile) => [profile.userId, profile]),
+  );
+  return incoming.every((profile) => {
+    const current = storedByUserId.get(profile.userId);
+    return (
+      current !== undefined &&
+      current.displayName === profile.displayName &&
+      current.avatarPath === profile.avatarPath &&
+      current.avatarUpdatedAt === profile.avatarUpdatedAt &&
+      current.defaultCurrency === profile.defaultCurrency
+    );
+  });
 }
 
 /**
@@ -97,6 +120,10 @@ export async function replaceSpaceMemberProfiles(
   spaceId: string,
   profiles: readonly SpaceMemberProfile[],
 ): Promise<void> {
+  // El refresco periódico trae casi siempre el mismo censo: reescribirlo
+  // ocupaba la cola de escrituras y repintaba la interfaz cada pocos segundos.
+  if (isSameCensus(await listSpaceMemberProfiles(spaceId), profiles)) return;
+
   const database = await getLocalDatabase();
   const now = new Date().toISOString();
 

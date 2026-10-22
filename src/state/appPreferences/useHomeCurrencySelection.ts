@@ -42,16 +42,24 @@ export function useHomeCurrencySelection(): HomeCurrencySelectionController {
 
   const setSelectedCurrency = useCallback(
     async (currency: CurrencyCode): Promise<void> => {
+      // Se aplica antes de guardar: esperar a AsyncStorage retrasaba el cambio
+      // de moneda y sus gráficas hasta que terminaba la escritura.
       const next: HomeCurrencySelection = { currency };
+      let previous: HomeCurrencySelection = defaultHomeCurrencySelection;
+      setSelection((current) => {
+        previous = current;
+        return next;
+      });
+      setError(null);
       try {
         await saveHomeCurrencySelection(next);
       } catch {
         const message = 'No pudimos guardar la moneda. Inténtalo de nuevo.';
+        // Solo revierte si nadie eligió otra moneda mientras se guardaba.
+        setSelection((current) => (current === next ? previous : current));
         setError(message);
         throw new Error(message);
       }
-      setSelection(next);
-      setError(null);
     },
     [],
   );

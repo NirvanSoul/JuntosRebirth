@@ -88,11 +88,8 @@ export function ActivityCategoryDetail({
 
     isTransitioning.current = false;
     entryOffset.current = null;
-    // SharedValue de Reanimated: mutable por diseño.
-    // eslint-disable-next-line react-hooks/immutability
-    opacity.value = 1;
-    // eslint-disable-next-line react-hooks/immutability
-    translateX.value = 0;
+    opacity.set(1);
+    translateX.set(0);
     // Este efecto también resetea la animación (arriba); no es un derivado puro.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedCategoryView(categoryView);
@@ -118,16 +115,16 @@ export function ActivityCategoryDetail({
     }
 
     entryOffset.current = null;
-    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
-    opacity.value = 0;
-    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
-    translateX.value = incomingOffset;
-    opacity.value = withTiming(1, categoryViewTiming);
-    translateX.value = withTiming(0, categoryViewTiming, (finished) => {
-      if (finished) {
-        runOnJS(finishTransition)();
-      }
-    });
+    opacity.set(0);
+    translateX.set(incomingOffset);
+    opacity.set(withTiming(1, categoryViewTiming));
+    translateX.set(
+      withTiming(0, categoryViewTiming, (finished) => {
+        if (finished) {
+          runOnJS(finishTransition)();
+        }
+      }),
+    );
   }, [displayedCategoryView, finishTransition, opacity, translateX]);
 
   const toggleCategoryView = () => {
@@ -141,17 +138,13 @@ export function ActivityCategoryDetail({
     isTransitioning.current = true;
     setSelectedCategoryView(nextView);
     onCategoryViewChange?.(nextView);
-    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
-    opacity.value = withTiming(0, categoryViewTiming);
-    // eslint-disable-next-line react-hooks/immutability -- SharedValue mutable por diseño
-    translateX.value = withTiming(
-      outgoingOffset,
-      categoryViewTiming,
-      (finished) => {
+    opacity.set(withTiming(0, categoryViewTiming));
+    translateX.set(
+      withTiming(outgoingOffset, categoryViewTiming, (finished) => {
         if (finished) {
           runOnJS(showNextCategoryView)(nextView, -outgoingOffset);
         }
-      },
+      }),
     );
   };
 

@@ -63,6 +63,8 @@ export async function copyTransactionToSpace({
     existingTargetCategory ??
     (await createLocalCategory({
       ...sourceCategory,
+      // La copia es otra fila: con el id del original chocaría con su clave.
+      id: undefined,
       spaceId: targetSpaceId,
       budgetMinor: undefined,
       isDefault: false,

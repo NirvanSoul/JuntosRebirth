@@ -1,4 +1,8 @@
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
+import {
+  resetDemoSessionStoreForTests,
+  saveDemoSession,
+} from '@/state/demoSession/demoSessionStore';
 
 const mockGetSession = jest.fn();
 const mockReadCachedSession = jest.fn();
@@ -150,4 +154,24 @@ describe('lectura de identidad durante el arranque', () => {
       expect(mockGetSession).toHaveBeenCalledTimes(1);
     },
   );
+
+  it('firma con el usuario demo sin consultar al proveedor', async () => {
+    await saveDemoSession({
+      userId: 'demo-self',
+      displayName: 'Angélica',
+      email: 'angelica@demo.juntoss.invalid',
+      partnerUserId: 'demo-partner',
+      partnerDisplayName: 'Manuel',
+      currency: 'EUR',
+      createdAt: '2026-10-17T10:00:00.000Z',
+      previousCurrencyPreferences: null,
+    });
+
+    try {
+      await expect(getAuthenticatedUserId()).resolves.toBe('demo-self');
+      expect(mockGetSession).not.toHaveBeenCalled();
+    } finally {
+      resetDemoSessionStoreForTests();
+    }
+  });
 });

@@ -15,20 +15,19 @@ import { extractRatesFromTransactions } from '@/features/accounts/utils/moneyAcc
 import type { Category } from '@/features/categories/types';
 import { PeriodCurrencyPickerModal } from '@/features/dashboard/components/TransactionPeriodModal/PeriodCurrencyPickerModal';
 import { PeriodTotalAmount } from '@/features/dashboard/components/TransactionPeriodModal/PeriodTotalAmount';
-import { computePeriodValuation } from '@/features/dashboard/utils/periodValuation';
 import {
-  describePreviousPeriod,
-  getPreviousPeriodTransactions,
-  listTransactionsByPeriod,
-  shiftTransactionPeriod,
-  type TransactionPeriod,
-} from '@/features/dashboard/utils/transactionPeriod';
+  getComparisonPeriodLabel,
+  getPreviousDateFilter,
+  listTransactionsByDateFilter,
+  type TransactionDateFilter,
+} from '@/features/activity/utils/transactionDateFilter';
+import { CategoryDetailPeriodFilter } from '@/features/categories/components/CategoryDetailModal/CategoryDetailPeriodFilter';
+import { computePeriodValuation } from '@/features/dashboard/utils/periodValuation';
 import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
 import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { PeriodComparisonIndicator } from '@/features/transactions/components/PeriodComparisonIndicator/PeriodComparisonIndicator';
-import { TransactionPeriodSelector } from '@/features/transactions/components/TransactionPeriodSelector/TransactionPeriodSelector';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type {
   SessionTransaction,
@@ -71,6 +70,15 @@ type TransactionPeriodModalProps = {
   visible: boolean;
 };
 
+function createInitialDateFilter(
+  initialDate: Date | undefined,
+): TransactionDateFilter {
+  return {
+    period: 'month',
+    selectedDate: initialDate ? new Date(initialDate) : new Date(),
+  };
+}
+
 export function TransactionPeriodModal({
   categories,
   chainActionsAfterDismiss = false,
@@ -90,9 +98,8 @@ export function TransactionPeriodModal({
   const { closeThenRun, handleDismissed } = useModalChainedAction(onClose);
   const runAction = (action: () => void) =>
     chainActionsAfterDismiss ? closeThenRun(action) : action();
-  const [period, setPeriod] = useState<TransactionPeriod>('month');
-  const [selectedDate, setSelectedDate] = useState(() =>
-    initialDate ? new Date(initialDate) : new Date(),
+  const [dateFilter, setDateFilter] = useState<TransactionDateFilter>(() =>
+    createInitialDateFilter(initialDate),
   );
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode | null>(
     initialCurrency ?? null,
@@ -138,8 +145,8 @@ export function TransactionPeriodModal({
     [isBalance, transactions, type],
   );
   const filteredTransactions = useMemo(
-    () => listTransactionsByPeriod(typeTransactions, period, selectedDate),
-    [period, selectedDate, typeTransactions],
+    () => listTransactionsByDateFilter(typeTransactions, dateFilter),
+    [dateFilter, typeTransactions],
   );
   const availableCurrencies = useMemo(() => {
     const currencies = getAvailableCurrencies(typeTransactions);
@@ -172,17 +179,15 @@ export function TransactionPeriodModal({
     [bcvRate, eurRate, filteredTransactions, type, valuationMode],
   );
 
-  const previousTransactions = useMemo(
-    () =>
-      getPreviousPeriodTransactions(
-        isBalance
-          ? transactions
-          : transactions.filter((transaction) => transaction.type === type),
-        period,
-        selectedDate,
-      ),
-    [isBalance, period, selectedDate, transactions, type],
-  );
+  // «Todos» no tiene periodo anterior: sin movimientos previos la
+  // comparación se oculta.
+  const previousTransactions = useMemo(() => {
+    const previousFilter = getPreviousDateFilter(dateFilter);
+    return previousFilter
+      ? listTransactionsByDateFilter(typeTransactions, previousFilter)
+      : [];
+  }, [dateFilter, typeTransactions]);
+  const comparisonLabel = getComparisonPeriodLabel(dateFilter);
 
   const previousCurrencyTransactions = useMemo(
     () =>
@@ -229,7 +234,9 @@ export function TransactionPeriodModal({
         ? previousTotals.expenseMinor
         : previousTotals.balanceMinor;
 
-  const comparison = calculatePeriodComparison(totalMinor, previousTotalMinor);
+  const comparison = comparisonLabel
+    ? calculatePeriodComparison(totalMinor, previousTotalMinor)
+    : null;
   const comparisonTone: 'balance' | 'expense' | 'income' =
     type === 'balance' ? 'balance' : type;
   const totalLabel = periodModalLabels.total[type];
@@ -248,8 +255,7 @@ export function TransactionPeriodModal({
     useDepsChanged([visible, initialCurrency, initialDate?.getTime()]) &&
     visible
   ) {
-    setPeriod('month');
-    setSelectedDate(initialDate ? new Date(initialDate) : new Date());
+    setDateFilter(createInitialDateFilter(initialDate));
     setSelectedCurrency(initialCurrency ?? null);
     setCurrencyPickerVisible(false);
     setValuationMode('USD');
@@ -294,21 +300,9 @@ export function TransactionPeriodModal({
             <ModalCloseButton onPress={onClose} />
           </View>
 
-          <TransactionPeriodSelector
-            onNext={() =>
-              setSelectedDate((current) =>
-                shiftTransactionPeriod(period, current, 1),
-              )
-            }
-            onPrevious={() =>
-              setSelectedDate((current) =>
-                shiftTransactionPeriod(period, current, -1),
-              )
-            }
-            onSelectPeriod={setPeriod}
-            period={period}
-            selectedDate={selectedDate}
-            singleRow
+          <CategoryDetailPeriodFilter
+            filter={dateFilter}
+            onChange={setDateFilter}
             testID={`${type}-period-selector`}
           />
 
@@ -353,7 +347,7 @@ export function TransactionPeriodModal({
                       tone={comparisonTone}
                     />
                     <Text tone="secondary" variant="overline">
-                      {describePreviousPeriod(period)}
+                      {comparisonLabel}
                     </Text>
                   </View>
                 ) : null}
@@ -397,6 +391,7 @@ export function TransactionPeriodModal({
                   onOpenTransactionDetail={(transactionId) =>
                     runAction(() => onOpenTransactionDetail?.(transactionId))
                   }
+                  progressive
                   testID={`${type}-period-transaction-list`}
                   transactions={displayedTransactions}
                 />

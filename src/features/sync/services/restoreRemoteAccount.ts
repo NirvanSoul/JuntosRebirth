@@ -36,6 +36,8 @@ export type RestoredRemoteAccount = {
 
 export type RestoreOutcome = {
   mode: 'full' | 'delta';
+  /** Filas recibidas que cambian lo guardado (sin el eco de la subida propia). */
+  changedRows: number;
   receivedRows: number;
   catalogueChanged: boolean;
 };
@@ -174,6 +176,7 @@ export type ApplyRemoteChangesResult =
   | ({ needsFullRestore?: false } & RestoredRemoteAccount & {
         outcome: {
           mode: 'delta';
+          changedRows: number;
           receivedRows: number;
           catalogueChanged: boolean;
         };
@@ -288,11 +291,17 @@ export async function applyRemoteChanges(input: {
       spaces,
       localCategoryIdByRemoteId: new Map(),
       localSpaceIdByRemoteId,
-      outcome: { mode: 'delta', receivedRows: 0, catalogueChanged },
+      outcome: {
+        mode: 'delta',
+        changedRows: 0,
+        receivedRows: 0,
+        catalogueChanged,
+      },
     };
   }
 
   let appliedResult: {
+    changedRows: number;
     receivedRows: number;
     localCategoryIdByRemoteId: Map<string, string>;
   };
@@ -319,6 +328,7 @@ export async function applyRemoteChanges(input: {
     localSpaceIdByRemoteId,
     outcome: {
       mode: 'delta',
+      changedRows: appliedResult!.changedRows,
       receivedRows: appliedResult!.receivedRows,
       catalogueChanged,
     },
@@ -399,7 +409,12 @@ export async function restoreRemoteAccountForCurrentSession(options?: {
 
     return {
       ...restored,
-      outcome: { mode: 'full', receivedRows, catalogueChanged: true },
+      outcome: {
+        mode: 'full',
+        changedRows: receivedRows,
+        receivedRows,
+        catalogueChanged: true,
+      },
     };
   };
 

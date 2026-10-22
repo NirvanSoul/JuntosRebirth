@@ -1,4 +1,5 @@
 import { authClient } from '@/lib/auth-client';
+import { loadDemoSession } from '@/state/demoSession/demoSessionStore';
 
 /**
  * Lee primero la sesión verificada y vigente que Better Auth ya mantiene para
@@ -8,6 +9,10 @@ import { authClient } from '@/lib/auth-client';
  * recuperación de identidad ante un fallo de transporte.
  */
 export async function getAuthenticatedUserId(): Promise<string | null> {
+  // El usuario demo es local: firma sus filas sin consultar al proveedor.
+  const demoSession = await loadDemoSession();
+  if (demoSession) return demoSession.userId;
+
   const cachedUserId = readVerifiedCachedSessionUserId();
   if (cachedUserId) return cachedUserId;
 

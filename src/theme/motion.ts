@@ -5,6 +5,16 @@ export const motion = {
   loadingTransitionDuration: 260,
   /** Transición ligera de icono y píldora al cambiar la pestaña activa. */
   mainTabSelectionDuration: 180,
+  /** Muelle de la píldora que se desliza hasta el espacio elegido. */
+  spaceSelectionSpring: {
+    damping: 22,
+    mass: 0.7,
+    stiffness: 260,
+  },
+  /** Cambio de color del texto de la fila mientras llega la píldora. */
+  spaceSelectionContentDuration: 160,
+  /** Lo que tarda la píldora en asentarse; entonces se cierra el menú. */
+  spaceSelectionDuration: 260,
   startupRevealDuration: 480,
   startupRevealStagger: 36,
   startupRevealMaxDelay: 216,
@@ -64,5 +74,19 @@ export const motion = {
     damping: 18,
     mass: 0.72,
     stiffness: 170,
+  },
+  /**
+   * Muelle de las hojas en iOS: el mismo de `@gorhom/bottom-sheet`, pero se da
+   * por terminado cuando le falta ~1 px. Con el umbral por defecto de
+   * Reanimated, `onDismiss` llegaba ~680 ms después de cerrar, cuando la hoja
+   * llevaba ~200 ms sin moverse de forma visible, y cada hoja encadenada
+   * esperaba ese tiempo. Android usa el `timing` de 250 ms de la librería.
+   */
+  sheetSpring: {
+    damping: 500,
+    energyThreshold: 1e-5,
+    mass: 3,
+    overshootClamping: true,
+    stiffness: 1000,
   },
 } as const;

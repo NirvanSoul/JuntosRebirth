@@ -57,8 +57,28 @@ export async function getLocalProfile(): Promise<LocalProfile> {
   return mapProfile(row ?? null);
 }
 
+let lastPublishedProfile: LocalProfile | null = null;
+
+function isSameProfile(a: LocalProfile, b: LocalProfile): boolean {
+  return (
+    a.avatarUri === b.avatarUri &&
+    a.avatarPath === b.avatarPath &&
+    a.avatarUpdatedAt === b.avatarUpdatedAt &&
+    a.displayName === b.displayName &&
+    a.countryCode === b.countryCode
+  );
+}
+
+/**
+ * Avisa solo si el perfil cambió: el refresco periódico lo reescribe cada pocos
+ * segundos, y cada aviso repintaba todas las filas que muestran a su autor.
+ */
 async function publishLocalProfile(): Promise<LocalProfile> {
   const profile = await getLocalProfile();
+  if (lastPublishedProfile && isSameProfile(lastPublishedProfile, profile)) {
+    return profile;
+  }
+  lastPublishedProfile = profile;
   profileSubscribers.forEach((subscriber) => subscriber(profile));
   return profile;
 }
@@ -288,8 +308,10 @@ export async function restoreRemoteProfileDisplayName(
      ON CONFLICT (singleton_id) DO UPDATE SET
        display_name = excluded.display_name,
        display_name_sync_status = 'synced'
-     WHERE local_profile.display_name_sync_status IS NULL
-        OR local_profile.display_name_sync_status NOT IN ('pending', 'failed')`,
+     WHERE (local_profile.display_name_sync_status IS NULL
+        OR local_profile.display_name_sync_status NOT IN ('pending', 'failed'))
+       AND (local_profile.display_name IS NOT excluded.display_name
+        OR local_profile.display_name_sync_status IS NOT 'synced')`,
     displayName?.trim() || null,
   );
   return publishLocalProfile();

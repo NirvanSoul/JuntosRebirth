@@ -27,6 +27,44 @@ const emptyMembership: SpaceMembership = {
   ownUserId: null,
 };
 
+function isSameMemberProfile(
+  a: SpaceMemberProfile,
+  b: SpaceMemberProfile,
+): boolean {
+  return (
+    a.userId === b.userId &&
+    a.displayName === b.displayName &&
+    a.avatarPath === b.avatarPath &&
+    a.avatarUpdatedAt === b.avatarUpdatedAt &&
+    a.avatarUri === b.avatarUri &&
+    a.defaultCurrency === b.defaultCurrency
+  );
+}
+
+/**
+ * Conserva la membresía anterior si nada cambió. El censo se relee en cada
+ * refresco periódico, y un objeto nuevo en el contexto repintaba todas las
+ * filas de movimientos aunque mostraran los mismos nombres.
+ */
+function keepIfUnchanged(
+  current: SpaceMembership,
+  next: SpaceMembership,
+): SpaceMembership {
+  if (current.ownUserId !== next.ownUserId) return next;
+  const currentIds = Object.keys(current.profilesByUserId);
+  if (currentIds.length !== Object.keys(next.profilesByUserId).length) {
+    return next;
+  }
+  const unchanged = currentIds.every((userId) => {
+    const nextProfile = next.profilesByUserId[userId];
+    return (
+      nextProfile !== undefined &&
+      isSameMemberProfile(current.profilesByUserId[userId]!, nextProfile)
+    );
+  });
+  return unchanged ? current : next;
+}
+
 /**
  * Censo del espacio activo: quién lo comparte y cómo se llama cada persona.
  *
@@ -77,13 +115,17 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
 
     void (async () => {
       try {
-        if (isMounted) setMembership(await load());
+        const initial = await load();
+        if (isMounted)
+          setMembership((current) => keepIfUnchanged(current, initial));
         void syncOwnAvatar();
 
         if (!isShared) return;
 
         await syncSpaceMemberProfiles(spaceId);
-        if (isMounted) setMembership(await load());
+        const synced = await load();
+        if (isMounted)
+          setMembership((current) => keepIfUnchanged(current, synced));
       } catch (error) {
         console.error('[profiles] no se pudo refrescar el censo', {
           spaceId,
@@ -103,7 +145,11 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
     const reload = () => {
       void load()
         .then((nextMembership) => {
-          if (isMounted) setMembership(nextMembership);
+          if (isMounted) {
+            setMembership((current) =>
+              keepIfUnchanged(current, nextMembership),
+            );
+          }
         })
         .catch((error) => {
           console.error('[profiles] no se pudo releer el censo local', {

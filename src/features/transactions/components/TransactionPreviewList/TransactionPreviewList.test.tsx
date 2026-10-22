@@ -82,6 +82,23 @@ describe('TransactionPreviewList', () => {
     ).toBeTruthy();
   });
 
+  it('en modo progresivo termina mostrando todo el historial', async () => {
+    const transactions = Array.from({ length: 30 }, (_, index) =>
+      transaction(`expense-${index}`, '2026-08-10', 'once'),
+    );
+    const screen = await renderWithTheme(
+      <TransactionPreviewList
+        categories={[category]}
+        progressive
+        transactions={transactions}
+      />,
+    );
+
+    expect(
+      await screen.findAllByTestId('transaction-preview-card'),
+    ).toHaveLength(30);
+  });
+
   it('aplica el límite después de agrupar las ocurrencias', async () => {
     const screen = await renderWithTheme(
       <TransactionPreviewList
