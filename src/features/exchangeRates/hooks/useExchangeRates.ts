@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 
-import { getCurrentExchangeRates } from '@/features/exchangeRates/gateways/juntossExchangeRateGateway';
+import {
+  getCurrentExchangeRates,
+  peekCurrentExchangeRates,
+} from '@/features/exchangeRates/gateways/juntossExchangeRateGateway';
 import type { CurrentExchangeRates } from '@/features/exchangeRates/types';
 
 export type ExchangeRatesState =
@@ -13,27 +16,33 @@ export type ExchangeRatesState =
  * la persona escriba un importe. `useExchangePreview` es quien resuelve la
  * conversión en vivo mientras escribe.
  */
+function toLoadedState(rates: CurrentExchangeRates): ExchangeRatesState {
+  return { status: rates.stale ? 'stale' : 'success', rates };
+}
+
 export function useExchangeRates(options?: {
   enabled?: boolean;
 }): ExchangeRatesState {
   const enabled = options?.enabled ?? true;
-  const [state, setState] = useState<ExchangeRatesState>({
-    status: 'loading',
+  const [state, setState] = useState<ExchangeRatesState>(() => {
+    const cached = enabled ? peekCurrentExchangeRates() : null;
+    return cached ? toLoadedState(cached) : { status: 'loading' };
   });
 
   useEffect(() => {
     if (!enabled) return;
     let isMounted = true;
-    // Reinicia a `loading` al montar; el análisis estático
-    // no distingue esto de un `setState` sin frontera asíncrona.
+    // Con tasas frescas en memoria la hoja abre ya con ellas, sin pasar por
+    // `loading`; el análisis estático no distingue esto de un `setState` sin
+    // frontera asíncrona.
+    const cached = peekCurrentExchangeRates();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState({ status: 'loading' });
+    setState(cached ? toLoadedState(cached) : { status: 'loading' });
+    if (cached) return;
 
     void getCurrentExchangeRates()
       .then((rates) => {
-        if (isMounted) {
-          setState({ status: rates.stale ? 'stale' : 'success', rates });
-        }
+        if (isMounted) setState(toLoadedState(rates));
       })
       .catch((error: unknown) => {
         console.error('[exchangeRates] No se pudo leer la tasa vigente', error);

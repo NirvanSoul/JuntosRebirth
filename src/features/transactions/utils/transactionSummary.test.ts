@@ -1,5 +1,6 @@
 import type { SessionTransaction } from '@/features/transactions/types';
 import {
+  listTransactionsThroughCurrentMonth,
   sortTransactionsByRecentActivity,
   summarizeTransactions,
   summarizeTransactionsByCurrency,
@@ -281,5 +282,22 @@ describe('sortTransactionsByRecentActivity', () => {
     const original = [...transactions];
     sortTransactionsByRecentActivity(transactions);
     expect(transactions).toEqual(original);
+  });
+});
+
+describe('listTransactionsThroughCurrentMonth', () => {
+  it('reutiliza la proyección de la misma lista y mes, y recalcula al cambiar de mes', () => {
+    const july = new Date('2026-07-15T12:00:00');
+    const august = new Date('2026-08-15T12:00:00');
+
+    const first = listTransactionsThroughCurrentMonth(transactions, july);
+
+    expect(listTransactionsThroughCurrentMonth(transactions, july)).toBe(first);
+    expect(
+      listTransactionsThroughCurrentMonth([...transactions], july),
+    ).not.toBe(first);
+    expect(listTransactionsThroughCurrentMonth(transactions, august)).not.toBe(
+      first,
+    );
   });
 });

@@ -32,16 +32,35 @@ export function getLocalMonthEndKey(referenceDate = new Date()): string {
   );
 }
 
+/**
+ * Última proyección por lista. Inicio, Actividad y sus resúmenes proyectan la
+ * misma lista hasta media docena de veces por cambio de datos, y proyectar es
+ * casi todo su coste. La lista y el mes la determinan por completo; con
+ * `WeakMap` una lista sustituida libera su proyección.
+ */
+const projectionCache = new WeakMap<
+  readonly SessionTransaction[],
+  { monthEnd: string; projected: readonly SessionTransaction[] }
+>();
+
+/**
+ * Movimientos hasta fin de mes, con las ocurrencias recurrentes proyectadas.
+ * El resultado se comparte entre llamadas: no debe mutarse.
+ */
 export function listTransactionsThroughCurrentMonth(
   transactions: readonly SessionTransaction[],
   referenceDate = new Date(),
-): SessionTransaction[] {
+): readonly SessionTransaction[] {
   const currentMonthEnd = getLocalMonthEndKey(referenceDate);
+  const cached = projectionCache.get(transactions);
+  if (cached?.monthEnd === currentMonthEnd) return cached.projected;
 
-  return projectRecurringTransactions({
+  const projected = projectRecurringTransactions({
     endOn: currentMonthEnd,
     transactions,
   }).filter((transaction) => transaction.occurredOn <= currentMonthEnd);
+  projectionCache.set(transactions, { monthEnd: currentMonthEnd, projected });
+  return projected;
 }
 
 /**

@@ -332,7 +332,7 @@ No debe:
 - Duplicar diseño.
 - Mezclar cientos de líneas de lógica y presentación.
 
-Una lista que puede crecer con el historial (como los movimientos de Actividad) no se monta entera: `useIncrementalLimit` (`src/hooks/`) monta una tanda y añade otra con `onEndReached` de `Screen`, y solo vuelve a la primera tanda al cambiar los filtros. Las filas de `TransactionPreviewList` se memoizan comparando lo que pintan, de modo que una recarga con los mismos datos no las repinta.
+Una lista que puede crecer con el historial (como los movimientos de Actividad) no se monta entera: `useIncrementalLimit` (`src/hooks/`) monta una tanda y añade otra con `onEndReached` de `Screen`, y solo vuelve a la primera tanda al cambiar los filtros. Las filas de `TransactionPreviewList` se memoizan comparando lo que pintan, de modo que una recarga con los mismos datos no las repinta. `listTransactionsThroughCurrentMonth` cachea la proyección de recurrentes por lista y mes, porque Inicio, Actividad y sus resúmenes la pedían varias veces por cada cambio de datos: su resultado se comparte y no debe mutarse (es `readonly`).
 
 ---
 

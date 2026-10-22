@@ -1,5 +1,7 @@
 import {
+  clearCurrentExchangeRatesCache,
   getCurrentExchangeRates,
+  peekCurrentExchangeRates,
   previewExchangeRate,
 } from '@/features/exchangeRates/gateways/juntossExchangeRateGateway';
 import { apiClient } from '@/services/api/juntossApiClient';
@@ -35,13 +37,32 @@ const currentRates = {
 };
 
 describe('juntossExchangeRateGateway', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCurrentExchangeRatesCache();
+  });
 
   it('lee las dos tasas vigentes desde la ruta real del backend', async () => {
     mockedGet.mockResolvedValue({ data: currentRates });
 
     await expect(getCurrentExchangeRates()).resolves.toEqual(currentRates);
     expect(mockedGet).toHaveBeenCalledWith('/v1/exchange/rates');
+  });
+
+  it('comparte la petición en curso y reutiliza las tasas unos minutos', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    mockedGet.mockResolvedValue({ data: currentRates });
+
+    await Promise.all([getCurrentExchangeRates(), getCurrentExchangeRates()]);
+    await getCurrentExchangeRates();
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+    expect(peekCurrentExchangeRates()).toEqual(currentRates);
+
+    now.mockReturnValue(1_000_000 + 5 * 60 * 1000);
+    expect(peekCurrentExchangeRates()).toBeNull();
+    await getCurrentExchangeRates();
+    expect(mockedGet).toHaveBeenCalledTimes(2);
+    now.mockRestore();
   });
 
   it('envía el importe decimal y normaliza las conversiones a unidades menores', async () => {

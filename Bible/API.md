@@ -202,6 +202,9 @@ Las tasas públicas de Venezuela viven bajo `/v1/exchange`:
 - `GET /v1/exchange/rates` devuelve las tasas `BCV` (USD/VES) y `EURO`
   (EUR/VES), su fecha de observación, su fecha de captura y `stale` si el
   servidor tuvo que usar el último snapshot conocido.
+  La app reutiliza la última respuesta durante 5 minutos y comparte la
+  petición en curso, de modo que las hojas que muestran tasas abren con ellas
+  sin estado de carga (las tasas ficticias del usuario demo no se cachean).
 - `POST /v1/exchange/preview` recibe `{ countryCode: 'VE', amount, currency }`.
   `amount` es un string decimal en unidades mayores y `currency` es `USD` o
   `VES`; devuelve conversiones BCV y Euro. La frontera entre ese contrato y

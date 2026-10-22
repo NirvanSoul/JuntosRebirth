@@ -191,6 +191,7 @@ jest.mock(
 jest.mock(
   '@/features/exchangeRates/gateways/juntossExchangeRateGateway',
   () => ({
+    peekCurrentExchangeRates: jest.fn(() => null),
     getCurrentExchangeRates: jest.fn(async () => ({
       rates: {
         BCV: {

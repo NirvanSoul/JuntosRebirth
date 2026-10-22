@@ -1,12 +1,16 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 
-import { getCurrentExchangeRates } from '@/features/exchangeRates/gateways/juntossExchangeRateGateway';
+import {
+  getCurrentExchangeRates,
+  peekCurrentExchangeRates,
+} from '@/features/exchangeRates/gateways/juntossExchangeRateGateway';
 import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 
 jest.mock(
   '@/features/exchangeRates/gateways/juntossExchangeRateGateway',
   () => ({
     getCurrentExchangeRates: jest.fn(),
+    peekCurrentExchangeRates: jest.fn(() => null),
   }),
 );
 
@@ -49,5 +53,36 @@ describe('useExchangeRates', () => {
     mockedGetCurrent.mockRejectedValue(new Error('502'));
     const { result } = await renderHook(useExchangeRates);
     await waitFor(() => expect(result.current.status).toBe('error'));
+  });
+  it('abre directamente con las tasas en memoria, sin estado de carga', async () => {
+    const cachedRates = {
+      rates: {
+        BCV: {
+          source: 'BCV' as const,
+          baseCurrency: 'USD' as const,
+          quoteCurrency: 'VES' as const,
+          rate: '50',
+          observedAt: '2026-09-01T04:00:00.000Z',
+          fetchedAt: '2026-08-31T20:00:00.000Z',
+        },
+        EURO: {
+          source: 'EURO' as const,
+          baseCurrency: 'EUR' as const,
+          quoteCurrency: 'VES' as const,
+          rate: '60',
+          observedAt: '2026-09-01T04:00:00.000Z',
+          fetchedAt: '2026-08-31T20:00:00.000Z',
+        },
+      },
+      ratesUpdatedAt: '2026-08-31T20:00:00.000Z',
+      stale: false,
+    };
+    jest.mocked(peekCurrentExchangeRates).mockReturnValue(cachedRates);
+
+    const { result } = await renderHook(() => useExchangeRates());
+
+    expect(result.current).toEqual({ status: 'success', rates: cachedRates });
+    expect(mockedGetCurrent).not.toHaveBeenCalled();
+    jest.mocked(peekCurrentExchangeRates).mockReturnValue(null);
   });
 });

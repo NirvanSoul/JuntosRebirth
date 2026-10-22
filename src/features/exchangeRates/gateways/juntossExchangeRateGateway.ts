@@ -98,11 +98,54 @@ function mapConversion(
   };
 }
 
+/**
+ * Las tasas vigentes cambian como mucho unas veces al día, pero cada hoja que
+ * las muestra las pedía al abrirse y enseñaba antes un estado de carga. Se
+ * reutilizan unos minutos y se comparte la petición en curso.
+ */
+const currentRatesTtlMs = 5 * 60 * 1000;
+let cachedCurrentRates: {
+  fetchedAt: number;
+  rates: CurrentExchangeRates;
+} | null = null;
+let currentRatesRequest: Promise<CurrentExchangeRates> | null = null;
+
+/** Tasas vigentes ya descargadas y aún frescas, sin pedir nada. */
+export function peekCurrentExchangeRates(): CurrentExchangeRates | null {
+  return cachedCurrentRates &&
+    Date.now() - cachedCurrentRates.fetchedAt < currentRatesTtlMs
+    ? cachedCurrentRates.rates
+    : null;
+}
+
+export function clearCurrentExchangeRatesCache(): void {
+  cachedCurrentRates = null;
+  currentRatesRequest = null;
+}
+
 export async function getCurrentExchangeRates(): Promise<CurrentExchangeRates> {
-  // El usuario demo venezolano usa tasas ficticias locales: no hay API.
+  // El usuario demo venezolano usa tasas ficticias locales: no hay API, y no
+  // se cachean para no mezclarlas con las reales.
   if (await loadDemoSession()) {
     return getDemoCurrentExchangeRates(getLocalTodayKey());
   }
+  const cached = peekCurrentExchangeRates();
+  if (cached) return cached;
+  if (!currentRatesRequest) {
+    const request = fetchCurrentExchangeRates()
+      .then((rates) => {
+        cachedCurrentRates = { fetchedAt: Date.now(), rates };
+        return rates;
+      })
+      .finally(() => {
+        if (currentRatesRequest === request) currentRatesRequest = null;
+      });
+    currentRatesRequest = request;
+  }
+  return currentRatesRequest;
+}
+
+async function fetchCurrentExchangeRates(): Promise<CurrentExchangeRates> {
   const response = await apiClient.get<{
     data: {
       rates: Record<VenezuelaExchangeRateSource, RawCurrentExchangeRate>;

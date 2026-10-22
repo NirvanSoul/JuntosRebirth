@@ -107,7 +107,8 @@ export function listTransactionsByDateFilter(
   filter: TransactionDateFilter,
 ): SessionTransaction[] {
   if (filter === 'all') {
-    return listTransactionsThroughCurrentMonth(transactions).sort(
+    // Copia: la proyección se comparte entre llamadas y no debe mutarse.
+    return [...listTransactionsThroughCurrentMonth(transactions)].sort(
       (left, right) => right.occurredOn.localeCompare(left.occurredOn),
     );
   }
