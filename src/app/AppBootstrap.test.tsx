@@ -1,5 +1,6 @@
 import { AppBootstrap } from '@/app/AppBootstrap';
 import { preloadAppIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
+import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
 const mockUseSession = jest.fn();
@@ -7,6 +8,9 @@ let mockFontsLoaded = false;
 
 jest.mock('expo-font', () => ({
   useFonts: () => [mockFontsLoaded, null],
+}));
+jest.mock('@/lib/storage/localDatabase', () => ({
+  getLocalDatabase: jest.fn(async () => ({})),
 }));
 jest.mock('@/lib/notifications/localNotifications', () => ({
   ensureNotificationHandlerRegistered: jest.fn(),
@@ -32,6 +36,8 @@ it('monta el navegador para restaurar la sesión mientras cargan las fuentes', a
   const screen = await renderWithTheme(<AppBootstrap />);
   expect(mockUseSession).toHaveBeenCalledWith(false);
   expect(preloadAppIllustrations).toHaveBeenCalledTimes(1);
+  // La base se abre en paralelo a las fuentes, sin esperar a la sesión.
+  expect(getLocalDatabase).toHaveBeenCalledTimes(1);
 
   mockFontsLoaded = true;
   await screen.rerender(<AppBootstrap />);

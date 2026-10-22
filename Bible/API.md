@@ -66,6 +66,8 @@ permitir un reintento.
 - Los cortes de red al enviar o leer una respuesta se normalizan como
   `ApiError` con `code: NETWORK_ERROR`, `status: 0` y el endpoint afectado.
   No equivalen a un 401 ni disparan reenvíos automáticos de escrituras.
+  Una petición que no recibe respuesta en 30 s (120 s si sube bytes, como el
+  avatar) se aborta y se normaliza igual.
 - El cliente comparte la inicialización y el snapshot que ya están en curso
   para una misma sesión. Ante un error recuperable no descarta la caché local
   ni reintenta a ciegas: muestra un aviso no bloqueante (`NoticeToast`) con

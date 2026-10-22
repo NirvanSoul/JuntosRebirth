@@ -69,7 +69,17 @@
     "assetBundlePatterns": ["**/*"],
     "plugins": [
       "expo-asset",
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Gilroy-Light.ttf",
+            "./assets/fonts/Gilroy-Regular.ttf",
+            "./assets/fonts/Gilroy-Medium.ttf",
+            "./assets/fonts/Gilroy-Bold.ttf"
+          ]
+        }
+      ],
       "expo-sqlite",
       "expo-secure-store",
       "expo-notifications",

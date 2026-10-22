@@ -25,7 +25,18 @@ type ApiClientDependencies = {
   baseUrl: string;
   fetchImpl?: typeof fetch;
   getCookie: () => Promise<string>;
+  /** Espera máxima hasta recibir la respuesta; inyectable para las pruebas. */
+  requestTimeoutMs?: number;
 };
+
+/**
+ * Sin límite, una petición colgada (portal cautivo, cobertura mínima) esperaba
+ * el timeout del sistema —~60 s en iOS— con el inicio de sesión o el sondeo
+ * detenidos detrás. Vencido, se trata como cualquier corte de red.
+ */
+const defaultRequestTimeoutMs = 30_000;
+/** Subir bytes (el avatar) puede tardar más con datos móviles lentos. */
+const binaryRequestTimeoutMultiplier = 4;
 
 /** Error normalizado para que la interfaz no exponga respuestas del servidor. */
 export class ApiError extends Error {
@@ -115,10 +126,11 @@ function throwRequestFailure(error: unknown, path: string): never {
   if (
     !(error instanceof ApiError) &&
     nativeError?.name !== 'SyntaxError' &&
-    typeof nativeError?.message === 'string' &&
-    /network request failed|network connection was lost|fetch failed|failed to fetch|load failed|networkerror/i.test(
-      nativeError.message,
-    )
+    (nativeError?.name === 'AbortError' ||
+      (typeof nativeError?.message === 'string' &&
+        /network request failed|network connection was lost|fetch failed|failed to fetch|load failed|networkerror/i.test(
+          nativeError.message,
+        )))
   ) {
     throw new ApiError({
       status: 0,
@@ -135,6 +147,7 @@ export function createApiClient({
   baseUrl,
   fetchImpl = fetch,
   getCookie,
+  requestTimeoutMs = defaultRequestTimeoutMs,
 }: ApiClientDependencies) {
   /**
    * Emite la petición y devuelve la `Response` cruda. Todo lo común —url,
@@ -166,9 +179,17 @@ export function createApiClient({
       if (cookie) headers.set('Cookie', cookie);
     }
 
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      binary
+        ? requestTimeoutMs * binaryRequestTimeoutMultiplier
+        : requestTimeoutMs,
+    );
     const response = await fetchImpl(joinUrl(baseUrl, path), {
       method,
       headers,
+      signal: controller.signal,
       // El binario viaja sin serializar: convertirlo a base64 multiplicaría por
       // 1,33 los bytes que salen por datos móviles y el contrato espera bytes.
       body: binary
@@ -178,7 +199,7 @@ export function createApiClient({
           : JSON.stringify(body),
       // Expo gestiona la cookie explícitamente; `include` interfiere con ella.
       credentials: 'omit',
-    });
+    }).finally(() => clearTimeout(timeout));
 
     if (!response.ok) {
       const errorBody = await readErrorBody(response);

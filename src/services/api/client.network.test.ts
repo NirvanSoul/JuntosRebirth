@@ -22,6 +22,29 @@ describe('apiClient transport failures', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('aborts a request that never answers and reports it as a network error', async () => {
+    const fetchImpl = jest.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(Object.assign(new Error('Aborted'), { name: 'AbortError' })),
+          );
+        }),
+    );
+    const client = createApiClient({
+      baseUrl: 'https://api.test',
+      fetchImpl,
+      getCookie: async () => '',
+      requestTimeoutMs: 10,
+    });
+
+    await expect(client.get('/v1/sync/changes')).rejects.toMatchObject({
+      code: 'NETWORK_ERROR',
+      status: 0,
+      endpoint: '/v1/sync/changes',
+    });
+  });
+
   it('recognizes transport errors from the native bridge without an Error prototype', async () => {
     const fetchImpl = jest
       .fn()

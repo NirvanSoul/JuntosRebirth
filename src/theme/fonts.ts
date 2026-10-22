@@ -10,7 +10,12 @@ export const fontFamily = {
 
 export type FontFamily = (typeof fontFamily)[keyof typeof fontFamily];
 
-/** Assets TTF compatibles con iOS, Android y web mediante Expo Go. */
+/**
+ * Assets TTF para `useFonts`. En los builds nativos van además incrustados en
+ * el binario (plugin `expo-font` de `app.json`): `useFonts` los encuentra ya
+ * registrados y no retrasa la primera pantalla. En Expo Go se cargan aquí.
+ * El nombre PostScript de cada archivo coincide con su clave.
+ */
 export const fontAssets = {
   [fontFamily.light]: require('../../assets/fonts/Gilroy-Light.ttf'),
   [fontFamily.regular]: require('../../assets/fonts/Gilroy-Regular.ttf'),
