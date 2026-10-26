@@ -21,6 +21,7 @@ type SelectableOptionProps = {
    * con texto y borde en color de acción, y ocupa menos ancho.
    */
   indicator?: boolean;
+  indicatorShape?: 'circle' | 'square';
   indicatorTestID?: string;
   label: string;
   onPress: () => void;
@@ -91,6 +92,7 @@ export function SelectableOption({
   label,
   onPress,
   role = 'radio',
+  indicatorShape = role === 'checkbox' ? 'square' : 'circle',
   selected,
   style,
   testID,
@@ -125,7 +127,7 @@ export function SelectableOption({
           name={
             selected
               ? 'checkmark-circle'
-              : role === 'checkbox'
+              : indicatorShape === 'square'
                 ? 'square-outline'
                 : 'ellipse-outline'
           }

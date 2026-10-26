@@ -12,6 +12,7 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
 import { Text } from '@/components/ui/Text/Text';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
+import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import {
   maxActiveCurrencies,
   searchCurrencyCatalog,
@@ -21,7 +22,8 @@ import type { CurrencyPreferences } from '@/state/appPreferences/currencyPrefere
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import type { ColorTokens } from '@/theme/types';
-import { iconSize } from '@/theme/layout';
+import { iconSize, layout } from '@/theme/layout';
+import { maxFontScale, typography } from '@/theme/typography';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 
@@ -48,6 +50,7 @@ function createSearchStyles(colors: ColorTokens) {
       paddingHorizontal: spacing.md,
     },
     searchInput: {
+      ...typography.label,
       flex: 1,
       color: colors.textPrimary,
     },
@@ -60,7 +63,8 @@ export function CurrencyPreferencesModal({
   preferences,
   visible,
 }: CurrencyPreferencesModalProps) {
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
+  const density = useLayoutDensity();
   const searchStyles = useThemedStyles(createSearchStyles);
   const [selectedCurrencies, setSelectedCurrencies] = useState<
     readonly CurrencyCode[]
@@ -131,7 +135,7 @@ export function CurrencyPreferencesModal({
                 ? `Ya elegiste ${maxActiveCurrencies} monedas. Quita una para añadir otra.`
                 : notice === 'min'
                   ? 'Debes mantener al menos una moneda activa.'
-                  : 'Elige hasta tres monedas para usar en tus movimientos.'}
+                  : 'Selecciona máximo 3 monedas'}
             </Text>
           </View>
           <ModalCloseButton onPress={onClose} />
@@ -141,6 +145,7 @@ export function CurrencyPreferencesModal({
           <Ionicons color={colors.textMuted} name="search" size={iconSize.md} />
           <BottomSheetTextInput
             accessibilityLabel="Buscar moneda"
+            maxFontSizeMultiplier={maxFontScale.label}
             onChangeText={setSearchQuery}
             placeholder="Busca por país, moneda o código"
             placeholderTextColor={colors.textMuted}
@@ -152,7 +157,9 @@ export function CurrencyPreferencesModal({
         </View>
 
         <BottomSheetScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={{
+            paddingBottom: layout.actionHeight[density] + spacing.lg,
+          }}
           showsVerticalScrollIndicator={false}
           testID="currency-preferences-scroll"
         >
@@ -166,6 +173,7 @@ export function CurrencyPreferencesModal({
                 <SelectableOption
                   accessibilityLabel={`${entry.flag} ${entry.name} (${entry.code})`}
                   disabled={disabled}
+                  indicatorShape="circle"
                   key={entry.code}
                   label={`${entry.flag}  ${entry.name} · ${entry.code}`}
                   onPress={() => handleToggle(entry.code)}
@@ -192,7 +200,7 @@ export function CurrencyPreferencesModal({
           accessibilityLabel="Guardar monedas"
           label="Guardar"
           onPress={handleSave}
-          style={styles.saveButton}
+          style={[styles.saveButton, shadows.floatingAction]}
           testID="currency-preferences-save"
         />
       </View>
@@ -204,8 +212,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, gap: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   headerText: { flex: 1, gap: spacing.xs },
-  scrollContent: { paddingBottom: spacing.md },
   optionsList: { gap: spacing.sm },
   emptyState: { marginTop: spacing.xl },
-  saveButton: { marginTop: spacing.sm },
+  saveButton: {
+    position: 'absolute',
+    bottom: spacing.none,
+    left: spacing.none,
+    right: spacing.none,
+  },
 });
