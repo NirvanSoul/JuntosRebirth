@@ -2,6 +2,7 @@ import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
@@ -39,6 +40,7 @@ export function ProfileDisplayNameModal({
 }: ProfileDisplayNameModalProps) {
   const density = useLayoutDensity();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
   const [name, setName] = useState(value ?? '');
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
@@ -86,7 +88,7 @@ export function ProfileDisplayNameModal({
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable
-            accessibilityLabel="Cerrar"
+            accessibilityLabel={t('common.close')}
             accessibilityRole="button"
             onPress={onClose}
             style={styles.headerButton}
@@ -99,17 +101,17 @@ export function ProfileDisplayNameModal({
           </Pressable>
           <View style={styles.headerText}>
             <Text accessibilityRole="header" variant="heading">
-              Editar nombre
+              {t('settings.displayName.title')}
             </Text>
             <Text style={styles.subtitle} tone="secondary" variant="label">
-              Solo lo verán las personas con las que compartas un espacio.
+              {t('settings.displayName.subtitle')}
             </Text>
           </View>
         </View>
 
         <View style={styles.step}>
           <BottomSheetTextInput
-            accessibilityLabel="Tu nombre"
+            accessibilityLabel={t('settings.displayName.inputLabel')}
             autoCapitalize="words"
             autoFocus
             editable={!isSaving}
@@ -117,7 +119,7 @@ export function ProfileDisplayNameModal({
             maxLength={displayNameMaxLength}
             onChangeText={setName}
             onSubmitEditing={handleSave}
-            placeholder="Escribe tu nombre"
+            placeholder={t('settings.displayName.placeholder')}
             placeholderTextColor={colors.textMuted}
             returnKeyType="done"
             style={[styles.input, { minHeight: layout.controlHeight[density] }]}
@@ -143,9 +145,9 @@ export function ProfileDisplayNameModal({
             testID="profile-display-name-action"
           >
             <ModalPrimaryAction
-              accessibilityLabel="Guardar nombre"
+              accessibilityLabel={t('settings.displayName.saveLabel')}
               disabled={!trimmedName || isSaving}
-              label={isSaving ? 'Guardando…' : 'Guardar'}
+              label={isSaving ? t('common.saving') : t('common.save')}
               onPress={handleSave}
               style={[
                 styles.primaryButtonLayout,

@@ -1,7 +1,14 @@
 import type { Category, CategoryIconName } from '@/features/categories/types';
+import {
+  getCategoryBudget,
+  getCategoryBudgetRange,
+  resolveBudgetAmount,
+} from '@/features/categories/utils/categoryBudgetPeriod';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
+import { projectRecurringTransactions } from '@/features/transactions/utils/transactionRecurrence';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+import { toLocalDateKey } from '@/lib/date/localDate';
 import type { CategoryColorToken } from '@/theme/categoryColors';
 
 export type CategorySummary = {
@@ -75,7 +82,7 @@ export function summarizeCategories(
         name: category.name,
         icon: category.icon,
         colorToken: category.colorToken,
-        budgetMinor: category.budgetMinor,
+        budgetMinor: resolveCurrencyBudget(category, currency, referenceDate),
         transactionCount: 0,
         incomeMinor: 0,
         expenseMinor: 0,
@@ -106,25 +113,61 @@ export function summarizeCategories(
   return Array.from(summaries.values());
 }
 
+function resolveCurrencyBudget(
+  category: Category,
+  currency: CurrencyCode,
+  date: Date,
+): number | undefined {
+  const budget = getCategoryBudget(category, currency);
+  return budget ? resolveBudgetAmount(budget, date) : undefined;
+}
+
 /**
- * Gasto que consume el presupuesto de cada categoría: el presupuesto es
- * mensual, así que solo cuentan los gastos del mes en curso en `currency`,
- * incluidos los recurrentes programados dentro de ese mes.
+ * Gasto que consume el presupuesto de cada categoría con presupuesto en
+ * `currency`: solo
+ * cuentan los gastos en `currency` dentro del periodo de esa categoría que
+ * contiene `referenceDate` (mes, semana, quincena o cada N días), incluidos
+ * los recurrentes programados dentro de él.
  */
-export function summarizeMonthlyBudgetExpenses(
+export function summarizeBudgetExpenses(
+  categories: readonly Category[],
   transactions: readonly SessionTransaction[],
   currency: CurrencyCode,
   referenceDate = new Date(),
 ): ReadonlyMap<string, number> {
-  const monthPrefix = `${getCurrentMonthKey(referenceDate)}-`;
-  const expenses = new Map<string, number>();
+  const ranges = new Map<string, { end: string; start: string }>();
+  categories.forEach((category) => {
+    const budget = getCategoryBudget(category, currency);
+    if (!budget) return;
+    const range = getCategoryBudgetRange(budget, referenceDate);
+    ranges.set(category.id, {
+      start: toLocalDateKey(range.start),
+      end: toLocalDateKey(range.end),
+    });
+  });
 
-  listTransactionsThroughCurrentMonth(transactions, referenceDate).forEach(
+  const expenses = new Map<string, number>();
+  if (ranges.size === 0) return expenses;
+
+  const bounds = [...ranges.values()];
+  const startOn = bounds.reduce(
+    (min, range) => (range.start < min ? range.start : min),
+    bounds[0]!.start,
+  );
+  const endOn = bounds.reduce(
+    (max, range) => (range.end > max ? range.end : max),
+    bounds[0]!.end,
+  );
+
+  projectRecurringTransactions({ transactions, startOn, endOn }).forEach(
     (transaction) => {
+      const range = ranges.get(transaction.categoryId);
       if (
+        !range ||
         transaction.type !== 'expense' ||
         transaction.currency !== currency ||
-        !transaction.occurredOn.startsWith(monthPrefix)
+        transaction.occurredOn < range.start ||
+        transaction.occurredOn > range.end
       ) {
         return;
       }
@@ -137,4 +180,25 @@ export function summarizeMonthlyBudgetExpenses(
   );
 
   return expenses;
+}
+
+/** Gasto de una categoría en `currency` entre dos fechas, con recurrentes. */
+export function summarizeCategoryExpenseInRange(
+  categoryId: string,
+  transactions: readonly SessionTransaction[],
+  currency: CurrencyCode,
+  startOn: string,
+  endOn: string,
+): number {
+  return projectRecurringTransactions({ transactions, startOn, endOn }).reduce(
+    (total, transaction) =>
+      transaction.categoryId === categoryId &&
+      transaction.type === 'expense' &&
+      transaction.currency === currency &&
+      transaction.occurredOn >= startOn &&
+      transaction.occurredOn <= endOn
+        ? total + transaction.amountMinor
+        : total,
+    0,
+  );
 }

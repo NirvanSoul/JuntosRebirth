@@ -454,7 +454,7 @@ export const AppCalendar = memo(
             initialNumToRender={5}
             initialScrollIndex={pastScrollRange}
             keyExtractor={(monthStart) => monthStart}
-            ListFooterComponent={footer}
+            ListFooterComponent={footer ?? undefined}
             maxToRenderPerBatch={scrollCalendarRenderWindow}
             onScroll={handleScroll}
             ref={calendarListRef}

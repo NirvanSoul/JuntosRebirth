@@ -15,19 +15,20 @@ export const defaultCurrencyPreferences: CurrencyPreferences = {
   currencies: [defaultCurrencyCode],
 };
 
-/** Monedas permitidas por defecto al activar el contexto de un país. */
+/**
+ * Monedas permitidas por defecto al activar el contexto de un país, o `null`
+ * si el país no está en el catálogo. Ese caso no cae a EUR: guardar una
+ * moneda que no es la del país sería presentarla como elegida.
+ */
 export function currencyPreferencesForCountry(
   countryCode: string,
-): CurrencyPreferences {
+): CurrencyPreferences | null {
   if (countryCode.toUpperCase() === 'VE') {
     return { currencies: ['USD', 'VES'] };
   }
 
-  return {
-    currencies: [
-      getCountryByIso2(countryCode)?.currencyCode ?? defaultCurrencyCode,
-    ],
-  };
+  const country = getCountryByIso2(countryCode);
+  return country ? { currencies: [country.currencyCode] } : null;
 }
 
 /**

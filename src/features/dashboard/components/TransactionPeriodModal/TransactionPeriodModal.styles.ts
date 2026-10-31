@@ -67,12 +67,20 @@ export function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       padding: spacing.xl,
     },
     diagonalArrow: { transform: [{ rotate: '45deg' }] },
-    addAction: { marginTop: spacing.xl },
+    addAction: {
+      ...shadows.mainMenu,
+      zIndex: 2,
+      position: 'absolute',
+      left: spacing.none,
+      right: spacing.none,
+    },
     pressed: { opacity: 0.72 },
   });
 }
 
 export const periodModalLabels = {
+  carryOver: 'de periodos anteriores',
+  carryOverTotal: 'Balance disponible',
   total: {
     income: 'Total de ingresos',
     expense: 'Total de gastos',

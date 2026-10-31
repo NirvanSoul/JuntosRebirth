@@ -4,10 +4,12 @@ import {
   createInitialSchema,
   createRecurringSeriesSchema,
 } from '@/lib/storage/localDatabaseBaseSchema';
+import { applyCategoryBudgetMigrations } from '@/lib/storage/localDatabaseCategoryBudgetMigration';
 import { applyRetiredCategoryColorMigration } from '@/lib/storage/localDatabaseCategoryColorMigration';
 import { withLegacyMoneyAccountRebuildTransaction } from '@/lib/storage/localDatabaseLegacyMoneyAccountMigration';
 import { applyMoneyAccountMigrations } from '@/lib/storage/localDatabaseMoneyAccountSchema';
 import { applyLocalProfileMigrations } from '@/lib/storage/localDatabaseProfileMigrations';
+import { applyNullableSeriesNextOccurrenceMigration } from '@/lib/storage/localDatabaseRecurringSeriesMigration';
 import {
   ensureLocalProfileCountryCodeColumn,
   ensureLocalProfileDisplayNameColumn,
@@ -21,7 +23,7 @@ import {
  * versión, de modo que la escalera es acumulativa y ningún bloque se
  * reejecuta.
  */
-export const localDatabaseVersion = 31;
+export const localDatabaseVersion = 35;
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -58,8 +60,10 @@ export async function migrateLocalDatabase(
     return;
   }
 
-  const needsLegacyMoneyAccountRebuild =
-    currentVersion >= 20 && currentVersion < 22;
+  // Las versiones 21-22 (cuentas) y 32 (series) reconstruyen tablas
+  // referenciadas con RESTRICT y necesitan las foráneas desactivadas; la 32
+  // abarca a cualquier base anterior.
+  const needsForeignKeysOffRebuild = currentVersion < 32;
   const runMigrations = async (transaction: SQLite.SQLiteDatabase) => {
     // La versión se releé ya bajo el candado exclusivo. La lectura de arriba
     // ocurre fuera de él, así que entre una y otra pudo migrar y confirmar
@@ -234,10 +238,9 @@ export async function migrateLocalDatabase(
     if (currentVersion < 10) {
       // categories.budget_minor only ever stored a single currency-less
       // budget, assumed EUR before ADR-060 introduced per-movement
-      // currencies. This adds a per-currency budgets table (up to 3
-      // currencies per category, enforced in localCategoryRepository)
-      // without touching budget_minor: it stays as historical data and
-      // nothing writes to it anymore.
+      // currencies. This adds a per-currency budgets table that only the
+      // remote sync fills; the editable budget is still budget_minor, in the
+      // space currency.
       await transaction.execAsync(`
         CREATE TABLE category_budgets (
           id TEXT PRIMARY KEY NOT NULL,
@@ -421,13 +424,21 @@ export async function migrateLocalDatabase(
 
     await applyMoneyAccountMigrations(transaction, currentVersion);
 
+    // Después de las cuentas: la copia necesita `money_account_id`.
+    await applyNullableSeriesNextOccurrenceMigration(
+      transaction,
+      currentVersion,
+    );
+
     await applyRetiredCategoryColorMigration(transaction, currentVersion);
+
+    await applyCategoryBudgetMigrations(transaction, currentVersion);
 
     await transaction.execAsync(
       `PRAGMA user_version = ${localDatabaseVersion}`,
     );
   };
-  if (needsLegacyMoneyAccountRebuild) {
+  if (needsForeignKeysOffRebuild) {
     await withLegacyMoneyAccountRebuildTransaction(database, runMigrations);
   } else {
     await database.withExclusiveTransactionAsync(runMigrations);

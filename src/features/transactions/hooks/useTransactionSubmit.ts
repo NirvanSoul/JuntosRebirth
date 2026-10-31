@@ -48,6 +48,11 @@ type UseTransactionSubmitInput = {
   onError: () => void;
   /** Cierra el formulario y limpia la selección tras guardar. */
   onTransactionSaved: (mode: 'created' | 'updated') => void;
+  /** Confirma a la persona los movimientos nuevos y su categoría. */
+  onTransactionsCreated: (
+    created: readonly SessionTransaction[],
+    category: Category,
+  ) => void;
   setTransactions: (
     update: (current: SessionTransaction[]) => SessionTransaction[],
   ) => void;
@@ -77,6 +82,7 @@ export function useTransactionSubmit({
   onChangesPublished,
   onError,
   onTransactionSaved,
+  onTransactionsCreated,
   setTransactions,
 }: UseTransactionSubmitInput) {
   const ensureAccountCurrency = useCallback(
@@ -103,7 +109,7 @@ export function useTransactionSubmit({
   );
 
   const commitCreated = useCallback(
-    (created: readonly SessionTransaction[]) => {
+    (created: readonly SessionTransaction[], category: Category) => {
       let nextTransactions: SessionTransaction[] = [];
       setTransactions((current) => {
         nextTransactions = [...created, ...current];
@@ -114,8 +120,9 @@ export function useTransactionSubmit({
         transactions: nextTransactions,
       }).catch(() => undefined);
       onChangesPublished();
+      onTransactionsCreated(created, category);
     },
-    [categories, onChangesPublished, setTransactions],
+    [categories, onChangesPublished, onTransactionsCreated, setTransactions],
   );
 
   const submitTransaction = useCallback(
@@ -157,7 +164,7 @@ export function useTransactionSubmit({
       }
 
       try {
-        commitCreated(await createLocalTransaction(safeDraft));
+        commitCreated(await createLocalTransaction(safeDraft), targetCategory);
         onTransactionSaved('created');
       } catch (error) {
         console.error(
@@ -246,6 +253,7 @@ export function useTransactionSubmit({
             toInput(submission.expense, 'expense'),
             toInput(submission.income, 'income'),
           ]),
+          category,
         );
         return true;
       } catch (error) {

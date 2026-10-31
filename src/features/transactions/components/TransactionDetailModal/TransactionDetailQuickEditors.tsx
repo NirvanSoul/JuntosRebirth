@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { MoneyAccount } from '@/features/accounts/types';
+import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
 import { TransactionDatePickerModal } from '@/features/transactions/components/CreateTransactionModal/TransactionDatePickerModal';
 import {
   recurrenceOptions,
@@ -16,14 +16,14 @@ import { useDepsChanged } from '@/hooks/useDepsChanged';
 /**
  * Campos cuyo selector abre el propio detalle. La categoría también se edita
  * sin pasar por el formulario, pero su selector lo posee la navegación —lleva
- * consigo la creación de categorías y sus plantillas—, así que no se apila
- * desde aquí.
+ * consigo la creación de categorías y sus plantillas—, así que el detalle solo
+ * lo pide con `onOpenCategoryPicker`.
  */
 export type TransactionQuickEditField = 'date' | 'money-account' | 'recurrence';
 
 type TransactionDetailQuickEditorsProps = {
   /** Solo las cuentas activas del espacio en la moneda del movimiento. */
-  assignableMoneyAccounts: readonly MoneyAccount[];
+  assignableMoneyAccounts: readonly MoneyAccountSummary[];
   field: TransactionQuickEditField | null;
   onClose: () => void;
   onCreateMoneyAccount?: () => void;

@@ -47,4 +47,43 @@ describe('useTransactionDetailModal', () => {
     expect(result.current.transaction).toBeNull();
     expect(nextAction).toHaveBeenCalledTimes(1);
   });
+
+  it('abre un movimiento que llega con la lista del espacio recién elegido', async () => {
+    const { rerender, result } = await renderHook(
+      ({ transactions }: { transactions: readonly SessionTransaction[] }) =>
+        useTransactionDetailModal({
+          assignableMoneyAccounts: [],
+          categories: [],
+          moneyAccounts: [],
+          transactions,
+        }),
+      { initialProps: { transactions: [] as SessionTransaction[] } },
+    );
+
+    await act(async () => result.current.open(transaction.id));
+    expect(result.current.visible).toBe(false);
+
+    await rerender({ transactions: [transaction] });
+    expect(result.current.visible).toBe(true);
+    expect(result.current.transaction).toEqual(transaction);
+  });
+
+  it('reintenta solo con la siguiente lista', async () => {
+    const { rerender, result } = await renderHook(
+      ({ transactions }: { transactions: readonly SessionTransaction[] }) =>
+        useTransactionDetailModal({
+          assignableMoneyAccounts: [],
+          categories: [],
+          moneyAccounts: [],
+          transactions,
+        }),
+      { initialProps: { transactions: [] as SessionTransaction[] } },
+    );
+
+    await act(async () => result.current.open(transaction.id));
+    await rerender({ transactions: [] });
+    await rerender({ transactions: [transaction] });
+
+    expect(result.current.visible).toBe(false);
+  });
 });

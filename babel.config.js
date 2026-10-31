@@ -29,23 +29,45 @@ const reactCompilerDirectories = [
   source('features', 'map'),
 ];
 
+const presetOptions = {
+  'react-compiler': {
+    sources: (filename) =>
+      !/\.test\.[jt]sx?$/.test(filename) &&
+      reactCompilerDirectories.some((directory) =>
+        filename.startsWith(directory),
+      ),
+  },
+};
+
+/**
+ * El código de la app usa el runtime JSX traducido (`src/lib/i18n/jsx`): sus
+ * textos se escriben en español y se muestran en el idioma activo. Las
+ * dependencias conservan el runtime de React; si React Native lo cargara, el
+ * runtime importaría de vuelta `react-native` durante su propia carga.
+ */
+const appSources = [source(), path.join(__dirname, 'App.tsx')];
+// Metro construye el transformador cargando esta configuración sin archivo:
+// los patrones deben ser funciones que acepten `filename` indefinido.
+const isAppSource = (filename) =>
+  Boolean(filename) &&
+  appSources.some((appSource) => filename.startsWith(appSource));
+const isDependency = (filename) => !isAppSource(filename);
+
 module.exports = function babelConfig(api) {
   api.cache(true);
 
   return {
-    presets: [
-      [
-        expoPreset,
-        {
-          'react-compiler': {
-            sources: (filename) =>
-              !/\.test\.[jt]sx?$/.test(filename) &&
-              reactCompilerDirectories.some((directory) =>
-                filename.startsWith(directory),
-              ),
-          },
-        },
-      ],
+    overrides: [
+      {
+        test: isAppSource,
+        presets: [
+          [expoPreset, { ...presetOptions, jsxImportSource: '@/lib/i18n/jsx' }],
+        ],
+      },
+      {
+        test: isDependency,
+        presets: [[expoPreset, presetOptions]],
+      },
     ],
   };
 };

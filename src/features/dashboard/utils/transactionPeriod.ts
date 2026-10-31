@@ -121,15 +121,15 @@ export function shiftTransactionPeriod(
   return createLocalDate(range.start.getFullYear() + offset, 0, 1);
 }
 
-const previousPeriodNouns: Record<TransactionPeriod, string> = {
-  month: 'mes',
-  week: 'semana',
-  fortnight: 'quincena',
-  year: 'año',
+const previousPeriodPhrases: Record<TransactionPeriod, string> = {
+  month: 'el mes anterior',
+  week: 'la semana anterior',
+  fortnight: 'la quincena anterior',
+  year: 'el año anterior',
 };
 
 export function describePreviousPeriod(period: TransactionPeriod): string {
-  return `vs. ${previousPeriodNouns[period]} anterior`;
+  return previousPeriodPhrases[period];
 }
 
 export function getPreviousPeriodTransactions(

@@ -8,6 +8,7 @@ import { NotificationsPermissionScreen } from '@/features/onboarding/screens/Not
 import { OnboardingLoginScreen } from '@/features/onboarding/screens/OnboardingLoginScreen';
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
 import { triggerHaptic } from '@/lib/haptics/haptics';
+import { i18n } from '@/lib/i18n/i18n';
 import { requestNotificationPermission } from '@/lib/notifications/localNotifications';
 import { renderWithTheme } from '@/test/renderWithTheme';
 
@@ -218,5 +219,63 @@ describe('pantallas de onboarding', () => {
     await waitFor(() => {
       expect(screen.getByText('Continuar')).toBeTruthy();
     });
+  });
+
+  it('pregunta el idioma al elegir un país de habla inglesa y lo aplica', async () => {
+    const screen = await renderWithTheme(
+      <CountryScreen navigation={navigation} route={route} />,
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-country-search'),
+      'estados',
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('onboarding-country-US')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('onboarding-language-prompt-en')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('onboarding-country-US'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('¿En qué idioma quieres usar Juntos?'),
+      ).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-language-prompt-en'));
+    });
+
+    // La elección se aplica al continuar, ya con la siguiente lámina.
+    expect(i18n.language).toBe('es');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('onboarding-country-action'));
+    });
+
+    await waitFor(() => {
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('Juntos');
+    });
+    expect(i18n.language).toBe('en');
+    await act(() => i18n.changeLanguage('es'));
+  });
+
+  it('no pregunta el idioma al elegir un país de habla hispana', async () => {
+    const screen = await renderWithTheme(
+      <CountryScreen navigation={navigation} route={route} />,
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('onboarding-country-search'),
+      'esp',
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('onboarding-country-ES')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByTestId('onboarding-country-ES'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('onboarding-country-selected')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('onboarding-language-prompt-en')).toBeNull();
   });
 });

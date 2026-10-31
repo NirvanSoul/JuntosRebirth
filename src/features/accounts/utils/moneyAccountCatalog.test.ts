@@ -2,6 +2,7 @@ import type { MoneyAccount } from '@/features/accounts/types';
 import {
   listMoneyAccountsBySpace,
   validateMoneyAccountName,
+  withCurrencyBalance,
 } from '@/features/accounts/utils/moneyAccountCatalog';
 
 function createAccount(overrides: Partial<MoneyAccount> = {}): MoneyAccount {
@@ -78,5 +79,21 @@ describe('validateMoneyAccountName', () => {
     expect(
       validateMoneyAccountName('  Caja   fuerte ', [], 'personal'),
     ).toEqual({ valid: true, name: 'Caja fuerte' });
+  });
+});
+
+describe('withCurrencyBalance', () => {
+  const eur = [{ currency: 'EUR' as const, openingBalanceMinor: 1000 }];
+
+  it('añade la moneda pedida con saldo inicial cero si falta', () => {
+    expect(withCurrencyBalance(eur, 'USD')).toEqual([
+      ...eur,
+      { currency: 'USD', openingBalanceMinor: 0 },
+    ]);
+  });
+
+  it('respeta los saldos cuando la moneda ya está o no se pide ninguna', () => {
+    expect(withCurrencyBalance(eur, 'EUR')).toBe(eur);
+    expect(withCurrencyBalance(eur, undefined)).toBe(eur);
   });
 });

@@ -701,9 +701,8 @@ describe('MainTabsNavigator', () => {
     ).not.toHaveProperty('backgroundColor');
     const homeTab = screen.getByRole('tab', { name: 'Inicio' });
     expect(
-      StyleSheet.flatten(screen.getByTestId('app-tab-item-Home').props.style)
-        .backgroundColor,
-    ).toBe('rgba(242, 242, 247, 1)');
+      StyleSheet.flatten(screen.getByTestId('app-tab-item-Home').props.style),
+    ).not.toHaveProperty('backgroundColor');
     expect(
       StyleSheet.flatten(within(homeTab).getByText('Inicio').props.style).color,
     ).toBe(colors.textPrimary);
@@ -760,7 +759,7 @@ describe('MainTabsNavigator', () => {
     ).toMatchObject({ selected: true });
   });
 
-  it('muestra el nombre de la persona autenticada en su espacio personal', async () => {
+  it('llama Personal al espacio personal aunque la persona tenga nombre', async () => {
     mockSession = {
       user: {
         id: 'user-ana',
@@ -785,8 +784,8 @@ describe('MainTabsNavigator', () => {
       </SafeAreaProvider>,
     );
 
-    expect(screen.getByLabelText('Espacio Ana María')).toBeTruthy();
-    expect(screen.queryByLabelText('Espacio Personal')).toBeNull();
+    expect(screen.getByLabelText('Espacio Personal')).toBeTruthy();
+    expect(screen.queryByLabelText('Espacio Ana María')).toBeNull();
   });
 
   it('alterna entre dos monedas desde Inicio, Actividad y Mapa', async () => {
@@ -1493,6 +1492,67 @@ describe('MainTabsNavigator', () => {
     expect(await screen.findByText('Ponle un nombre')).toBeTruthy();
   });
 
+  it('cambia la categoría desde el detalle del movimiento sin abrir el detalle de la categoría', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <NavigationContainer>
+            <MainTabsNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    await fireEvent.press(screen.getByTestId('quick-create-category'));
+    await fireEvent.press(screen.getByLabelText('Salario'));
+    await fireEvent.press(screen.getByLabelText('Supermercado'));
+    await fireEvent.press(screen.getByLabelText('Guardar categorías'));
+
+    await fireEvent.press(screen.getByTestId('floating-create-button'));
+    await fireEvent.press(screen.getByLabelText('Crear gasto'));
+    await fireEvent.press(screen.getByLabelText('Agregar categoría'));
+    await fireEvent.press(screen.getByLabelText('Salario'));
+    await fireEvent.press(screen.getByLabelText('5'));
+    await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
+    await fireEvent.press(
+      await screen.findByRole('button', { name: 'Gasto agregado' }),
+    );
+
+    const detail = await screen.findByTestId('transaction-detail-modal');
+    // El icono de arriba abre la categoría; la fila la cambia.
+    expect(
+      within(detail).getAllByRole('button', {
+        name: 'Cambiar categoría: Salario',
+      }),
+    ).toHaveLength(1);
+    expect(
+      within(detail).getByRole('button', {
+        name: 'Abrir categoría: Salario',
+      }),
+    ).toBeTruthy();
+    await fireEvent.press(
+      within(detail).getByTestId('transaction-detail-category-row'),
+    );
+
+    expect(await screen.findByText('Elige una categoría')).toBeTruthy();
+    expect(screen.queryByTestId('category-detail-modal')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Supermercado'));
+
+    const updatedDetail = await screen.findByTestId('transaction-detail-modal');
+    expect(
+      await within(updatedDetail).findAllByRole('button', {
+        name: 'Cambiar categoría: Supermercado',
+      }),
+    ).toHaveLength(1);
+    expect(screen.queryByTestId('category-detail-modal')).toBeNull();
+  });
+
   it('confirma una categoría copiada con su nombre y espacio de destino', async () => {
     mockUseSpaces.mockReturnValue({
       activeSpace: {
@@ -1549,9 +1609,7 @@ describe('MainTabsNavigator', () => {
       screen.getByRole('button', { name: 'Copiar a Pareja' }),
     );
 
-    expect(
-      await screen.findByLabelText('Salario copiado en Pareja exitosamente.'),
-    ).toBeTruthy();
+    expect(await screen.findByLabelText('Categoría copiada')).toBeTruthy();
   });
 
   it('abre los detalles desde Inicio y confirma la copia de un movimiento', async () => {
@@ -1613,9 +1671,8 @@ describe('MainTabsNavigator', () => {
     await fireEvent.press(screen.getByLabelText('Salario'));
     await fireEvent.press(screen.getByLabelText('5'));
     await fireEvent.press(screen.getByLabelText('Agregar movimiento'));
-
     await fireEvent.press(
-      screen.getByRole('button', { name: /Gasto: Salario/ }),
+      await screen.findByRole('button', { name: 'Gasto agregado' }),
     );
     const detail = await screen.findByTestId('transaction-detail-modal');
     expect(within(detail).queryByText(/presupuesto/i)).toBeNull();
@@ -1628,13 +1685,22 @@ describe('MainTabsNavigator', () => {
 
     expect(await screen.findByLabelText('Movimiento copiado')).toBeTruthy();
     expect(
-      screen.getByTestId('copy-notice-category-icon', {
+      screen.getByTestId('movement-notice-category-icon', {
         includeHiddenElements: true,
       }),
     ).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByTestId('transaction-detail-modal')).toBeNull(),
+    );
 
     await fireEvent.press(
-      within(detail).getByRole('button', { name: 'Editar movimiento' }),
+      screen.getByRole('button', { name: /Gasto: Salario/ }),
+    );
+    const reopenedDetail = await screen.findByTestId(
+      'transaction-detail-modal',
+    );
+    await fireEvent.press(
+      within(reopenedDetail).getByRole('button', { name: 'Editar movimiento' }),
     );
     expect(await screen.findByLabelText('5 euros')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('0'));
@@ -1818,7 +1884,7 @@ describe('MainTabsNavigator', () => {
       expect(screen.getByText('Alimentación')).toBeTruthy();
     });
 
-    it('muestra un aviso no bloqueante con Reintentar cuando la inicialización falla sin conexión y vuelve a inicializar al pulsarlo', async () => {
+    it('muestra el aviso fijo sin conexión con Reintentar cuando la inicialización falla por red y vuelve a inicializar al pulsarlo', async () => {
       localCatalog();
       const alertSpy = jest.spyOn(Alert, 'alert');
       (initializeAuthenticatedSession as jest.Mock)
@@ -1843,7 +1909,7 @@ describe('MainTabsNavigator', () => {
       expect(toast).toBeTruthy();
       expect(
         screen.getByText(
-          'Sin conexión. Mostramos lo guardado en este dispositivo.',
+          'Sin conexión. Tus cambios se guardan aquí y se subirán al reconectar.',
         ),
       ).toBeTruthy();
       expect(screen.getByText('Compra semanal')).toBeTruthy();

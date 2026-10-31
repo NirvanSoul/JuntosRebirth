@@ -11,6 +11,7 @@ import type {
   MoneyAccount,
 } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
+import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
 import { createOpeningBalanceTransactions } from '@/features/accounts/utils/openingBalanceTransactions';
 import { createLocalTransactions } from '@/features/transactions/repositories/localTransactionRepository';
 import type { SessionTransaction } from '@/features/transactions/types';
@@ -19,11 +20,21 @@ import { getLocalTodayKey } from '@/lib/date/localDate';
 import {
   listMoneyAccountsBySpace,
   validateMoneyAccountName,
+  withCurrencyBalance,
 } from '@/features/accounts/utils/moneyAccountCatalog';
+
+export type MoneyAccountCreationRequest = {
+  currency: CurrencyCode;
+  onCreated: (moneyAccountId: string) => void;
+};
 
 type UseMoneyAccountsInput = {
   activeSpaceId: string;
   categories: readonly Category[];
+  /** Confirma al usuario que la cuenta se eliminó. */
+  onArchived: () => void;
+  /** Confirma al usuario que la cuenta se creó. */
+  onCreated: (account: MoneyAccount) => void;
   /** Sube los cambios al espacio compartido tras cada mutación local. */
   onChangesPublished: () => void;
   onError: () => void;
@@ -41,7 +52,9 @@ type UseMoneyAccountsInput = {
 export function useMoneyAccounts({
   activeSpaceId,
   categories,
+  onArchived,
   onChangesPublished,
+  onCreated,
   onError,
   onTransactionsCreated,
   transactions,
@@ -57,10 +70,13 @@ export function useMoneyAccounts({
    * mutación evita la zona muerta temporal y mantiene estables las
    * dependencias de los `useCallback`.
    */
-  const notifyRef = useRef({ onChangesPublished, onError });
+  const notify = { onArchived, onChangesPublished, onCreated, onError };
+  const notifyRef = useRef(notify);
   useEffect(() => {
-    notifyRef.current = { onChangesPublished, onError };
+    notifyRef.current = notify;
   });
+  /** Quien abrió la creación para usar la cuenta nueva en cuanto exista. */
+  const creationRequestRef = useRef<MoneyAccountCreationRequest | null>(null);
   const materializingOpeningBalances = useRef(new Set<string>());
 
   const spaceMoneyAccounts = useMemo(
@@ -70,6 +86,11 @@ export function useMoneyAccounts({
   const activeSpaceMoneyAccounts = useMemo(
     () => listMoneyAccountsBySpace(moneyAccounts, activeSpaceId),
     [activeSpaceId, moneyAccounts],
+  );
+  /** Las cuentas activas del espacio con su saldo, para los selectores. */
+  const accountSummaries = useMemo(
+    () => summarizeMoneyAccounts(activeSpaceMoneyAccounts, transactions),
+    [activeSpaceMoneyAccounts, transactions],
   );
   const editingAccount =
     activeSpaceMoneyAccounts.find((account) => account.id === editingId) ??
@@ -151,12 +172,23 @@ export function useMoneyAccounts({
   ]);
 
   const openCreation = useCallback(() => {
+    creationRequestRef.current = null;
     setEditingId(null);
     setCurrencyLocked(false);
     setModalVisible(true);
   }, []);
 
+  /** Abre la creación para un flujo que usará la cuenta nueva al guardarse. */
+  const openCreationFor = useCallback(
+    (request: MoneyAccountCreationRequest) => {
+      openCreation();
+      creationRequestRef.current = request;
+    },
+    [openCreation],
+  );
+
   const closeModal = useCallback(() => {
+    creationRequestRef.current = null;
     setModalVisible(false);
     setEditingId(null);
   }, []);
@@ -235,6 +267,8 @@ export function useMoneyAccounts({
         return;
       }
 
+      const request = creationRequestRef.current;
+      const balances = withCurrencyBalance(input.balances, request?.currency);
       try {
         // El saldo inicial no se persiste en la cuenta para no contar dos
         // veces. Se materializa como ingreso o gasto y así también entra en
@@ -242,7 +276,7 @@ export function useMoneyAccounts({
         const openingBalanceTransactions = createOpeningBalanceTransactions({
           accountId: '',
           accountName: validation.name,
-          balances: input.balances,
+          balances,
           categories,
           occurredOn: getLocalTodayKey(),
           spaceId: input.spaceId,
@@ -250,7 +284,7 @@ export function useMoneyAccounts({
         const created = await createLocalMoneyAccount({
           ...input,
           name: validation.name,
-          balances: input.balances.map((balance) => ({
+          balances: balances.map((balance) => ({
             ...balance,
             openingBalanceMinor: 0,
           })),
@@ -264,7 +298,10 @@ export function useMoneyAccounts({
         setMoneyAccounts((current) => [...current, created]);
         onTransactionsCreated(createdTransactions);
         notifyRef.current.onChangesPublished();
+        creationRequestRef.current = null;
         setModalVisible(false);
+        notifyRef.current.onCreated(created);
+        request?.onCreated(created.id);
       } catch (error) {
         console.error('[accounts] No se pudo crear la cuenta', error);
         notifyRef.current.onError();
@@ -294,6 +331,7 @@ export function useMoneyAccounts({
         );
         notifyRef.current.onChangesPublished();
         setDetailId(null);
+        notifyRef.current.onArchived();
       } catch (error) {
         console.error('[accounts] No se pudo archivar la cuenta', error);
         notifyRef.current.onError();
@@ -341,6 +379,7 @@ export function useMoneyAccounts({
   // cambia por otra hoja.
   return useMemo(
     () => ({
+      accountSummaries,
       activeSpaceMoneyAccounts,
       archive,
       closeModal,
@@ -351,6 +390,7 @@ export function useMoneyAccounts({
       isModalVisible,
       moneyAccounts,
       openCreation,
+      openCreationFor,
       openDetail: setDetailId,
       setMoneyAccounts,
       spaceMoneyAccounts,
@@ -358,6 +398,7 @@ export function useMoneyAccounts({
       submit,
     }),
     [
+      accountSummaries,
       activeSpaceMoneyAccounts,
       archive,
       closeModal,
@@ -368,6 +409,7 @@ export function useMoneyAccounts({
       isModalVisible,
       moneyAccounts,
       openCreation,
+      openCreationFor,
       spaceMoneyAccounts,
       startEditing,
       submit,

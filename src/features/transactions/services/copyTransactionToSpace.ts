@@ -66,7 +66,7 @@ export async function copyTransactionToSpace({
       // La copia es otra fila: con el id del original chocaría con su clave.
       id: undefined,
       spaceId: targetSpaceId,
-      budgetMinor: undefined,
+      budgets: undefined,
       isDefault: false,
       templateKey: undefined,
       sourceCategoryId: sourceCategory.id,

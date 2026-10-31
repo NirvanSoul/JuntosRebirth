@@ -5,6 +5,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
@@ -64,6 +65,7 @@ export function CurrencyPreferencesModal({
   visible,
 }: CurrencyPreferencesModalProps) {
   const { colors, shadows } = useTheme();
+  const { t } = useTranslation();
   const density = useLayoutDensity();
   const searchStyles = useThemedStyles(createSearchStyles);
   const [selectedCurrencies, setSelectedCurrencies] = useState<
@@ -91,7 +93,7 @@ export function CurrencyPreferencesModal({
         if (current.length <= 1) {
           setNotice('min');
           void AccessibilityInfo.announceForAccessibility(
-            'Debes mantener al menos una moneda activa.',
+            t('settings.currencyModal.minRequired'),
           );
           return current;
         }
@@ -102,7 +104,7 @@ export function CurrencyPreferencesModal({
       if (current.length >= maxActiveCurrencies) {
         setNotice('max');
         void AccessibilityInfo.announceForAccessibility(
-          `Ya elegiste ${maxActiveCurrencies} monedas. Quita una para añadir otra.`,
+          t('settings.currencyModal.maxReached', { max: maxActiveCurrencies }),
         );
         return current;
       }
@@ -128,14 +130,18 @@ export function CurrencyPreferencesModal({
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text accessibilityRole="header" variant="heading">
-              Moneda
+              {t('settings.currencyModal.title')}
             </Text>
             <Text tone="secondary" variant="label">
               {notice === 'max'
-                ? `Ya elegiste ${maxActiveCurrencies} monedas. Quita una para añadir otra.`
+                ? t('settings.currencyModal.maxReached', {
+                    max: maxActiveCurrencies,
+                  })
                 : notice === 'min'
-                  ? 'Debes mantener al menos una moneda activa.'
-                  : 'Selecciona máximo 3 monedas'}
+                  ? t('settings.currencyModal.minRequired')
+                  : t('settings.currencyModal.hint', {
+                      max: maxActiveCurrencies,
+                    })}
             </Text>
           </View>
           <ModalCloseButton onPress={onClose} />
@@ -144,10 +150,10 @@ export function CurrencyPreferencesModal({
         <View style={searchStyles.searchField}>
           <Ionicons color={colors.textMuted} name="search" size={iconSize.md} />
           <BottomSheetTextInput
-            accessibilityLabel="Buscar moneda"
+            accessibilityLabel={t('settings.currencyModal.searchLabel')}
             maxFontSizeMultiplier={maxFontScale.label}
             onChangeText={setSearchQuery}
-            placeholder="Busca por país, moneda o código"
+            placeholder={t('settings.currencyModal.searchPlaceholder')}
             placeholderTextColor={colors.textMuted}
             returnKeyType="search"
             style={searchStyles.searchInput}
@@ -190,15 +196,15 @@ export function CurrencyPreferencesModal({
                 tone="secondary"
                 variant="label"
               >
-                No encontramos ninguna moneda con esa búsqueda.
+                {t('settings.currencyModal.noResults')}
               </Text>
             ) : null}
           </View>
         </BottomSheetScrollView>
 
         <ModalPrimaryAction
-          accessibilityLabel="Guardar monedas"
-          label="Guardar"
+          accessibilityLabel={t('settings.currencyModal.saveLabel')}
+          label={t('common.save')}
           onPress={handleSave}
           style={[styles.saveButton, shadows.floatingAction]}
           testID="currency-preferences-save"

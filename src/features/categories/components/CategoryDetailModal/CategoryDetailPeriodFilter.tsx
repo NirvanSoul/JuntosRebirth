@@ -11,7 +11,9 @@ import { TransactionPeriodSelector } from '@/features/transactions/components/Tr
 
 type CategoryDetailPeriodFilterProps = {
   filter: TransactionDateFilter;
+  nextDisabled?: boolean;
   onChange: (filter: TransactionDateFilter) => void;
+  optionsStyle?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 };
@@ -23,7 +25,9 @@ type CategoryDetailPeriodFilterProps = {
  */
 export function CategoryDetailPeriodFilter({
   filter,
+  nextDisabled,
   onChange,
+  optionsStyle,
   style,
   testID = 'category-detail-period-selector',
 }: CategoryDetailPeriodFilterProps) {
@@ -58,11 +62,13 @@ export function CategoryDetailPeriodFilter({
         customSelected={Boolean(customRange)}
         includeAllOption
         includeCustomOption
+        nextDisabled={nextDisabled}
         onNext={() => shiftPeriod(1)}
         onPrevious={() => shiftPeriod(-1)}
         onSelectAll={() => onChange('all')}
         onSelectCustom={() => setRangePickerVisible(true)}
         onSelectPeriod={(period) => onChange({ period, selectedDate: anchor })}
+        optionsStyle={optionsStyle}
         period={periodFilter?.period ?? null}
         selectedDate={anchor}
         testID={testID}

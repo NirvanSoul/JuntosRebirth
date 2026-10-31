@@ -21,7 +21,13 @@
       "Bash(npm install *)",
       "Bash(xxd)",
       "Bash(python3 -)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(lsof -nP -iTCP:8081 -sTCP:LISTEN)",
+      "Bash(curl -s -m 10 -o /dev/null -w \"%{http_code} %{time_total}s\\\\n\" http://localhost:8081/status)",
+      "Bash(curl -s -m 60 -o /dev/null -w \"manifest %{http_code} %{time_total}s\\\\n\" -H \"expo-platform: ios\" -H \"Accept: application/expo+json,application/json\" http://localhost:8081/)",
+      "Bash(curl -s -m 15 -o /dev/null -w \"root-browser %{http_code} %{time_total}s\\\\n\" http://localhost:8081/)",
+      "Bash(awk '{print $2, $9, $11, $12, $13, $14, $15, $16, $17}')",
+      "Bash(npx expo *)"
     ]
   }
 }

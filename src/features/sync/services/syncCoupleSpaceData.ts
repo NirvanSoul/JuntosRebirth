@@ -3,6 +3,12 @@ import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { syncCoupleSpaceRemotely } from '@/features/sync/gateways/juntossCoupleSpaceSyncGateway';
 import { findRemoteIdForLocalEntity } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
+import {
+  flattenBudgetSchedule,
+  parseBudgetHistory,
+  parseBudgetOverrides,
+} from '@/features/categories/utils/categoryBudgetSerialization';
+import { migrateLegacyCategoryBudgets } from '@/features/categories/repositories/localCategoryBudgetRepository';
 
 type SyncRow = { id: string; updated_at: string } & Record<string, unknown>;
 
@@ -13,8 +19,42 @@ type MoneyAccountBalanceRow = {
 type CategoryBudgetRow = {
   category_id: string;
   currency: string;
-  budgetAmountMinor: number;
+  budget_minor: number;
+  period: string;
+  interval_days: number | null;
+  anchor_on: string | null;
+  overrides_json: string;
+  history_json: string;
 };
+
+/** Presupuestos de una categoría, uno por moneda, con su periodicidad. */
+function buildCategoryBudgets(
+  categoryId: string,
+  rows: readonly CategoryBudgetRow[],
+): Record<string, unknown>[] {
+  return rows
+    .filter((row) => row.category_id === categoryId)
+    .map((row) => ({
+      currency: row.currency,
+      budgetAmountMinor: row.budget_minor,
+      period: row.period,
+      intervalDays: row.interval_days,
+      anchorOn: row.anchor_on,
+      overrides: parseBudgetOverrides(row.overrides_json).map(
+        ({ periodStartOn, amountMinor }) => ({
+          periodStartOn,
+          budgetAmountMinor: amountMinor,
+        }),
+      ),
+      history: parseBudgetHistory(row.history_json).map(
+        ({ endsOn, amountMinor, schedule }) => ({
+          endsOn,
+          budgetAmountMinor: amountMinor,
+          ...flattenBudgetSchedule(schedule),
+        }),
+      ),
+    }));
+}
 
 type CoupleSpaceSyncResult = {
   categoryCount: number;
@@ -94,6 +134,8 @@ async function syncSpaceData(input: {
       localId: input.spaceId,
     })) ?? input.spaceId;
   const statuses = uploadableStatuses(input.includeLocalOnly ?? true);
+  // Un presupuesto heredado sin mover no tendría moneda con la que viajar.
+  await migrateLegacyCategoryBudgets(database);
   const [
     categories,
     categoryBudgets,
@@ -104,7 +146,7 @@ async function syncSpaceData(input: {
   ] = await Promise.all([
     database.getAllAsync<SyncRow>(
       `SELECT id, name, icon, color_token AS "colorToken",
-              budget_minor AS "budgetMinor", is_default AS "isDefault",
+              is_default AS "isDefault",
               template_key AS "templateKey", is_archived AS "isArchived",
               created_at AS "createdAt", updated_at
          FROM categories
@@ -117,9 +159,10 @@ async function syncSpaceData(input: {
     // presupuesto puede cambiar sin que cambie la categoría, y hasta ahora no
     // salía nunca del dispositivo.
     database.getAllAsync<CategoryBudgetRow>(
-      `SELECT category_budgets.category_id,
-              category_budgets.currency,
-              category_budgets.budget_minor AS "budgetAmountMinor"
+      `SELECT category_budgets.category_id, category_budgets.currency,
+              category_budgets.budget_minor, category_budgets.period,
+              category_budgets.interval_days, category_budgets.anchor_on,
+              category_budgets.overrides_json, category_budgets.history_json
          FROM category_budgets
          JOIN categories ON categories.id = category_budgets.category_id
         WHERE categories.space_id = ?
@@ -202,15 +245,12 @@ async function syncSpaceData(input: {
   const remoteResult = await syncCoupleSpaceRemotely({
     installationId,
     spaceId: remoteSpaceId,
-    // Cada categoría viaja con sus presupuestos por moneda. `budgetMinor`
-    // sigue yendo para el servidor que solo entiende un importe único, en la
-    // moneda del espacio; `budgets` lleva el modelo multidivisa completo.
-    categories: categories.map((row) => {
-      const budgets = categoryBudgets
-        .filter((budget) => budget.category_id === row.id)
-        .map(({ category_id: _categoryId, ...budget }) => budget);
-      return { ...serializeRow(row), budgets };
-    }),
+    // Cada categoría viaja con todos sus presupuestos por moneda: el
+    // servidor los reescribe enteros, así que quitar uno aquí lo quita allí.
+    categories: categories.map((row) => ({
+      ...serializeRow(row),
+      budgets: buildCategoryBudgets(row.id, categoryBudgets),
+    })),
     // Cada cuenta viaja con sus monedas: el RPC las reescribe enteras, así
     // que una divisa retirada aquí desaparece también en el otro dispositivo.
     moneyAccounts: moneyAccounts.map((row) => ({

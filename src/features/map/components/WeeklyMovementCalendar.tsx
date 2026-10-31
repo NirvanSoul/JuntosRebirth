@@ -4,13 +4,17 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ReactElement,
 } from 'react';
-import { FlatList, StyleSheet, View, type ViewToken } from 'react-native';
-import { compactCardHeight } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
+import { FlatList, StyleSheet, View, type ListViewToken } from 'react-native';
+import {
+  compactCardHeight,
+  pillCardHeight,
+} from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
 import { MapWeekRow } from '@/features/map/components/MapWeekRow';
 import { MapWeekdayHeader } from '@/features/map/components/MapWeekdayHeader';
@@ -35,8 +39,8 @@ type WeeklyMovementCalendarProps = {
   onFocusedMonthChange?: (month: string, date?: string) => void;
   onOpenTransactionDetail?: (transactionId: string) => void;
   onSelectDate: (date: string) => void;
+  previewMode?: 'cards' | 'pills';
   rangeEndDate: string;
-  selectedDate?: string;
   testID: string;
   today?: string;
 };
@@ -56,25 +60,60 @@ const scrollRetryDelay = 50;
 
 const dayColumnBaseHeight = layout.minTouchTarget + spacing.sm;
 
-function getDayColumnHeight(cardCount: number): number {
+function getDayColumnHeight(
+  cardCount: number,
+  previewMode: 'cards' | 'pills',
+): number {
   if (cardCount === 0) return dayColumnBaseHeight;
+  const visibleCount =
+    previewMode === 'pills' ? Math.min(cardCount, 3) : cardCount;
+  const overflow = previewMode === 'pills' && cardCount > 3;
   return (
     dayColumnBaseHeight +
-    cardCount * compactCardHeight +
-    (cardCount - 1) * spacing.xs
+    visibleCount *
+      (previewMode === 'pills' ? pillCardHeight : compactCardHeight) +
+    (visibleCount - 1) * spacing.xs +
+    (overflow ? spacing.xs + pillCardHeight : 0)
   );
 }
 
 function getWeekRowHeight(
   maxCardCount: number,
   hasMonthSeparator: boolean,
+  previewMode: 'cards' | 'pills',
 ): number {
   return (
     (hasMonthSeparator ? spacing.xxxl : 0) +
-    spacing.xl +
-    getDayColumnHeight(maxCardCount) +
+    spacing.md +
+    getDayColumnHeight(maxCardCount, previewMode) +
     spacing.xl
   );
+}
+
+type WeekLayout = { index: number; length: number; offset: number };
+
+/** Conserva la semana y la posición relativa cuando cambia su altura. */
+export function mapCalendarOffset(
+  offset: number,
+  previous: readonly WeekLayout[],
+  next: readonly WeekLayout[],
+): number {
+  if (previous.length === 0 || next.length === 0) return offset;
+  let low = 0;
+  let high = previous.length - 1;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (previous[middle]!.offset <= offset) low = middle;
+    else high = middle - 1;
+  }
+  const oldWeek = previous[low]!;
+  const newWeek = next[low];
+  if (!newWeek) return offset;
+  const progress = Math.max(
+    0,
+    Math.min(1, (offset - oldWeek.offset) / oldWeek.length),
+  );
+  return newWeek.offset + progress * newWeek.length;
 }
 
 const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
@@ -90,8 +129,8 @@ export const WeeklyMovementCalendar = memo(
         onFocusedMonthChange,
         onOpenTransactionDetail,
         onSelectDate,
+        previewMode = 'cards',
         rangeEndDate,
-        selectedDate,
         testID,
         today,
       },
@@ -101,6 +140,7 @@ export const WeeklyMovementCalendar = memo(
       const [initialDate] = useState(currentDate);
       const calendarToday = today ?? initialDate;
       const listRef = useRef<FlatList<MonthSeparatedCalendarWeek>>(null);
+      const scrollOffset = useRef<number | null>(null);
       const pendingScrollIndex = useRef<number | null>(null);
       const scrollRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(
         null,
@@ -138,25 +178,58 @@ export const WeeklyMovementCalendar = memo(
         () => new Map(categories.map((category) => [category.id, category])),
         [categories],
       );
-      const weekLayouts = useMemo(() => {
-        const layouts: { index: number; length: number; offset: number }[] =
-          new Array(weeks.length);
-        let offset = 0;
+      // Preparar ambas alturas una sola vez evita recorrer el rango completo
+      // durante el cierre de filtros y el cambio de visualización.
+      const layoutsByMode = useMemo(() => {
+        const layouts: Record<'cards' | 'pills', WeekLayout[]> = {
+          cards: [],
+          pills: [],
+        };
+        const offsets = { cards: 0, pills: 0 };
         weeks.forEach((week, index) => {
           const maxCardCount = week.reduce(
             (max, date) =>
               Math.max(max, days.get(date ?? '')?.transactions.length ?? 0),
             0,
           );
-          const length = getWeekRowHeight(
-            maxCardCount,
-            startsNewMonthSeparatedWeek(weeks, index),
-          );
-          layouts[index] = { index, length, offset };
-          offset += length;
+          const hasMonthSeparator = startsNewMonthSeparatedWeek(weeks, index);
+          for (const mode of ['cards', 'pills'] as const) {
+            const length = getWeekRowHeight(
+              maxCardCount,
+              hasMonthSeparator,
+              mode,
+            );
+            layouts[mode].push({ index, length, offset: offsets[mode] });
+            offsets[mode] += length;
+          }
         });
         return layouts;
       }, [days, weeks]);
+      const weekLayouts = layoutsByMode[previewMode];
+      const previousLayout = useRef({
+        mode: previewMode,
+        layouts: weekLayouts,
+      });
+      useLayoutEffect(() => {
+        const previous = previousLayout.current;
+        if (previous.mode !== previewMode) {
+          const oldOffset =
+            scrollOffset.current ??
+            previous.layouts[initialWeekIndex]?.offset ??
+            0;
+          const nextOffset = mapCalendarOffset(
+            oldOffset,
+            previous.layouts,
+            weekLayouts,
+          );
+          scrollOffset.current = nextOffset;
+          listRef.current?.scrollToOffset({
+            offset: nextOffset,
+            animated: false,
+          });
+        }
+        previousLayout.current = { mode: previewMode, layouts: weekLayouts };
+      }, [initialWeekIndex, previewMode, weekLayouts]);
       const getItemLayout = useCallback(
         (_: unknown, index: number) => weekLayouts[index]!,
         [weekLayouts],
@@ -166,14 +239,10 @@ export const WeeklyMovementCalendar = memo(
         onFocusedMonthChangeRef.current = onFocusedMonthChange;
       });
       const handleViewableItemsChanged = useCallback(
-        ({
-          viewableItems,
-        }: {
-          viewableItems: ViewToken<MonthSeparatedCalendarWeek>[];
-        }) => {
+        ({ viewableItems }: { viewableItems: ListViewToken[] }) => {
           const focusedWeek = viewableItems.find(
             (viewableItem) => viewableItem.isViewable,
-          )?.item;
+          )?.item as MonthSeparatedCalendarWeek | undefined;
           const focusedDate = focusedWeek
             ? getMonthSeparatedWeekStart(focusedWeek)
             : undefined;
@@ -224,11 +293,7 @@ export const WeeklyMovementCalendar = memo(
             hasMonthSeparator={startsNewMonthSeparatedWeek(weeks, index)}
             onOpenTransactionDetail={onOpenTransactionDetail}
             onSelectDate={onSelectDate}
-            selectedDate={
-              selectedDate && week.includes(selectedDate)
-                ? selectedDate
-                : undefined
-            }
+            previewMode={previewMode}
             testID={testID}
             week={week}
           />
@@ -239,7 +304,7 @@ export const WeeklyMovementCalendar = memo(
           days,
           onOpenTransactionDetail,
           onSelectDate,
-          selectedDate,
+          previewMode,
           testID,
           weeks,
         ],
@@ -281,9 +346,13 @@ export const WeeklyMovementCalendar = memo(
             keyExtractor={(week) =>
               getMonthSeparatedWeekStart(week) ?? 'empty-week'
             }
-            ListFooterComponent={footer}
+            ListFooterComponent={footer ?? undefined}
             maxToRenderPerBatch={10}
             onViewableItemsChanged={handleViewableItemsChanged}
+            onScroll={(event) => {
+              scrollOffset.current = event.nativeEvent.contentOffset.y;
+            }}
+            scrollEventThrottle={16}
             removeClippedSubviews={false}
             onScrollToIndexFailed={({ averageItemLength, index }) => {
               const targetIndex = pendingScrollIndex.current ?? index;

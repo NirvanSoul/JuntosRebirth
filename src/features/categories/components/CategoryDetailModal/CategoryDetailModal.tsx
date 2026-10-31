@@ -18,6 +18,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedCont
 import { Text } from '@/components/ui/Text/Text';
 import { TransactionFilterButton } from '@/components/ui/TransactionFilterButton/TransactionFilterButton';
 import {
+  type TransactionAuthorFilter,
   TransactionFiltersModal,
   type TransactionFilters,
 } from '@/features/activity/components/TransactionFiltersModal';
@@ -25,26 +26,33 @@ import { extractRatesFromTransactions } from '@/features/accounts/utils/moneyAcc
 import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
 import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
-import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
 import { createStyles } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal.styles';
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
 import { CategoryTransactionMetrics } from '@/features/categories/components/CategoryDetailModal/CategoryTransactionMetrics';
 import { CategoryDetailPeriodFilter } from '@/features/categories/components/CategoryDetailModal/CategoryDetailPeriodFilter';
 import {
   createInitialFilters,
-  getCategoryDetailAuthorOptions,
+  getBudgetReferenceDate,
 } from '@/features/categories/components/CategoryDetailModal/categoryDetailFilters';
+import { getTransactionAuthorFilterOptions } from '@/features/activity/utils/transactionAuthorFilter';
 import { useCategoryDetailTransactions } from '@/features/categories/components/CategoryDetailModal/useCategoryDetailTransactions';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
+import { getCategoryCopyRequest } from '@/features/categories/components/CategoryIcon/categoryCopyItem';
 import type {
   Category,
   CategoryEditorTarget,
   CategoryShareTarget,
 } from '@/features/categories/types';
+import { summarizeCategories } from '@/features/categories/utils/categorySummary';
 import {
-  summarizeCategories,
-  summarizeMonthlyBudgetExpenses,
-} from '@/features/categories/utils/categorySummary';
+  applyCategoryBudgetChange,
+  type CategoryBudgetChange,
+  getBudgetSchedule,
+  getCategoryBudget,
+  withCategoryBudget,
+} from '@/features/categories/utils/categoryBudgetPeriod';
+import { CategoryBudgetHistoryModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetHistoryModal';
+import { CategoryBudgetSummaryCard } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetSummaryCard';
 import { computeCategoryMetrics } from '@/features/categories/utils/categoryValuation';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { useSpaceMembership } from '@/features/profile/state/SpaceMembershipContext';
@@ -54,6 +62,7 @@ import { useDepsChanged } from '@/hooks/useDepsChanged';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { triggerHaptic } from '@/lib/haptics/haptics';
+import { categoryDeletionCopy } from '@/features/categories/utils/categoryActionCopy';
 import { categoryColors } from '@/theme/categoryColors';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { iconSize, layout } from '@/theme/layout';
@@ -66,19 +75,20 @@ type DetailPanel = 'delete' | null;
 type CategoryDetailModalProps = {
   category: Category | null;
   displayCurrency: CurrencyCode;
+  initialAuthor?: TransactionAuthorFilter;
   onAddTransaction: (categoryId: string) => void;
   onClose: () => void;
   onDelete: (categoryId: string) => void;
   onEdit: (categoryId: string, initialEditor?: CategoryEditorTarget) => void;
   onOpenTransactionDetail: (transactionId: string) => void;
-  onSaveBudget: (categoryId: string, budgetMinor?: number) => void;
+  /** Recibe la categoría con el presupuesto de `currency` ya cambiado. */
+  onSaveBudget: (category: Category, currency: CurrencyCode) => void;
   onSaveNote: (categoryId: string, note: string | null) => void;
   onShare: (
     categoryId: string,
     targetSpaceId: string,
   ) => boolean | Promise<boolean>;
   shareTargets: readonly CategoryShareTarget[];
-  spaceCurrency: CurrencyCode;
   transactions: readonly SessionTransaction[];
   visible: boolean;
 };
@@ -86,6 +96,7 @@ type CategoryDetailModalProps = {
 export function CategoryDetailModal({
   category,
   displayCurrency,
+  initialAuthor,
   onAddTransaction,
   onClose,
   onDelete,
@@ -95,7 +106,6 @@ export function CategoryDetailModal({
   onSaveNote,
   onShare,
   shareTargets,
-  spaceCurrency,
   transactions,
   visible,
 }: CategoryDetailModalProps) {
@@ -111,10 +121,11 @@ export function CategoryDetailModal({
   const membership = useSpaceMembership();
   const [panel, setPanel] = useState<DetailPanel>(null);
   const [filters, setFilters] = useState<TransactionFilters>(() =>
-    createInitialFilters(displayCurrency),
+    createInitialFilters(displayCurrency, initialAuthor),
   );
   const [isFiltersModalVisible, setFiltersModalVisible] = useState(false);
   const [isBudgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [isBudgetHistoryVisible, setBudgetHistoryVisible] = useState(false);
   const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [isSpacePickerVisible, setSpacePickerVisible] = useState(false);
   const [selectedCurrency, setSelectedCurrency] =
@@ -128,12 +139,14 @@ export function CategoryDetailModal({
   const detailCurrencies = useMemo<readonly CurrencyCode[]>(() => {
     if (!category) return [];
 
+    // También las monedas con presupuesto, aunque aún no tengan movimientos.
     return Array.from(
-      new Set(
-        transactions
+      new Set([
+        ...transactions
           .filter((transaction) => transaction.categoryId === category.id)
           .map((transaction) => transaction.currency),
-      ),
+        ...(Object.keys(category.budgets ?? {}) as CurrencyCode[]),
+      ]),
     );
   }, [category, transactions]);
   const {
@@ -186,25 +199,18 @@ export function CategoryDetailModal({
     ? Number(apiRates.EURO.rate)
     : fallbackRates.eurRate;
 
-  const budgetExpenseMinor = useMemo(
-    () =>
-      category
-        ? (summarizeMonthlyBudgetExpenses(transactions, spaceCurrency).get(
-            category.id,
-          ) ?? 0)
-        : 0,
-    [category, spaceCurrency, transactions],
-  );
-
+  // Se reinicia al abrir u otra categoría, no por identidad: cada
+  // sincronización trae objetos nuevos y borraba el filtro elegido.
   if (
-    useDepsChanged([visible, category, detailCurrencies, displayCurrency]) &&
+    useDepsChanged([visible, category?.id, displayCurrency, initialAuthor]) &&
     visible
   ) {
     setPanel(null);
     setBudgetModalVisible(false);
+    setBudgetHistoryVisible(false);
     setNoteModalVisible(false);
     setSpacePickerVisible(false);
-    setFilters(createInitialFilters(displayCurrency));
+    setFilters(createInitialFilters(displayCurrency, initialAuthor));
     setFiltersModalVisible(false);
     setSelectedCurrency(
       detailCurrencies.includes(displayCurrency)
@@ -236,19 +242,17 @@ export function CategoryDetailModal({
     'es-ES',
   );
   const income = formatCurrency(metrics.incomeMinor, metrics.currency, 'es-ES');
-  const budget = category.budgetMinor
-    ? formatCurrency(category.budgetMinor, spaceCurrency, 'es-ES')
-    : null;
-  const availableBudgetMinor = category.budgetMinor
-    ? Math.max(category.budgetMinor - budgetExpenseMinor, 0)
-    : null;
-  const availableBudget =
-    availableBudgetMinor === null
-      ? null
-      : formatCurrency(availableBudgetMinor, spaceCurrency, 'es-ES');
-  const budgetProgress = category.budgetMinor
-    ? Math.min(budgetExpenseMinor / category.budgetMinor, 1)
-    : 0;
+  // El presupuesto es por moneda: el de la moneda que se está viendo.
+  const budget = getCategoryBudget(category, selectedCurrency);
+  const saveBudget = (change: CategoryBudgetChange) =>
+    onSaveBudget(
+      withCategoryBudget(
+        category,
+        selectedCurrency,
+        applyCategoryBudgetChange(budget, change),
+      ),
+      selectedCurrency,
+    );
   return (
     <>
       <AppModal
@@ -328,11 +332,10 @@ export function CategoryDetailModal({
 
             {panel === 'delete' ? (
               <DestructiveConfirmationPanel
-                description="Se ocultará de este espacio. Sus movimientos asociados se conservarán."
+                {...categoryDeletionCopy}
                 onCancel={() => setPanel(null)}
                 onConfirm={() => closeThenRun(() => onDelete(category.id))}
                 testID="category-delete-panel"
-                title="¿Eliminar esta categoría?"
               />
             ) : null}
 
@@ -408,36 +411,14 @@ export function CategoryDetailModal({
               />
             </Pressable>
 
-            {category.budgetMinor && budget && availableBudget ? (
-              <Pressable
-                accessibilityLabel="Abrir presupuesto"
-                accessibilityRole="button"
-                onPress={() => setBudgetModalVisible(true)}
-                style={styles.budgetCard}
-                testID="category-budget-summary"
-              >
-                <View style={styles.budgetHeader}>
-                  <View>
-                    <Text tone="secondary" variant="caption">
-                      Disponible ({spaceCurrency})
-                    </Text>
-                    <Text variant="subheading">{availableBudget}</Text>
-                  </View>
-                  <View style={styles.budgetTotal}>
-                    <Text align="right" tone="secondary" variant="caption">
-                      Presupuesto ({spaceCurrency})
-                    </Text>
-                    <Text align="right" variant="label" weight="semibold">
-                      {budget}
-                    </Text>
-                  </View>
-                </View>
-                <CategoryBudgetProgress
-                  accessibilityText={`${Math.round(budgetProgress * 100)}% utilizado, ${availableBudget} disponible`}
-                  color={categoryColors[category.colorToken]}
-                  progress={budgetProgress}
-                />
-              </Pressable>
+            {budget ? (
+              <CategoryBudgetSummaryCard
+                category={category}
+                currency={selectedCurrency}
+                onPress={() => setBudgetHistoryVisible(true)}
+                referenceDate={getBudgetReferenceDate(filters.date)}
+                transactions={transactions}
+              />
             ) : null}
 
             <View style={styles.actions} testID="category-detail-actions">
@@ -451,11 +432,7 @@ export function CategoryDetailModal({
               />
               <DetailActionCard
                 icon="wallet-outline"
-                label={
-                  category.budgetMinor
-                    ? 'Editar presupuesto'
-                    : 'Añadir presupuesto'
-                }
+                label={budget ? 'Editar presupuesto' : 'Añadir presupuesto'}
                 onPress={() => setBudgetModalVisible(true)}
                 testIDPrefix="category"
               />
@@ -540,7 +517,7 @@ export function CategoryDetailModal({
       </AppModal>
       {membership.isSharedSpace ? (
         <TransactionFiltersModal
-          authorOptions={getCategoryDetailAuthorOptions(membership)}
+          authorOptions={getTransactionAuthorFilterOptions(membership)}
           categories={[]}
           currencies={[selectedCurrency]}
           filters={filters}
@@ -555,20 +532,37 @@ export function CategoryDetailModal({
       ) : null}
       <CategoryBudgetModal
         categoryColor={categoryColors[category.colorToken]}
+        categoryIcon={category.icon}
         categoryName={category.name}
-        initialBudgetMinor={category.budgetMinor}
+        currency={selectedCurrency}
+        hasPeriodOverrides={Boolean(
+          budget?.budgetOverrides?.length || budget?.budgetHistory?.length,
+        )}
+        initialBudgetMinor={budget?.budgetMinor}
+        initialSchedule={budget ? getBudgetSchedule(budget) : undefined}
         onClose={() => setBudgetModalVisible(false)}
         onRemove={() => {
-          onSaveBudget(category.id, undefined);
+          saveBudget({ kind: 'remove' });
           setBudgetModalVisible(false);
         }}
-        onSave={(budgetMinor) => {
-          onSaveBudget(category.id, budgetMinor);
+        onSave={(amountMinor, schedule) => {
+          saveBudget({ kind: 'base', amountMinor, schedule });
           setBudgetModalVisible(false);
         }}
-        spaceCurrency={spaceCurrency}
         visible={isBudgetModalVisible}
       />
+      {budget ? (
+        <CategoryBudgetHistoryModal
+          budget={budget}
+          category={category}
+          categoryColor={categoryColors[category.colorToken]}
+          currency={selectedCurrency}
+          onClose={() => setBudgetHistoryVisible(false)}
+          onSaveBudget={saveBudget}
+          transactions={transactions}
+          visible={isBudgetHistoryVisible}
+        />
+      ) : null}
       <NoteEditorModal
         onClose={() => setNoteModalVisible(false)}
         onSave={(note) => {
@@ -583,11 +577,7 @@ export function CategoryDetailModal({
         visible={isNoteModalVisible}
       />
       <CopyToSpaceModal
-        description="Elige dónde crear una copia independiente de esta categoría."
-        failureMessage={(target) =>
-          `Ya existe una categoría con este nombre en ${target.name}.`
-        }
-        itemName={category.name}
+        {...getCategoryCopyRequest(category)}
         onClose={() => setSpacePickerVisible(false)}
         onSelect={(targetSpaceId) => onShare(category.id, targetSpaceId)}
         targets={shareTargets}

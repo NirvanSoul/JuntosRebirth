@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/ui/Avatar/Avatar';
 import { Text } from '@/components/ui/Text/Text';
 import { ProfileEditorModal } from '@/features/profile/components/ProfileEditorModal';
+import { SideMenuLinkRow } from '@/features/spaces/components/SideMenuLinkRow';
 import { SpaceCreationView } from '@/features/spaces/components/SpaceCreationView';
 import { SpaceMenuRow } from '@/features/spaces/components/SpaceMenuRow';
 import {
@@ -13,6 +14,10 @@ import {
   type SpaceRowLayout,
 } from '@/features/spaces/components/SpaceSelectionPill';
 import { isAwaitingPartnerSpace, type Space } from '@/features/spaces/types';
+import {
+  getSpaceLabel,
+  sortSpacesForMenu,
+} from '@/features/spaces/utils/spaceMenuLabels';
 import { iconSize, minTouchTarget } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
@@ -26,7 +31,7 @@ type SpaceSideMenuProps = {
   isInvitePartnerActive?: boolean;
   onClose: () => void;
   onCreateSpace: (name: string) => Promise<Space>;
-  onInvitePartner: () => void;
+  onInvitePartner: () => Promise<void> | void;
   onOpenSettings: () => void;
   onSelectSpace: (spaceId: string) => Promise<void>;
   profileAvatarUri?: string | null;
@@ -37,12 +42,6 @@ type SpaceSideMenuProps = {
 
 const profileAvatarSize = 56,
   inviteSelectionKey = 'invite-juntos';
-
-function getSpaceLabel(space: Space): string {
-  if (space.type === 'personal') return 'Personal';
-  if (space.type === 'couple') return 'Juntos';
-  return space.name;
-}
 
 export function SpaceSideMenu({
   activeSpaceId,
@@ -63,10 +62,7 @@ export function SpaceSideMenu({
   const [isProfileEditorVisible, setProfileEditorVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasCoupleSpace = spaces.some((space) => space.type === 'couple');
-  const orderedSpaces = [...spaces].sort((first, second) => {
-    const order = { personal: 0, couple: 1, other: 2 };
-    return order[first.type] - order[second.type];
-  });
+  const orderedSpaces = useMemo(() => sortSpacesForMenu(spaces), [spaces]);
   const committedKey = isInvitePartnerActive
     ? inviteSelectionKey
     : activeSpaceId;
@@ -89,35 +85,49 @@ export function SpaceSideMenu({
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  // La selección local se suelta cuando el padre ya refleja el nuevo espacio.
-  if (pendingKey !== null && pendingKey === committedKey) setPendingKey(null);
-
+  const cancelScheduled = () => {
+    transitionTimers.current.forEach(clearTimeout);
+    transitionTimers.current = [];
+  };
   const schedule = (callback: () => void, delay: number) => {
     transitionTimers.current.push(setTimeout(callback, delay));
   };
 
   /**
-   * Primero desliza la píldora al botón elegido y, en cuanto llega, cierra el
-   * menú y cambia de espacio a la vez: la carga del nuevo espacio se ve
-   * mientras el menú se retira.
+   * Desliza la píldora al botón elegido y, a la vez, pinta el espacio nuevo
+   * detrás del menú; al asentarse la píldora el menú se retira y ya se ve la
+   * entrada del espacio nuevo, sin rastro del anterior. Un toque nuevo antes
+   * de cerrar sustituye al anterior: nunca se ignora.
    */
   const transitionTo = (key: string, commit: () => Promise<void> | void) => {
-    if (pendingKey !== null) return;
+    cancelScheduled();
     if (key === committedKey) {
+      setPendingKey(null);
       onClose();
       return;
     }
 
     setError(null);
     setPendingKey(key);
+    let failed = false;
+    // Un turno después del toque, para que la píldora arranque antes de que
+    // el repintado del espacio nuevo ocupe el hilo de JS.
     schedule(() => {
       Promise.resolve()
         .then(commit)
         .catch(() => {
-          setPendingKey(null);
+          failed = true;
           setError('No pudimos cambiar de espacio. Inténtalo de nuevo.');
-        });
-      onClose();
+        })
+        // Se suelta al terminar, haya cambiado o no el padre: una selección
+        // colgada dejaría la píldora en un espacio que no es el activo.
+        .finally(() =>
+          setPendingKey((current) => (current === key ? null : current)),
+        );
+    }, 0);
+    // Si falló, el menú sigue abierto para que se lea el aviso.
+    schedule(() => {
+      if (!failed) onClose();
     }, motion.spaceSelectionDuration);
   };
 
@@ -273,34 +283,13 @@ export function SpaceSideMenu({
               />
             </View>
 
-            <Pressable
+            <SideMenuLinkRow
               accessibilityHint="Abre la pantalla de ajustes"
-              accessibilityRole="button"
+              iconName="settings-outline"
+              iconTestID="settings-menu-icon"
+              label="Ajustes"
               onPress={onOpenSettings}
-              style={({ pressed }) => [
-                styles.actionRow,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Ionicons
-                color={colors.textPrimary}
-                name="settings-outline"
-                size={iconSize.sm}
-                testID="settings-menu-icon"
-              />
-              <Text
-                style={styles.actionLabel}
-                variant="label"
-                weight="semibold"
-              >
-                Ajustes
-              </Text>
-              <Ionicons
-                color={colors.textMuted}
-                name="chevron-forward"
-                size={iconSize.xs}
-              />
-            </Pressable>
+            />
           </ScrollView>
 
           <View style={styles.profileFooter}>

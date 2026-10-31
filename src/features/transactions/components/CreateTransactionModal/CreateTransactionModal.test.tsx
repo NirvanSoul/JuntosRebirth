@@ -16,6 +16,10 @@ import { minTouchTarget } from '@/theme/layout';
 import { shadows } from '@/theme/shadows';
 
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
+import {
+  summarizeMoneyAccounts,
+  type MoneyAccountSummary,
+} from '@/features/accounts/utils/moneyAccountSummary';
 
 // El modal solo consulta el país para decidir si muestra la conversión de
 // Venezuela (sección 7 del plan); sin este mock arrastraría el repositorio
@@ -1311,16 +1315,21 @@ describe('CreateTransactionModal', () => {
     );
   });
   describe('cuenta del movimiento', () => {
-    const bankAccount = {
-      id: 'account-1',
-      spaceId: 'personal',
-      name: 'Cuenta nómina',
-      kind: 'bank' as const,
-      icon: 'bank' as const,
-      colorToken: 'blue' as const,
-      balances: [{ currency: 'USD' as const, openingBalanceMinor: 0 }],
-      isArchived: false,
-    };
+    const [bankAccount] = summarizeMoneyAccounts(
+      [
+        {
+          id: 'account-1',
+          spaceId: 'personal',
+          name: 'Cuenta nómina',
+          kind: 'bank' as const,
+          icon: 'bank' as const,
+          colorToken: 'blue' as const,
+          balances: [{ currency: 'USD' as const, openingBalanceMinor: 0 }],
+          isArchived: false,
+        },
+      ],
+      [],
+    ) as [MoneyAccountSummary];
 
     it('no muestra el selector cuando el espacio no tiene cuentas', async () => {
       const screen = await renderWithTheme(
@@ -1370,7 +1379,8 @@ describe('CreateTransactionModal', () => {
         screen.getByRole('header', { name: 'Elige la cuenta' }),
       ).toBeTruthy();
       expect(
-        screen.getByLabelText('Cuenta nómina · USD').props.accessibilityState,
+        screen.getByTestId('money-account-card-account-1').props
+          .accessibilityState,
       ).toMatchObject({ checked: true });
       expect(
         screen.getByTestId('transaction-metadata-account-divider'),
@@ -1416,7 +1426,7 @@ describe('CreateTransactionModal', () => {
       );
 
       await fireEvent.press(screen.getByLabelText('Cuenta: ninguna'));
-      await fireEvent.press(screen.getByLabelText('Cuenta nómina · USD'));
+      await fireEvent.press(screen.getByTestId('money-account-card-account-1'));
       await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
       await fireEvent.press(screen.getByLabelText('1'));
 
@@ -1454,7 +1464,7 @@ describe('CreateTransactionModal', () => {
       );
 
       await fireEvent.press(screen.getByLabelText('Cuenta: ninguna'));
-      await fireEvent.press(screen.getByLabelText('Cuenta nómina · USD'));
+      await fireEvent.press(screen.getByTestId('money-account-card-account-1'));
       await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
 
       await fireEvent.press(screen.getByLabelText('Cuenta: Cuenta nómina'));
@@ -1524,16 +1534,21 @@ describe('CreateTransactionModal', () => {
   });
 
   describe('tono neutral en botones de metadatos interactuados', () => {
-    const bankAccount = {
-      id: 'account-1',
-      spaceId: 'personal',
-      name: 'Cuenta nómina',
-      kind: 'bank' as const,
-      icon: 'bank' as const,
-      colorToken: 'blue' as const,
-      balances: [{ currency: 'EUR' as const, openingBalanceMinor: 0 }],
-      isArchived: false,
-    };
+    const [bankAccount] = summarizeMoneyAccounts(
+      [
+        {
+          id: 'account-1',
+          spaceId: 'personal',
+          name: 'Cuenta nómina',
+          kind: 'bank' as const,
+          icon: 'bank' as const,
+          colorToken: 'blue' as const,
+          balances: [{ currency: 'EUR' as const, openingBalanceMinor: 0 }],
+          isArchived: false,
+        },
+      ],
+      [],
+    ) as [MoneyAccountSummary];
 
     it('mantiene los botones en tono neutral (textPrimary) al seleccionarlos o modificarlos', async () => {
       const screen = await renderWithTheme(
@@ -1591,7 +1606,7 @@ describe('CreateTransactionModal', () => {
       await fireEvent.press(
         screen.getByTestId('transaction-money-account-button'),
       );
-      await fireEvent.press(screen.getByLabelText('Cuenta nómina · EUR'));
+      await fireEvent.press(screen.getByTestId('money-account-card-account-1'));
       await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
       expect(
         StyleSheet.flatten(

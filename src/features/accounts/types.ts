@@ -128,3 +128,20 @@ export function moneyAccountSupportsCurrency(
 ): boolean {
   return account.balances.some((balance) => balance.currency === currency);
 }
+
+/**
+ * Cuentas que puede tomar un movimiento ya guardado: sin moneda, todas; con
+ * moneda, solo las que la guardan, porque cambiar de cuenta no cambia la moneda.
+ */
+export function listMoneyAccountsForCurrency<
+  Account extends Pick<MoneyAccount, 'balances'>,
+>(
+  accounts: readonly Account[],
+  currency: CurrencyCode | undefined,
+): readonly Account[] {
+  return currency
+    ? accounts.filter((account) =>
+        moneyAccountSupportsCurrency(account, currency),
+      )
+    : accounts;
+}

@@ -40,6 +40,8 @@ import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 import { AccountTransactionMetric } from './AccountTransactionMetric';
+import { moneyAccountDeletionCopy } from '@/features/accounts/utils/moneyAccountActionCopy';
+
 import { createStyles } from './MoneyAccountDetailModal.styles';
 
 type MoneyAccountDetailModalProps = {
@@ -250,11 +252,11 @@ export function MoneyAccountDetailModal({
 
           {isDeletePanelVisible ? (
             <DestructiveConfirmationPanel
-              description="Se ocultará de este espacio. Sus movimientos asociados se conservarán."
+              description={moneyAccountDeletionCopy.description}
               onCancel={() => setDeletePanelVisible(false)}
               onConfirm={() => onDelete(account.id)}
               testID="money-account-delete-panel"
-              title="¿Eliminar esta cuenta?"
+              title={moneyAccountDeletionCopy.title}
             />
           ) : null}
 

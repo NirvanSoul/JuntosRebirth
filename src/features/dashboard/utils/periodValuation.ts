@@ -1,5 +1,6 @@
 import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import type { SessionTransaction } from '@/features/transactions/types';
+import { summarizeTransactionTotals } from '@/features/transactions/utils/transactionSummary';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
 export type PeriodEffectiveMetrics = {
@@ -72,4 +73,35 @@ export function computePeriodValuation({
     currency: 'VES',
     totalMinor: Math.round(usdTotal * activeEurRate),
   };
+}
+
+/**
+ * Total de un periodo tal como lo muestra su detalle: en modo Venezuela,
+ * valorado con las tasas; si no, solo los movimientos de `currency`.
+ */
+export function summarizePeriodTotalMinor({
+  currency,
+  transactions,
+  type,
+  valuation,
+}: {
+  currency: CurrencyCode;
+  transactions: readonly SessionTransaction[];
+  type: 'income' | 'expense' | 'balance';
+  valuation: {
+    bcvRate: number | null;
+    eurRate: number | null;
+    mode: VenezuelaDisplayMode;
+  } | null;
+}): number {
+  if (valuation) {
+    return computePeriodValuation({ ...valuation, transactions, type })
+      .totalMinor;
+  }
+
+  const totals = summarizeTransactionTotals(
+    transactions.filter((transaction) => transaction.currency === currency),
+  );
+  if (type === 'income') return totals.incomeMinor;
+  return type === 'expense' ? totals.expenseMinor : totals.balanceMinor;
 }

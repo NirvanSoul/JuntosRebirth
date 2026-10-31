@@ -1,3 +1,5 @@
+import { NativeModules } from 'react-native';
+
 const mockInitialize = jest.fn();
 const mockConsent = jest.fn(async () => true);
 const mockPause = jest.fn(async () => true);
@@ -23,6 +25,15 @@ import {
 } from '@/services/analytics/clarityAnalytics';
 
 describe('clarityAnalytics', () => {
+  beforeAll(() => {
+    NativeModules.Clarity = {};
+    NativeModules.ClarityEmitter = {};
+  });
+
+  afterAll(() => {
+    delete NativeModules.Clarity;
+    delete NativeModules.ClarityEmitter;
+  });
   it('no inicializa ni captura antes del consentimiento', async () => {
     await trackClarityScreen('Access');
     await setClarityAnalyticsEnabled(false);

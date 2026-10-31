@@ -6,11 +6,12 @@ import { Receipt } from 'phosphor-react-native/src/icons/Receipt';
 import { Sparkle } from 'phosphor-react-native/src/icons/Sparkle';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   Easing,
-  interpolateColor,
   ReduceMotion,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSequence,
   withTiming,
@@ -33,21 +34,28 @@ type TabRouteName = keyof MainTabParamList;
 type AppTabBarProps = BottomTabBarProps & {
   createDisabled?: boolean;
   disabledRoutes?: readonly TabRouteName[];
+  /** Baja la barra y el botón `+` fuera de la pantalla, y los sube al volver. */
+  lowered?: boolean;
   onCreatePress: () => void;
   visible?: boolean;
 };
 
 type TabPresentation = { icon: Icon; label: string };
 
-const tabPresentation: Record<TabRouteName, TabPresentation> = {
-  Home: { label: 'Inicio', icon: House },
-  ComingSoon: { label: 'Pronto', icon: Sparkle },
+type TabLabelKey = 'home' | 'comingSoon' | 'activity' | 'map';
+
+const tabPresentation: Record<
+  TabRouteName,
+  { icon: Icon; labelKey: TabLabelKey }
+> = {
+  Home: { labelKey: 'home', icon: House },
+  ComingSoon: { labelKey: 'comingSoon', icon: Sparkle },
   Activity: {
-    label: 'Actividad',
+    labelKey: 'activity',
     icon: Receipt,
   },
   Map: {
-    label: 'Mapa',
+    labelKey: 'map',
     icon: CalendarDots,
   },
 };
@@ -62,7 +70,6 @@ type TabItemContentProps = NavigationIconProps & {
   disabled: boolean;
   pressed: boolean;
   routeName: TabRouteName;
-  selectedBackgroundColor: string;
   styles: ReturnType<typeof createStyles>;
 };
 
@@ -100,6 +107,7 @@ function NavigationIcon({ color, focused, presentation }: NavigationIconProps) {
   );
 }
 
+/** La pestaña activa solo se distingue por el icono relleno, sin fondo. */
 function TabItemContent({
   color,
   disabled,
@@ -107,32 +115,12 @@ function TabItemContent({
   presentation,
   pressed,
   routeName,
-  selectedBackgroundColor,
   styles,
 }: TabItemContentProps) {
-  const selectionProgress = useSharedValue(focused ? 1 : 0);
-
-  useEffect(() => {
-    selectionProgress.value = withTiming(focused ? 1 : 0, {
-      duration: motion.mainTabSelectionDuration,
-      easing: Easing.out(Easing.cubic),
-      reduceMotion: ReduceMotion.System,
-    });
-  }, [focused, selectionProgress]);
-
-  const selectionStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      selectionProgress.value,
-      [0, 1],
-      ['rgba(0, 0, 0, 0)', selectedBackgroundColor],
-    ),
-  }));
-
   return (
-    <Animated.View
+    <View
       style={[
         styles.itemInner,
-        selectionStyle,
         disabled && styles.itemInnerDisabled,
         pressed && styles.itemInnerPressed,
       ]}
@@ -146,7 +134,7 @@ function TabItemContent({
       <Text style={{ color }} variant="caption" weight="semibold">
         {presentation.label}
       </Text>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -156,29 +144,51 @@ export function AppTabBar({
   navigation,
   createDisabled = false,
   disabledRoutes = [],
+  lowered = false,
   onCreatePress,
   visible = true,
 }: AppTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
-  const isMenuVisible = visible;
+  const isMenuVisible = visible && !lowered;
+  const bottomPadding = Math.max(insets.bottom, spacing.sm);
+  // Transición CSS de Reanimated: sin valores animados mientras no cambia.
+  const reduceMotion = useReducedMotion();
 
   return (
-    <View
+    <Animated.View
       accessibilityElementsHidden={!isMenuVisible}
       importantForAccessibility={isMenuVisible ? 'auto' : 'no-hide-descendants'}
       pointerEvents={isMenuVisible ? 'auto' : 'none'}
       style={[
         styles.container,
-        { paddingBottom: Math.max(insets.bottom, spacing.sm) },
-        !isMenuVisible && styles.containerHidden,
+        {
+          paddingBottom: bottomPadding,
+          transform: [
+            {
+              translateY: lowered
+                ? layout.floatingActionSize + bottomPadding + spacing.xl
+                : 0,
+            },
+          ],
+          transitionDuration: reduceMotion ? 0 : motion.tabBarLowerDuration,
+          transitionProperty: 'transform',
+          transitionTimingFunction: lowered ? 'ease-in' : 'ease-out',
+        },
+        !visible && styles.containerHidden,
       ]}
       testID="app-tab-bar"
     >
       <View style={styles.tabs} testID="app-tab-bar-tabs">
         {state.routes.map((route, index) => {
-          const presentation = tabPresentation[route.name as TabRouteName];
+          const { icon, labelKey } =
+            tabPresentation[route.name as TabRouteName];
+          const presentation: TabPresentation = {
+            icon,
+            label: t(`navigation.tabs.${labelKey}`),
+          };
           const options = descriptors[route.key]?.options;
           const isFocused = state.index === index;
           const isDisabled = disabledRoutes.includes(
@@ -228,7 +238,6 @@ export function AppTabBar({
                   presentation={presentation}
                   pressed={pressed}
                   routeName={route.name as TabRouteName}
-                  selectedBackgroundColor={colors.background}
                   styles={styles}
                 />
               )}
@@ -241,7 +250,7 @@ export function AppTabBar({
         placement="inline"
         visible={!createDisabled}
       />
-    </View>
+    </Animated.View>
   );
 }
 

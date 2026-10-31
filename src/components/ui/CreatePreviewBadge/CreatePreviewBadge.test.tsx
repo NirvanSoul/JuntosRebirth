@@ -2,6 +2,7 @@ import { StyleSheet } from 'react-native';
 
 import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { renderWithTheme } from '@/test/renderWithTheme';
+import { lightColors } from '@/theme/colors';
 import { minTouchTarget } from '@/theme/layout';
 import { spacing } from '@/theme/spacing';
 import { typography } from '@/theme/typography';
@@ -45,5 +46,30 @@ describe('CreatePreviewBadge', () => {
       StyleSheet.flatten(screen.getByTestId('create-account-badge').props.style)
         .width,
     ).toBeUndefined();
+  });
+
+  it('ofrece la variante de quitar con fondo oscuro y estado de opción', async () => {
+    const screen = await renderWithTheme(
+      <CreatePreviewBadge
+        accessibilityLabel="Sin cuenta"
+        bordered
+        label="Sin cuenta"
+        onPress={jest.fn()}
+        removeSelected
+        testID="no-account-badge"
+      />,
+    );
+
+    const badge = screen.getByTestId('no-account-badge');
+    expect(badge.props.accessibilityState).toMatchObject({ checked: true });
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('no-account-badge-icon-background').props.style,
+      ).backgroundColor,
+    ).toBe(lightColors.textPrimary);
+    expect(StyleSheet.flatten(badge.props.style)).toMatchObject({
+      borderColor: lightColors.textPrimary,
+      minHeight: minTouchTarget,
+    });
   });
 });

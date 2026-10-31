@@ -117,13 +117,13 @@ describe('ActivityScreen scroll dirigido', () => {
 
     const chart = screen.getByTestId('category-donut-chart');
     await fireEvent.press(
-      within(chart).getByRole('button', { name: 'Ver mes anterior' }),
+      within(chart).getByRole('button', { name: 'Ver periodo anterior' }),
     );
     await fireEvent(screen.getByTestId('activity-movements-header'), 'layout', {
       nativeEvent: { layout: { height: 48, width: 342, x: 0, y: 640 } },
     });
     await fireEvent.press(
-      within(chart).getByRole('button', { name: 'Ver mes siguiente' }),
+      within(chart).getByRole('button', { name: 'Ver periodo siguiente' }),
     );
     await fireEvent(screen.getByTestId('activity-movements-header'), 'layout', {
       nativeEvent: { layout: { height: 48, width: 342, x: 0, y: 700 } },

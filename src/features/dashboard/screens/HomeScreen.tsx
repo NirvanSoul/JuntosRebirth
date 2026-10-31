@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  type ScrollViewInstance,
+  StyleSheet,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
@@ -15,26 +20,24 @@ import {
   HomeSectionHeader,
   HomeTransactionListFooter,
 } from '@/features/dashboard/components/HomeSectionHeader/HomeSectionHeader';
+import { CategoryDetailPeriodFilter } from '@/features/categories/components/CategoryDetailModal/CategoryDetailPeriodFilter';
 import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { Category } from '@/features/categories/types';
 import {
   summarizeCategories,
-  summarizeMonthlyBudgetExpenses,
+  summarizeBudgetExpenses,
 } from '@/features/categories/utils/categorySummary';
 import { HomeEntrance } from '@/features/dashboard/components/HomeEntrance';
 import { IncomeExpenseArc } from '@/features/dashboard/components/IncomeExpenseArc/IncomeExpenseArc';
 import { TransactionPeriodModal } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal';
-import { getPreviousPeriodTransactions } from '@/features/dashboard/utils/transactionPeriod';
+import { useHomePeriodTotals } from '@/features/dashboard/hooks/useHomePeriodTotals';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import { TransactionSummaryBadges } from '@/features/transactions/components/TransactionSummaryBadges/TransactionSummaryBadges';
 import type { SessionTransaction } from '@/features/transactions/types';
-import { calculatePeriodComparison } from '@/features/transactions/utils/periodComparison';
 import {
   listTransactionsThroughCurrentMonth,
   sortTransactionsByRecentActivity,
-  summarizeTransactionTotals,
-  summarizeTransactions,
 } from '@/features/transactions/utils/transactionSummary';
 import {
   defaultCurrencyCode,
@@ -51,10 +54,8 @@ const recentTransactionLimit = 8;
 type HomeScreenProps = {
   categories?: readonly Category[];
   moneyAccounts?: readonly MoneyAccount[];
-  /** Moneda del resumen superior (balance, ingresos y gastos del mes). */
+  /** Moneda del resumen superior (balance, ingresos y gastos del periodo). */
   currency?: CurrencyCode;
-  /** Moneda del espacio activo para cálculo de presupuestos. */
-  spaceCurrency?: CurrencyCode;
   onCreateCategory?: () => void;
   onCreateExpense?: () => void;
   onCreateMoneyAccount?: () => void;
@@ -70,17 +71,20 @@ type HomeScreenProps = {
   /** Cambia al reenfocar la pantalla para reiniciar el arco de balance. */
   focusResetKey?: number;
   /**
-   * Identifica el contexto mostrado sin remontar los bloques de Inicio.
-   * Se conserva en la API para que el cambio de datos sea inmediato.
+   * Identifica el espacio mostrado: al cambiar, los bloques de Inicio repiten
+   * su entrada (suben y aparecen uno tras otro).
    */
   revealKey?: string;
   topContent?: ReactNode;
-  /** Muestra el % de cambio de Ingresos/Gastos frente al mes anterior. */
+  /** Anuncio que se muestra bajo los resúmenes de ingresos y gastos. */
+  adContent?: ReactNode;
+  /** Muestra el % de cambio de Ingresos/Gastos frente al periodo anterior. */
   showComparisonIndicators?: boolean;
   transactions?: readonly SessionTransaction[];
 };
 
 export function HomeScreen({
+  adContent,
   categories = [],
   currency = defaultCurrencyCode,
   focusResetKey,
@@ -97,15 +101,15 @@ export function HomeScreen({
   onViewAccounts,
   onViewCategories,
   onViewMovements,
+  revealKey,
   showComparisonIndicators = false,
-  spaceCurrency = defaultCurrencyCode,
   topContent,
   transactions = [],
 }: HomeScreenProps) {
   const { formatCurrency } = useCurrencySymbolPreference();
   const { colors } = useTheme();
   const density = useLayoutDensity();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   useScrollToTop(scrollRef);
   const [isIncomeModalVisible, setIncomeModalVisible] = useState(false);
   const [isExpenseModalVisible, setExpenseModalVisible] = useState(false);
@@ -128,42 +132,22 @@ export function HomeScreen({
       transactions.filter((transaction) => transaction.currency === currency),
     [currency, transactions],
   );
-  const summary = useMemo(
-    () => summarizeTransactions(currencyTransactions),
-    [currencyTransactions],
-  );
-  const previousMonthTotals = useMemo(() => {
-    if (!showComparisonIndicators) {
-      return null;
-    }
-
-    const previousMonthTransactions = getPreviousPeriodTransactions(
-      currencyTransactions,
-      'month',
-      new Date(),
-    );
-
-    return summarizeTransactionTotals(previousMonthTransactions);
-  }, [currencyTransactions, showComparisonIndicators]);
-  const incomeComparison = previousMonthTotals
-    ? (calculatePeriodComparison(
-        summary.monthIncomeMinor,
-        previousMonthTotals.incomeMinor,
-      ) ?? undefined)
-    : undefined;
-  const expenseComparison = previousMonthTotals
-    ? (calculatePeriodComparison(
-        summary.monthExpenseMinor,
-        previousMonthTotals.expenseMinor,
-      ) ?? undefined)
-    : undefined;
+  const {
+    balanceMinor,
+    dateFilter,
+    expenseComparison,
+    incomeComparison,
+    periodContext,
+    periodTotals,
+    setDateFilter,
+  } = useHomePeriodTotals(currencyTransactions, showComparisonIndicators);
   const categorySummaries = useMemo(
     () => summarizeCategories(categories, transactions, currency),
     [categories, currency, transactions],
   );
   const budgetExpenseByCategoryId = useMemo(
-    () => summarizeMonthlyBudgetExpenses(transactions, spaceCurrency),
-    [spaceCurrency, transactions],
+    () => summarizeBudgetExpenses(categories, transactions, currency),
+    [categories, currency, transactions],
   );
   // Cada tarjeta muestra el saldo en la moneda de su propia cuenta, así que
   // el selector de moneda del encabezado no las filtra: un saldo nunca mezcla
@@ -176,7 +160,7 @@ export function HomeScreen({
     () => sortTransactionsByRecentActivity(transactionsThroughCurrentMonth),
     [transactionsThroughCurrentMonth],
   );
-  const balance = formatCurrency(summary.balanceMinor, currency, 'es-ES');
+  const balance = formatCurrency(balanceMinor, currency, 'es-ES');
 
   return (
     <>
@@ -185,11 +169,18 @@ export function HomeScreen({
         scrollRef={scrollRef}
         testID="home-screen"
       >
-        <HomeEntrance>
+        <HomeEntrance revealKey={revealKey}>
           {topContent}
+          <CategoryDetailPeriodFilter
+            filter={dateFilter}
+            onChange={setDateFilter}
+            optionsStyle={styles.periodOptions}
+            testID="home-period-selector"
+          />
           <IncomeExpenseArc
-            expenseMinor={summary.monthExpenseMinor}
-            incomeMinor={summary.monthIncomeMinor}
+            accessibilityContext={periodContext}
+            expenseMinor={periodTotals.expenseMinor}
+            incomeMinor={periodTotals.incomeMinor}
             resetKey={focusResetKey}
             testID="home-income-expense-arc"
           >
@@ -222,18 +213,19 @@ export function HomeScreen({
 
           <TransactionSummaryBadges
             animateEntrance
-            accessibilityContext="de este mes"
+            accessibilityContext={periodContext}
             comparisonPlacement="title"
             currency={currency}
             expenseComparison={expenseComparison}
-            expenseMinor={summary.monthExpenseMinor}
+            expenseMinor={periodTotals.expenseMinor}
             incomeComparison={incomeComparison}
-            incomeMinor={summary.monthIncomeMinor}
+            incomeMinor={periodTotals.incomeMinor}
             onExpensePress={() => setExpenseModalVisible(true)}
             onIncomePress={() => setIncomeModalVisible(true)}
             style={styles.monthBadges}
             testIDPrefix="home"
           />
+          {adContent}
 
           <HomeSectionHeader onViewMore={onViewCategories} title="Categorías" />
           {categorySummaries.length > 0 ? (
@@ -260,10 +252,11 @@ export function HomeScreen({
                 >
                   <CategoryPreviewCard
                     {...category}
+                    actionTarget={{ kind: 'category', id }}
                     budgetExpenseMinor={budgetExpenseByCategoryId.get(id) ?? 0}
                     displayCurrency={currency}
                     onPress={() => onOpenCategoryDetail?.(id)}
-                    spaceCurrency={spaceCurrency}
+                    spaceCurrency={currency}
                     variant="tile"
                   />
                 </Animated.View>
@@ -329,13 +322,12 @@ export function HomeScreen({
               ) : null}
             </>
           ) : (
-            <EmptyState
+            <CreatePreviewBadge
               accessibilityLabel="Crear primer gasto"
-              icon="swap-vertical-outline"
-              iconBackgroundColor={colors.cta}
+              bordered
+              label="Crear movimiento"
               onPress={onCreateExpense}
               testID="home-empty-activity"
-              title="Crea un movimiento"
             />
           )}
         </HomeEntrance>
@@ -384,6 +376,7 @@ export function HomeScreen({
 }
 
 const styles = StyleSheet.create({
+  periodOptions: { marginBottom: spacing.lg },
   balanceHero: {
     minHeight: layout.minTouchTarget,
     alignItems: 'center',

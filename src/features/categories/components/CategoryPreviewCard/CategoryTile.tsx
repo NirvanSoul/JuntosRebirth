@@ -7,6 +7,10 @@ import {
 } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import {
+  type PreviewActionTarget,
+  usePreviewActionsTrigger,
+} from '@/components/overlays/PreviewActions/previewActions';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
 import { CategoryAmountSwitcher } from '@/features/categories/components/CategoryPreviewCard/CategoryAmountSwitcher';
@@ -37,6 +41,8 @@ const progressCircumference = 2 * Math.PI * progressRadius;
 
 export type CategoryTileProps = {
   accessibilityHint?: string;
+  /** Elemento sobre el que actúan las acciones de la pulsación larga. */
+  actionTarget?: PreviewActionTarget;
   name: string;
   icon: CategoryIconName;
   colorToken: CategoryColorToken;
@@ -52,21 +58,26 @@ export type CategoryTileProps = {
   variant?: 'grid' | 'tile';
 };
 
-export function CategoryTile({
-  accessibilityHint = 'Abre el detalle de la categoría',
-  name,
-  icon,
-  colorToken,
-  displayCurrency,
-  budgetMinor,
-  incomeMinor,
-  expenseMinor,
-  budgetExpenseMinor,
-  onPress,
-  style,
-  testID = 'category-preview-card',
-  variant = 'tile',
-}: CategoryTileProps) {
+export function CategoryTile(props: CategoryTileProps) {
+  const {
+    accessibilityHint = 'Abre el detalle de la categoría',
+    actionTarget,
+    name,
+    icon,
+    colorToken,
+    displayCurrency,
+    budgetMinor,
+    incomeMinor,
+    expenseMinor,
+    budgetExpenseMinor,
+    onPress,
+    style,
+    testID = 'category-preview-card',
+    variant = 'tile',
+  } = props;
+  const previewActions = usePreviewActionsTrigger(actionTarget, () => (
+    <CategoryTile {...props} />
+  ));
   const { formatCurrency } = useCurrencySymbolPreference();
   const { colors, shadows } = useTheme();
   const themedStyles = useThemedStyles((palette) =>
@@ -93,8 +104,9 @@ export function CategoryTile({
             : `${name}, gastado ${expense}`
       }
       accessibilityRole="button"
-      disabled={!onPress}
+      disabled={!onPress && !previewActions}
       onPress={onPress}
+      {...previewActions}
       style={({ pressed }) => [
         themedStyles.tile,
         variant === 'grid' ? themedStyles.gridTile : null,

@@ -7,10 +7,10 @@ import { DeviceMobile } from 'phosphor-react-native/src/icons/DeviceMobile';
 import { FileText } from 'phosphor-react-native/src/icons/FileText';
 import { Key } from 'phosphor-react-native/src/icons/Key';
 import { MapPin } from 'phosphor-react-native/src/icons/MapPin';
-import { MoonStars } from 'phosphor-react-native/src/icons/MoonStars';
 import { SlidersHorizontal } from 'phosphor-react-native/src/icons/SlidersHorizontal';
 import { Trash } from 'phosphor-react-native/src/icons/Trash';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Linking,
@@ -53,6 +53,7 @@ import { useOnboardingRestart } from '@/features/onboarding/context/OnboardingRe
 import { CountryPreferencesModal } from '@/features/settings/components/CountryPreferencesModal/CountryPreferencesModal';
 import { CountryChangeBlockedModal } from '@/features/settings/components/CountryPreferencesModal/CountryChangeBlockedModal';
 import { CountryChangeSharedSpaceWarningModal } from '@/features/settings/components/CountryPreferencesModal/CountryChangeSharedSpaceWarningModal';
+import { LanguagePreferenceModal } from '@/features/settings/components/LanguagePreferenceModal/LanguagePreferenceModal';
 import { SettingsHelpSection } from '@/features/settings/components/SettingsHelpSection/SettingsHelpSection';
 import { saveCountryChangeNotice } from '@/features/spaces/repositories/countryChangeNoticeRepository';
 import { ProfileHeader } from '@/features/settings/components/ProfileHeader/ProfileHeader';
@@ -66,6 +67,8 @@ import type { SaveLocalNotificationRuleInput } from '@/features/transactions/rep
 import type { TransactionNotificationRule } from '@/features/transactions/types';
 import { getCurrencyName } from '@/lib/currency/currencyCatalog';
 import { getCountryByIso2 } from '@/lib/geography/countryCatalog';
+import { appLanguageLabels } from '@/lib/i18n/languages';
+import { useAppLanguage } from '@/lib/i18n/useAppLanguage';
 import type { CurrencyPreferences } from '@/state/appPreferences/currencyPreferences';
 import { useDemoSession } from '@/state/demoSession/demoSessionStore';
 import { categoryColors } from '@/theme/categoryColors';
@@ -106,13 +109,6 @@ const confirmLeaveCoupleSpaceDelaySeconds =
 
 const developerContactEmail = 'aora.estudio.o@gmail.com';
 
-function showPendingNotice() {
-  Alert.alert(
-    'Función pendiente',
-    'Este ajuste ya tiene su lugar preparado, pero todavía falta implementar su funcionamiento.',
-  );
-}
-
 export function SettingsScreen({
   activeSpaceId,
   activeSpaceType,
@@ -127,11 +123,13 @@ export function SettingsScreen({
   onToggleHomeComparisonIndicators,
   showHomeComparisonIndicators,
 }: SettingsScreenProps) {
-  const { colors, isDark, setAppearance, shadows } = useTheme();
+  const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const { session } = useAuthSession();
   const { demoSession } = useDemoSession();
   const resetOnboarding = useOnboardingRestart();
+  const { t } = useTranslation();
+  const { language } = useAppLanguage();
   const {
     countryCode,
     error: countryError,
@@ -141,6 +139,7 @@ export function SettingsScreen({
   const [isSigningOut, setSigningOut] = useState(false);
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [isCountryModalVisible, setCountryModalVisible] = useState(false);
+  const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isCountryChangeBlockedVisible, setCountryChangeBlockedVisible] =
     useState(false);
   const [pendingCountryChange, setPendingCountryChange] = useState<
@@ -173,12 +172,12 @@ export function SettingsScreen({
       : getCurrencyName(currencyPreferences.currencies[0]!);
   const countryValueLabel = countryCode
     ? (getCountryByIso2(countryCode)?.name ?? countryCode)
-    : 'Sin elegir';
+    : t('settings.rows.countryNotSelected');
   const notificationRulesValueLabel = notificationRules.some(
     (rule) => rule.isEnabled,
   )
-    ? 'Activadas'
-    : 'Desactivadas';
+    ? t('settings.rows.remindersOn')
+    : t('settings.rows.remindersOff');
   const backSwipeGesture = useSettingsBackSwipe(onBack);
 
   useEffect(() => {
@@ -226,7 +225,7 @@ export function SettingsScreen({
         await saveCountryChangeNotice(session.user.id, {
           previousCountryName: countryCode
             ? countryValueLabel
-            : 'tu país anterior',
+            : t('settings.previousCountryFallback'),
         }).catch(() => undefined);
       }
       // El país ya cambió en el servidor: recargar el contexto financiero es
@@ -252,10 +251,10 @@ export function SettingsScreen({
   };
 
   const handleAccountRowPress = () => {
-    Alert.alert('Cerrar sesión', '¿Quieres cerrar la sesión de esta cuenta?', [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('settings.signOut.title'), t('settings.signOut.message'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Cerrar sesión',
+        text: t('settings.signOut.confirm'),
         style: 'destructive',
         onPress: () => void handleSignOut(),
       },
@@ -278,8 +277,8 @@ export function SettingsScreen({
       await afterSignOut?.();
     } catch {
       Alert.alert(
-        'No pudimos cerrar sesión',
-        'Inténtalo de nuevo en unos momentos.',
+        t('settings.signOut.errorTitle'),
+        t('settings.signOut.errorMessage'),
       );
     } finally {
       setSigningOut(false);
@@ -288,7 +287,9 @@ export function SettingsScreen({
 
   const handleContactDeveloper = () => {
     void Clipboard.setStringAsync(developerContactEmail);
-    showSaveConfirmation(`Correo copiado: ${developerContactEmail}`);
+    showSaveConfirmation(
+      t('settings.contactCopied', { email: developerContactEmail }),
+    );
     void Linking.openURL(`mailto:${developerContactEmail}`);
   };
 
@@ -299,7 +300,7 @@ export function SettingsScreen({
     void onLeaveCoupleSpace().catch(() => {
       setCoupleSpaceExit({
         step: 'error',
-        message: 'No pudimos salir del espacio de pareja. Inténtalo de nuevo.',
+        message: t('settings.leaveCoupleSpace.error'),
       });
     });
   };
@@ -310,7 +311,7 @@ export function SettingsScreen({
         <View style={styles.screenContent}>
           <View style={styles.header} testID="settings-header">
             <Pressable
-              accessibilityLabel="Volver"
+              accessibilityLabel={t('common.back')}
               accessibilityRole="button"
               hitSlop={spacing.sm}
               onPress={onBack}
@@ -332,7 +333,7 @@ export function SettingsScreen({
               testID="settings-title"
               variant="heading"
             >
-              Ajustes
+              {t('settings.title')}
             </Text>
           </View>
 
@@ -346,12 +347,12 @@ export function SettingsScreen({
             <SettingsSection
               emphasizeIcon={false}
               icon="options-outline"
-              title="Preferencias"
+              title={t('settings.sections.preferences')}
             >
               <SettingsRow
                 iconComponent={Coins}
                 iconBackgroundColor={categoryColors.green}
-                label="Moneda"
+                label={t('settings.rows.currency')}
                 onPress={
                   isVenezuela ? undefined : () => setCurrencyModalVisible(true)
                 }
@@ -361,17 +362,17 @@ export function SettingsScreen({
               <SettingsRow
                 iconComponent={MapPin}
                 iconBackgroundColor={categoryColors.blue}
-                label="País"
+                label={t('settings.rows.country')}
                 onPress={() => setCountryModalVisible(true)}
                 value={countryValueLabel}
               />
               <SettingsDivider />
               <SettingsToggleRow
-                description="Compara con el mes anterior"
+                description={t('settings.rows.homeComparisonDescription')}
                 enabled={showHomeComparisonIndicators}
                 iconComponent={ChartLineUp}
                 iconBackgroundColor={categoryColors.green}
-                label="Comparación en Inicio"
+                label={t('settings.rows.homeComparison')}
                 onToggle={onToggleHomeComparisonIndicators}
                 testID="home-comparison-toggle"
               />
@@ -380,33 +381,20 @@ export function SettingsScreen({
               <SettingsRow
                 icon="language-outline"
                 iconBackgroundColor={categoryColors.blue}
-                label="Idioma"
-                onPress={showPendingNotice}
-                pending
-                value="Español"
-              />
-              <SettingsDivider />
-              <SettingsToggleRow
-                description="Usa una interfaz oscura"
-                enabled={isDark}
-                iconComponent={MoonStars}
-                iconBackgroundColor={categoryColors.blue}
-                label="Modo oscuro"
-                onToggle={(enabled) => {
-                  void setAppearance(enabled ? 'dark' : 'light');
-                }}
-                testID="dark-mode-toggle"
+                label={t('language.settingsLabel')}
+                onPress={() => setLanguageModalVisible(true)}
+                value={appLanguageLabels[language]}
               />
             </SettingsSection>
 
             <SettingsSection
               icon="notifications-outline"
-              title="Notificaciones"
+              title={t('settings.sections.notifications')}
             >
               <SettingsRow
                 iconComponent={Alarm}
                 iconBackgroundColor={categoryColors.pink}
-                label="Recordatorios y alertas"
+                label={t('settings.rows.reminders')}
                 onPress={() => setNotificationRulesModalVisible(true)}
                 value={notificationRulesValueLabel}
               />
@@ -414,45 +402,48 @@ export function SettingsScreen({
 
             <SettingsSection
               icon="lock-closed-outline"
-              title="Datos y privacidad"
+              title={t('settings.sections.dataPrivacy')}
             >
               <SettingsRow
                 iconComponent={DeviceMobile}
                 iconBackgroundColor={categoryColors.violet}
-                label="Estado de los datos"
+                label={t('settings.rows.dataStatus')}
                 onPress={() => setDataRightsVisible(true)}
-                value="Guardados en este dispositivo"
+                value={t('settings.rows.dataStatusValue')}
               />
               <SettingsDivider />
               <SettingsRow
                 iconComponent={FileText}
                 iconBackgroundColor={categoryColors.violet}
-                label="Cómo usamos tus datos"
+                label={t('settings.rows.dataUsage')}
                 onPress={() => setDataUsageDocVisible(true)}
               />
               <SettingsDivider />
               <SettingsRow
                 iconComponent={SlidersHorizontal}
                 iconBackgroundColor={categoryColors.green}
-                label="Preferencias de privacidad"
+                label={t('settings.rows.privacyChoices')}
                 onPress={() => setPrivacyChoicesVisible(true)}
               />
               <SettingsDivider />
               <SettingsRow
                 iconComponent={Key}
                 iconBackgroundColor={categoryColors.blue}
-                label="Permisos de la aplicación"
+                label={t('settings.rows.permissions')}
                 onPress={() => setPermissionsVisible(true)}
               />
             </SettingsSection>
 
             {activeSpaceType === 'couple' ? (
-              <SettingsSection icon="people-outline" title="Espacio de pareja">
+              <SettingsSection
+                icon="people-outline"
+                title={t('settings.sections.coupleSpace')}
+              >
                 <SettingsRow
                   destructive
                   iconComponent={Trash}
                   iconBackgroundColor={categoryColors.red}
-                  label="Salir del espacio de pareja"
+                  label={t('settings.rows.leaveCoupleSpace')}
                   onPress={() => setCoupleSpaceExit({ step: 'confirming' })}
                 />
               </SettingsSection>
@@ -462,11 +453,10 @@ export function SettingsScreen({
             coupleSpaceExit.step === 'confirming' ? (
               <View style={styles.warningCard}>
                 <Text tone="expense" variant="bodyStrong" weight="semibold">
-                  Saldrás de este espacio
+                  {t('settings.leaveCoupleSpace.warningTitle')}
                 </Text>
                 <Text tone="secondary" variant="label">
-                  Dejarás de tener acceso a sus movimientos y categorías. Si
-                  ambas personas salen, el espacio se eliminará automáticamente.
+                  {t('settings.leaveCoupleSpace.warningMessage')}
                 </Text>
                 <View style={styles.progressTrack}>
                   <Animated.View
@@ -475,8 +465,10 @@ export function SettingsScreen({
                 </View>
                 <View style={styles.actionsRow}>
                   <ModalPrimaryAction
-                    accessibilityLabel="Cancelar salida del espacio de pareja"
-                    label="Cancelar"
+                    accessibilityLabel={t(
+                      'settings.leaveCoupleSpace.cancelLabel',
+                    )}
+                    label={t('common.cancel')}
                     onPress={() => setCoupleSpaceExit({ step: 'idle' })}
                     style={styles.actionButton}
                     variant="surface"
@@ -484,14 +476,18 @@ export function SettingsScreen({
                   <ModalPrimaryAction
                     accessibilityLabel={
                       coupleSpaceExitSecondsRemaining > 0
-                        ? `Espera ${coupleSpaceExitSecondsRemaining} segundos para confirmar la salida`
-                        : 'Confirmar salida del espacio de pareja'
+                        ? t('settings.leaveCoupleSpace.waitLabel', {
+                            seconds: coupleSpaceExitSecondsRemaining,
+                          })
+                        : t('settings.leaveCoupleSpace.confirmLabel')
                     }
                     disabled={coupleSpaceExitSecondsRemaining > 0}
                     label={
                       coupleSpaceExitSecondsRemaining > 0
-                        ? `Espera (${coupleSpaceExitSecondsRemaining})`
-                        : 'Sí, salir'
+                        ? t('settings.leaveCoupleSpace.wait', {
+                            seconds: coupleSpaceExitSecondsRemaining,
+                          })
+                        : t('settings.leaveCoupleSpace.confirm')
                     }
                     onPress={handleConfirmLeaveCoupleSpace}
                     style={[styles.actionButton, styles.destructiveButton]}
@@ -521,12 +517,12 @@ export function SettingsScreen({
               <SettingsSection
                 emphasizeIcon={false}
                 icon="person-circle-outline"
-                title="Cuenta"
+                title={t('settings.sections.account')}
               >
                 <SettingsRow
                   icon="log-out-outline"
                   iconBackgroundColor={categoryColors.blue}
-                  label="Cerrar sesión"
+                  label={t('settings.rows.signOut')}
                   onPress={handleAccountRowPress}
                   value={session?.user.email ?? undefined}
                 />
@@ -593,12 +589,15 @@ export function SettingsScreen({
         visible={isCountryChangeBlockedVisible}
       />
 
+      <LanguagePreferenceModal
+        onClose={() => setLanguageModalVisible(false)}
+        visible={isLanguageModalVisible}
+      />
+
       <NotificationRulesModal
         onClose={() => setNotificationRulesModalVisible(false)}
         onSave={onSaveNotificationRule}
-        onSaved={() =>
-          showSaveConfirmation('Recordatorios y alertas actualizados.')
-        }
+        onSaved={() => showSaveConfirmation(t('settings.remindersSaved'))}
         rules={notificationRules}
         spaceId={activeSpaceId}
         visible={isNotificationRulesModalVisible}

@@ -101,7 +101,9 @@ export function CreateCategoryModal({
     };
   }, []);
 
-  if (useDepsChanged([visible, category, initialEditor])) {
+  // Se reinicia al abrir u otra categoría, no por identidad: cada
+  // sincronización trae objetos nuevos y pisaba lo que se estaba escribiendo.
+  if (useDepsChanged([visible, category?.id, initialEditor])) {
     if (visible) {
       setStep(initialEditor ?? 'name');
       setName(category?.name ?? '');

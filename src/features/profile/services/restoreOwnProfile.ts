@@ -5,10 +5,11 @@ import {
   saveLocalProfileCountry,
 } from '@/features/profile/repositories/localProfileRepository';
 import { restoreOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
+import { syncOwnDefaultCurrency } from '@/features/profile/services/syncOwnDefaultCurrency';
 import { apiClient } from '@/services/api/juntossApiClient';
 import { currencyPreferencesForCountry } from '@/state/appPreferences/currencyPreferences';
 import {
-  loadCurrencyPreferences,
+  loadStoredCurrencyPreferences,
   saveCurrencyPreferences,
 } from '@/state/appPreferences/currencyPreferencesRepository';
 
@@ -58,15 +59,22 @@ export async function restoreOwnProfile(): Promise<string | null> {
     }
     // Las preferencias de moneda viven en AsyncStorage y sobreviven al cierre
     // de sesión. Al entrar en una cuenta VE no deben conservar el EUR de la
-    // cuenta anterior: el contrato venezolano solo permite USD/VES.
-    if (normalizedCountry === 'VE') {
-      const venezuelaPreferences =
-        currencyPreferencesForCountry(normalizedCountry);
-      const stored = await loadCurrencyPreferences();
-      // Se restaura en cada refresco: solo se escribe si hace falta.
-      if (stored.currencies.join() !== venezuelaPreferences.currencies.join()) {
-        await saveCurrencyPreferences(venezuelaPreferences);
-      }
+    // cuenta anterior: el contrato venezolano solo permite USD/VES. En el
+    // resto de países solo se siembran si nunca se guardaron (instalación
+    // nueva o inicio de sesión sin pasar por el paso de país): sin esto la
+    // cuenta quedaba con el EUR por defecto del catálogo.
+    const countryPreferences = currencyPreferencesForCountry(normalizedCountry);
+    const stored = await loadStoredCurrencyPreferences();
+    const shouldSeed =
+      normalizedCountry === 'VE'
+        ? stored?.currencies.join() !== countryPreferences?.currencies.join()
+        : stored === null;
+    // Se restaura en cada refresco: solo se escribe si hace falta. Un país
+    // fuera del catálogo no siembra nada en lugar de imponer EUR.
+    if (countryPreferences && shouldSeed) {
+      await saveCurrencyPreferences(countryPreferences);
+      const defaultCurrency = countryPreferences.currencies[0];
+      if (defaultCurrency) await syncOwnDefaultCurrency(defaultCurrency);
     }
     return normalizedCountry;
   }

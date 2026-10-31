@@ -17,6 +17,11 @@ import { colors, darkColors, lightColors } from '@/theme/colors';
 import { motion } from '@/theme/motion';
 import type { AppearancePreference } from '@/theme/types';
 
+// Los tipos públicos de Reanimated resuelven el stub web, que no recibe argumentos.
+const readAnimatedStyle = getAnimatedStyle as unknown as (
+  component: unknown,
+) => Record<string, unknown>;
+
 const spaces: Space[] = [
   { id: 'personal', name: 'Personal', type: 'personal', currency: 'EUR' },
   { id: 'juntos', name: 'Juntos', type: 'couple', currency: 'EUR' },
@@ -71,7 +76,7 @@ describe('SpaceSideMenu', () => {
     expect(props.onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
-  it('cambia primero el botón y, al terminar, cierra el menú y cambia de espacio', async () => {
+  it('cambia el botón y el espacio a la vez y cierra el menú al asentarse la píldora', async () => {
     jest.useFakeTimers();
     try {
       let finishSelection: (() => void) | undefined;
@@ -95,19 +100,70 @@ describe('SpaceSideMenu', () => {
         screen.getByLabelText('Seleccionar espacio Personal').props
           .accessibilityState?.checked,
       ).toBe(false);
-      expect(onSelectSpace).not.toHaveBeenCalled();
-
+      // El espacio nuevo se pinta detrás del menú mientras la píldora llega.
+      await act(async () => {
+        jest.advanceTimersByTime(0);
+      });
+      expect(onSelectSpace).toHaveBeenCalledWith('juntos');
       expect(props.onClose).not.toHaveBeenCalled();
 
-      // Al asentarse la píldora se cierra el menú y empieza el cambio, sin
-      // esperar a que termine de persistirse la selección.
+      // Al asentarse la píldora se cierra el menú, sin esperar a que termine
+      // de persistirse la selección.
       await act(async () => {
         jest.advanceTimersByTime(motion.spaceSelectionDuration);
       });
-      expect(onSelectSpace).toHaveBeenCalledWith('juntos');
       expect(props.onClose).toHaveBeenCalledTimes(1);
 
       finishSelection?.();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('un segundo toque antes de cerrar sustituye al primero en vez de ignorarse', async () => {
+    jest.useFakeTimers();
+    try {
+      const { props, screen } = await renderMenu();
+
+      await fireEvent.press(screen.getByLabelText('Seleccionar espacio Casa'));
+      await fireEvent.press(
+        screen.getByLabelText('Seleccionar espacio Juntos'),
+      );
+      await act(async () => {
+        jest.advanceTimersByTime(motion.spaceSelectionDuration);
+      });
+
+      expect(props.onSelectSpace).toHaveBeenCalledTimes(1);
+      expect(props.onSelectSpace).toHaveBeenCalledWith('juntos');
+      expect(props.onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('suelta la selección al terminar aunque el espacio activo no cambie', async () => {
+    jest.useFakeTimers();
+    try {
+      const { props, screen } = await renderMenu();
+
+      await fireEvent.press(screen.getByLabelText('Seleccionar espacio Casa'));
+      await act(async () => {
+        jest.advanceTimersByTime(motion.spaceSelectionDuration);
+      });
+
+      expect(
+        screen.getByLabelText('Seleccionar espacio Personal').props
+          .accessibilityState?.checked,
+      ).toBe(true);
+
+      // Sin una selección colgada, el siguiente toque vuelve a funcionar.
+      await fireEvent.press(
+        screen.getByLabelText('Seleccionar espacio Juntos'),
+      );
+      await act(async () => {
+        jest.advanceTimersByTime(motion.spaceSelectionDuration);
+      });
+      expect(props.onSelectSpace).toHaveBeenLastCalledWith('juntos');
     } finally {
       jest.useRealTimers();
     }
@@ -122,6 +178,33 @@ describe('SpaceSideMenu', () => {
 
     expect(props.onClose).toHaveBeenCalledTimes(1);
     expect(props.onSelectSpace).not.toHaveBeenCalled();
+  });
+
+  it('deja el menú abierto con el aviso si el cambio falla', async () => {
+    jest.useFakeTimers();
+    try {
+      const { props, screen } = await renderMenu({
+        onSelectSpace: jest.fn(async () => {
+          throw new Error('fallo');
+        }),
+      });
+
+      await fireEvent.press(screen.getByLabelText('Seleccionar espacio Casa'));
+      // El cambio falla mientras la píldora aún se desliza.
+      await act(async () => {
+        jest.advanceTimersByTime(0);
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(motion.spaceSelectionDuration);
+      });
+
+      expect(props.onClose).not.toHaveBeenCalled();
+      expect(
+        screen.getByText('No pudimos cambiar de espacio. Inténtalo de nuevo.'),
+      ).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('vuelve a marcar el espacio anterior si el cambio falla', async () => {
@@ -234,6 +317,15 @@ describe('SpaceSideMenu', () => {
     expect(screen.getByLabelText('Seleccionar espacio Juntos')).toBeTruthy();
   });
 
+  it('ya no muestra Notificaciones: se abren desde la campana de la cabecera', async () => {
+    const { screen } = await renderMenu();
+
+    const labels = screen
+      .getAllByText(/^(Modo oscuro|Notificaciones|Ajustes)$/)
+      .map((node) => node.props.children);
+    expect(labels).toEqual(['Modo oscuro', 'Ajustes']);
+  });
+
   it('presenta las acciones inferiores oscuras sobre una superficie blanca', async () => {
     const { screen } = await renderMenu();
 
@@ -299,7 +391,7 @@ describe('SpaceSideMenu', () => {
           nativeEvent: { layout: { x: 0, y, width: 300, height: 64 } },
         });
       const pillStyle = () =>
-        getAnimatedStyle(screen.getByTestId('space-selection-pill'));
+        readAnimatedStyle(screen.getByTestId('space-selection-pill'));
       const settle = () =>
         act(async () => {
           jest.advanceTimersByTime(1000);

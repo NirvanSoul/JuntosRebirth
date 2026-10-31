@@ -88,8 +88,13 @@ export function randomInt(
  * Importes del guion, escritos en euros de España, convertidos a la moneda
  * elegida con su escala de coste de vida y redondeados como se ven en ese
  * país: céntimos donde la moneda es fuerte, centenas en el peso colombiano.
+ * Nóminas y aportes usan `incomeScale`, que solo difiere en Venezuela.
  */
-export function createDemoAmounts(costScale: number, random: DemoRandom) {
+export function createDemoAmounts(
+  costScale: number,
+  random: DemoRandom,
+  incomeScale: number = costScale,
+) {
   // Unidad mínima que alguien escribiría en un gasto suelto de esa moneda.
   const priceStep =
     costScale < 4
@@ -98,6 +103,11 @@ export function createDemoAmounts(costScale: number, random: DemoRandom) {
   const toMinor = (major: number) => Math.max(1, Math.round(major * 100));
   const roundTo = (value: number, step: number) =>
     Math.max(step, Math.round(value / step) * step);
+  const roundFigure = (local: number) => {
+    const digits = Math.floor(Math.log10(local)) + 1;
+    const step = 10 ** Math.max(0, digits - (local >= 1000 ? 3 : 2));
+    return toMinor(roundTo(local, step));
+  };
 
   return {
     /** Gasto variable entre dos importes: supermercado, cafés, cenas. */
@@ -107,12 +117,13 @@ export function createDemoAmounts(costScale: number, random: DemoRandom) {
       const step = costScale < 4 && local < 20 ? 0.1 : priceStep;
       return toMinor(roundTo(local, step));
     },
-    /** Cifra redonda de nómina, alquiler o aportes: 2.300 €, 4.600.000 $. */
+    /** Cifra redonda de alquiler, saldos o cuotas: 800 €, 1.140.000 $. */
     round(eur: number): number {
-      const local = eur * costScale;
-      const digits = Math.floor(Math.log10(local)) + 1;
-      const step = 10 ** Math.max(0, digits - (local >= 1000 ? 3 : 2));
-      return toMinor(roundTo(local, step));
+      return roundFigure(eur * costScale);
+    },
+    /** Cifra redonda de nómina o aportes: 1.400 €, 2.000.000 $. */
+    income(eur: number): number {
+      return roundFigure(eur * incomeScale);
     },
     /** Precio comercial terminado en 9: 10,99 €, 149 MXN, 27.900 COP. */
     charm(eur: number): number {

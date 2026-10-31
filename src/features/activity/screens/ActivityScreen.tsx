@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
-import { ScrollView, View } from 'react-native';
+import { type ScrollViewInstance, View } from 'react-native';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -12,6 +12,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/feedback/EmptyState/EmptyState';
+import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { Screen } from '@/components/layout/Screen/Screen';
 import type { MoneyAccount } from '@/features/accounts/types';
 import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
@@ -21,37 +22,39 @@ import {
   ActivityCollapsibleSection,
   getActivityLayoutTransition,
 } from '@/features/activity/components/ActivityCollapsibleSection';
+import {
+  ActivityMovementList,
+  useActivityMonthSections,
+} from '@/features/activity/components/ActivityMonthSections';
 import { ActivityMovementsHeader } from '@/features/activity/components/ActivityMovementsHeader';
 import { CategoryDonutChart } from '@/features/activity/components/CategoryDonutChart';
+import { useActivityFilters } from '@/features/activity/hooks/useActivityFilters';
 import {
-  type CategoryFilter,
-  type RecurrenceFilter,
+  type TransactionAuthorFilter,
   TransactionFiltersModal,
-  type TransactionTypeFilter,
 } from '@/features/activity/components/TransactionFiltersModal';
 import {
-  getComparisonPeriodLabel,
   getPreviousDateFilter,
-  matchesTransactionDateFilter,
-  type TransactionDateFilter,
+  listTransactionsByDateFilter,
 } from '@/features/activity/utils/transactionDateFilter';
+import { listActivityTransactions } from '@/features/activity/utils/activityTimeline';
+import { CategoryDetailPeriodFilter } from '@/features/categories/components/CategoryDetailModal/CategoryDetailPeriodFilter';
 import type { Category } from '@/features/categories/types';
 import {
   summarizeCategories,
-  summarizeMonthlyBudgetExpenses,
+  summarizeBudgetExpenses,
 } from '@/features/categories/utils/categorySummary';
 import {
   TransactionPeriodModal,
   type TransactionPeriodModalType,
 } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal';
-import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import { TransactionSummaryBadges } from '@/features/transactions/components/TransactionSummaryBadges/TransactionSummaryBadges';
 import type { SessionTransaction } from '@/features/transactions/types';
 import {
   getAvailableCurrencies,
   pickEffectiveCurrency,
 } from '@/features/transactions/utils/transactionCurrencyGrouping';
-import { calculatePeriodComparison } from '@/features/transactions/utils/periodComparison';
+import { compareTransactionTotals } from '@/features/transactions/utils/periodComparison';
 import {
   listTransactionsThroughCurrentMonth,
   summarizeTransactionTotals,
@@ -74,8 +77,6 @@ type ActivityScreenProps = {
   moneyAccounts?: readonly MoneyAccount[];
   /** Moneda elegida en el encabezado global; nunca se mezclan importes aquí. */
   currency?: CurrencyCode;
-  /** Moneda del espacio activo para presupuestos. */
-  spaceCurrency?: CurrencyCode;
   /** Cambia al reenfocar la pantalla para reiniciar el donut de categorías. */
   focusResetKey?: number;
   onCreateCategory?: () => void;
@@ -86,7 +87,11 @@ type ActivityScreenProps = {
   onCreateIncome?: () => void;
   onCreateMovement?: () => void;
   onImport?: () => void;
-  onOpenCategoryDetail?: (categoryId: string, currency?: CurrencyCode) => void;
+  onOpenCategoryDetail?: (
+    categoryId: string,
+    currency?: CurrencyCode,
+    author?: TransactionAuthorFilter,
+  ) => void;
   onAccountsExpandedChange?: (expanded: boolean) => void;
   accountsExpanded?: boolean;
   onOpenMoneyAccountDetail?: (moneyAccountId: string) => void;
@@ -124,7 +129,6 @@ export function ActivityScreen({
   onOpenTransactionDetail,
   onScrollDirectionChange,
   onSummaryPinnedChange,
-  spaceCurrency = defaultCurrencyCode,
   summaryPinned = false,
   targetRequestId,
   targetSection,
@@ -133,7 +137,7 @@ export function ActivityScreen({
   const { colors, shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   useScrollToTop(scrollRef);
   const handledTargetKeyRef = useRef<string | null>(null);
   const hasPinnedStateMountedRef = useRef(false);
@@ -150,22 +154,16 @@ export function ActivityScreen({
   const [areAccountsExpanded, setAccountsExpanded] = useState(
     accountsExpanded ?? true,
   );
-  const [transactionFilter, setTransactionFilter] =
-    useState<TransactionTypeFilter>('all');
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>([]);
-  const [recurrenceFilter, setRecurrenceFilter] =
-    useState<RecurrenceFilter>('all');
-  const [dateFilter, setDateFilter] = useState<TransactionDateFilter>('all');
-  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode | null>(
-    null,
-  );
+  const filters = useActivityFilters();
   const [isFiltersModalVisible, setFiltersModalVisible] = useState(false);
+  const { authorFilter } = filters;
   const movementPages = useIncrementalLimit(movementPageSize, [
-    transactionFilter,
-    categoryFilter,
-    recurrenceFilter,
-    dateFilter,
-    selectedCurrency,
+    authorFilter.author,
+    filters.type,
+    filters.category,
+    filters.recurrence,
+    filters.date,
+    filters.currency,
   ]);
   const [periodModalType, setPeriodModalType] =
     useState<TransactionPeriodModalType | null>(null);
@@ -209,7 +207,7 @@ export function ActivityScreen({
   );
   const effectiveCurrency = pickEffectiveCurrency(
     availableCurrencies,
-    selectedCurrency ?? currency,
+    filters.currency ?? currency,
     currency,
   );
   const currencyTransactionsThroughCurrentMonth = useMemo(
@@ -229,12 +227,8 @@ export function ActivityScreen({
     [categories, effectiveCurrency, transactionsThroughCurrentMonth],
   );
   const budgetExpenseByCategoryId = useMemo(
-    () =>
-      summarizeMonthlyBudgetExpenses(
-        transactionsThroughCurrentMonth,
-        spaceCurrency,
-      ),
-    [spaceCurrency, transactionsThroughCurrentMonth],
+    () => summarizeBudgetExpenses(categories, transactions, effectiveCurrency),
+    [categories, effectiveCurrency, transactions],
   );
   // Cada tarjeta lleva su propia moneda, así que la selección de moneda de
   // los movimientos no filtra las cuentas ni mezcla divisas en un saldo.
@@ -242,80 +236,55 @@ export function ActivityScreen({
     () => summarizeMoneyAccounts(moneyAccounts, transactions),
     [moneyAccounts, transactions],
   );
-  const matchesNonDateFilters = useCallback(
-    (transaction: SessionTransaction) =>
-      (transactionFilter === 'all' || transaction.type === transactionFilter) &&
-      (categoryFilter.length === 0 ||
-        categoryFilter.includes(transaction.categoryId)) &&
-      (recurrenceFilter === 'all' ||
-        transaction.recurrence === recurrenceFilter),
-    [categoryFilter, recurrenceFilter, transactionFilter],
-  );
+  const matchesNonDateFilters = filters.matchesMovementFilters;
+
+  // Un periodo futuro proyecta sus recurrencias: limitarse al mes en curso
+  // dejaría vacíos los meses siguientes aunque tengan movimientos previstos.
   const filteredTransactions = useMemo(
     () =>
-      transactionsThroughCurrentMonth.filter(
+      listActivityTransactions(transactions, filters.date).filter(
         (transaction) =>
           transaction.currency === effectiveCurrency &&
-          matchesNonDateFilters(transaction) &&
-          matchesTransactionDateFilter(transaction.occurredOn, dateFilter),
+          matchesNonDateFilters(transaction),
       ),
-    [
-      dateFilter,
-      effectiveCurrency,
-      matchesNonDateFilters,
-      transactionsThroughCurrentMonth,
-    ],
+    [effectiveCurrency, filters.date, matchesNonDateFilters, transactions],
   );
+  // El detalle de categoría abre con el autor que se está filtrando aquí.
+  const openCategoryDetail = (id: string, code = effectiveCurrency) =>
+    onOpenCategoryDetail?.(id, code, authorFilter.author);
   const activeFilterCount =
-    Number(transactionFilter !== 'all') +
-    Number(categoryFilter.length > 0) +
-    Number(recurrenceFilter !== 'all') +
-    Number(dateFilter !== 'all');
-  const filteredSummary = useMemo(
-    () => summarizeTransactionTotals(filteredTransactions),
-    [filteredTransactions],
-  );
+    Number(filters.type !== 'all') +
+    Number(filters.category.length > 0) +
+    Number(filters.recurrence !== 'all') +
+    Number(authorFilter.isActive);
+  // «Desde el inicio» resume el mes que se está viendo.
+  const months = useActivityMonthSections(filteredTransactions, filters.date);
+  const filteredSummary = months.summary;
   const previousDateFilter = useMemo(
-    () => getPreviousDateFilter(dateFilter),
-    [dateFilter],
+    () => getPreviousDateFilter(filters.date),
+    [filters.date],
   );
   const previousFilteredSummary = useMemo(() => {
     if (!previousDateFilter) return null;
-    const previousTransactions = transactionsThroughCurrentMonth.filter(
+    const previousTransactions = listTransactionsByDateFilter(
+      transactions,
+      previousDateFilter,
+    ).filter(
       (transaction) =>
         transaction.currency === effectiveCurrency &&
-        matchesNonDateFilters(transaction) &&
-        matchesTransactionDateFilter(
-          transaction.occurredOn,
-          previousDateFilter,
-        ),
+        matchesNonDateFilters(transaction),
     );
     return summarizeTransactionTotals(previousTransactions);
   }, [
     effectiveCurrency,
     matchesNonDateFilters,
     previousDateFilter,
-    transactionsThroughCurrentMonth,
+    transactions,
   ]);
-  const comparisonPeriodLabel = getComparisonPeriodLabel(dateFilter);
-  const incomeComparison = previousFilteredSummary
-    ? (calculatePeriodComparison(
-        filteredSummary.incomeMinor,
-        previousFilteredSummary.incomeMinor,
-      ) ?? undefined)
-    : undefined;
-  const expenseComparison = previousFilteredSummary
-    ? (calculatePeriodComparison(
-        filteredSummary.expenseMinor,
-        previousFilteredSummary.expenseMinor,
-      ) ?? undefined)
-    : undefined;
-  const balanceComparison = previousFilteredSummary
-    ? (calculatePeriodComparison(
-        filteredSummary.balanceMinor,
-        previousFilteredSummary.balanceMinor,
-      ) ?? undefined)
-    : undefined;
+  const comparisons = compareTransactionTotals(
+    filteredSummary,
+    previousFilteredSummary,
+  );
   const updateSummaryPinnedState = (scrollOffset: number) => {
     if (summaryOffsetRef.current <= 0) {
       return;
@@ -391,11 +360,12 @@ export function ActivityScreen({
         onScrollOffsetChange={(offset) => {
           scrollOffsetRef.current = offset;
           updateSummaryPinnedState(offset);
+          months.onScroll(offset);
         }}
         onScrollDirectionChange={onScrollDirectionChange}
         onEndReached={movementPages.showMore}
         scrollRef={scrollRef}
-        stickyHeaderIndices={[3]}
+        stickyHeaderIndices={[4]}
         testID="activity-screen"
         transparentBackground
       >
@@ -411,9 +381,7 @@ export function ActivityScreen({
               currency={effectiveCurrency}
               onCreateMovement={onCreateMovement}
               onDataAvailabilityChange={setHasCategoryBreakdownData}
-              onOpenCategoryDetail={(categoryId) =>
-                onOpenCategoryDetail?.(categoryId, effectiveCurrency)
-              }
+              onOpenCategoryDetail={openCategoryDetail}
               resetKey={focusResetKey}
               transactions={currencyTransactionsThroughCurrentMonth}
             />
@@ -425,9 +393,9 @@ export function ActivityScreen({
             currency={effectiveCurrency}
             hasBreakdownData={hasCategoryBreakdownData}
             onCreateCategory={onCreateCategory}
-            onOpenCategoryDetail={onOpenCategoryDetail}
+            onOpenCategoryDetail={openCategoryDetail}
             onCategoryViewChange={onCategoryViewChange}
-            spaceCurrency={spaceCurrency}
+            spaceCurrency={effectiveCurrency}
           />
         </ActivityCollapsibleSection>
 
@@ -461,6 +429,13 @@ export function ActivityScreen({
           onOpenImport={onImport}
         />
 
+        <CategoryDetailPeriodFilter
+          filter={filters.date}
+          onChange={filters.setDate}
+          optionsStyle={styles.periodOptions}
+          testID="activity-date-period-selector"
+        />
+
         {/**
          * Ancla fija del resumen. El relleno superior reserva la safe area para
          * cuando queda anclada arriba, y el margen negativo lo compensa en
@@ -473,6 +448,7 @@ export function ActivityScreen({
         <View
           onLayout={({ nativeEvent }) => {
             summaryOffsetRef.current = nativeEvent.layout.y;
+            months.onSummaryLayout(nativeEvent.layout.height);
             updateSummaryPinnedState(scrollOffsetRef.current);
           }}
           pointerEvents="box-none"
@@ -486,15 +462,14 @@ export function ActivityScreen({
           <Animated.View style={summaryAnimatedStyle}>
             <TransactionSummaryBadges
               accessibilityContext="de los movimientos mostrados"
-              balanceComparison={balanceComparison}
+              balanceComparison={comparisons.balance}
               balanceMinor={filteredSummary.balanceMinor}
               bordered={summaryPinned}
               compact
-              comparisonPeriodLabel={comparisonPeriodLabel}
               currency={effectiveCurrency}
-              expenseComparison={expenseComparison}
+              expenseComparison={comparisons.expense}
               expenseMinor={filteredSummary.expenseMinor}
-              incomeComparison={incomeComparison}
+              incomeComparison={comparisons.income}
               incomeMinor={filteredSummary.incomeMinor}
               onBalancePress={() => setPeriodModalType('balance')}
               onExpensePress={() => setPeriodModalType('expense')}
@@ -506,11 +481,17 @@ export function ActivityScreen({
         </View>
 
         {filteredTransactions.length > 0 ? (
-          <Animated.View layout={getActivityLayoutTransition()}>
-            <TransactionPreviewList
+          <Animated.View
+            layout={getActivityLayoutTransition()}
+            onLayout={({ nativeEvent }) =>
+              months.onListLayout(nativeEvent.layout.y)
+            }
+          >
+            <ActivityMovementList
               categories={categories}
               groupingTransactions={transactions}
               limit={movementPages.limit}
+              months={months}
               onOpenTransactionDetail={onOpenTransactionDetail}
               testID="activity-transaction-preview-list"
               transactions={filteredTransactions}
@@ -519,14 +500,12 @@ export function ActivityScreen({
         ) : (
           <Animated.View layout={getActivityLayoutTransition()}>
             {transactionsThroughCurrentMonth.length === 0 ? (
-              <EmptyState
+              <CreatePreviewBadge
                 accessibilityLabel="Crear primer gasto"
-                description="Registra un gasto para empezar a ver tu actividad."
-                icon="swap-vertical-outline"
-                iconBackgroundColor={colors.cta}
+                bordered
+                label="Crear movimiento"
                 onPress={onCreateExpense}
                 testID="activity-empty-movements"
-                title="Todavía no hay movimientos"
               />
             ) : (
               <EmptyState
@@ -541,21 +520,19 @@ export function ActivityScreen({
         )}
       </Screen>
       <TransactionFiltersModal
+        authorOptions={authorFilter.authorOptions}
         categories={categories}
         currencies={availableCurrencies}
         filters={{
-          category: categoryFilter,
+          author: authorFilter.author,
+          category: filters.category,
           currency: effectiveCurrency,
-          date: dateFilter,
-          recurrence: recurrenceFilter,
-          type: transactionFilter,
+          date: filters.date,
+          recurrence: filters.recurrence,
+          type: filters.type,
         }}
-        onApply={(filters) => {
-          setTransactionFilter(filters.type);
-          setCategoryFilter(filters.category);
-          setRecurrenceFilter(filters.recurrence);
-          setDateFilter(filters.date);
-          setSelectedCurrency(filters.currency);
+        onApply={(nextFilters) => {
+          filters.applyFilters(nextFilters);
           setFiltersModalVisible(false);
         }}
         onClose={() => setFiltersModalVisible(false)}
@@ -564,6 +541,7 @@ export function ActivityScreen({
       {periodModalType ? (
         <TransactionPeriodModal
           categories={categories}
+          initialAuthor={authorFilter.author}
           onAdd={() => {
             const currentType = periodModalType;
             setPeriodModalType(null);

@@ -1,4 +1,5 @@
 import type { MoneyAccount } from '@/features/accounts/types';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
 const maximumMoneyAccountNameLength = 40;
 
@@ -70,4 +71,17 @@ export function validateMoneyAccountName(
   }
 
   return { valid: true, name: normalizedName };
+}
+
+/**
+ * Añade la moneda con saldo inicial cero si la cuenta todavía no la guarda.
+ * Una cuenta creada para un movimiento debe poder llevarlo en su moneda.
+ */
+export function withCurrencyBalance(
+  balances: MoneyAccount['balances'],
+  currency: CurrencyCode | undefined,
+): MoneyAccount['balances'] {
+  return !currency || balances.some((balance) => balance.currency === currency)
+    ? balances
+    : [...balances, { currency, openingBalanceMinor: 0 }];
 }

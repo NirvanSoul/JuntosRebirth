@@ -24,9 +24,13 @@ type SelectableOptionProps = {
   indicatorShape?: 'circle' | 'square';
   indicatorTestID?: string;
   label: string;
+  /** Contenido antes del texto, como el icono del tipo de movimiento. */
+  leading?: ReactNode;
   onPress: () => void;
   role?: 'radio' | 'checkbox';
   selected: boolean;
+  /** Color de borde, texto e indicador al estar seleccionada. */
+  selectedTone?: 'cta' | 'income' | 'expense';
   style?: StyleProp<ViewStyle>;
   testID?: string;
   /** Contenido adicional al final de la fila, como el icono de dirección de un movimiento. */
@@ -61,9 +65,6 @@ function createSelectableOptionStyles(
     outlineOption: {
       justifyContent: 'center',
     },
-    selectedOutlineOption: {
-      borderColor: colors.cta,
-    },
     disabledOption: {
       opacity: 0.56,
     },
@@ -90,10 +91,12 @@ export function SelectableOption({
   indicator = true,
   indicatorTestID,
   label,
+  leading,
   onPress,
   role = 'radio',
   indicatorShape = role === 'checkbox' ? 'square' : 'circle',
   selected,
+  selectedTone = 'cta',
   style,
   testID,
   trailing,
@@ -114,7 +117,7 @@ export function SelectableOption({
         compact ? styles.compactOption : null,
         indicator ? null : styles.outlineOption,
         selected ? styles.selectedOption : null,
-        selected && !indicator ? styles.selectedOutlineOption : null,
+        selected && !indicator ? { borderColor: colors[selectedTone] } : null,
         disabled ? styles.disabledOption : null,
         style,
         pressed && !disabled ? styles.pressed : null,
@@ -123,7 +126,7 @@ export function SelectableOption({
     >
       {indicator ? (
         <Ionicons
-          color={selected ? colors.cta : colors.textMuted}
+          color={selected ? colors[selectedTone] : colors.textMuted}
           name={
             selected
               ? 'checkmark-circle'
@@ -135,6 +138,7 @@ export function SelectableOption({
           testID={indicatorTestID}
         />
       ) : null}
+      {leading}
       <Text
         numberOfLines={1}
         style={[
@@ -142,7 +146,7 @@ export function SelectableOption({
           trailing ? styles.labelWithTrailing : null,
           compact ? styles.compactLabel : null,
         ]}
-        tone={selected ? 'cta' : 'primary'}
+        tone={selected ? selectedTone : 'primary'}
         variant={compact ? 'footnote' : 'label'}
         weight="medium"
       >

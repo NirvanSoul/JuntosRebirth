@@ -25,6 +25,11 @@ type ModalCloseButtonProps = {
   label?: string;
   size?: number;
   shadow?: boolean;
+  /**
+   * Botón que flota sobre la pantalla, como la campana de la cabecera:
+   * superficie blanca y sombra elevada.
+   */
+  floating?: boolean;
   testID?: string;
   variant?: 'back' | 'close';
 };
@@ -40,6 +45,7 @@ export function ModalCloseButton({
   hitSlop = spacing.sm,
   size = layout.minTouchTarget,
   shadow = false,
+  floating = false,
   testID,
   variant = 'close',
 }: ModalCloseButtonProps) {
@@ -64,6 +70,7 @@ export function ModalCloseButton({
         isLabeled && styles.labeledButton,
         isBack && !showBackground && styles.backButton,
         shadow && styles.shadow,
+        floating && styles.floating,
         pressed && styles.pressed,
       ]}
       testID={testID}
@@ -100,6 +107,7 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       backgroundColor: 'transparent',
     },
     shadow: shadows.subtle,
+    floating: { ...shadows.raised, backgroundColor: colors.surface },
     pressed: { opacity: 0.7 },
   });
 }

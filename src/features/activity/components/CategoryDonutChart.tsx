@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { StyleSheet } from 'react-native';
 
 import {
   DonutBreakdownChart,
@@ -6,16 +7,13 @@ import {
 } from '@/components/ui/Charts/DonutBreakdownChart';
 import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import type { Category } from '@/features/categories/types';
-import {
-  formatMonthKey,
-  getCurrentMonthKey,
-  listTransactionsByMonth,
-  shiftMonthKey,
-  summarizeCategories,
-} from '@/features/categories/utils/categorySummary';
+import { useBreakdownPeriod } from '@/features/activity/components/useBreakdownPeriod';
+import { CategoryDetailPeriodFilter } from '@/features/categories/components/CategoryDetailModal/CategoryDetailPeriodFilter';
+import { summarizeCategories } from '@/features/categories/utils/categorySummary';
 import type { SessionTransaction } from '@/features/transactions/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { categoryColors } from '@/theme/categoryColors';
+import { spacing } from '@/theme/spacing';
 
 type CategoryDonutChartProps = {
   categories: readonly Category[];
@@ -39,22 +37,20 @@ export function CategoryDonutChart({
   transactions,
 }: CategoryDonutChartProps) {
   const [mode, setMode] = useState<DonutBreakdownMode>('expense');
-  const currentMonthKey = getCurrentMonthKey();
-  const [monthKey, setMonthKey] = useState(currentMonthKey);
+  const { filter, nextDisabled, periodKey, periodTransactions, setFilter } =
+    useBreakdownPeriod(transactions);
   const slices = useMemo(
     () =>
-      summarizeCategories(
-        categories,
-        listTransactionsByMonth(transactions, monthKey),
-        currency,
-      ).map((category) => ({
-        color: categoryColors[category.colorToken],
-        id: category.id,
-        label: category.name,
-        valueMinor:
-          mode === 'expense' ? category.expenseMinor : category.incomeMinor,
-      })),
-    [categories, currency, mode, monthKey, transactions],
+      summarizeCategories(categories, periodTransactions, currency).map(
+        (category) => ({
+          color: categoryColors[category.colorToken],
+          id: category.id,
+          label: category.name,
+          valueMinor:
+            mode === 'expense' ? category.expenseMinor : category.incomeMinor,
+        }),
+      ),
+    [categories, currency, mode, periodTransactions],
   );
 
   return (
@@ -70,15 +66,20 @@ export function CategoryDonutChart({
         />
       }
       idPrefix="category"
-      isCurrentMonth={monthKey === currentMonthKey}
       mode={mode}
-      monthLabel={formatMonthKey(monthKey)}
       onModeChange={setMode}
       onDataAvailabilityChange={onDataAvailabilityChange}
-      onMonthChange={(offset) =>
-        setMonthKey((current) => shiftMonthKey(current, offset))
-      }
       onSlicePress={onOpenCategoryDetail}
+      periodControl={
+        <CategoryDetailPeriodFilter
+          filter={filter}
+          nextDisabled={nextDisabled}
+          onChange={setFilter}
+          optionsStyle={styles.periodOptions}
+          testID="category-period-selector"
+        />
+      }
+      periodKey={periodKey}
       resetKey={resetKey}
       slicePressHint="Abre el detalle de la categoría"
       size={205}
@@ -86,3 +87,7 @@ export function CategoryDonutChart({
     />
   );
 }
+
+const styles = StyleSheet.create({
+  periodOptions: { marginBottom: spacing.lg },
+});

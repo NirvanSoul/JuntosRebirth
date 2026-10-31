@@ -2,6 +2,16 @@ import {
   isCurrencyCode,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
+import {
+  normalizeBudgetHistory,
+  normalizeBudgetOverrides,
+  normalizeBudgetSchedule,
+} from '@/features/categories/utils/categoryBudgetSerialization';
+import {
+  type BudgetOverride,
+  type BudgetSchedule,
+  type BudgetScheduleSegment,
+} from '@/features/categories/types';
 import type { TransactionExchangeSnapshot } from '@/features/transactions/types';
 import { apiClient } from '@/services/api/juntossApiClient';
 
@@ -26,7 +36,16 @@ export type RemoteAccountCategory = {
   createdAt: string;
   updatedAt: string;
   /** Presupuesto por moneda; el modelo antiguo solo admitía uno. */
-  budgets: readonly { currency: CurrencyCode; budgetMinor: number }[];
+  budgets: readonly RemoteCategoryBudget[];
+};
+
+export type RemoteCategoryBudget = {
+  currency: CurrencyCode;
+  budgetMinor: number;
+  /** Un servidor anterior no la envía: equivale a mensual. */
+  schedule?: BudgetSchedule;
+  overrides: readonly BudgetOverride[];
+  history: readonly BudgetScheduleSegment[];
 };
 
 export type RemoteAccountMoneyAccount = {
@@ -126,6 +145,17 @@ function minorAmount(value: unknown): number {
 
 function optionalMinorAmount(value: unknown): number | null {
   return value === null || value === undefined ? null : minorAmount(value);
+}
+
+function optionalSchedule(budget: Record<string, unknown>): {
+  schedule?: BudgetSchedule;
+} {
+  const schedule = normalizeBudgetSchedule(
+    budget.period,
+    budget.intervalDays,
+    budget.anchorOn,
+  );
+  return schedule ? { schedule } : {};
 }
 
 function text(value: unknown): string {
@@ -247,6 +277,23 @@ function parseCollections(raw: RawCollections) {
               `presupuesto ${text(category.id)}`,
             ),
             budgetMinor: minorAmount(budget.budgetAmountMinor),
+            ...optionalSchedule(budget),
+            history: normalizeBudgetHistory(
+              (Array.isArray(budget.history) ? budget.history : []).map(
+                (segment: Record<string, unknown>) => ({
+                  ...segment,
+                  amountMinor: Number(segment.budgetAmountMinor),
+                }),
+              ),
+            ),
+            overrides: normalizeBudgetOverrides(
+              (Array.isArray(budget.overrides) ? budget.overrides : []).map(
+                (override: Record<string, unknown>) => ({
+                  periodStartOn: override.periodStartOn,
+                  amountMinor: Number(override.budgetAmountMinor),
+                }),
+              ),
+            ),
           }),
         ),
       }),

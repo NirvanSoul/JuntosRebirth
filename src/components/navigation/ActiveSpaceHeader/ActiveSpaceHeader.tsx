@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   Easing,
   ReduceMotion,
@@ -30,11 +31,18 @@ type ActiveSpaceHeaderProps = {
    * cuando el usuario tiene más de una moneda disponible. */
   currencyFlag?: string;
   onCurrencyPress?: () => void;
+  /** Botón fijo en la esquina derecha, como la campana de avisos. */
+  trailingAction?: ReactNode;
   /**
    * Fotos de los miembros del espacio, la primera delante. Una sola en un
    * espacio personal; dos, solapadas, en uno juntos.
    */
   memberAvatarUris?: readonly (string | null)[];
+  /**
+   * Ancho que se deja libre junto a `trailingAction` para un botón propio de
+   * la pantalla.
+   */
+  trailingInset?: number;
   visible?: boolean;
 };
 
@@ -47,6 +55,8 @@ export function ActiveSpaceHeader({
   currencyFlag,
   onCurrencyPress,
   memberAvatarUris,
+  trailingAction,
+  trailingInset = 0,
   visible = true,
 }: ActiveSpaceHeaderProps) {
   const { showCurrencySymbols } = useCurrencySymbolPreference();
@@ -54,6 +64,7 @@ export function ActiveSpaceHeader({
   const { width } = useWindowDimensions();
   const { colors, shadows } = useTheme();
   const [frontAvatarUri, backAvatarUri] = memberAvatarUris ?? [];
+  const { t } = useTranslation();
   const isSharedSpace = (memberAvatarUris?.length ?? 0) > 1;
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const visibilityProgress = useSharedValue(visible ? 1 : 0);
@@ -88,12 +99,17 @@ export function ActiveSpaceHeader({
         pointerEvents="box-none"
         style={[
           styles.header,
-          { paddingHorizontal: layout.screenGutter[density] },
+          {
+            paddingLeft: layout.screenGutter[density],
+            paddingRight: layout.screenGutter[density],
+          },
         ]}
       >
         <Pressable
-          accessibilityHint="Abre el menú para cambiar o crear un espacio"
-          accessibilityLabel={`Espacio ${spaceName}`}
+          accessibilityHint={t('navigation.spaceHeader.spaceHint')}
+          accessibilityLabel={t('navigation.spaceHeader.spaceLabel', {
+            name: spaceName,
+          })}
           accessibilityRole="button"
           onPress={onSpacePress}
           style={({ pressed }) => [
@@ -126,29 +142,37 @@ export function ActiveSpaceHeader({
           />
         </Pressable>
 
-        {currencyFlag ? (
-          <Pressable
-            accessibilityHint="Cambia la moneda seleccionada"
-            accessibilityLabel={`Moneda seleccionada: ${currencyFlag}`}
-            accessibilityRole="button"
-            onPress={onCurrencyPress}
-            style={({ pressed }) => [
-              styles.currencyButton,
-              pressed ? styles.spaceButtonPressed : null,
-            ]}
-            testID="home-currency-flag-button"
-          >
-            <Text style={styles.currencyFlag}>
-              {showCurrencySymbols
-                ? currencyFlag
-                : currencyFlag === '$'
-                  ? '🇺🇸'
-                  : currencyFlag === 'Bs'
-                    ? '🇻🇪'
-                    : currencyFlag}
-            </Text>
-          </Pressable>
-        ) : null}
+        <View pointerEvents="box-none" style={styles.trailing}>
+          {currencyFlag ? (
+            <Pressable
+              accessibilityHint={t('navigation.spaceHeader.currencyHint')}
+              accessibilityLabel={t('navigation.spaceHeader.currencyLabel', {
+                currency: currencyFlag,
+              })}
+              accessibilityRole="button"
+              onPress={onCurrencyPress}
+              style={({ pressed }) => [
+                styles.currencyButton,
+                pressed ? styles.spaceButtonPressed : null,
+              ]}
+              testID="home-currency-flag-button"
+            >
+              <Text style={styles.currencyFlag}>
+                {showCurrencySymbols
+                  ? currencyFlag
+                  : currencyFlag === '$'
+                    ? '🇺🇸'
+                    : currencyFlag === 'Bs'
+                      ? '🇻🇪'
+                      : currencyFlag}
+              </Text>
+            </Pressable>
+          ) : null}
+          {trailingInset > 0 ? <View style={{ width: trailingInset }} /> : null}
+          {trailingAction ? (
+            <View style={styles.trailingAction}>{trailingAction}</View>
+          ) : null}
+        </View>
       </View>
     </AnimatedSafeAreaView>
   );
@@ -176,14 +200,23 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       flexShrink: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
+      gap: spacing.xs,
       minHeight: layout.minTouchTarget,
       backgroundColor: colors.surface,
       borderColor: colors.border,
       borderWidth: 1,
       borderRadius: radii.round,
-      paddingLeft: spacing.sm,
-      paddingRight: spacing.lg,
+      // A la izquierda, el mismo margen que deja la foto arriba y abajo.
+      paddingLeft: spacing.xs,
+      paddingRight: spacing.md,
+    },
+    trailing: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 0,
+    },
+    trailingAction: {
+      marginLeft: spacing.sm,
     },
     spaceButtonPressed: {
       opacity: 0.72,

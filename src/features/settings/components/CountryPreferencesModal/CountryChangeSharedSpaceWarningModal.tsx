@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
@@ -19,6 +20,8 @@ export function CountryChangeSharedSpaceWarningModal({
   onConfirm,
   visible,
 }: CountryChangeSharedSpaceWarningModalProps) {
+  const { t } = useTranslation();
+
   return (
     <AppModal
       onClose={onCancel}
@@ -28,24 +31,22 @@ export function CountryChangeSharedSpaceWarningModal({
     >
       <View style={styles.content}>
         <Text accessibilityRole="header" variant="heading">
-          Saldrás del espacio compartido
+          {t('settings.countryWarning.title')}
         </Text>
         <Text tone="secondary" variant="body">
-          Al cambiar tu país a {countryName}, dejarás tu espacio compartido
-          actual. Tus finanzas personales no se borrarán y la otra persona
-          conservará el espacio.
+          {t('settings.countryWarning.message', { country: countryName })}
         </Text>
         <View style={styles.actions}>
           <ModalPrimaryAction
-            accessibilityLabel="Cancelar cambio de país"
-            label="Cancelar"
+            accessibilityLabel={t('settings.countryWarning.cancelLabel')}
+            label={t('common.cancel')}
             onPress={onCancel}
             style={styles.action}
             variant="surface"
           />
           <ModalPrimaryAction
-            accessibilityLabel="Cambiar país"
-            label="Cambiar país"
+            accessibilityLabel={t('settings.countryWarning.confirm')}
+            label={t('settings.countryWarning.confirm')}
             onPress={onConfirm}
             style={styles.action}
             variant="cta"

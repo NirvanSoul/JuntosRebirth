@@ -215,6 +215,7 @@ export function CreateFirstCategoryScreen({ navigation }: Props) {
       />
       <CategoryPickerModal
         categories={categories}
+        createTitle="Elige 3 categorías"
         mode="create"
         minimumTemplateSelections={Math.max(1, remainingCategories)}
         onClose={() => setPickerVisible(false)}

@@ -48,11 +48,16 @@ export function buildDemoScenario(input: {
   today: string;
   seed: number;
 }): DemoScenario {
-  const { accountingCurrency, activeCurrencies, countryCode, costScale } =
-    getDemoCurrencyProfile(input.currency);
+  const {
+    accountingCurrency,
+    activeCurrencies,
+    countryCode,
+    costScale,
+    incomeScale,
+  } = getDemoCurrencyProfile(input.currency);
   const isVenezuela = countryCode === 'VE';
   const random = createDemoRandom(input.seed);
-  const amounts = createDemoAmounts(costScale, random);
+  const amounts = createDemoAmounts(costScale, random, incomeScale);
   const calendar = createDemoCalendar(input.today);
   const names = pickOne(random, demoCouples);
   const [selfName, partnerName] =

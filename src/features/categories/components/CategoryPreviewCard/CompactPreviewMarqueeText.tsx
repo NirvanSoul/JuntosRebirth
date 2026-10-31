@@ -3,8 +3,7 @@ import {
   StyleSheet,
   View,
   type LayoutChangeEvent,
-  type NativeSyntheticEvent,
-  type TextLayoutEventData,
+  type TextLayoutEvent,
 } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -85,12 +84,9 @@ export function CompactPreviewMarqueeText({
   const handleViewportLayout = useCallback((event: LayoutChangeEvent) => {
     setViewportWidth(event.nativeEvent.layout.width);
   }, []);
-  const handleTextLayout = useCallback(
-    (event: NativeSyntheticEvent<TextLayoutEventData>) => {
-      setTextWidth(event.nativeEvent.lines[0]?.width ?? 0);
-    },
-    [],
-  );
+  const handleTextLayout = useCallback((event: TextLayoutEvent) => {
+    setTextWidth(event.nativeEvent.lines[0]?.width ?? 0);
+  }, []);
 
   if (reduceMotion) {
     return (
@@ -168,6 +164,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: compactPreviewMarqueeHeight,
     overflow: 'hidden',
+    justifyContent: 'center',
   },
   track: {
     flexDirection: 'row',

@@ -36,7 +36,9 @@ const frozenLineDebt = {
   // `components/overlays/AppModal/useModalChainedAction.ts`.
   'src/features/categories/components/CategoryDetailModal/CategoryDetailModal.tsx': 576,
   'src/features/map/screens/MapScreen.tsx': 597,
-  'src/features/activity/screens/ActivityScreen.tsx': 573,
+  // Bajado de 573 a 555 el 2026-10-24 al extraer los filtros a
+  // `features/activity/hooks/useActivityFilters.ts`.
+  'src/features/activity/screens/ActivityScreen.tsx': 555,
   'src/components/ui/AppCalendar/AppCalendar.tsx': 565,
   'src/features/import/repositories/localImportBatchRepository.ts': 556,
   // `localDatabase.ts` salió de esta lista el 2026-08-17: al extraer el esquema
@@ -46,11 +48,16 @@ const frozenLineDebt = {
   // donut compartido a `components/ui/Charts/DonutBreakdownChart.tsx` bajó de
   // 325 a 73 líneas y ya cumple el umbral general de 400. El componente
   // extraído también.
-  'src/features/activity/components/TransactionFiltersModal.tsx': 536,
+  // Bajado de 536 a 432 el 2026-10-25 al sacar la fecha del modal: se elige
+  // fuera, con el selector de periodo de cada pantalla.
+  'src/features/activity/components/TransactionFiltersModal.tsx': 432,
   'src/features/categories/components/CategoryPickerModal/CategoryPickerModal.tsx': 485,
-  'src/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal.tsx': 441,
+  // Bajado de 441 a 404 el 2026-10-25 al extraer los periodos anteriores a
+  // `OlderPeriodSections.tsx`, el aviso vacío a `PeriodEmptyState.tsx` y el
+  // botón de moneda a `PeriodCurrencyButton.tsx`.
+  'src/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal.tsx': 404,
   'src/features/map/components/WeeklyMovementCalendar.tsx': 439,
-  'src/features/spaces/components/SpaceSideMenu.tsx': 439,
+  'src/features/spaces/components/SpaceSideMenu.tsx': 385,
   'src/features/categories/components/CategoryPreviewCard/CategoryPreviewCard.tsx': 425,
 };
 

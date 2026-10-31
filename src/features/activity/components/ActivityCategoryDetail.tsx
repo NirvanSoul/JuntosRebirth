@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { List } from 'phosphor-react-native/src/icons/List';
-import { SquaresFour } from 'phosphor-react-native/src/icons/SquaresFour';
+import {
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Animated, {
   Easing,
   ReduceMotion,
@@ -11,15 +14,17 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { RowLimitedScroll } from '@/components/layout/RowLimitedScroll/RowLimitedScroll';
 import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { Text } from '@/components/ui/Text/Text';
+import { ViewToggleButton } from '@/components/ui/ViewToggleButton';
 import { getActivityLayoutTransition } from '@/features/activity/components/ActivityCollapsibleSection';
 import { CategoryPreviewCard } from '@/features/categories/components/CategoryPreviewCard/CategoryPreviewCard';
 import type { CategorySummary } from '@/features/categories/utils/categorySummary';
+import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
-import { iconSize, layout } from '@/theme/layout';
+import { layout } from '@/theme/layout';
 import { previewCardLayout } from '@/theme/previewCard';
-import { radii } from '@/theme/radii';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens, ThemeShadows } from '@/theme/types';
@@ -40,6 +45,13 @@ type ActivityCategoryDetailProps = {
 
 type CategoryView = 'grid' | 'list';
 
+/** La cuadrícula muestra tres columnas y, a partir de la cuarta fila, sigue en horizontal. */
+const gridColumns = 3;
+const gridMaxRows = 3;
+const gridTileWidthRatio = 0.315;
+/** La lista agrupa las categorías de cuatro en cuatro; el resto se desliza. */
+const listPageSize = 4;
+
 const categoryViewTiming = {
   duration: motion.categoryViewTransitionDuration,
   easing: Easing.out(Easing.cubic),
@@ -57,8 +69,51 @@ export function ActivityCategoryDetail({
   onOpenCategoryDetail,
   spaceCurrency,
 }: ActivityCategoryDetailProps) {
-  const { colors, shadows } = useTheme();
+  const { shadows } = useTheme();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
+  const { width } = useWindowDimensions();
+  const gutter = layout.screenGutter[useLayoutDensity()];
+  const gridWidth = width - gutter * 2;
+  const gridTileWidth = Math.floor(gridWidth * gridTileWidthRatio);
+  const gridColumnGap = Math.floor(
+    (gridWidth - gridTileWidth * gridColumns) / (gridColumns - 1),
+  );
+  const listPages = Array.from(
+    { length: Math.ceil(categories.length / listPageSize) },
+    (_, page) =>
+      categories.slice(page * listPageSize, (page + 1) * listPageSize),
+  );
+  const isListPaged = listPages.length > 1;
+  // Asoma el borde de la siguiente página para que se note que hay más.
+  const listPageWidth = gridWidth - spacing.xl;
+  const renderListPage = (
+    pageCategories: readonly CategorySummary[],
+    testID?: string,
+  ) => (
+    <View style={styles.group} testID={testID}>
+      {pageCategories.map(({ id, ...category }, index) => (
+        <View key={id}>
+          <CategoryPreviewCard
+            {...category}
+            actionTarget={{ kind: 'category', id }}
+            budgetExpenseMinor={budgetExpenseByCategoryId.get(id) ?? 0}
+            displayCurrency={currency}
+            onPress={() => onOpenCategoryDetail?.(id, currency)}
+            spaceCurrency={spaceCurrency}
+            variant="row"
+          />
+          {index < pageCategories.length - 1 ? (
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              style={styles.separator}
+              testID="activity-category-separator"
+            />
+          ) : null}
+        </View>
+      ))}
+    </View>
+  );
   const [selectedCategoryView, setSelectedCategoryView] =
     useState<CategoryView>(categoryView);
   const [displayedCategoryView, setDisplayedCategoryView] =
@@ -157,78 +212,77 @@ export function ActivityCategoryDetail({
         <Text accessibilityRole="header" variant="label">
           Detalle por categoría
         </Text>
-        <Pressable
+        <ViewToggleButton
           accessibilityHint="Cambia cómo se muestran las categorías"
           accessibilityLabel={
             isGridVisible
               ? 'Cambiar a vista de lista'
               : 'Cambiar a vista de cuadrícula'
           }
-          accessibilityRole="button"
-          hitSlop={spacing.sm}
+          nextView={isGridVisible ? 'list' : 'grid'}
           onPress={toggleCategoryView}
-          style={({ pressed }) => [
-            styles.viewToggle,
-            pressed ? styles.viewTogglePressed : null,
-          ]}
           testID="activity-category-view-toggle"
-        >
-          {isGridVisible ? (
-            <List color={colors.textSecondary} size={iconSize.sm} />
-          ) : (
-            <SquaresFour color={colors.textSecondary} size={iconSize.sm} />
-          )}
-        </Pressable>
+        />
       </View>
       {categories.length > 0 ? (
         <>
           <Animated.View
             layout={getActivityLayoutTransition()}
             style={[
-              displayedGridView ? styles.grid : styles.groupShadow,
+              displayedGridView || isListPaged
+                ? styles.grid
+                : styles.groupShadow,
               categoryViewAnimatedStyle,
             ]}
             testID="activity-category-preview-group"
           >
-            <View
-              style={displayedGridView ? styles.gridContent : styles.group}
-              testID="activity-category-preview-list"
-            >
-              {categories.map(({ id, ...category }, index) =>
-                displayedGridView ? (
+            {displayedGridView ? (
+              <RowLimitedScroll
+                columnGap={gridColumnGap}
+                maxRows={gridMaxRows}
+                rowGap={spacing.md}
+                testID="activity-category-preview-list"
+              >
+                {categories.map(({ id, ...category }) => (
                   <CategoryPreviewCard
                     {...category}
+                    actionTarget={{ kind: 'category', id }}
                     budgetExpenseMinor={budgetExpenseByCategoryId.get(id) ?? 0}
                     displayCurrency={currency}
                     key={id}
                     onPress={() => onOpenCategoryDetail?.(id, currency)}
                     spaceCurrency={spaceCurrency}
+                    style={{ width: gridTileWidth }}
                     variant="grid"
                   />
-                ) : (
-                  <View key={id}>
-                    <CategoryPreviewCard
-                      {...category}
-                      budgetExpenseMinor={
-                        budgetExpenseByCategoryId.get(id) ?? 0
-                      }
-                      displayCurrency={currency}
-                      onPress={() => onOpenCategoryDetail?.(id, currency)}
-                      spaceCurrency={spaceCurrency}
-                      variant="row"
-                    />
-                    {index < categories.length - 1 ? (
-                      <View
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                        style={styles.separator}
-                        testID="activity-category-separator"
-                      />
-                    ) : null}
+                ))}
+              </RowLimitedScroll>
+            ) : isListPaged ? (
+              <ScrollView
+                contentContainerStyle={[
+                  styles.listPages,
+                  { paddingHorizontal: gutter },
+                ]}
+                decelerationRate="fast"
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={listPageWidth + spacing.md}
+                style={[styles.listScroll, { marginLeft: -gutter, width }]}
+                testID="activity-category-preview-list"
+              >
+                {listPages.map((pageCategories) => (
+                  <View
+                    key={pageCategories[0]!.id}
+                    style={[styles.groupShadow, { width: listPageWidth }]}
+                    testID="activity-category-preview-page"
+                  >
+                    {renderListPage(pageCategories)}
                   </View>
-                ),
-              )}
-            </View>
+                ))}
+              </ScrollView>
+            ) : (
+              renderListPage(categories, 'activity-category-preview-list')
+            )}
           </Animated.View>
           {hasBreakdownData ? (
             <View style={styles.createCategoryBadge}>
@@ -261,12 +315,6 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
   return StyleSheet.create({
     createCategoryBadge: { marginTop: spacing.md },
     grid: { width: '100%' },
-    gridContent: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      rowGap: spacing.md,
-    },
     group: {
       overflow: 'hidden',
       backgroundColor: colors.surface,
@@ -274,6 +322,11 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: previewCardLayout.borderRadius,
       borderWidth: 1,
     },
+    listPages: {
+      alignItems: 'flex-start',
+      gap: spacing.md,
+    },
+    listScroll: { flexGrow: 0, overflow: 'visible' },
     groupShadow: {
       ...shadows.subtle,
       borderRadius: previewCardLayout.borderRadius,
@@ -290,13 +343,5 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       height: 1,
       backgroundColor: colors.categoryPreviewBorder,
     },
-    viewToggle: {
-      width: layout.minTouchTarget,
-      height: layout.minTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radii.round,
-    },
-    viewTogglePressed: { backgroundColor: colors.background },
   });
 }

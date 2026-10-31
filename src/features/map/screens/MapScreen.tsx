@@ -14,16 +14,19 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  useReducedMotion,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '@/components/layout/Screen/Screen';
+import { useActivityFilters } from '@/features/activity/hooks/useActivityFilters';
 import type { Category } from '@/features/categories/types';
 import {
   TransactionPeriodModal,
   type TransactionPeriodModalType,
 } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal';
+import { MapFilterButton } from '@/features/map/components/MapFilterButton';
 import { MapCalendarHeader } from '@/features/map/components/MapCalendarHeader';
 import { MapCalendarLoadMore } from '@/features/map/components/MapCalendarLoadMore';
 import { MapDayModal } from '@/features/map/components/MapDayModal';
@@ -38,11 +41,11 @@ import type {
   TransactionType,
 } from '@/features/transactions/types';
 import { projectRecurringTransactions } from '@/features/transactions/utils/transactionRecurrence';
-import { summarizeTransactionTotals } from '@/features/transactions/utils/transactionSummary';
 import {
   getInitialMapCalendarRangeEnd,
   getNextMapCalendarRangeEnd,
 } from '@/features/map/model/calendarRange';
+import { summarizeMapMonthWithComparison } from '@/features/map/model/mapMonthTotals';
 import { indexMapCalendarDays } from '@/features/map/model/mapCalendarDays';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import {
@@ -88,6 +91,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
     ref,
   ) {
     const density = useLayoutDensity();
+    const reduceMotion = useReducedMotion();
     const insets = useSafeAreaInsets();
     const { colors } = useTheme();
     const calendarRef = useRef<WeeklyMovementCalendarHandle>(null);
@@ -104,10 +108,43 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
     const isCalendarResetMountPendingRef = useRef(false);
     const isCalendarResettingRef = useRef(false);
     const [isCalendarResetting, setCalendarResetting] = useState(false);
+    const [previewMode, setPreviewMode] = useState<'cards' | 'pills'>('pills');
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [isDayModalVisible, setDayModalVisible] = useState(false);
     const [periodModalType, setPeriodModalType] =
       useState<TransactionPeriodModalType | null>(null);
+    const filters = useActivityFilters('map');
+    const { authorFilter, matchesMovementFilters } = filters;
+    // Filtrar antes de proyectar basta: cada recurrencia proyectada copia el
+    // tipo, la categoría, la recurrencia y el autor de su plantilla.
+    const filteredTransactions = useMemo(
+      () => transactions.filter(matchesMovementFilters),
+      [matchesMovementFilters, transactions],
+    );
+    const previewTransitionOpacity = useSharedValue(1);
+    const previewTransitionY = useSharedValue(0);
+    const previewTransitionStyle = useAnimatedStyle(() => ({
+      opacity: previewTransitionOpacity.value,
+      transform: [{ translateY: previewTransitionY.value }],
+    }));
+    const handleApplyPreviewMode = useCallback(
+      (nextMode: 'cards' | 'pills') => {
+        if (nextMode === previewMode) return;
+        if (!reduceMotion) {
+          previewTransitionOpacity.set(0.72);
+          previewTransitionY.set(spacing.xs);
+          const timing = {
+            duration: motion.calendarMonthNavigationFadeOutDuration,
+            easing: Easing.out(Easing.cubic),
+            reduceMotion: ReduceMotion.System,
+          };
+          previewTransitionOpacity.set(withTiming(1, timing));
+          previewTransitionY.set(withTiming(0, timing));
+        }
+        setPreviewMode(nextMode);
+      },
+      [previewMode, previewTransitionOpacity, previewTransitionY, reduceMotion],
+    );
     const calendarResetOpacity = useSharedValue(1);
     const calendarNavigationTranslateY = useSharedValue(0);
     const calendarResetStyle = useAnimatedStyle(() => ({
@@ -120,10 +157,10 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
     const visibleTransactions = useMemo(
       () =>
         projectRecurringTransactions({
-          transactions,
+          transactions: filteredTransactions,
           endOn: calendarRangeEndDate,
         }),
-      [calendarRangeEndDate, transactions],
+      [filteredTransactions, calendarRangeEndDate],
     );
     const calendarDays = useMemo(
       () => indexMapCalendarDays(visibleTransactions),
@@ -136,14 +173,14 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
           : [],
       [calendarDays, selectedDate],
     );
-    const focusedMonthTotals = useMemo(
+    // El balance arrastra lo que sobró o se debe de los meses anteriores para
+    // mostrar el dinero disponible al cerrar el mes enfocado.
+    const focusedMonthSummary = useMemo(
       () =>
-        summarizeTransactionTotals(
-          visibleTransactions.filter(
-            (transaction) =>
-              transaction.currency === currency &&
-              transaction.occurredOn.startsWith(`${focusedMonth}-`),
-          ),
+        summarizeMapMonthWithComparison(
+          visibleTransactions,
+          currency,
+          focusedMonth,
         ),
       [currency, focusedMonth, visibleTransactions],
     );
@@ -351,7 +388,8 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
             onBalancePress={() => setPeriodModalType('balance')}
             onExpensePress={() => setPeriodModalType('expense')}
             onIncomePress={() => setPeriodModalType('income')}
-            totals={focusedMonthTotals}
+            comparisons={focusedMonthSummary.comparisons}
+            totals={focusedMonthSummary.totals}
           />
 
           <Animated.View
@@ -363,21 +401,33 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
             ]}
             testID="map-calendar-viewport"
           >
-            <WeeklyMovementCalendar
-              ref={calendarRef}
-              categories={categories}
-              currentDate={today}
-              days={calendarDays}
-              footer={calendarLoadMore}
-              onFocusedMonthChange={handleFocusedMonthChange}
-              onOpenTransactionDetail={onOpenTransactionDetail}
-              onSelectDate={handleSelectDate}
-              rangeEndDate={calendarRangeEndDate}
-              selectedDate={selectedDate ?? undefined}
-              testID="map-weekly-calendar"
-              today={today}
-            />
+            <Animated.View
+              style={[styles.previewContent, previewTransitionStyle]}
+            >
+              <WeeklyMovementCalendar
+                ref={calendarRef}
+                categories={categories}
+                currentDate={today}
+                days={calendarDays}
+                footer={calendarLoadMore}
+                onFocusedMonthChange={handleFocusedMonthChange}
+                onOpenTransactionDetail={onOpenTransactionDetail}
+                onSelectDate={handleSelectDate}
+                previewMode={previewMode}
+                rangeEndDate={calendarRangeEndDate}
+                testID="map-weekly-calendar"
+                today={today}
+              />
+            </Animated.View>
           </Animated.View>
+
+          <MapFilterButton
+            categories={categories}
+            currency={currency}
+            filters={filters}
+            previewMode={previewMode}
+            onApplyPreviewMode={handleApplyPreviewMode}
+          />
 
           {returnDirection ? (
             <MapReturnToToday
@@ -401,7 +451,9 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
 
         {periodModalType ? (
           <TransactionPeriodModal
+            carryOverBalance
             categories={categories}
+            initialAuthor={authorFilter.author}
             initialCurrency={currency}
             initialDate={focusedMonthDate}
             onAdd={() => {
@@ -417,7 +469,7 @@ export const MapScreen = forwardRef<MapScreenHandle, MapScreenProps>(
               setPeriodModalType(null);
               onOpenTransactionDetail?.(transactionId);
             }}
-            transactions={transactions}
+            transactions={filteredTransactions}
             type={periodModalType}
             visible
           />
@@ -433,6 +485,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.none,
     paddingBottom: spacing.none,
   },
+  previewContent: { flex: 1 },
   calendarViewport: {
     flex: 1,
     position: 'relative',

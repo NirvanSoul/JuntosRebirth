@@ -32,6 +32,7 @@ function startupInput() {
   return {
     refreshSharedCoupleData: jest.fn(async () => undefined),
     reloadLocalFinance: jest.fn(async () => undefined),
+    reloadCurrencyPreferences: jest.fn(async () => undefined),
     reloadSpaces: jest.fn(async () => undefined),
     session,
     setNotificationRules: jest.fn(),

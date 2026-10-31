@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import { createJuntossInvitationGateway } from '@/features/spaces/gateways/juntossInvitationGateway';
@@ -17,6 +17,7 @@ import {
   type Space,
   type SpacesState,
 } from '@/features/spaces/types';
+import { mergeRemoteCoupleSpace } from '@/features/spaces/utils/mergeRemoteCoupleSpace';
 import { projectSpacesForSession } from '@/features/spaces/utils/sessionSpaceProjection';
 import {
   fetchRemoteCoupleSpace,
@@ -51,62 +52,12 @@ type SpacesController = {
 };
 
 /**
- * Fusiona el espacio de pareja remoto (o su ausencia) con el catálogo local.
- * Si existe uno remoto, reemplaza o añade la entrada local `type: 'couple'`.
- * Si no existe (nunca se creó, o se disolvió), retira cualquier entrada
- * local `couple` que hubiera quedado obsoleta, cayendo al espacio Personal
- * si esa era la selección activa. Devuelve la misma referencia de `current`
- * cuando no hay nada que cambiar, para que el llamador sepa si debe
- * persistir.
+ * Un catálogo publicado igual al que ya se muestra no debe sustituirlo: cada
+ * lectura de disco trae objetos nuevos y repintaba toda la pantalla principal
+ * justo después de cambiar de espacio.
  */
-function mergeRemoteCoupleSpace(
-  current: SpacesState,
-  remoteSpace: Space | null,
-): SpacesState {
-  const localCoupleSpace = current.spaces.find(
-    (space) => space.type === 'couple',
-  );
-
-  if (remoteSpace) {
-    if (
-      localCoupleSpace &&
-      localCoupleSpace.id === remoteSpace.id &&
-      localCoupleSpace.name === remoteSpace.name &&
-      localCoupleSpace.currency === remoteSpace.currency &&
-      (localCoupleSpace.isAwaitingPartner ?? false) ===
-        remoteSpace.isAwaitingPartner
-    ) {
-      return current;
-    }
-
-    const withoutStaleCouple = current.spaces.filter(
-      (space) => space.type !== 'couple' || space.id === remoteSpace.id,
-    );
-    const alreadyPresent = withoutStaleCouple.some(
-      (space) => space.id === remoteSpace.id,
-    );
-    const nextSpaces = alreadyPresent
-      ? withoutStaleCouple.map((space) =>
-          space.id === remoteSpace.id ? remoteSpace : space,
-        )
-      : [...withoutStaleCouple, remoteSpace];
-
-    return { ...current, spaces: nextSpaces };
-  }
-
-  if (!localCoupleSpace) {
-    return current;
-  }
-
-  const nextSpaces = current.spaces.filter(
-    (space) => space.id !== localCoupleSpace.id,
-  );
-  const nextActiveSpaceId =
-    current.activeSpaceId === localCoupleSpace.id
-      ? resolvePersonalSpaceId(nextSpaces)
-      : current.activeSpaceId;
-
-  return { activeSpaceId: nextActiveSpaceId, spaces: nextSpaces };
+function isSameSpacesState(a: SpacesState, b: SpacesState): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
 export function useSpaces(): SpacesController {
@@ -115,11 +66,23 @@ export function useSpaces(): SpacesController {
   const [error, setError] = useState<string | null>(null);
   const { isReady: isAuthReady, session } = useAuthSession();
   const userId = session?.user.id ?? null;
+  // Selección ya pintada que aún se está guardando: una escritura anterior de
+  // la cola no debe devolver la pantalla al espacio de antes.
+  const pendingActiveSpaceId = useRef<string | null>(null);
 
   useEffect(
     () =>
       subscribeToSpaces((stored) => {
-        setState(stored);
+        const pending = pendingActiveSpaceId.current;
+        const next =
+          pending !== null &&
+          stored.activeSpaceId !== pending &&
+          stored.spaces.some((space) => space.id === pending)
+            ? { ...stored, activeSpaceId: pending }
+            : stored;
+        setState((current) =>
+          isSameSpacesState(current, next) ? current : next,
+        );
       }),
     [],
   );
@@ -286,6 +249,15 @@ export function useSpaces(): SpacesController {
   );
 
   const selectSpace = useCallback(async (spaceId: string): Promise<void> => {
+    // Se pinta ya: esperar a guardar en disco retrasaba el cambio de espacio.
+    // Lo guardado sigue siendo la fuente de verdad y lo corrige si hace falta.
+    pendingActiveSpaceId.current = spaceId;
+    setState((current) =>
+      current.activeSpaceId !== spaceId &&
+      current.spaces.some((space) => space.id === spaceId)
+        ? { ...current, activeSpaceId: spaceId }
+        : current,
+    );
     try {
       await updateSpaces((stored) => {
         if (!stored.spaces.some((space) => space.id === spaceId)) {
@@ -297,6 +269,13 @@ export function useSpaces(): SpacesController {
           : { ...stored, activeSpaceId: spaceId };
       });
     } catch (caught) {
+      if (pendingActiveSpaceId.current === spaceId) {
+        pendingActiveSpaceId.current = null;
+      }
+      // Sin guardar, se vuelve a lo que hay en disco.
+      void loadSpaces()
+        .then(setState)
+        .catch(() => undefined);
       if (
         caught instanceof Error &&
         caught.message === 'El espacio seleccionado no existe.'
@@ -306,6 +285,9 @@ export function useSpaces(): SpacesController {
       const message = 'No pudimos guardar el cambio. Inténtalo de nuevo.';
       setError(message);
       throw new Error(message);
+    }
+    if (pendingActiveSpaceId.current === spaceId) {
+      pendingActiveSpaceId.current = null;
     }
     setError(null);
   }, []);

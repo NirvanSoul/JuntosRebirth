@@ -160,7 +160,17 @@ un tick inmediato y retomando la cadencia normal al volver al primer plano o rec
 Si esa inicialización falla, la caché sigue en pantalla y `NoticeToast` (único
 aviso global: confirmaciones, avisos recuperables y sin conexión, con tono y
 acción opcional) ofrece "Reintentar"; sin conexión se reintenta también al
-recuperar la red, y un 401 cierra sesión sin aviso.
+recuperar la red (aunque el aviso ya se haya retirado), y un 401 cierra sesión
+sin aviso.
+
+`SyncIssueToast` reúne el estado de red y de sincronización en un único aviso
+arriba. Sin conexión (al abrir o al perderla en uso, tras 1,5 s para ignorar
+cortes breves, o cuando una petición falla por red) muestra una tarjeta
+`persistent` con wifi tachado que explica que los cambios se guardan en el
+dispositivo y se subirán al reconectar; tocarla la oculta hasta el siguiente
+corte y queda por debajo de los avisos breves. Al volver la red confirma
+"Conexión recuperada". `useNetworkAvailability` comparte una sola suscripción
+nativa (`expo-network`) entre todos sus consumidores.
 
 ### Diagnóstico de arranque y optimización de bundle
 
@@ -368,6 +378,18 @@ Reglas de rendimiento de las hojas:
 - Una hoja de detalle conserva su entidad hasta `onDismissed`, para animar el cierre en lugar de desmontarse de golpe.
 - Las listas de movimientos dentro de hojas usan `TransactionPreviewList` con `progressive`: la hoja se monta con las primeras filas y el resto llega en un render diferido.
 - En iOS, `AppModal` usa `motion.sheetSpring`, que da el cierre por terminado cuando falta ~1 px, para que `onDismissed` no llegue cientos de milisegundos después de que la hoja dejó de verse.
+- Un cierre por gesto se notifica al padre con `onClose` en cuanto empieza a animarse (`onAnimate`), sin esperar a `onDismiss`. La librería solo emite `onDismiss` si la animación termina completa; cuando se interrumpía, el padre se quedaba con `visible` en `true` y la hoja no volvía a abrirse.
+
+Acciones de pulsación larga de las tarjetas (`PRODUCT.md` §14):
+
+- `components/overlays/PreviewActions/` es genérico: tipos de acción (`run`, `confirm`, `copyToSpace`), geometría del arco y la superposición visual. No conoce el dominio.
+- `navigation/components/PreviewActionsLayer` envuelve pestañas y hojas, publica en un contexto solo la función de apertura (con identidad fija, para no repintar las tarjetas) y pinta la superposición en el host de portal `preview-actions` de la raíz. Ese host es hermano de las hojas, con `zIndex` y `elevation` entre la capa de hojas y los avisos.
+- Lo que se pinta en un portal pierde los contextos de la pantalla: la capa reinyecta la preferencia de símbolos de moneda y el censo del espacio (`SpaceMembershipScope`) para que la copia elevada sea idéntica a la tarjeta.
+- `navigation/previewItemActions` decide las acciones de cada movimiento o categoría con las mismas reglas y los mismos textos que los detalles (`transactionActionCopy`, `categoryActionCopy`).
+- Coste en reposo mínimo: ninguna tarjeta crea valores animados ni efectos. La superposición solo se monta al abrirse, y sus animaciones (`Keyframe` de Reanimated en el hilo de UI) respetan el movimiento reducido.
+- Selección múltiple: `previewSelection` es un almacén externo (`useSyncExternalStore`). Cada tarjeta horizontal de movimiento se suscribe solo a su propio estado (`off`, `disabled`, `selected`, `unselected`), así marcar una no repinta las demás. Si una tarjeta admite la acción se resuelve una vez por selección con el mismo `resolveActions`. `PreviewSelectionFrame` abre el círculo y encoge la tarjeta con transiciones CSS de Reanimated, que no crean valores animados en reposo, y `PreviewSelectionBar` se pinta en el mismo portal que la superposición.
+- `resolveActions` recibe `{ kind, ids }`: un elemento tras la pulsación larga o varios movimientos desde la selección. Varios se eliminan uno tras otro con el manejador individual y se copian con `useCopyToSpace`, que encadena las categorías creadas y muestra un solo aviso.
+- El desenfoque es el mismo `BlurScrim` del fondo de las hojas.
 
 ---
 
@@ -389,6 +411,9 @@ Los hooks de categorías o movimientos viven en su feature.
 Servicios transversales:
 
 - Analítica.
+- Anuncios (`ads/mobileAds.ts`): carga diferida de AdMob como Clarity, para
+  que Expo Go siga funcionando; reúne el consentimiento UMP, inicializa el SDK
+  y carga el anuncio nativo de Inicio (`features/ads`).
 - Crash reporting.
 - Notificaciones.
 - Logging.
@@ -404,10 +429,60 @@ src/lib/
 ├── storage/
 ├── dates/
 ├── currency/
+├── i18n/
 └── validation/
 ```
 
 El resto de la app no debe depender directamente de detalles complejos de configuración de proveedores.
+
+#### Idiomas (`src/lib/i18n/`)
+
+- `i18next` + `react-i18next`, con una instancia propia inicializada al
+  importar `i18n.ts` (desde `AppProviders` y `src/test/setup.ts`).
+- Idiomas admitidos: español (referencia) e inglés. `locales/es.ts` define las
+  claves y `locales/en.ts` debe cubrirlas todas: una clave ausente no compila,
+  y `t()` está tipado con esas claves.
+- Sin elección guardada se sigue el idioma del dispositivo (`expo-localization`);
+  si no está admitido, español. La elección se guarda en el dispositivo, no en
+  la cuenta, porque el onboarding la pide antes de que exista sesión.
+  `AppBootstrap` la restaura antes de pintar la primera pantalla.
+- Solo se traduce lo que ve el usuario. Los logs, los errores internos y los
+  datos sincronizados se quedan en español.
+
+Los componentes escriben sus textos en español y **no cambian para
+traducirse**. La traducción se enlaza fuera de ellos:
+
+- `dictionary/en.ts` reúne, por áreas (`dictionary/en/*.ts`), el texto en
+  inglés indexado por el texto español tal como aparece en el código. Las
+  frases con partes variables usan marcadores: `'Cambiar fecha: {{date}}'`.
+  Un texto nuevo se traduce añadiéndolo al archivo de su área.
+- `translateText` resuelve un texto por coincidencia exacta, después por
+  patrón (los valores capturados también se traducen), por fechas con nombres
+  de días y meses, y por segmentos de etiquetas como «🇪🇸  España · EUR».
+  Sin traducción devuelve el texto original. En español no hace nada.
+- `babel.config.js` usa `jsxImportSource: '@/lib/i18n/jsx'` solo para `src/`
+  y `App.tsx`: ese runtime traduce `children`, `accessibilityLabel`,
+  `accessibilityHint` y `placeholder` antes de delegar en el de React. Las
+  dependencias conservan el runtime de React para no crear un ciclo con
+  `react-native`.
+- Lo que no pasa por JSX se enlaza aparte: `installTranslationHooks` envuelve
+  `Alert.alert` y `AccessibilityInfo.announceForAccessibility`, y
+  `localNotifications` traduce título y cuerpo al programar.
+- Al cambiar de idioma, `RootNavigator` vuelve a montar la navegación en la
+  misma pantalla para que todo se pinte otra vez. Por eso el onboarding aplica
+  el idioma elegido al continuar, no al tocar la opción.
+- Ajustes, el selector de idioma y la pantalla de país del onboarding usan
+  `useTranslation()` con las claves de `locales/` (primera entrega); el resto
+  de la app usa el diccionario.
+- Fechas: el código formatea con `Intl.DateTimeFormat('es-ES')`.
+  `installDateLocale` (primer import de `index.ts` y de `src/test/setup.ts`)
+  hace que ese locale signifique «idioma activo», eligiéndolo al formatear:
+  en inglés salen «October 3, 2026» y «10/03/2026», también en los
+  formateadores creados al cargar un módulo. Las horas `HH:mm` se muestran en
+  12 h («8:05 PM») y las fechas compuestas a mano se reordenan por patrón.
+- Pendiente: los importes siguen el formato numérico `es-ES` (`1.234,56`); el
+  texto legal en inglés es una traducción de referencia y el español es el
+  vinculante.
 
 ---
 
@@ -599,6 +674,25 @@ La frontera remota vive en `src/services/api/` y la coordinación de migración
 en `src/features/sync/`. La UI no importa el cliente: una vez exista sesión,
 llama al caso de uso autenticado, que prepara el lote SQLite, lo envía mediante
 un gateway y confirma localmente los conteos.
+
+El presupuesto de una categoría es por moneda y vive en `category_budgets`,
+una fila por categoría y moneda (versión local 35): `budget_minor`, `period`
+(`month`, `week`, `fortnight` o `custom`), `interval_days` y `anchor_on` para
+el personalizado, `overrides_json` con los importes de periodos concretos e
+`history_json` con los tramos anteriores cuando la periodicidad cambia desde
+un periodo; el periodo frontera se recorta para que los tramos no se solapen.
+En el dominio es `Category.budgets[moneda]`. Las columnas `budget_*` de
+`categories` (versiones 33 y 34) son herencia de cuando el presupuesto era
+solo de la moneda del espacio: `migrateLegacyCategoryBudgets` las mueve una
+vez a esa moneda —que solo se conoce en AsyncStorage— y las vacía. Guardar un
+presupuesto marca la categoría como pendiente, y `syncCoupleSpaceData` sube
+todos sus presupuestos en `budgets[]`; el servidor los reescribe enteros en su
+`category_budgets` (`period`, `interval_days`, `anchor_on`, `overrides`,
+`history`). Al bajar, los presupuestos remotos sustituyen a los locales solo
+si la fila de la categoría se aplicó, es decir, si no había cambios locales
+sin subir. Los cálculos de periodo están en
+`features/categories/utils/categoryBudgetPeriod.ts`, que reutiliza los
+periodos de Actividad para mensual, semanal y quincenal.
 
 ### 16.1 Usuario demo de desarrollo
 

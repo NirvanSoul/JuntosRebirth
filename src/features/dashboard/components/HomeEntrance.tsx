@@ -4,16 +4,26 @@ import Animated from 'react-native-reanimated';
 import { getStartupEntering } from '@/theme/transitions';
 
 type HomeEntranceProps = PropsWithChildren<{
+  /**
+   * Cuando cambia, cada bloque vuelve a montarse y repite su entrada. Solo
+   * debe cambiar con el espacio: los datos del mismo espacio se actualizan
+   * sin remontar.
+   */
+  revealKey?: string;
   startIndex?: number;
 }>;
 
 /** Cada bloque entra por separado; el orden permanece estable al actualizar datos. */
-export function HomeEntrance({ children, startIndex = 0 }: HomeEntranceProps) {
+export function HomeEntrance({
+  children,
+  revealKey,
+  startIndex = 0,
+}: HomeEntranceProps) {
   return Children.map(children, (child, index) =>
     child == null ? null : (
       <Animated.View
         entering={getStartupEntering(startIndex + index)}
-        key={index}
+        key={revealKey === undefined ? index : `${revealKey}:${index}`}
       >
         {child}
       </Animated.View>

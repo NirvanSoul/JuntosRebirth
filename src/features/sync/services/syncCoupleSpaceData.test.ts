@@ -10,6 +10,10 @@ jest.mock('@/lib/storage/localIdentity');
 jest.mock('@/features/sync/gateways/juntossCoupleSpaceSyncGateway');
 jest.mock('@/features/legal/services/authenticatedUser');
 jest.mock('@/features/sync/repositories/localRemoteEntityLinkRepository');
+jest.mock(
+  '@/features/categories/repositories/localCategoryBudgetRepository',
+  () => ({ migrateLegacyCategoryBudgets: jest.fn(async () => undefined) }),
+);
 
 describe('syncSpaceDataForCurrentSession', () => {
   const getAllAsync = jest.fn();
@@ -44,7 +48,6 @@ describe('syncSpaceDataForCurrentSession', () => {
           name: 'Casa',
           icon: 'home',
           colorToken: 'blue',
-          budgetMinor: null,
           isDefault: 0,
           templateKey: null,
           isArchived: 0,
@@ -56,12 +59,23 @@ describe('syncSpaceDataForCurrentSession', () => {
         {
           category_id: 'category-a',
           currency: 'EUR',
-          budgetAmountMinor: 30000,
+          budget_minor: 30000,
+          period: 'custom',
+          interval_days: 10,
+          anchor_on: '2026-08-01',
+          overrides_json:
+            '[{"periodStartOn":"2026-08-11","amountMinor":45000}]',
+          history_json: '[]',
         },
         {
           category_id: 'category-a',
           currency: 'VES',
-          budgetAmountMinor: 900000,
+          budget_minor: 900000,
+          period: 'month',
+          interval_days: null,
+          anchor_on: null,
+          overrides_json: '[]',
+          history_json: '[]',
         },
       ])
       .mockResolvedValueOnce([
@@ -118,11 +132,28 @@ describe('syncSpaceDataForCurrentSession', () => {
           remoteId: 'category-a',
           isDefault: false,
           isArchived: false,
-          // Los presupuestos por moneda viajan con su categoría: hasta ahora
-          // no salían nunca del dispositivo y se perdían al cambiar de móvil.
+          // Cada moneda viaja con su propio presupuesto y su periodicidad.
           budgets: [
-            { currency: 'EUR', budgetAmountMinor: 30000 },
-            { currency: 'VES', budgetAmountMinor: 900000 },
+            {
+              currency: 'EUR',
+              budgetAmountMinor: 30000,
+              period: 'custom',
+              intervalDays: 10,
+              anchorOn: '2026-08-01',
+              overrides: [
+                { periodStartOn: '2026-08-11', budgetAmountMinor: 45000 },
+              ],
+              history: [],
+            },
+            {
+              currency: 'VES',
+              budgetAmountMinor: 900000,
+              period: 'month',
+              intervalDays: null,
+              anchorOn: null,
+              overrides: [],
+              history: [],
+            },
           ],
         }),
       ],

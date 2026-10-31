@@ -54,8 +54,9 @@ async function seedSpace(
   plan: DemoSpacePlan,
 ): Promise<SeededSpace> {
   const categories = await createLocalCategories(
-    plan.categories.map(({ key: _key, ...category }) => ({
+    plan.categories.map(({ key: _key, budgetMinor, ...category }) => ({
       ...category,
+      ...(budgetMinor ? { budgets: { [currency]: { budgetMinor } } } : {}),
       spaceId,
     })),
   );

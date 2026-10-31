@@ -2,6 +2,7 @@ import { PendingInvitationBanner } from '@/features/spaces/components/PendingInv
 import { AwaitingPartnerScreen } from '@/features/spaces/screens/AwaitingPartnerScreen';
 import { InvitePartnerScreen } from '@/features/spaces/screens/InvitePartnerScreen';
 import type { Space } from '@/features/spaces/types';
+import { HomeNativeAdCard } from '@/features/ads/components/HomeNativeAdCard/HomeNativeAdCard';
 import { HomeScreen } from '@/features/dashboard/screens/HomeScreen';
 import type { Category } from '@/features/categories/types';
 import type { MoneyAccount } from '@/features/accounts/types';
@@ -84,6 +85,7 @@ export function HomeTabContent({
     />
   ) : (
     <HomeScreen
+      adContent={<HomeNativeAdCard />}
       categories={activeSpaceCategories}
       currency={effectiveHomeCurrency}
       focusResetKey={focusResetKey}
@@ -99,9 +101,8 @@ export function HomeTabContent({
       onViewAccounts={() => navigateToActivitySection('accounts')}
       onViewCategories={() => navigateToActivitySection('categories')}
       onViewMovements={() => navigateToActivitySection('movements')}
-      revealKey={`${activeSpace.id}:${effectiveHomeCurrency}`}
+      revealKey={activeSpace.id}
       showComparisonIndicators={showHomeComparisonIndicators}
-      spaceCurrency={activeSpace.currency}
       transactions={activeSpaceTransactions}
     />
   );

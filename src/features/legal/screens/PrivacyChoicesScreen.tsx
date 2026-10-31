@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import {
+  SettingsRow,
   SettingsSection,
   SettingsToggleRow,
 } from '@/components/layout/SettingsList/SettingsList';
@@ -16,6 +17,10 @@ import {
   restoreAnalyticsPreference,
   updateAnalyticsPreference,
 } from '@/features/legal/services/analyticsPreferenceService';
+import {
+  isAdsPrivacyOptionsRequired,
+  showAdsPrivacyOptions,
+} from '@/services/ads/mobileAds';
 import { categoryColors } from '@/theme/categoryColors';
 import { spacing } from '@/theme/spacing';
 import { useThemedStyles } from '@/theme/useThemedStyles';
@@ -42,12 +47,14 @@ export function PrivacyChoicesScreen({
     }),
   );
   const [showAmounts, setShowAmounts] = useState(true);
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
+  const [adsPrivacyRequired, setAdsPrivacyRequired] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     void getShowAmountsInNotifications().then(setShowAmounts);
     void restoreAnalyticsPreference().then(setAnalyticsEnabled);
+    void isAdsPrivacyOptionsRequired().then(setAdsPrivacyRequired);
   }, [visible]);
 
   const handleToggle = (next: boolean) => {
@@ -109,8 +116,19 @@ export function PrivacyChoicesScreen({
             Microsoft Clarity procesa estos datos para crear métricas, mapas de
             interacción y reproducciones técnicas. Juntos no envía tu correo ni
             identificador de cuenta; Clarity genera un identificador técnico del
-            dispositivo. Puedes retirar el consentimiento en cualquier momento.
+            dispositivo. Está activado por defecto y puedes desactivarlo en
+            cualquier momento.
           </Text>
+          {adsPrivacyRequired ? (
+            <SettingsSection icon="megaphone-outline" title="Anuncios">
+              <SettingsRow
+                icon="options-outline"
+                iconBackgroundColor={categoryColors.blue}
+                label="Gestionar consentimiento de anuncios"
+                onPress={() => void showAdsPrivacyOptions()}
+              />
+            </SettingsSection>
+          ) : null}
         </View>
       </View>
     </AppModal>

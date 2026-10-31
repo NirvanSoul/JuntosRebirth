@@ -2,11 +2,20 @@ import {
   applyCurrencySymbol,
   type CurrencyCode,
 } from '@/lib/currency/currencyCatalog';
+import { getAppLocale } from '@/lib/i18n/i18n';
 
 export type FormatCurrencyOptions = {
   omitZeroDecimals?: boolean;
   showCurrencySymbol?: boolean;
 };
+
+/**
+ * El código formatea importes con `'es-ES'`, el locale de referencia: se
+ * resuelve aquí al idioma activo para que en inglés salga `1,234.56`.
+ */
+function resolveDisplayLocale(locale: string): string {
+  return locale === 'es-ES' ? getAppLocale() : locale;
+}
 
 // Crear un `Intl.NumberFormat` es caro en Hermes y estas funciones se llaman
 // por cada fila en cada render: se reutiliza uno por locale y decimales.
@@ -97,9 +106,10 @@ function enforceGrouping(
 export function formatCurrency(
   amountMinor: number,
   currency: CurrencyCode,
-  locale: string,
+  requestedLocale: string,
   options: FormatCurrencyOptions = {},
 ): string {
+  const locale = resolveDisplayLocale(requestedLocale);
   if (!Number.isSafeInteger(amountMinor)) {
     throw new Error('El importe debe ser un entero seguro en unidades menores');
   }
@@ -131,9 +141,10 @@ export function formatExchangeRate(
   rate: string,
   baseCurrency: CurrencyCode,
   quoteCurrency: CurrencyCode,
-  locale: string,
+  requestedLocale: string,
   options: Pick<FormatCurrencyOptions, 'showCurrencySymbol'> = {},
 ): string {
+  const locale = resolveDisplayLocale(requestedLocale);
   const rateValue = Number(rate);
   if (!Number.isFinite(rateValue)) {
     throw new Error('La tasa debe ser un número válido');

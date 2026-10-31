@@ -3,6 +3,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   ScrollView,
+  type ScrollViewInstance,
   StyleSheet,
   View,
   type ViewStyle,
@@ -24,7 +25,7 @@ type ScreenProps = PropsWithChildren<{
   onScrollDirectionChange?: (direction: 'down' | 'up') => void;
   /** A menos de una pantalla del final; una vez por cada altura de contenido. */
   onEndReached?: () => void;
-  scrollRef?: RefObject<ScrollView | null>;
+  scrollRef?: RefObject<ScrollViewInstance | null>;
   scrollable?: boolean;
   stickyHeaderIndices?: number[];
   testID?: string;

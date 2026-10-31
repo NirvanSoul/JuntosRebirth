@@ -1,5 +1,6 @@
 import { EnvelopeSimple } from 'phosphor-react-native/src/icons/EnvelopeSimple';
 import { ShieldCheck } from 'phosphor-react-native/src/icons/ShieldCheck';
+import { useTranslation } from 'react-i18next';
 
 import {
   SettingsDivider,
@@ -20,19 +21,24 @@ export function SettingsHelpSection({
   onOpenPrivacy,
   onRestartOnboarding,
 }: SettingsHelpSectionProps) {
+  const { t } = useTranslation();
+
   return (
-    <SettingsSection icon="help-circle-outline" title="Ayuda">
+    <SettingsSection
+      icon="help-circle-outline"
+      title={t('settings.sections.help')}
+    >
       <SettingsRow
         iconComponent={EnvelopeSimple}
         iconBackgroundColor={categoryColors.brown}
-        label="Contactar con el desarrollador"
+        label={t('settings.rows.contactDeveloper')}
         onPress={onContactDeveloper}
       />
       <SettingsDivider />
       <SettingsRow
         iconComponent={ShieldCheck}
         iconBackgroundColor={categoryColors.violet}
-        label="Política de privacidad"
+        label={t('settings.rows.privacyPolicy')}
         onPress={onOpenPrivacy}
       />
       <SettingsDivider />

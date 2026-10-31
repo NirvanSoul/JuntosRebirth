@@ -47,7 +47,7 @@ export function buildCoupleScenario({
   // Aportes y gastos fijos de la casa.
   add({
     type: 'income',
-    amountMinor: amounts.round(1000),
+    amountMinor: amounts.income(850),
     title: `Aporte de ${selfName}`,
     categoryKey: 'contributions',
     accountKey: 'joint',
@@ -57,7 +57,7 @@ export function buildCoupleScenario({
   });
   add({
     type: 'income',
-    amountMinor: amounts.round(1100),
+    amountMinor: amounts.income(1000),
     title: `Aporte de ${partnerName}`,
     categoryKey: 'contributions',
     accountKey: 'joint',
@@ -67,7 +67,7 @@ export function buildCoupleScenario({
   });
   add({
     type: 'expense',
-    amountMinor: amounts.round(950),
+    amountMinor: amounts.round(800),
     title: 'Alquiler',
     categoryKey: 'housing',
     accountKey: 'joint',
@@ -258,7 +258,7 @@ export function buildCoupleScenario({
     note: `Vacunas de ${petName}`,
   });
   const trip: [string, number, DemoAuthor][] = [
-    ['Hotel de la escapada', 240, 'partner'],
+    ['Hotel de la escapada', 160, 'partner'],
     ['Gasolina del viaje', 55, 'partner'],
     ['Cena frente al mar', 64, 'self'],
     ['Excursión en barco', 48, 'self'],
@@ -296,7 +296,7 @@ export function buildCoupleScenario({
   });
   add({
     type: 'expense',
-    amountMinor: amounts.round(180),
+    amountMinor: amounts.round(120),
     title: 'Reserva casa rural',
     categoryKey: 'travel',
     accountKey: 'vacation',
@@ -307,7 +307,7 @@ export function buildCoupleScenario({
   });
   add({
     type: 'expense',
-    amountMinor: amounts.round(320),
+    amountMinor: amounts.round(240),
     title: 'Vuelos para las fiestas',
     categoryKey: 'travel',
     accountKey: 'vacation',

@@ -64,6 +64,7 @@
     },
     "android": {
       "package": "com.juntosapp.finance",
+      "versionCode": 2,
       "predictiveBackGestureEnabled": true
     },
     "assetBundlePatterns": ["**/*"],
@@ -100,7 +101,15 @@
           "iosUrlScheme": "com.googleusercontent.apps.518884531876-sb1bhtaksbglhg780gqadvjmcl4j03n2"
         }
       ],
-      "./plugins/withIosBuildFixes"
+      "./plugins/withIosBuildFixes",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-1780084292132285~6367426702",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "reactCompiler": true

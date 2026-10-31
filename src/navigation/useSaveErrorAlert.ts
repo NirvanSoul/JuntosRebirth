@@ -1,11 +1,14 @@
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 export function useSaveErrorAlert(): () => void {
+  const { t } = useTranslation();
+
   return useCallback(() => {
     Alert.alert(
-      'No pudimos guardar el cambio',
-      'Tus datos anteriores siguen intactos. Inténtalo de nuevo.',
+      t('navigation.saveError.title'),
+      t('navigation.saveError.message'),
     );
-  }, []);
+  }, [t]);
 }

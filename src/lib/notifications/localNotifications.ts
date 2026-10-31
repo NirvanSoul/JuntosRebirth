@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 import { getNotificationModule } from '@/lib/notifications/notificationRuntime';
+import { translateText } from '@/lib/i18n/translateText';
 
 const androidReminderChannelId = 'transaction-reminders';
 const androidDailyEngagementChannelId = 'daily-engagement';
@@ -110,7 +111,8 @@ export async function scheduleLocalNotification({
   }
 
   return notifications.scheduleNotificationAsync({
-    content: { body, data, title },
+    // Las plantillas se escriben en español; se envían en el idioma activo.
+    content: { body: translateText(body), data, title: translateText(title) },
     trigger: {
       channelId: Platform.OS === 'android' ? channelId : undefined,
       date,

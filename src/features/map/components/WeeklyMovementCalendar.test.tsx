@@ -6,6 +6,7 @@ import type { Category } from '@/features/categories/types';
 import {
   formatWeekMonthLabel,
   getWeeksInCalendarRange,
+  mapCalendarOffset,
   WeeklyMovementCalendar,
 } from '@/features/map/components/WeeklyMovementCalendar';
 import {
@@ -18,7 +19,7 @@ import { indexMapCalendarDays } from '@/features/map/model/mapCalendarDays';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { colors } from '@/theme/colors';
-import { typography } from '@/theme/typography';
+import { fontFamilyByWeight, typography } from '@/theme/typography';
 
 const category: Category = {
   id: 'food',
@@ -47,6 +48,8 @@ const transaction: SessionTransaction = {
 function renderCalendar(
   onSelectDate = jest.fn(),
   onOpenTransactionDetail = jest.fn(),
+  previewMode: 'cards' | 'pills' = 'cards',
+  transactions: SessionTransaction[] = [transaction],
 ) {
   return render(
     <SafeAreaProvider
@@ -59,9 +62,10 @@ function renderCalendar(
         <WeeklyMovementCalendar
           categories={[category]}
           currentDate="2026-08-12"
-          days={indexMapCalendarDays([transaction])}
+          days={indexMapCalendarDays(transactions)}
           onOpenTransactionDetail={onOpenTransactionDetail}
           onSelectDate={onSelectDate}
+          previewMode={previewMode}
           rangeEndDate="2028-08-31"
           testID="weekly-calendar"
         />
@@ -71,6 +75,21 @@ function renderCalendar(
 }
 
 describe('WeeklyMovementCalendar', () => {
+  it('mantiene la semana y la posición relativa al cambiar de vista', () => {
+    const previous = [
+      { index: 0, offset: 0, length: 100 },
+      { index: 1, offset: 100, length: 200 },
+      { index: 2, offset: 300, length: 100 },
+    ];
+    const next = [
+      { index: 0, offset: 0, length: 80 },
+      { index: 1, offset: 80, length: 100 },
+      { index: 2, offset: 180, length: 80 },
+    ];
+    expect(mapCalendarOffset(200, previous, next)).toBe(130);
+    expect(mapCalendarOffset(130, next, previous)).toBe(200);
+  });
+
   it('muestra los siete días y previews compactas de movimientos sin repetir el mes', async () => {
     const onSelectDate = jest.fn();
     const onOpenTransactionDetail = jest.fn();
@@ -89,7 +108,7 @@ describe('WeeklyMovementCalendar', () => {
     expect(
       StyleSheet.flatten(within(selectedDay).getByText('12').props.style),
     ).toMatchObject({
-      fontFamily: typography.body.fontFamily,
+      fontFamily: fontFamilyByWeight.regular,
       fontSize: typography.body.fontSize,
     });
     const preview = screen.getByTestId('weekly-calendar-movement-lunch');
@@ -105,6 +124,53 @@ describe('WeeklyMovementCalendar', () => {
     expect(onOpenTransactionDetail).toHaveBeenCalledWith('lunch');
     await fireEvent.press(selectedDay);
     expect(onSelectDate).toHaveBeenCalledWith('2026-08-12');
+  });
+
+  it('limita las pastillas a tres y muestra el número restante', async () => {
+    const movements = Array.from({ length: 5 }, (_, index) => ({
+      ...transaction,
+      id: `movement-${index}`,
+    }));
+    const screen = await renderCalendar(
+      jest.fn(),
+      jest.fn(),
+      'pills',
+      movements,
+    );
+    expect(
+      screen.getByTestId('weekly-calendar-movement-movement-0'),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('weekly-calendar-movement-movement-2'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByTestId('weekly-calendar-movement-movement-3'),
+    ).toBeNull();
+    expect(
+      screen.getByTestId('weekly-calendar-overflow-2026-08-12'),
+    ).toHaveTextContent('+2');
+  });
+
+  it('identifica el mes y solo destaca el día actual', async () => {
+    const screen = await renderCalendar();
+    expect(
+      screen.getByTestId('weekly-calendar-month-2026-08'),
+    ).toHaveTextContent('Agosto 2026');
+    expect(
+      screen.queryByTestId('weekly-calendar-guides-2026-08-03'),
+    ).toBeNull();
+    const today = screen.getByTestId('weekly-calendar-day-2026-08-12');
+    expect(
+      StyleSheet.flatten(within(today).getByText('12').parent?.props.style),
+    ).toMatchObject({ backgroundColor: colors.cta });
+    await fireEvent.press(screen.getByTestId('weekly-calendar-day-2026-08-13'));
+    expect(
+      StyleSheet.flatten(within(today).getByText('12').parent?.props.style),
+    ).toMatchObject({ backgroundColor: colors.cta });
+    expect(
+      screen.getByTestId('weekly-calendar-day-2026-08-13').props
+        .accessibilityState?.selected,
+    ).toBeUndefined();
   });
 
   it('separa los meses sin desplazar el día 1 de su columna real', async () => {

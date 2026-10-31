@@ -6,10 +6,13 @@ import {
   NoticeToast,
   type ToastNotice,
 } from '@/components/overlays/NoticeToast/NoticeToast';
+import { triggerHaptic } from '@/lib/haptics/haptics';
 import { renderWithTheme } from '@/test/renderWithTheme';
-import { colors } from '@/theme/colors';
+import { colors, darkColors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
+
+jest.mock('@/lib/haptics/haptics', () => ({ triggerHaptic: jest.fn() }));
 
 function renderToast(notice: ToastNotice | null, onDismiss = jest.fn()) {
   return renderWithTheme(<NoticeToast notice={notice} onDismiss={onDismiss} />);
@@ -17,7 +20,27 @@ function renderToast(notice: ToastNotice | null, onDismiss = jest.fn()) {
 
 describe('NoticeToast', () => {
   beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.mocked(triggerHaptic).mockClear();
+  });
+
+  it('vibra de forma sutil una vez por cada aviso nuevo', async () => {
+    const notice = { id: 1, message: 'Movimiento copiado' };
+    const screen = await renderToast(notice);
+    expect(triggerHaptic).toHaveBeenCalledTimes(1);
+    expect(triggerHaptic).toHaveBeenCalledWith('noticeShow');
+
+    await screen.rerender(
+      <NoticeToast notice={{ ...notice }} onDismiss={jest.fn()} />,
+    );
+    expect(triggerHaptic).toHaveBeenCalledTimes(1);
+
+    await screen.rerender(
+      <NoticeToast notice={{ ...notice, id: 2 }} onDismiss={jest.fn()} />,
+    );
+    expect(triggerHaptic).toHaveBeenCalledTimes(2);
+  });
 
   it('confirma con contraste, icono y énfasis en el color del tono', async () => {
     const screen = await renderToast({
@@ -55,6 +78,12 @@ describe('NoticeToast', () => {
     });
 
     expect(screen.getByTestId('notice-toast')).toBeTruthy();
+    // Sin `onPress` no se insinúa que la tarjeta se pueda tocar.
+    expect(
+      screen.queryByTestId('notice-toast-chevron', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
     expect(
       screen.getByText('Recordatorios y alertas actualizados.'),
     ).toBeTruthy();
@@ -95,6 +124,36 @@ describe('NoticeToast', () => {
 
     await act(() => jest.advanceTimersByTime(motion.toastTransitionDuration));
     expect(onDismiss).toHaveBeenCalledWith(7);
+  });
+
+  it('con onPress toda la tarjeta es un botón que se retira y lo ejecuta', async () => {
+    const onPress = jest.fn();
+    const onDismiss = jest.fn();
+    const screen = await renderToast(
+      {
+        id: 4,
+        message: 'Gasto agregado',
+        onPress,
+        placement: 'bottom',
+        pressHint: 'Abre el detalle del movimiento',
+      },
+      onDismiss,
+    );
+
+    const card = screen.getByRole('button', { name: 'Gasto agregado' });
+    expect(card.props.accessibilityHint).toBe('Abre el detalle del movimiento');
+    expect(screen.getByTestId('notice-toast').props.pointerEvents).toBe('auto');
+    expect(
+      screen.getByTestId('notice-toast-chevron', {
+        includeHiddenElements: true,
+      }),
+    ).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(card);
+    });
+    expect(onDismiss).toHaveBeenCalledWith(4);
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it('renderiza la acción, captura el toque y espera más antes de retirarse', async () => {
@@ -147,6 +206,29 @@ describe('NoticeToast', () => {
     expect(icon.props.children).toContain(
       String.fromCodePoint(Number(Ionicons.glyphMap['cloud-offline-outline'])),
     );
+  });
+
+  it('en modo oscuro invierte texto, icono y flecha para contrastar con la tarjeta clara', async () => {
+    const screen = await renderWithTheme(
+      <NoticeToast
+        notice={{ id: 5, message: 'Gasto agregado', onPress: jest.fn() }}
+        onDismiss={jest.fn()}
+      />,
+      { appearance: 'dark' },
+    );
+
+    const colorOf = (testID: string) =>
+      StyleSheet.flatten(
+        screen.getByTestId(testID, { includeHiddenElements: true }).props.style,
+      ).color;
+    expect(
+      StyleSheet.flatten(screen.getByText('Gasto agregado').props.style).color,
+    ).toBe(darkColors.onInverse);
+    expect(colorOf('notice-toast-chevron')).toBe(darkColors.onInverse);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('notice-toast').props.style)
+        .backgroundColor,
+    ).toBe(darkColors.textPrimary);
   });
 
   it('no muestra nada sin un aviso activo', async () => {

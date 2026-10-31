@@ -9,11 +9,11 @@ import {
 import { useTheme } from '@/theme/useTheme';
 import type { ColorTokens } from '@/theme/types';
 
-type NamedStyles<T> = StyleSheet.NamedStyles<T>;
+type NamedStyles = Parameters<typeof StyleSheet.create>[0];
 
 type StyleValue = ViewStyle | TextStyle | ImageStyle;
 
-export function useThemedStyles<T extends NamedStyles<T>>(
+export function useThemedStyles<T extends NamedStyles>(
   factory: (colors: ColorTokens) => T,
 ): T {
   const { colors } = useTheme();

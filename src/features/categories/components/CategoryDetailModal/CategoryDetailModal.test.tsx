@@ -124,7 +124,6 @@ function ClosableDetail({
           onSaveNote={jest.fn()}
           onShare={jest.fn(() => true)}
           shareTargets={[]}
-          spaceCurrency="EUR"
           transactions={[transaction]}
           visible={visible}
         />
@@ -213,7 +212,10 @@ describe('CategoryDetailModal', () => {
       type: 'income' as const,
       title: 'Cena de Beto',
     };
-    const screen = await render(
+    const renderDetail = (
+      detailCategory: Category,
+      detailTransactions: readonly SessionTransaction[],
+    ) => (
       <SafeAreaProvider
         initialMetrics={{
           frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -223,7 +225,7 @@ describe('CategoryDetailModal', () => {
         <ThemeProvider initialAppearance="light">
           <SpaceMembershipProvider space={coupleSpace}>
             <CategoryDetailModal
-              category={category}
+              category={detailCategory}
               displayCurrency="EUR"
               onAddTransaction={jest.fn()}
               onClose={jest.fn()}
@@ -234,13 +236,15 @@ describe('CategoryDetailModal', () => {
               onSaveNote={jest.fn()}
               onShare={jest.fn(() => true)}
               shareTargets={[]}
-              spaceCurrency="EUR"
-              transactions={[ownTransaction, partnerTransaction]}
+              transactions={detailTransactions}
               visible
             />
           </SpaceMembershipProvider>
         </ThemeProvider>
-      </SafeAreaProvider>,
+      </SafeAreaProvider>
+    );
+    const screen = await render(
+      renderDetail(category, [ownTransaction, partnerTransaction]),
     );
 
     const detail = screen.getByTestId('category-detail-modal');
@@ -267,6 +271,16 @@ describe('CategoryDetailModal', () => {
 
     expect(within(detail).queryByText('Almuerzo propio')).toBeNull();
     expect(within(detail).getByText('Cena de Beto')).toBeTruthy();
+    expect(within(detail).getByLabelText('Filtros, 1 activos')).toBeTruthy();
+
+    // Una sincronización trae objetos nuevos: el filtro elegido se mantiene.
+    await screen.rerender(
+      renderDetail({ ...category }, [
+        { ...ownTransaction },
+        { ...partnerTransaction },
+      ]),
+    );
+    expect(within(detail).queryByText('Almuerzo propio')).toBeNull();
     expect(within(detail).getByLabelText('Filtros, 1 activos')).toBeTruthy();
   });
 
@@ -298,7 +312,6 @@ describe('CategoryDetailModal', () => {
             onSaveNote={onSaveNote}
             onShare={onShare}
             shareTargets={[{ id: 'couple', name: 'Pareja' }]}
-            spaceCurrency="EUR"
             transactions={[transaction]}
             visible
           />
@@ -414,7 +427,13 @@ describe('CategoryDetailModal', () => {
     await fireEvent.press(
       within(budgetModal).getByRole('button', { name: 'Agregar presupuesto' }),
     );
-    expect(onSaveBudget).toHaveBeenCalledWith('food', 30_000);
+    expect(onSaveBudget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'food',
+        budgets: { EUR: { budgetMinor: 30_000 } },
+      }),
+      'EUR',
+    );
 
     await fireEvent.press(
       within(detail).getByRole('button', { name: 'Copiar en otro espacio' }),
@@ -532,7 +551,7 @@ describe('CategoryDetailModal', () => {
       >
         <ThemeProvider initialAppearance="light">
           <CategoryDetailModal
-            category={{ ...category, budgetMinor: 5000 }}
+            category={{ ...category, budgets: { EUR: { budgetMinor: 5000 } } }}
             displayCurrency="EUR"
             onAddTransaction={jest.fn()}
             onClose={jest.fn()}
@@ -543,7 +562,6 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
-            spaceCurrency="EUR"
             transactions={[transaction]}
             visible
           />
@@ -568,7 +586,7 @@ describe('CategoryDetailModal', () => {
     );
 
     await fireEvent.press(
-      screen.getByRole('button', { name: 'Abrir presupuesto' }),
+      screen.getByRole('button', { name: 'Editar presupuesto' }),
     );
     const budgetModal = screen.getByTestId('category-budget-modal');
     const removeButton = within(budgetModal).getByRole('button', {
@@ -588,10 +606,226 @@ describe('CategoryDetailModal', () => {
     expect(within(removeButton).getByText('Quitar Presupuesto')).toBeTruthy();
 
     await fireEvent.press(removeButton);
-    expect(onSaveBudget).toHaveBeenCalledWith('food', undefined);
+    expect(onSaveBudget).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'food', budgets: undefined }),
+      'EUR',
+    );
   });
 
-  it('multidivisa: separa totales en displayCurrency (USD) y presupuesto en spaceCurrency (VES)', async () => {
+  it('muestra el presupuesto del periodo elegido en el detalle', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={{ ...category, budgets: { EUR: { budgetMinor: 5000 } } }}
+            displayCurrency="EUR"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={jest.fn()}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getByRole('progressbar').props.accessibilityValue).toEqual(
+      expect.objectContaining({ now: 38 }),
+    );
+
+    await fireEvent.press(
+      within(screen.getByTestId('category-detail-period-selector')).getByRole(
+        'button',
+        { name: 'Ver periodo siguiente' },
+      ),
+    );
+
+    expect(screen.getByTestId('category-budget-period')).toHaveTextContent(
+      'Mensual · Agosto 2026',
+    );
+    expect(screen.getByRole('progressbar').props.accessibilityValue).toEqual(
+      expect.objectContaining({ now: 0 }),
+    );
+  });
+
+  it('abre el historial, navega a un periodo anterior y edita solo ese periodo', async () => {
+    const onSaveBudget = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={{ ...category, budgets: { EUR: { budgetMinor: 5000 } } }}
+            displayCurrency="EUR"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={onSaveBudget}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    expect(screen.getByTestId('category-budget-period')).toHaveTextContent(
+      'Mensual · Julio 2026',
+    );
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Abrir detalle de presupuesto' }),
+    );
+    const history = screen.getByTestId('category-budget-history-modal');
+    const navigator = within(history).getByTestId(
+      'category-budget-history-navigator',
+    );
+    expect(within(navigator).getByText('Julio 2026')).toBeTruthy();
+
+    await fireEvent.press(
+      within(history).getByRole('button', { name: 'Ver periodo anterior' }),
+    );
+    expect(within(navigator).getByText('Junio 2026')).toBeTruthy();
+    expect(
+      within(history).getByTestId('category-budget-history-expense'),
+    ).toHaveTextContent(/^0\s*€$/);
+
+    await fireEvent.press(
+      within(history).getByRole('button', { name: 'Editar este periodo' }),
+    );
+    const [budgetModal] = screen.getAllByTestId('category-budget-modal');
+    // La periodicidad también se puede cambiar desde un periodo.
+    expect(
+      within(budgetModal!).getByTestId('category-budget-periods'),
+    ).toBeTruthy();
+    await fireEvent.press(
+      within(budgetModal!).getByRole('button', { name: 'Borrar' }),
+    );
+    await fireEvent.press(
+      within(budgetModal!).getByRole('button', { name: 'Borrar' }),
+    );
+    await fireEvent.press(
+      within(budgetModal!).getByRole('button', { name: '8' }),
+    );
+    await fireEvent.press(
+      within(budgetModal!).getByRole('button', { name: '0' }),
+    );
+    await fireEvent.press(
+      within(budgetModal!).getByRole('button', { name: 'Guardar presupuesto' }),
+    );
+
+    expect(onSaveBudget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'food',
+        budgets: {
+          EUR: {
+            budgetMinor: 5000,
+            budgetOverrides: [
+              { periodStartOn: '2026-06-01', amountMinor: 8000 },
+            ],
+          },
+        },
+      }),
+      'EUR',
+    );
+  });
+
+  it('cambia la periodicidad desde el periodo elegido y conserva los anteriores', async () => {
+    const onSaveBudget = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={{ ...category, budgets: { EUR: { budgetMinor: 5000 } } }}
+            displayCurrency="EUR"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={onSaveBudget}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[transaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Abrir detalle de presupuesto' }),
+    );
+    const history = screen.getByTestId('category-budget-history-modal');
+    expect(
+      within(history).queryByTestId('category-budget-history-today'),
+    ).toBeNull();
+    await fireEvent.press(
+      within(history).getByRole('button', { name: 'Ver periodo anterior' }),
+    );
+    expect(
+      within(history).getByTestId('category-budget-history-today'),
+    ).toBeTruthy();
+    await fireEvent.press(
+      within(history).getByRole('button', { name: 'Editar este periodo' }),
+    );
+    const [budgetModal] = screen.getAllByTestId('category-budget-modal');
+    await fireEvent.press(
+      within(budgetModal!).getByTestId('category-budget-period-week'),
+    );
+    expect(
+      within(budgetModal!).getByTestId('category-budget-subtitle'),
+    ).toHaveTextContent('Desde Junio 2026 en adelante');
+    await fireEvent.press(
+      within(budgetModal!).getByRole('button', { name: 'Guardar presupuesto' }),
+    );
+
+    expect(onSaveBudget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        budgets: {
+          EUR: {
+            budgetMinor: 5000,
+            budgetSchedule: { period: 'week' },
+            budgetHistory: [
+              {
+                endsOn: '2026-05-31',
+                amountMinor: 5000,
+                schedule: { period: 'month' },
+              },
+            ],
+          },
+        },
+      }),
+      'EUR',
+    );
+  });
+
+  it('multidivisa: cada moneda muestra su propio presupuesto y ninguno si no lo tiene', async () => {
     const mixedTransactions: SessionTransaction[] = [
       {
         id: 'tx-eur',
@@ -643,7 +877,8 @@ describe('CategoryDetailModal', () => {
       >
         <ThemeProvider initialAppearance="light">
           <CategoryDetailModal
-            category={{ ...category, budgetMinor: 10000 }} // 100 VES
+            // 100 VES; sin presupuesto en USD
+            category={{ ...category, budgets: { VES: { budgetMinor: 10000 } } }}
             displayCurrency="USD"
             onAddTransaction={jest.fn()}
             onClose={jest.fn()}
@@ -654,7 +889,6 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
-            spaceCurrency="VES"
             transactions={mixedTransactions}
             visible
           />
@@ -673,6 +907,11 @@ describe('CategoryDetailModal', () => {
     const expenseMetric = within(detail).getByTestId('category-expense-metric');
     expect(within(expenseMetric).getByText(/20/)).toBeTruthy();
     expect(within(expenseMetric).getByText(/\$/)).toBeTruthy();
+    // En USD no hay presupuesto: ni resumen ni «Editar».
+    expect(within(detail).queryByTestId('category-budget-summary')).toBeNull();
+    expect(
+      within(detail).getByRole('button', { name: 'Añadir presupuesto' }),
+    ).toBeTruthy();
 
     expect(
       within(detail).getByTestId('category-currency-selector'),
@@ -697,6 +936,59 @@ describe('CategoryDetailModal', () => {
     expect(within(budgetSummary).getByText(/100/)).toBeTruthy();
   });
 
+  it('crea el presupuesto en la moneda seleccionada sin tocar el de otra', async () => {
+    const onSaveBudget = jest.fn();
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <CategoryDetailModal
+            category={{ ...category, budgets: { EUR: { budgetMinor: 5000 } } }}
+            displayCurrency="USD"
+            onAddTransaction={jest.fn()}
+            onClose={jest.fn()}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onOpenTransactionDetail={jest.fn()}
+            onSaveBudget={onSaveBudget}
+            onSaveNote={jest.fn()}
+            onShare={jest.fn(() => true)}
+            shareTargets={[]}
+            transactions={[
+              transaction,
+              { ...transaction, id: 'lunch-usd', currency: 'USD' },
+            ]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const detail = screen.getByTestId('category-detail-modal');
+    expect(within(detail).queryByTestId('category-budget-summary')).toBeNull();
+    await fireEvent.press(
+      within(detail).getByRole('button', { name: 'Añadir presupuesto' }),
+    );
+    const budgetModal = screen.getByTestId('category-budget-modal');
+    await fireEvent.press(
+      within(budgetModal).getByRole('button', { name: '3' }),
+    );
+    await fireEvent.press(
+      within(budgetModal).getByRole('button', { name: 'Agregar presupuesto' }),
+    );
+
+    expect(onSaveBudget).toHaveBeenCalledWith(
+      expect.objectContaining({
+        budgets: { EUR: { budgetMinor: 5000 }, USD: { budgetMinor: 300 } },
+      }),
+      'USD',
+    );
+  });
+
   it('abre el editor de nota desde el botón del detalle y guarda al confirmar', async () => {
     const onSaveNote = jest.fn();
     const screen = await render(
@@ -719,7 +1011,6 @@ describe('CategoryDetailModal', () => {
             onSaveNote={onSaveNote}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
-            spaceCurrency="EUR"
             transactions={[transaction]}
             visible
           />
@@ -736,7 +1027,7 @@ describe('CategoryDetailModal', () => {
     const noteInput = within(noteModal).getByTestId(
       'category-note-modal-input',
     );
-    expect(noteInput.props.value).toBe('Nota previa');
+    expect(noteInput.props.defaultValue).toBe('Nota previa');
 
     await fireEvent.changeText(noteInput, 'Lista: pan, leche');
     await fireEvent.press(
@@ -766,7 +1057,6 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
-            spaceCurrency="EUR"
             transactions={[transaction]}
             visible
           />
@@ -807,7 +1097,6 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
-            spaceCurrency="EUR"
             transactions={[incomeTransaction]}
             visible
           />
@@ -848,7 +1137,6 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
-            spaceCurrency="EUR"
             transactions={[transaction, juneTransaction]}
             visible
           />
@@ -939,7 +1227,6 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
-            spaceCurrency="EUR"
             transactions={[transaction, futureTransaction]}
             visible
           />
@@ -1037,7 +1324,6 @@ describe('CategoryDetailModal', () => {
             onSaveNote={jest.fn()}
             onShare={jest.fn(() => true)}
             shareTargets={[]}
-            spaceCurrency="USD"
             transactions={[venezuelaTransaction]}
             visible
           />

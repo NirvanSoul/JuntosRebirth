@@ -57,6 +57,8 @@ export type CategoryPickerSelection = {
 
 type CategoryPickerModalProps = {
   categories: readonly Category[];
+  /** Título del modo crear; por defecto «Nueva categoría». */
+  createTitle?: string;
   mode: 'create' | 'select';
   /** Mínimo de plantillas que se deben escoger antes de guardarlas. */
   minimumTemplateSelections?: number;
@@ -111,6 +113,7 @@ function CategoryPageIndicatorDot({
 
 export function CategoryPickerModal({
   categories,
+  createTitle = 'Nueva categoría',
   mode,
   minimumTemplateSelections = 1,
   selectedCategoryId,
@@ -204,9 +207,7 @@ export function CategoryPickerModal({
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text accessibilityRole="header" variant="heading">
-              {displayMode === 'select'
-                ? 'Elige una categoría'
-                : 'Nueva categoría'}
+              {displayMode === 'select' ? 'Elige una categoría' : createTitle}
             </Text>
             <Text style={styles.subtitle} tone="secondary" variant="label">
               {duplicateNoticeVisible

@@ -5,6 +5,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
@@ -61,6 +62,7 @@ export function CountryPreferencesModal({
   visible,
 }: CountryPreferencesModalProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const searchStyles = useThemedStyles(createSearchStyles);
   const [selectedIso2, setSelectedIso2] = useState<string | null>(countryCode);
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,10 +96,10 @@ export function CountryPreferencesModal({
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text accessibilityRole="header" variant="heading">
-              País
+              {t('settings.countryModal.title')}
             </Text>
             <Text tone="secondary" variant="label">
-              Elige el país desde donde usas Juntos.
+              {t('settings.countryModal.subtitle')}
             </Text>
           </View>
           <ModalCloseButton onPress={onClose} />
@@ -106,10 +108,10 @@ export function CountryPreferencesModal({
         <View style={searchStyles.searchField}>
           <Ionicons color={colors.textMuted} name="search" size={iconSize.md} />
           <BottomSheetTextInput
-            accessibilityLabel="Buscar país"
+            accessibilityLabel={t('settings.countryModal.searchLabel')}
             editable={!isSaving}
             onChangeText={setSearchQuery}
-            placeholder="Busca por nombre de país"
+            placeholder={t('settings.countryModal.searchPlaceholder')}
             placeholderTextColor={colors.textMuted}
             returnKeyType="search"
             style={searchStyles.searchInput}
@@ -151,16 +153,16 @@ export function CountryPreferencesModal({
                 tone="secondary"
                 variant="label"
               >
-                No encontramos ningún país con esa búsqueda.
+                {t('settings.countryModal.noResults')}
               </Text>
             ) : null}
           </View>
         </BottomSheetScrollView>
 
         <ModalPrimaryAction
-          accessibilityLabel="Guardar país"
+          accessibilityLabel={t('settings.countryModal.saveLabel')}
           disabled={!selectedIso2 || isSaving}
-          label={isSaving ? 'Guardando…' : 'Guardar'}
+          label={isSaving ? t('common.saving') : t('common.save')}
           onPress={() => void handleSave()}
           style={styles.saveButton}
           testID="country-preferences-save"

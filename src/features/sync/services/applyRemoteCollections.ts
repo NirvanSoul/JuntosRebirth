@@ -10,6 +10,7 @@ import {
   upsertRemoteEntityLink,
   type RemoteEntityType,
 } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
+import { applyRemoteCategoryBudgets } from '@/features/sync/services/remoteCategoryBudgets';
 import type { LocalSqlExecutor } from '@/lib/storage/localSqlExecutor';
 
 export async function createLinkResolver(input: {
@@ -63,7 +64,6 @@ export type ApplyRemoteCollectionsInput = {
     transactions: readonly RemoteAccountTransaction[];
   };
   localSpaceIdByRemoteId: ReadonlyMap<string, string>;
-  currencyBySpaceRemoteId: ReadonlyMap<string, string>;
   linkMode: 'full' | 'delta';
 };
 
@@ -125,16 +125,15 @@ export async function applyRemoteCollections(
     if (!spaceId) continue;
     const categoryId = (await linkCategory(remoteCategory.remoteId))!;
     localCategoryIdByRemoteId.set(remoteCategory.remoteId, categoryId);
-    await transaction.runAsync(
+    const applied = await transaction.runAsync(
       `INSERT INTO categories (
          id, space_id, name, icon, color_token, budget_minor, is_default,
          template_key, note, source_category_id, created_by, sync_status,
          is_archived, created_at, updated_at, archived_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 'synced', ?, ?, ?, NULL)
+       ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, NULL, ?, ?, 'synced', ?, ?, ?, NULL)
        ON CONFLICT (id) DO UPDATE SET
          space_id = excluded.space_id, name = excluded.name,
          icon = excluded.icon, color_token = excluded.color_token,
-         budget_minor = excluded.budget_minor,
          is_default = excluded.is_default, template_key = excluded.template_key,
          is_archived = excluded.is_archived, updated_at = excluded.updated_at
        WHERE categories.sync_status = 'synced'`,
@@ -143,11 +142,6 @@ export async function applyRemoteCollections(
       remoteCategory.name,
       remoteCategory.icon,
       remoteCategory.colorToken,
-      remoteCategory.budgets.find(
-        (budget) =>
-          budget.currency ===
-          input.currencyBySpaceRemoteId.get(remoteCategory.spaceRemoteId),
-      )?.budgetMinor ?? null,
       remoteCategory.isDefault ? 1 : 0,
       remoteCategory.templateKey,
       remoteCategory.remoteId,
@@ -157,23 +151,8 @@ export async function applyRemoteCollections(
       remoteCategory.updatedAt,
     );
 
-    for (const budget of remoteCategory.budgets) {
-      await transaction.runAsync(
-        `INSERT INTO category_budgets (
-           id, category_id, currency, budget_minor, sync_status,
-           created_at, updated_at
-         ) VALUES (?, ?, ?, ?, 'synced', ?, ?)
-         ON CONFLICT (category_id, currency) DO UPDATE SET
-           budget_minor = excluded.budget_minor,
-           updated_at = excluded.updated_at
-         WHERE category_budgets.sync_status = 'synced'`,
-        `${categoryId}:${budget.currency}`,
-        categoryId,
-        budget.currency,
-        budget.budgetMinor,
-        remoteCategory.createdAt,
-        remoteCategory.updatedAt,
-      );
+    if (applied.changes > 0) {
+      await applyRemoteCategoryBudgets(transaction, categoryId, remoteCategory);
     }
   }
 

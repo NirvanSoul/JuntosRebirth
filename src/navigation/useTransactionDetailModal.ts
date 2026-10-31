@@ -1,13 +1,15 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { MoneyAccount } from '@/features/accounts/types';
-import { moneyAccountSupportsCurrency } from '@/features/accounts/types';
+import { listMoneyAccountsForCurrency } from '@/features/accounts/types';
+import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { resolveTransactionForDetail } from '@/features/transactions/utils/transactionDetailResolution';
+import { useStableCallback } from '@/hooks/useStableCallback';
 
 type TransactionDetailModalSource = {
-  assignableMoneyAccounts: readonly MoneyAccount[];
+  assignableMoneyAccounts: readonly MoneyAccountSummary[];
   categories: readonly Category[];
   moneyAccounts: readonly MoneyAccount[];
   transactions: readonly SessionTransaction[];
@@ -30,20 +32,43 @@ export function useTransactionDetailModal({
   );
   const transaction = liveTransaction ?? retainedTransaction;
 
+  const pendingTransactionIdRef = useRef<string | null>(null);
+
+  // Estable y con la lista más reciente: quien la llamó puede tener una
+  // versión de `open` de antes de cambiar de espacio.
+  const showTransaction = useStableCallback((nextTransactionId: string) => {
+    const nextTransaction = resolveTransactionForDetail(
+      transactions,
+      nextTransactionId,
+    );
+    if (!nextTransaction) return false;
+
+    setTransactionId(nextTransactionId);
+    setRetainedTransaction(nextTransaction);
+    setVisible(true);
+    return true;
+  });
+
+  /**
+   * Quien abre un movimiento justo después de cambiar de espacio puede llegar
+   * antes de que la lista de este espacio se actualice: en ese caso se
+   * reintenta una sola vez, con la siguiente lista.
+   */
   const open = useCallback(
     (nextTransactionId: string) => {
-      const nextTransaction = resolveTransactionForDetail(
-        transactions,
-        nextTransactionId,
-      );
-      if (!nextTransaction) return;
-
-      setTransactionId(nextTransactionId);
-      setRetainedTransaction(nextTransaction);
-      setVisible(true);
+      pendingTransactionIdRef.current = showTransaction(nextTransactionId)
+        ? null
+        : nextTransactionId;
     },
-    [transactions],
+    [showTransaction],
   );
+
+  useEffect(() => {
+    const pendingTransactionId = pendingTransactionIdRef.current;
+    if (!pendingTransactionId) return;
+    pendingTransactionIdRef.current = null;
+    showTransaction(pendingTransactionId);
+  }, [showTransaction, transactions]);
   const close = useCallback(() => setVisible(false), []);
   const closeThenRun = useCallback((action: () => void) => {
     pendingActionRef.current = action;
@@ -69,8 +94,9 @@ export function useTransactionDetailModal({
         null)
       : null,
     moneyAccountOptions: transaction
-      ? assignableMoneyAccounts.filter((account) =>
-          moneyAccountSupportsCurrency(account, transaction.currency),
+      ? listMoneyAccountsForCurrency(
+          assignableMoneyAccounts,
+          transaction.currency,
         )
       : [],
     open,

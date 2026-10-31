@@ -10,6 +10,8 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { Category } from '@/features/categories/types';
+import { SpaceMembershipScope } from '@/features/profile/state/SpaceMembershipContext';
+import type { SpaceMemberProfile } from '@/features/profile/types';
 import { mapReturnToTodayRight } from '@/features/map/components/MapReturnToToday';
 import {
   MapScreen,
@@ -54,6 +56,7 @@ jest.mock('@/features/map/components/WeeklyMovementCalendar', () => {
         footer,
         onFocusedMonthChange,
         onSelectDate,
+        previewMode,
         rangeEndDate,
         testID,
       }: {
@@ -64,6 +67,7 @@ jest.mock('@/features/map/components/WeeklyMovementCalendar', () => {
         footer?: React.ReactNode;
         onFocusedMonthChange?: (month: string, date?: string) => void;
         onSelectDate: (date: string) => void;
+        previewMode: 'cards' | 'pills';
         rangeEndDate: string;
         testID: string;
       },
@@ -84,6 +88,7 @@ jest.mock('@/features/map/components/WeeklyMovementCalendar', () => {
           <Text testID="map-weekly-dates">
             {JSON.stringify([...days.keys()])}
           </Text>
+          <Text testID="map-preview-mode">{previewMode}</Text>
           <Text testID="map-calendar-range-end">{rangeEndDate}</Text>
           {['2026-01-31', '2026-02-10', '2026-02-28'].map((date) => (
             <Pressable
@@ -220,6 +225,25 @@ describe('MapScreen', () => {
     mockWeeklyMount.mockClear();
   });
 
+  it('muestra la visualización en vivo desde filtros y la revierte al cancelar', async () => {
+    const screen = await renderMap();
+    expect(screen.getByTestId('map-preview-mode')).toHaveTextContent('pills');
+    await fireEvent.press(screen.getByLabelText('Filtros'));
+    expect(
+      screen.getByRole('button', { name: 'Visualización' }).props
+        .accessibilityState.expanded,
+    ).toBe(true);
+    await fireEvent.press(screen.getByLabelText('Visualización: Medianas'));
+    expect(screen.getByTestId('map-preview-mode')).toHaveTextContent('cards');
+    await fireEvent.press(screen.getByLabelText('Aplicar filtros'));
+    expect(screen.getByTestId('map-preview-mode')).toHaveTextContent('cards');
+    await fireEvent.press(screen.getByLabelText('Filtros'));
+    await fireEvent.press(screen.getByLabelText('Visualización: Pequeñas'));
+    expect(screen.getByTestId('map-preview-mode')).toHaveTextContent('pills');
+    await fireEvent.press(screen.getByLabelText('Cerrar'));
+    expect(screen.getByTestId('map-preview-mode')).toHaveTextContent('cards');
+  });
+
   it('usa siempre el calendario semanal con sus mini previews', async () => {
     const onAddTransaction = jest.fn();
     const screen = await renderMap(onAddTransaction);
@@ -334,9 +358,10 @@ describe('MapScreen', () => {
     expect(
       screen.getByTestId('map-month-expense-amount').props.children,
     ).toContain('12,99');
+    // Febrero arrastra el balance de enero: 2400 - 12,99.
     expect(
       screen.getByTestId('map-month-balance-amount').props.children,
-    ).toContain('487,01');
+    ).toContain('2.874,02');
     expect(
       StyleSheet.flatten(screen.getByTestId('map-month-summary').props.style),
     ).toMatchObject({ minHeight: layout.minTouchTarget });
@@ -350,7 +375,7 @@ describe('MapScreen', () => {
     ).toContain('12,99');
     expect(
       screen.getByTestId('map-month-balance-amount').props.children,
-    ).toContain('-12,99');
+    ).toContain('2.861,03');
 
     expect(screen.getByTestId('map-month-summary-panel')).toBeTruthy();
   });
@@ -391,8 +416,11 @@ describe('MapScreen', () => {
 
     await fireEvent.press(screen.getByTestId('map-month-balance-badge'));
     expect(screen.getByTestId('balance-period-total').props.children).toContain(
-      '487,01',
+      '2.874,02',
     );
+    expect(
+      screen.getByTestId('balance-period-carry-over').props.children,
+    ).toContain('2.387,01');
     expect(screen.getByTestId('balance-period-transaction-list')).toBeTruthy();
   });
 
@@ -527,5 +555,135 @@ describe('MapScreen', () => {
     }
     expect(screen.getByTestId('map-return-direction-down')).toBeTruthy();
     expect(screen.queryByTestId('map-return-direction-up')).toBeNull();
+  });
+});
+
+describe('MapScreen · filtros', () => {
+  const ownMovement: SessionTransaction = {
+    ...incomeTransaction,
+    id: 'own',
+    createdBy: 'me',
+    occurredOn: '2026-02-10',
+  };
+  const partnerMovement: SessionTransaction = {
+    ...incomeTransaction,
+    id: 'partner',
+    createdBy: 'partner',
+    occurredOn: '2026-02-28',
+  };
+  const membership = {
+    isSharedSpace: true,
+    ownUserId: 'me',
+    profilesByUserId: {
+      me: { userId: 'me', displayName: 'Alex' } as SpaceMemberProfile,
+      partner: { userId: 'partner', displayName: 'Sam' } as SpaceMemberProfile,
+    },
+  };
+
+  const renderSharedMap = (isSharedSpace = true) =>
+    render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <SpaceMembershipScope value={{ ...membership, isSharedSpace }}>
+            <MapScreen
+              categories={[category]}
+              currency="EUR"
+              today="2026-02-02"
+              transactions={[ownMovement, partnerMovement]}
+            />
+          </SpaceMembershipScope>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+  it('filtra por tipo en un espacio personal, sin el grupo de autor', async () => {
+    const screen = await renderSharedMap(false);
+    const dates = () =>
+      JSON.parse(
+        String(screen.getByTestId('map-weekly-dates').props.children),
+      ) as string[];
+    expect(dates()).toEqual(
+      expect.arrayContaining(['2026-02-10', '2026-02-28']),
+    );
+
+    await fireEvent.press(screen.getByTestId('map-filter-button'));
+    expect(screen.queryByLabelText('Autor: Sam')).toBeNull();
+    expect(screen.queryByText('Fecha')).toBeNull();
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Tipo de movimiento' }),
+    );
+    await fireEvent.press(screen.getByLabelText('Tipo: Gastos'));
+    // El calendario de detrás ya refleja el borrador antes de aplicar.
+    expect(dates()).toEqual([]);
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Aplicar filtros' }),
+    );
+
+    expect(dates()).toEqual([]);
+    expect(
+      screen.getByTestId('map-filter-button').props.accessibilityLabel,
+    ).toBe('Filtros, 1 activos');
+  });
+
+  it('revierte los filtros mostrados en vivo al cerrar sin aplicar', async () => {
+    const screen = await renderSharedMap(false);
+    const dates = () =>
+      JSON.parse(
+        String(screen.getByTestId('map-weekly-dates').props.children),
+      ) as string[];
+
+    await fireEvent.press(screen.getByTestId('map-filter-button'));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Tipo de movimiento' }),
+    );
+    await fireEvent.press(screen.getByLabelText('Tipo: Gastos'));
+    expect(dates()).toEqual([]);
+    await fireEvent.press(screen.getByLabelText('Cerrar'));
+
+    expect(dates()).toEqual(
+      expect.arrayContaining(['2026-02-10', '2026-02-28']),
+    );
+    expect(
+      screen.getByTestId('map-filter-button').props.accessibilityLabel,
+    ).toBe('Filtros');
+  });
+
+  it('alinea el botón con la cabecera y filtra el calendario por autor', async () => {
+    const screen = await renderSharedMap();
+    const button = screen.getByTestId('map-filter-button');
+    const anchor = screen.getByTestId('map-filter-anchor');
+    expect(StyleSheet.flatten(anchor.props.style)).toMatchObject({
+      position: 'absolute',
+      top: 47 + spacing.sm,
+    });
+    // Mismo aspecto que la campana de avisos: superficie blanca y borde.
+    expect(StyleSheet.flatten(button.props.style)).toMatchObject({
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    });
+    const dates = () =>
+      JSON.parse(
+        String(screen.getByTestId('map-weekly-dates').props.children),
+      ) as string[];
+    expect(dates()).toEqual(
+      expect.arrayContaining(['2026-02-10', '2026-02-28']),
+    );
+
+    await fireEvent.press(button);
+    await fireEvent.press(screen.getByRole('button', { name: 'Autor' }));
+    await fireEvent.press(screen.getByLabelText('Autor: Sam'));
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Aplicar filtros' }),
+    );
+
+    expect(dates()).toEqual(['2026-02-28']);
+    expect(
+      screen.getByTestId('map-filter-button').props.accessibilityLabel,
+    ).toBe('Filtros, 1 activos');
   });
 });

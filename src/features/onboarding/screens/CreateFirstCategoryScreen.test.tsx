@@ -72,7 +72,7 @@ describe('CreateFirstCategoryScreen', () => {
     });
     expect(screen.queryByText(/María/)).toBeNull();
 
-    expect(screen.queryByText('Nueva categoría')).toBeNull();
+    expect(screen.queryByText('Elige 3 categorías')).toBeNull();
     await fireEvent.press(screen.getByTestId('floating-create-button'));
     expect(
       screen.queryByTestId('onboarding-create-category-action'),
@@ -94,7 +94,7 @@ describe('CreateFirstCategoryScreen', () => {
       disabled: false,
     });
     await fireEvent.press(screen.getByLabelText('Crear categoría'));
-    expect(screen.getByText('Nueva categoría')).toBeTruthy();
+    expect(screen.getByText('Elige 3 categorías')).toBeTruthy();
     expect(screen.getByLabelText('Salario')).toBeTruthy();
   });
 
@@ -239,7 +239,7 @@ describe('CreateFirstCategoryScreen', () => {
         expect.objectContaining({ spaceId: 'personal', name: 'Jardinería' }),
       );
     });
-    expect(screen.getByText('Nueva categoría')).toBeTruthy();
+    expect(screen.getByText('Elige 3 categorías')).toBeTruthy();
     expect(
       screen.getByLabelText('Guardar categorías').props.accessibilityState,
     ).toMatchObject({ disabled: false });

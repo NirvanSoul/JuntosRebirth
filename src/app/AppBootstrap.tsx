@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useFonts } from 'expo-font';
 
 import { ensureNotificationHandlerRegistered } from '@/lib/notifications/localNotifications';
@@ -11,9 +11,11 @@ import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { preloadAppIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
 import { warmUpAuthSession } from '@/features/auth/services/googleAuth';
 import { restoreAnalyticsPreference } from '@/features/legal/services/analyticsPreferenceService';
+import { restoreLanguagePreference } from '@/lib/i18n/i18n';
 
 export function AppBootstrap() {
   const [fontsLoaded, fontError] = useFonts(fontAssets);
+  const [isLanguageReady, setLanguageReady] = useState(false);
 
   useEffect(() => {
     // Abrir y migrar SQLite no depende de fuentes ni de sesión: empezar aquí
@@ -24,6 +26,9 @@ export function AppBootstrap() {
     void preloadAppIllustrations();
     void restoreAnalyticsPreference();
     warmUpAuthSession();
+    // Se espera junto con las fuentes para no pintar un instante el idioma
+    // del dispositivo a quien eligió otro.
+    void restoreLanguagePreference().finally(() => setLanguageReady(true));
   }, []);
 
   useEffect(() => {
@@ -38,7 +43,7 @@ export function AppBootstrap() {
 
   return (
     <LoadingProgressProvider>
-      <RootNavigator fontsReady={fontsLoaded} />
+      <RootNavigator fontsReady={fontsLoaded && isLanguageReady} />
       {fontsLoaded && <InvitationPushRegistration />}
     </LoadingProgressProvider>
   );

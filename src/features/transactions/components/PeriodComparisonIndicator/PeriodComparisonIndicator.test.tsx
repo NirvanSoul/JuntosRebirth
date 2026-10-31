@@ -5,44 +5,50 @@ describe('PeriodComparisonIndicator', () => {
   it('muestra un aumento de gastos como desfavorable', async () => {
     const { getByText } = await renderWithTheme(
       <PeriodComparisonIndicator
-        comparison={{ changePercent: 20, direction: 'up' }}
+        comparison={{ changeMinor: 2000, direction: 'up' }}
+        currency="EUR"
         tone="expense"
       />,
     );
 
-    expect(getByText('20%')).toBeTruthy();
+    expect(getByText('20\u00a0€')).toBeTruthy();
   });
 
   it('muestra una disminución de gastos como favorable', async () => {
     const { getByText } = await renderWithTheme(
       <PeriodComparisonIndicator
-        comparison={{ changePercent: -20, direction: 'down' }}
+        comparison={{ changeMinor: -3050, direction: 'down' }}
+        currency="EUR"
+        previousPeriodLabel="el mes anterior"
         tone="expense"
       />,
     );
 
-    expect(getByText('20%')).toBeTruthy();
+    expect(getByText('30,50\u00a0€')).toBeTruthy();
+    expect(getByText('menos que el mes anterior')).toBeTruthy();
   });
 
   it('muestra un aumento de ingresos como favorable', async () => {
     const { getByText } = await renderWithTheme(
       <PeriodComparisonIndicator
-        comparison={{ changePercent: 15, direction: 'up' }}
+        comparison={{ changeMinor: 1500, direction: 'up' }}
+        currency="EUR"
         tone="income"
       />,
     );
 
-    expect(getByText('15%')).toBeTruthy();
+    expect(getByText('15\u00a0€')).toBeTruthy();
   });
 
-  it('muestra 0% sin cambios', async () => {
+  it('muestra 0 € sin cambios', async () => {
     const { getByText } = await renderWithTheme(
       <PeriodComparisonIndicator
-        comparison={{ changePercent: 0, direction: 'flat' }}
+        comparison={{ changeMinor: 0, direction: 'flat' }}
+        currency="EUR"
         tone="balance"
       />,
     );
 
-    expect(getByText('0%')).toBeTruthy();
+    expect(getByText('0\u00a0€')).toBeTruthy();
   });
 });

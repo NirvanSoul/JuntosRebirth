@@ -209,6 +209,46 @@ describe('useSpaces (espacio de pareja y multidivisa)', () => {
     expect(updateSpaces).toHaveBeenLastCalledWith(expect.any(Function));
   });
 
+  it('pinta el espacio elegido sin esperar a que termine de guardarse', async () => {
+    mockAuthSession(fakeSession);
+    const homeSpace: Space = {
+      id: 'space-home',
+      name: 'Casa',
+      type: 'other',
+      currency: 'EUR',
+    };
+    jest.mocked(loadSpaces).mockResolvedValue({
+      activeSpaceId: personalSpace.id,
+      spaces: [personalSpace, homeSpace],
+    });
+    let finishWrite: (() => void) | undefined;
+    jest.mocked(updateSpaces).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishWrite = () =>
+            resolve({
+              activeSpaceId: homeSpace.id,
+              spaces: [personalSpace, homeSpace],
+            });
+        }),
+    );
+
+    const { result } = await renderHook(() => useSpaces());
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+
+    let selection: Promise<void> | undefined;
+    await act(async () => {
+      selection = result.current.selectSpace(homeSpace.id);
+    });
+    expect(result.current.activeSpace.id).toBe(homeSpace.id);
+
+    await act(async () => {
+      finishWrite?.();
+      await selection;
+    });
+    expect(result.current.activeSpace.id).toBe(homeSpace.id);
+  });
+
   it('fusiona un espacio de pareja remoto nuevo en el catálogo local y lo persiste', async () => {
     mockAuthSession(fakeSession);
     jest.mocked(loadSpaces).mockResolvedValue({

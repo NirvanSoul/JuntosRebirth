@@ -5,6 +5,7 @@ import { CategoryPreviewCard } from '@/features/categories/components/CategoryPr
 import type { Category } from '@/features/categories/types';
 import { mapWeekdayLabels } from '@/features/map/components/MapWeekdayHeader';
 import {
+  getMonthLabelParts,
   getMonthSeparatedWeekStart,
   type MonthSeparatedCalendarWeek,
 } from '@/features/map/model/calendarPeriods';
@@ -21,16 +22,15 @@ type MapWeekRowProps = {
   currentDate?: string;
   days: MapCalendarDays;
   hasMonthSeparator: boolean;
+  previewMode: 'cards' | 'pills';
   onOpenTransactionDetail?: (transactionId: string) => void;
   onSelectDate: (date: string) => void;
-  selectedDate?: string;
   testID: string;
   week: MonthSeparatedCalendarWeek;
 };
 
 /**
- * Cada semana solo recibe la fecha seleccionada o de hoy cuando le pertenece,
- * así cambiar de mes o de selección no vuelve a pintar el resto de filas.
+ * Cada semana solo recibe la fecha de hoy cuando le pertenece.
  */
 export const MapWeekRow = memo(function MapWeekRow({
   categoriesById,
@@ -39,19 +39,28 @@ export const MapWeekRow = memo(function MapWeekRow({
   hasMonthSeparator,
   onOpenTransactionDetail,
   onSelectDate,
-  selectedDate,
+  previewMode,
   testID,
   week,
 }: MapWeekRowProps) {
   const themedStyles = useThemedStyles(createThemedStyles);
+  const weekStart = getMonthSeparatedWeekStart(week)!;
+  const month = getMonthLabelParts(weekStart.slice(0, 7));
   return (
     <View
-      style={[
-        themedStyles.weekBlock,
-        hasMonthSeparator && styles.monthSeparator,
-      ]}
+      style={themedStyles.weekBlock}
       testID={`${testID}-week-${getMonthSeparatedWeekStart(week)}`}
     >
+      {hasMonthSeparator ? (
+        <View
+          style={styles.monthSeparator}
+          testID={`${testID}-month-${weekStart.slice(0, 7)}`}
+        >
+          <Text variant="footnote" tone="secondary" weight="semibold">
+            {month.month} {month.year}
+          </Text>
+        </View>
+      ) : null}
       <View style={styles.weekRow}>
         {week.map((date, dayIndex) => {
           if (!date) {
@@ -59,7 +68,6 @@ export const MapWeekRow = memo(function MapWeekRow({
           }
           const dayTransactions =
             days.get(date)?.transactions ?? emptyTransactions;
-          const selected = selectedDate === date;
           const isCurrentDate = currentDate === date;
           const dayOfMonth = Number(date.slice(8, 10));
           return (
@@ -67,7 +75,6 @@ export const MapWeekRow = memo(function MapWeekRow({
               <Pressable
                 accessibilityLabel={`${mapWeekdayLabels[dayIndex]} ${dayOfMonth}`}
                 accessibilityRole="button"
-                accessibilityState={{ selected }}
                 onPress={() => onSelectDate(date)}
                 style={({ pressed }) => [
                   styles.dayHeader,
@@ -78,25 +85,36 @@ export const MapWeekRow = memo(function MapWeekRow({
                 <View
                   style={[
                     styles.dayNumber,
-                    isCurrentDate && !selected && themedStyles.currentDay,
-                    selected && themedStyles.selectedDay,
+                    isCurrentDate && themedStyles.currentDay,
                   ]}
                 >
                   <Text
                     align="center"
-                    tone={selected ? 'onBrand' : 'primary'}
+                    tone={isCurrentDate ? 'onBrand' : 'primary'}
                     variant="body"
+                    weight="regular"
                   >
                     {dayOfMonth}
                   </Text>
                 </View>
               </Pressable>
               <View style={styles.movementList}>
-                {dayTransactions.map((transaction) => {
+                {(previewMode === 'pills'
+                  ? dayTransactions.slice(0, 3)
+                  : dayTransactions
+                ).map((transaction) => {
                   const category = categoriesById.get(transaction.categoryId);
                   return (
                     <CategoryPreviewCard
                       accessibilityHint="Abre el detalle del movimiento"
+                      actionTarget={
+                        previewMode === 'cards'
+                          ? {
+                              kind: 'transaction',
+                              id: transaction.id,
+                            }
+                          : undefined
+                      }
                       colorToken={category?.colorToken ?? 'slate'}
                       expenseMinor={0}
                       icon={category?.icon ?? 'receipt'}
@@ -113,10 +131,22 @@ export const MapWeekRow = memo(function MapWeekRow({
                           : undefined
                       }
                       testID={`${testID}-movement-${transaction.id}`}
-                      variant="compact"
+                      variant={previewMode === 'pills' ? 'pill' : 'compact'}
                     />
                   );
                 })}
+                {previewMode === 'pills' && dayTransactions.length > 3 ? (
+                  <View style={styles.overflow}>
+                    <Text
+                      align="center"
+                      variant="caption"
+                      tone="secondary"
+                      testID={`${testID}-overflow-${date}`}
+                    >
+                      +{dayTransactions.length - 3}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             </View>
           );
@@ -129,7 +159,7 @@ export const MapWeekRow = memo(function MapWeekRow({
 const styles = StyleSheet.create({
   weekRow: {
     flexDirection: 'row',
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
   },
   dayColumn: {
     flex: 1,
@@ -150,7 +180,12 @@ const styles = StyleSheet.create({
     borderRadius: spacing.sm,
   },
   movementList: { gap: spacing.xs },
-  monthSeparator: { paddingTop: spacing.xxxl },
+  overflow: { height: 24, justifyContent: 'center', alignItems: 'center' },
+  monthSeparator: {
+    height: spacing.xxxl,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   pressed: { opacity: 0.64 },
 });
 
@@ -162,10 +197,6 @@ function createThemedStyles(colors: ColorTokens) {
       borderBottomWidth: StyleSheet.hairlineWidth,
       paddingBottom: spacing.xl,
     },
-    currentDay: {
-      borderColor: colors.cta,
-      borderWidth: 1,
-    },
-    selectedDay: { backgroundColor: colors.cta },
+    currentDay: { backgroundColor: colors.cta },
   });
 }

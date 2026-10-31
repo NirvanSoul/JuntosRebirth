@@ -4,9 +4,10 @@ import {
 } from '@/features/profile/repositories/localProfileRepository';
 import { restoreOwnProfile } from '@/features/profile/services/restoreOwnProfile';
 import { restoreOwnAvatar } from '@/features/profile/services/syncOwnAvatar';
+import { syncOwnDefaultCurrency } from '@/features/profile/services/syncOwnDefaultCurrency';
 import { apiClient } from '@/services/api/juntossApiClient';
 import {
-  loadCurrencyPreferences,
+  loadStoredCurrencyPreferences,
   saveCurrencyPreferences,
 } from '@/state/appPreferences/currencyPreferencesRepository';
 
@@ -21,11 +22,16 @@ jest.mock('@/features/legal/services/authenticatedUser', () => ({
 jest.mock('@/features/profile/services/syncOwnAvatar', () => ({
   restoreOwnAvatar: jest.fn(),
 }));
+jest.mock('@/features/profile/services/syncOwnDefaultCurrency', () => ({
+  syncOwnDefaultCurrency: jest.fn(async () => true),
+}));
 jest.mock('@/services/api/juntossApiClient', () => ({
   apiClient: { get: jest.fn() },
 }));
 jest.mock('@/state/appPreferences/currencyPreferencesRepository', () => ({
-  loadCurrencyPreferences: jest.fn(async () => ({ currencies: ['EUR'] })),
+  loadStoredCurrencyPreferences: jest.fn(async () => ({
+    currencies: ['EUR'],
+  })),
   saveCurrencyPreferences: jest.fn(),
 }));
 
@@ -62,7 +68,7 @@ describe('restoreOwnProfile', () => {
 
   it('no reescribe las monedas de Venezuela si ya están guardadas', async () => {
     jest
-      .mocked(loadCurrencyPreferences)
+      .mocked(loadStoredCurrencyPreferences)
       .mockResolvedValueOnce({ currencies: ['USD', 'VES'] });
     jest.mocked(apiClient.get).mockResolvedValue({
       data: { profile: { countryCode: 'VE' } },
@@ -71,6 +77,46 @@ describe('restoreOwnProfile', () => {
     await restoreOwnProfile();
 
     expect(saveCurrencyPreferences).not.toHaveBeenCalled();
+  });
+
+  it('siembra las monedas del país si nunca se guardaron', async () => {
+    jest.mocked(loadStoredCurrencyPreferences).mockResolvedValueOnce(null);
+    jest.mocked(apiClient.get).mockResolvedValue({
+      data: { profile: { countryCode: 'CO' } },
+    } as never);
+
+    await restoreOwnProfile();
+
+    expect(saveCurrencyPreferences).toHaveBeenCalledWith({
+      currencies: ['COP'],
+    });
+    expect(syncOwnDefaultCurrency).toHaveBeenCalledWith('COP');
+  });
+
+  it('respeta las monedas que la persona ya eligió fuera de Venezuela', async () => {
+    jest
+      .mocked(loadStoredCurrencyPreferences)
+      .mockResolvedValueOnce({ currencies: ['COP', 'USD'] });
+    jest.mocked(apiClient.get).mockResolvedValue({
+      data: { profile: { countryCode: 'CO' } },
+    } as never);
+
+    await restoreOwnProfile();
+
+    expect(saveCurrencyPreferences).not.toHaveBeenCalled();
+    expect(syncOwnDefaultCurrency).not.toHaveBeenCalled();
+  });
+
+  it('no siembra EUR si el país no está en el catálogo', async () => {
+    jest.mocked(loadStoredCurrencyPreferences).mockResolvedValueOnce(null);
+    jest.mocked(apiClient.get).mockResolvedValue({
+      data: { profile: { countryCode: 'EC' } },
+    } as never);
+
+    await restoreOwnProfile();
+
+    expect(saveCurrencyPreferences).not.toHaveBeenCalled();
+    expect(syncOwnDefaultCurrency).not.toHaveBeenCalled();
   });
 
   it('conserva la caché si el backend todavía no entrega país', async () => {

@@ -1,8 +1,10 @@
 import {
   NavigationContainer,
+  type NavigationState,
   useNavigationContainerRef,
 } from '@react-navigation/native';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { PortalHost } from '@gorhom/portal';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -10,6 +12,8 @@ import { StyleSheet, View } from 'react-native';
 import { linking } from '@/navigation/linking';
 import type { RootDrawerParamList } from '@/navigation/types';
 import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
+import { noticeToastHostName } from '@/components/overlays/NoticeToast/NoticeToast';
+import { previewActionsHostName } from '@/components/overlays/PreviewActions/previewActions';
 import { MainTabsNavigator } from '@/navigation/MainTabsNavigator';
 import { AccessScreen } from '@/features/access/screens/AccessScreen';
 import { useBetterAuthSession } from '@/features/auth/hooks/useBetterAuthSession';
@@ -25,6 +29,13 @@ import { fontFamily } from '@/theme/fonts';
 import { markStartup } from '@/lib/diagnostics/startupTrace';
 import { CurrencySymbolPreferenceProvider } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { trackClarityScreen } from '@/services/analytics/clarityAnalytics';
+import { useAppLanguage } from '@/lib/i18n/useAppLanguage';
+
+/**
+ * Última pantalla visitada: al cambiar de idioma la navegación se vuelve a
+ * montar y arranca desde aquí. Solo se lee al montar el contenedor.
+ */
+let lastNavigationState: NavigationState | undefined;
 
 export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
   const navigationRef = useNavigationContainerRef<RootDrawerParamList>();
@@ -39,6 +50,16 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     setHasCompleted: setOnboardingCompleted,
   } = useOnboardingCompletion();
   const isNameIllustrationReady = useNameScreenIllustrationReady();
+  // Los textos se traducen al pintarse: al cambiar de idioma se vuelve a montar
+  // la navegación en la misma pantalla para que todo salga en el nuevo idioma.
+  const { language } = useAppLanguage();
+
+  useEffect(
+    () => () => {
+      lastNavigationState = undefined;
+    },
+    [],
+  );
 
   const trackCurrentScreen = useCallback(() => {
     const routeName = navigationRef.getCurrentRoute()?.name;
@@ -126,17 +147,24 @@ export function RootNavigator({ fontsReady = true }: { fontsReady?: boolean }) {
     <AccessScreen />
   );
   const navigationContent = (
-    <BottomSheetModalProvider>
+    <BottomSheetModalProvider key={language}>
       <NavigationContainer
         fallback={<LoadingState />}
+        initialState={lastNavigationState}
         linking={linking}
         onReady={trackCurrentScreen}
-        onStateChange={trackCurrentScreen}
+        onStateChange={(state) => {
+          lastNavigationState = state;
+          trackCurrentScreen();
+        }}
         ref={navigationRef}
         theme={navigationTheme}
       >
         {content}
       </NavigationContainer>
+      {/* Hermanos de las hojas: acciones de tarjeta y, encima, los avisos. */}
+      <PortalHost name={previewActionsHostName} />
+      <PortalHost name={noticeToastHostName} />
     </BottomSheetModalProvider>
   );
   const themedNavigationContent = forceLightTheme ? (

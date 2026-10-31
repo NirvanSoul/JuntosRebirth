@@ -16,6 +16,8 @@ import {
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
 import { updateProfileDisplayName } from '@/features/profile/services/updateProfileDisplayName';
 import { SettingsScreen } from '@/features/settings/screens/SettingsScreen';
+import { i18n } from '@/lib/i18n/i18n';
+import { loadLanguagePreference } from '@/lib/i18n/languagePreferenceRepository';
 import { ApiError } from '@/services/api/client';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import type { CurrencyPreferences } from '@/state/appPreferences/currencyPreferences';
@@ -123,7 +125,7 @@ describe('SettingsScreen', () => {
       expect(screen.getByTestId(`section-icon-${title}`)).toBeTruthy();
     }
 
-    expect(screen.getByTestId('pending-Idioma')).toBeTruthy();
+    expect(screen.queryByTestId('pending-Idioma')).toBeNull();
     expect(screen.getByTestId('currency-symbols-toggle')).toBeTruthy();
     expect(screen.queryByText('Gestionar espacios')).toBeNull();
     expect(screen.queryByText('Borrar mis datos')).toBeNull();
@@ -204,16 +206,21 @@ describe('SettingsScreen', () => {
     expect(toggle.props.thumbTintColor).toBe(colors.surface);
   });
 
-  it('explica una opción pendiente', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation();
+  it('cambia el idioma de la app desde la fila Idioma', async () => {
     const { screen } = await renderScreen();
 
+    expect(screen.getByText('Español')).toBeTruthy();
     await fireEvent.press(screen.getByText('Idioma'));
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Función pendiente',
-      expect.stringContaining('falta implementar'),
-    );
-    alertSpy.mockRestore();
+    await fireEvent.press(screen.getByTestId('language-preference-modal-en'));
+
+    expect(screen.getAllByText('Language').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('English').length).toBeGreaterThan(0);
+    // El resto de Ajustes se vuelve a pintar en inglés sin reabrir la pantalla.
+    expect(screen.getByText('Settings')).toBeTruthy();
+    expect(screen.getByText('Preferences')).toBeTruthy();
+    expect(screen.getByText('Sign out')).toBeTruthy();
+    await expect(loadLanguagePreference()).resolves.toBe('en');
+    await act(() => i18n.changeLanguage('es'));
   });
 
   it('abre las reglas de notificación en vez de mostrar el aviso pendiente', async () => {
@@ -482,29 +489,20 @@ describe('SettingsScreen', () => {
     );
   });
 
-  it('permite activar y desactivar el modo oscuro', async () => {
-    const { screen } = await renderScreen();
+  it.each(['light', 'dark'] as const)(
+    'no duplica el control de apariencia del menú lateral en modo %s',
+    async (appearance) => {
+      const { screen } = await renderScreen(
+        undefined,
+        undefined,
+        {},
+        appearance,
+      );
 
-    expect(screen.getByTestId('dark-mode-toggle').props.value).toBe(false);
-
-    fireEvent(screen.getByTestId('dark-mode-toggle'), 'valueChange', true);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('dark-mode-toggle').props.value).toBe(true),
-    );
-
-    fireEvent(screen.getByTestId('dark-mode-toggle'), 'valueChange', false);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('dark-mode-toggle').props.value).toBe(false),
-    );
-  });
-
-  it('muestra el modo oscuro activado cuando ya está seleccionado', async () => {
-    const { screen } = await renderScreen(undefined, undefined, {}, 'dark');
-
-    expect(screen.getByTestId('dark-mode-toggle').props.value).toBe(true);
-  });
+      expect(screen.queryByTestId('dark-mode-toggle')).toBeNull();
+      expect(screen.queryByText('Modo oscuro')).toBeNull();
+    },
+  );
 
   it('ya no anuncia que los datos quedan solo en el dispositivo y explica cómo cambiar la foto', async () => {
     const { screen } = await renderScreen();

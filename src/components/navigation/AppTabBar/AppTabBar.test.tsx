@@ -3,6 +3,7 @@ import { fireEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { AppTabBar } from '@/components/navigation/AppTabBar/AppTabBar';
+import { i18n } from '@/lib/i18n/i18n';
 import { renderWithTheme } from '@/test/renderWithTheme';
 import { colors } from '@/theme/colors';
 import { radii } from '@/theme/radii';
@@ -41,6 +42,23 @@ function createTabBarProps() {
 }
 
 describe('AppTabBar', () => {
+  it('nombra las pestañas en el idioma activo', async () => {
+    const { onCreatePress, props } = createTabBarProps();
+    await i18n.changeLanguage('en');
+    try {
+      const screen = await renderWithTheme(
+        <AppTabBar {...props} onCreatePress={onCreatePress} />,
+      );
+
+      for (const label of ['Home', 'Activity', 'Map', 'Soon']) {
+        expect(screen.getByLabelText(label)).toBeTruthy();
+      }
+      expect(screen.getByLabelText('Create')).toBeTruthy();
+    } finally {
+      await i18n.changeLanguage('es');
+    }
+  });
+
   it('impide abrir Actividad y Mapa cuando esas rutas están bloqueadas', async () => {
     const { navigate, onCreatePress, props } = createTabBarProps();
     const screen = await renderWithTheme(
@@ -104,10 +122,7 @@ describe('AppTabBar', () => {
     });
     expect(
       StyleSheet.flatten(screen.getByTestId('app-tab-item-Home').props.style),
-    ).toMatchObject({
-      backgroundColor: 'rgba(242, 242, 247, 1)',
-      borderRadius: radii.round,
-    });
+    ).not.toHaveProperty('backgroundColor');
     expect(
       StyleSheet.flatten(
         screen.getByTestId('floating-create-button-container').props.style,
@@ -133,5 +148,20 @@ describe('AppTabBar', () => {
       screen.getByTestId('app-tab-bar', { includeHiddenElements: true }).props
         .pointerEvents,
     ).toBe('none');
+  });
+
+  it('baja fuera de la pantalla, con el botón +, al bajarla', async () => {
+    const { onCreatePress, props } = createTabBarProps();
+    const screen = await renderWithTheme(
+      <AppTabBar {...props} lowered onCreatePress={onCreatePress} />,
+    );
+    const bar = screen.getByTestId('app-tab-bar', {
+      includeHiddenElements: true,
+    });
+
+    expect(bar.props.pointerEvents).toBe('none');
+    expect(
+      StyleSheet.flatten(bar.props.style).transform?.[0]?.translateY,
+    ).toBeGreaterThan(0);
   });
 });

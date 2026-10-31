@@ -21,7 +21,10 @@ import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/component
 import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import type { MoneyAccount } from '@/features/accounts/types';
+import type { MoneyAccountCreationRequest } from '@/features/accounts/hooks/useMoneyAccounts';
+import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
+import { getCategoryCopyItem } from '@/features/categories/components/CategoryIcon/categoryCopyItem';
 import type { Category } from '@/features/categories/types';
 import { createStyles } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal.styles';
 import {
@@ -49,6 +52,14 @@ import {
   getUpcomingTransactionDates,
   parseProjectedTransactionId,
 } from '@/features/transactions/utils/transactionRecurrence';
+import {
+  getTransactionDeletionCopy,
+  transactionCopyToSpaceCopy,
+} from '@/features/transactions/utils/transactionActionCopy';
+import {
+  type CopiedSpaceIds,
+  getTransactionCopyTargets,
+} from '@/features/transactions/utils/transactionCopyIdentity';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import {
@@ -65,7 +76,7 @@ type TransactionDetailModalProps = {
   /** Cuenta del movimiento; puede estar archivada y se sigue mostrando. */
   moneyAccount?: MoneyAccount | null;
   /** Cuentas asignables: solo las activas del espacio en esta misma moneda. */
-  assignableMoneyAccounts?: readonly MoneyAccount[];
+  assignableMoneyAccounts?: readonly MoneyAccountSummary[];
   onClose: () => void;
   onDismissed?: () => void;
   onCopy: (
@@ -77,8 +88,12 @@ type TransactionDetailModalProps = {
     transactionId: string,
     initialEditor?: TransactionEditorTarget,
   ) => void;
-  onCreateMoneyAccount?: () => void;
-  onOpenCategoryDetail?: (categoryId: string) => void;
+  /** Crea una cuenta y la asigna al movimiento en cuanto existe. */
+  onCreateMoneyAccount?: (request: MoneyAccountCreationRequest) => void;
+  /** Abre el detalle de la categoría del movimiento desde su icono. */
+  onOpenCategory?: (categoryId: string) => void;
+  /** Abre el selector de categorías encima del detalle para cambiarla. */
+  onOpenCategoryPicker?: () => void;
   /** Guarda un cambio puntual sin salir del detalle. */
   onQuickEdit?: (transactionId: string, change: TransactionQuickEdit) => void;
   onRemoveReminder: (transactionId: string) => boolean | Promise<boolean>;
@@ -90,6 +105,8 @@ type TransactionDetailModalProps = {
   ) => boolean | Promise<boolean>;
   reminder: TransactionReminder | null;
   shareTargets: readonly CopyTarget[];
+  /** Copiar solo ofrece los espacios donde el movimiento aún no está. */
+  copiedSpaceIds?: CopiedSpaceIds;
   transaction: SessionTransaction | null;
   transactions: readonly SessionTransaction[];
   visible: boolean;
@@ -100,11 +117,13 @@ const recurrencePageSize = 5;
 export function TransactionDetailModal({
   assignableMoneyAccounts = [],
   category,
+  copiedSpaceIds,
   moneyAccount,
   onClose,
   onDismissed,
   onCreateMoneyAccount,
-  onOpenCategoryDetail,
+  onOpenCategory,
+  onOpenCategoryPicker,
   onQuickEdit,
   onCopy,
   onDelete,
@@ -135,7 +154,9 @@ export function TransactionDetailModal({
   const author = useTransactionAuthor(transaction?.createdBy ?? '');
   const canDisplayVenezuelaRates = useCanDisplayVenezuelaRates(transaction);
 
-  if (useDepsChanged([transaction, visible]) && visible) {
+  // Por id y no por objeto: la sincronización vuelve a crear el movimiento
+  // aunque no cambie, y reiniciar aquí cerraría el selector que esté abierto.
+  if (useDepsChanged([transaction?.id, visible]) && visible) {
     setSpacePickerVisible(false);
     setReminderModalVisible(false);
     setNoteModalVisible(false);
@@ -155,8 +176,13 @@ export function TransactionDetailModal({
   if (!transaction) return null;
 
   const title = transaction.title.trim() || category?.name || 'Movimiento';
-  const openCategory = () => category && onOpenCategoryDetail?.(category.id);
+  const categoryEditorLabel = category
+    ? `Cambiar categoría: ${category.name}`
+    : 'Elegir una categoría para este movimiento';
   const isProjected = parseProjectedTransactionId(transaction.id) !== null;
+  const copyTargets = copiedSpaceIds
+    ? getTransactionCopyTargets([transaction], shareTargets, copiedSpaceIds)
+    : shareTargets;
   const upcomingDates = getUpcomingTransactionDates({
     count: visibleRecurrenceCount + 1,
     transaction,
@@ -209,13 +235,16 @@ export function TransactionDetailModal({
             <View style={styles.hero}>
               <Pressable
                 accessibilityLabel={
-                  category
+                  category && onOpenCategory
                     ? `Abrir categoría: ${category.name}`
-                    : 'Sin categoría'
+                    : categoryEditorLabel
                 }
-                accessibilityRole={category ? 'button' : undefined}
-                disabled={!category}
-                onPress={openCategory}
+                accessibilityRole="button"
+                onPress={
+                  category && onOpenCategory
+                    ? () => onOpenCategory(category.id)
+                    : onOpenCategoryPicker
+                }
                 style={({ pressed }) => [
                   styles.heroIcon,
                   {
@@ -286,21 +315,10 @@ export function TransactionDetailModal({
 
             {isDeleteVisible ? (
               <DestructiveConfirmationPanel
-                description={
-                  isProjected
-                    ? 'Se omitirá solo esta repetición. Las demás fechas de la serie seguirán iguales.'
-                    : transaction.sourceTransactionId
-                      ? 'Es una copia de otro espacio. Se eliminará solo en este espacio; el movimiento original no se verá afectado.'
-                      : 'Dejará de aparecer en este espacio y sus totales se actualizarán.'
-                }
+                {...getTransactionDeletionCopy(transaction)}
                 onCancel={() => setDeleteVisible(false)}
                 onConfirm={() => onDelete(transaction.id)}
                 testID="transaction-delete-panel"
-                title={
-                  isProjected
-                    ? '¿Eliminar esta repetición?'
-                    : '¿Eliminar este movimiento?'
-                }
               />
             ) : null}
 
@@ -313,22 +331,38 @@ export function TransactionDetailModal({
             {!isProjected ? (
               <TransactionDetailSecondaryActions
                 hasReminder={Boolean(reminder)}
-                hasShareTargets={shareTargets.length > 0}
+                hasShareTargets={copyTargets.length > 0}
                 onPressCopy={() => setSpacePickerVisible(true)}
                 onPressReminder={() => setReminderModalVisible(true)}
               />
             ) : null}
 
             <View style={styles.detailsCard}>
+              {/* Primero el autor: es la única fila que no se puede tocar. */}
+              {author ? (
+                <>
+                  <View
+                    style={styles.detailRow}
+                    testID="transaction-detail-author-row"
+                  >
+                    <Avatar
+                      size={iconSize.sm}
+                      uri={author.profile?.avatarUri}
+                    />
+                    <View style={styles.detailCopy}>
+                      <Text tone="secondary" variant="caption">
+                        Autor
+                      </Text>
+                      <Text variant="label">{formatAuthorName(author)}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.divider} />
+                </>
+              ) : null}
               <Pressable
-                accessibilityLabel={
-                  category
-                    ? `Abrir categoría: ${category.name}`
-                    : 'Sin categoría'
-                }
-                accessibilityRole={category ? 'button' : undefined}
-                disabled={!category}
-                onPress={openCategory}
+                accessibilityLabel={categoryEditorLabel}
+                accessibilityRole="button"
+                onPress={onOpenCategoryPicker}
                 style={({ pressed }) => [
                   styles.detailRow,
                   pressed && styles.pressed,
@@ -434,26 +468,6 @@ export function TransactionDetailModal({
                   size={iconSize.sm}
                 />
               </Pressable>
-              {author ? (
-                <>
-                  <View style={styles.divider} />
-                  <View
-                    style={styles.detailRow}
-                    testID="transaction-detail-author-row"
-                  >
-                    <Avatar
-                      size={iconSize.sm}
-                      uri={author.profile?.avatarUri}
-                    />
-                    <View style={styles.detailCopy}>
-                      <Text tone="secondary" variant="caption">
-                        Autor
-                      </Text>
-                      <Text variant="label">{formatAuthorName(author)}</Text>
-                    </View>
-                  </View>
-                </>
-              ) : null}
               <View style={styles.divider} />
               <Pressable
                 accessibilityLabel={`Cambiar recurrencia: ${transactionRecurrenceLabels[transaction.recurrence]}`}
@@ -612,7 +626,21 @@ export function TransactionDetailModal({
         assignableMoneyAccounts={assignableMoneyAccounts}
         field={quickEditField}
         onClose={() => setQuickEditField(null)}
-        onCreateMoneyAccount={onCreateMoneyAccount}
+        onCreateMoneyAccount={
+          onCreateMoneyAccount
+            ? () =>
+                onCreateMoneyAccount({
+                  currency: transaction.currency,
+                  onCreated: (moneyAccountId) => {
+                    setQuickEditField(null);
+                    onQuickEdit?.(transaction.id, {
+                      field: 'money-account',
+                      moneyAccountId,
+                    });
+                  },
+                })
+            : undefined
+        }
         onSubmit={(change) => {
           setQuickEditField(null);
           onQuickEdit?.(transaction.id, change);
@@ -621,14 +649,12 @@ export function TransactionDetailModal({
       />
 
       <CopyToSpaceModal
-        description="Elige dónde crear una copia independiente de este movimiento."
-        failureMessage={(target) =>
-          `No se pudo copiar el movimiento en ${target.name}.`
-        }
+        {...transactionCopyToSpaceCopy}
+        {...getCategoryCopyItem(category)}
         itemName={title}
         onClose={() => setSpacePickerVisible(false)}
         onSelect={(targetSpaceId) => onCopy(transaction.id, targetSpaceId)}
-        targets={shareTargets}
+        targets={copyTargets}
         testID="transaction-space-picker-modal"
         visible={isSpacePickerVisible}
       />

@@ -1,6 +1,11 @@
-import { fireEvent } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { fireEvent, within } from '@testing-library/react-native';
+import {
+  type MeasureInWindowOnSuccessCallback,
+  StyleSheet,
+  View,
+} from 'react-native';
 
+import { PreviewActionsContext } from '@/components/overlays/PreviewActions/previewActions';
 import { TransactionPeriodModal } from '@/features/dashboard/components/TransactionPeriodModal/TransactionPeriodModal';
 import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
@@ -90,6 +95,113 @@ describe('TransactionPeriodModal', () => {
     });
   });
 
+  it('deja el botón de añadir flotando sobre la lista', async () => {
+    const { getByRole, getByTestId } = await renderWithTheme(
+      <TransactionPeriodModal
+        categories={[]}
+        onAdd={jest.fn()}
+        onClose={jest.fn()}
+        transactions={transactions}
+        type="expense"
+        visible
+      />,
+    );
+
+    expect(
+      StyleSheet.flatten(
+        getByRole('button', { name: 'Añadir gasto' }).props.style,
+      ),
+    ).toMatchObject({ position: 'absolute' });
+    // El final del scroll reserva el alto del botón para el último movimiento.
+    expect(
+      StyleSheet.flatten(
+        getByTestId('expense-period-scroll-view').props.contentContainerStyle,
+      ).paddingBottom,
+    ).toBeGreaterThan(0);
+  });
+
+  it('sigue bajando hacia los periodos anteriores sin cambiar el selector', async () => {
+    const history = [
+      ...transactions,
+      transaction('expense-march', 'expense', 300, '2026-03-05'),
+    ];
+    const { getAllByTestId, getByTestId, queryByText } = await renderWithTheme(
+      <TransactionPeriodModal
+        categories={[]}
+        onAdd={jest.fn()}
+        onClose={jest.fn()}
+        transactions={history}
+        type="expense"
+        visible
+      />,
+    );
+
+    // Bajo julio siguen los movimientos de junio, sin título propio.
+    const [june] = getAllByTestId('expense-period-older-section');
+    expect(within(june!).getByText('expense-june')).toBeTruthy();
+    expect(queryByText('Junio 2026')).toBeNull();
+    expect(queryByText('expense-march')).toBeNull();
+
+    // Al bajar, el selector fijo de arriba pasa al mes que se ve y, cerca del
+    // final, se añade el siguiente con movimientos saltando los vacíos.
+    const selector = getByTestId('expense-period-selector');
+    const scrollView = getByTestId('expense-period-scroll-view');
+    await fireEvent(scrollView, 'layout', {
+      nativeEvent: { layout: { height: 600 } },
+    });
+    await fireEvent(june!, 'layout', { nativeEvent: { layout: { y: 400 } } });
+    expect(within(selector).getByText('Julio 2026')).toBeTruthy();
+    await fireEvent.scroll(scrollView, {
+      nativeEvent: {
+        contentOffset: { y: 300 },
+        contentSize: { height: 1000, width: 390 },
+        layoutMeasurement: { height: 600, width: 390 },
+      },
+    });
+
+    expect(within(selector).getByText('Junio 2026')).toBeTruthy();
+    expect(getAllByTestId('expense-period-older-section')).toHaveLength(2);
+    expect(queryByText('expense-march')).toBeTruthy();
+  });
+
+  it('abre las acciones de un movimiento con una pulsación larga', async () => {
+    const openPreviewActions = jest.fn();
+    const { getAllByTestId } = await renderWithTheme(
+      <PreviewActionsContext.Provider value={openPreviewActions}>
+        <TransactionPeriodModal
+          categories={[]}
+          onAdd={jest.fn()}
+          onClose={jest.fn()}
+          transactions={transactions}
+          type="expense"
+          visible
+        />
+      </PreviewActionsContext.Provider>,
+    );
+
+    // El entorno de pruebas no mide vistas: se simula la posición en ventana.
+    const measure = jest
+      .spyOn(
+        View.prototype as {
+          measureInWindow: (callback: MeasureInWindowOnSuccessCallback) => void;
+        },
+        'measureInWindow',
+      )
+      .mockImplementation((callback) => callback(20, 400, 60, 74));
+    await fireEvent(
+      getAllByTestId('transaction-preview-card')[0]!,
+      'longPress',
+    );
+    measure.mockRestore();
+
+    expect(openPreviewActions).toHaveBeenCalledWith(
+      { kind: 'transaction', id: 'expense-july' },
+      expect.anything(),
+      expect.any(Function),
+      true,
+    );
+  });
+
   it('compara los ingresos del mes con el mes anterior', async () => {
     const { getByText } = await renderWithTheme(
       <TransactionPeriodModal
@@ -102,8 +214,8 @@ describe('TransactionPeriodModal', () => {
       />,
     );
 
-    expect(getByText('vs. mes anterior')).toBeTruthy();
-    expect(getByText('20%')).toBeTruthy();
+    expect(getByText('más que el mes anterior')).toBeTruthy();
+    expect(getByText('2\u00a0€')).toBeTruthy();
   });
 
   it('compara los gastos del mes con el mes anterior', async () => {
@@ -118,7 +230,8 @@ describe('TransactionPeriodModal', () => {
       />,
     );
 
-    expect(getByText('20%')).toBeTruthy();
+    expect(getByText('1\u00a0€')).toBeTruthy();
+    expect(getByText('menos que el mes anterior')).toBeTruthy();
   });
 
   it('compara el balance del mes con el mes anterior', async () => {
@@ -133,7 +246,7 @@ describe('TransactionPeriodModal', () => {
       />,
     );
 
-    expect(getByText('60%')).toBeTruthy();
+    expect(getByText('3\u00a0€')).toBeTruthy();
   });
 
   it('respeta el mes y la moneda iniciales enviados por la pantalla de origen', async () => {

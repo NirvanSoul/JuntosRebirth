@@ -1,13 +1,11 @@
 import { useMemo } from 'react';
 
 import type { TransactionFilters } from '@/features/activity/components/TransactionFiltersModal';
+import { matchesTransactionAuthorFilter } from '@/features/activity/utils/transactionAuthorFilter';
 import { matchesTransactionDateFilter } from '@/features/activity/utils/transactionDateFilter';
 import type { Category } from '@/features/categories/types';
 import type { SessionTransaction } from '@/features/transactions/types';
-import {
-  resolveTransactionAuthor,
-  type TransactionAuthorContext,
-} from '@/features/transactions/utils/transactionAuthor';
+import type { TransactionAuthorContext } from '@/features/transactions/utils/transactionAuthor';
 import { listTransactionsThroughCurrentMonth } from '@/features/transactions/utils/transactionSummary';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { getLocalTodayKey } from '@/lib/date/localDate';
@@ -47,10 +45,11 @@ export function useCategoryDetailTransactions({
   const authorFilteredTransactions = useMemo(() => {
     if (filters.author === 'all' || !isSharedSpace) return transactions;
 
-    return transactions.filter(
-      (transaction) =>
-        resolveTransactionAuthor(transaction.createdBy, membership).isOwn ===
-        (filters.author === 'own'),
+    return transactions.filter((transaction) =>
+      matchesTransactionAuthorFilter(transaction, filters.author, {
+        ...membership,
+        isSharedSpace,
+      }),
     );
   }, [filters.author, isSharedSpace, membership, transactions]);
   const matchesCategory = useMemo(

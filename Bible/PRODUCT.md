@@ -129,12 +129,26 @@ dentro de un único carrusel horizontal. Ninguna categoría de plantilla o perso
 implícitamente en otro espacio. Los iconos de categoría usan siempre su
 variante rellena para mantener una identidad visual consistente.
 
-Una categoría puede tener un presupuesto simple opcional. El presupuesto es
-mensual: se reinicia cada mes y solo lo consumen los gastos del mes en curso en
-la moneda del espacio, incluidos los recurrentes programados dentro de ese mes.
-Cuando existe, las vistas previas pueden mostrar el progreso del gasto del mes
-frente a ese límite; cuando no existe, no deben simular ni mostrar un anillo de
-progreso.
+En el detalle de un movimiento, el icono grande de la categoría abre el
+detalle de esa categoría; la fila `Categoría` es la que permite cambiarla.
+
+Una categoría puede tener un presupuesto opcional por moneda: cada moneda
+tiene el suyo, independiente, o ninguno. Cada presupuesto tiene periodicidad
+mensual (por defecto), semanal, quincenal o personalizada (cada N días, de 2 a
+365, desde una fecha de inicio). Se reinicia en cada periodo y solo lo
+consumen los gastos del periodo en curso en su moneda, incluidos los
+recurrentes programados dentro de él. Inicio, Actividad y el detalle de la
+categoría muestran el presupuesto de la moneda que se está viendo; si esa
+moneda no tiene presupuesto, no se muestra ninguno y el detalle ofrece
+`Añadir presupuesto` en esa moneda. El selector de moneda del detalle incluye
+también las monedas con presupuesto aunque aún no tengan movimientos. El importe de un
+periodo concreto, pasado o futuro, puede cambiarse sin tocar el resto, y la
+periodicidad puede cambiar desde un periodo en adelante conservando la
+anterior en los periodos previos. Cambiarla para todo el presupuesto, desde el
+detalle de la categoría, descarta esos importes y tramos, avisándolo antes de
+guardar. Cuando existe, las vistas previas pueden mostrar el progreso del gasto
+del periodo frente a ese límite; cuando no existe, no deben simular ni mostrar
+un anillo de progreso.
 
 Ejemplo:
 
@@ -158,6 +172,21 @@ lo permiten— y cada una lleva su propio saldo; nunca se suman entre sí. Al
 registrar un movimiento solo se ofrecen cuentas que guarden su moneda. El tipo
 solo propone el icono y el color al crearla: los tres calculan el saldo igual y
 cualquiera puede quedar en negativo.
+
+El selector de cuenta —desde el formulario de movimiento, el detalle de un
+movimiento y el cambio de divisa— muestra cada cuenta como su tarjeta de
+preview en tamaño compacto, con icono, monedas, nombre, tipo y saldo. Las
+tarjetas van en dos filas, dos por fila y cada una de la mitad del ancho
+disponible; con más de cuatro cuentas las filas se recorren en horizontal. La
+tarjeta elegida se rellena con el color de su cuenta y su texto e icono pasan a
+blanco. Debajo, en una misma fila, `Sin cuenta` y `Crear cuenta` usan el badge
+de creación de la sección de cuentas de Actividad: `Sin cuenta` lleva un signo
+menos sobre fondo oscuro en lugar del más violeta y, al elegirla, marca su borde
+con ese mismo tono oscuro. Si desde el selector del detalle de un movimiento se
+crea una cuenta, esta nace con la moneda del movimiento, queda asignada a él al
+guardarse y el selector se cierra. Toda cuenta creada se confirma con el aviso
+inferior `Cuenta «nombre» creada`, con el icono de la cuenta sobre su color. En el selector la pulsación
+larga no abre editar ni eliminar.
 
 Después de registrar movimientos, las monedas ya guardadas y sus saldos
 iniciales no se pueden alterar. Una cuenta nueva nace solo con la moneda
@@ -313,7 +342,14 @@ se desplaza de forma animada al inicio.
 
 - Espacio activo.
 - Balance disponible como cifra principal, libre sobre el fondo.
-- Ingresos y gastos del mes.
+- Selector de periodo sobre el arco de ingresos y gastos: el mismo de
+  Categoría y los donuts, con el periodo en el centro que despliega `Todos`,
+  semanal, quincenal, mensual, anual y `Personalizada`. Abre en el mes en curso
+  y se conserva al cambiar de pantalla.
+- Ingresos y gastos del periodo elegido.
+- Un anuncio nativo de Google AdMob bajo los ingresos y gastos, con la
+  etiqueta `Anuncio`. Solo aparece tras el mensaje de consentimiento de Google
+  y no ocupa espacio si no hay anuncio. En desarrollo usa el bloque de prueba.
 - Progreso circular por categoría únicamente cuando tenga presupuesto.
 - Vista previa de categorías.
 - Vista previa de cuentas.
@@ -339,8 +375,12 @@ saturarse con gráficas complejas.
 
 Inicio trabaja con un horizonte mensual. El balance acumula los movimientos de
 meses anteriores y todos los ingresos y gastos registrados para el mes local
-actual, aunque su día todavía no haya llegado. Los indicadores de ingresos y
-gastos muestran únicamente ese mes completo. Ningún movimiento de un mes
+actual, aunque su día todavía no haya llegado. El arco y los indicadores de
+ingresos y gastos muestran el periodo elegido en el selector (por defecto, ese
+mes completo, con las recurrencias proyectadas si el periodo es futuro). El
+balance disponible también sigue al selector: es el que quedaba al cerrar el
+periodo elegido, es decir, lo que sobró de los periodos anteriores más lo del
+periodo, igual que en Mapa. Con `Todos` es el balance acumulado actual. Ningún movimiento de un mes
 posterior entra todavía en el balance, los totales, los presupuestos, las
 categorías ni los movimientos recientes; sigue visible en Mapa para poder
 consultarlo y editarlo.
@@ -356,14 +396,35 @@ series abiertas sin sumarlas al resumen de Inicio ni persistir filas por
 adelantado. Los filtros reutilizan la opción seleccionable compartida, con
 superficie blanca y, al seleccionar, texto violeta y el mismo borde en violeta
 en lugar de gris, sin check, para que quepan en una sola fila. Debajo muestran una tarjeta con el total de ingresos o gastos del
-periodo seleccionado. Después del listado aparece la acción `Añadir ingreso` en
-verde o `Añadir gasto` en rojo.
+periodo seleccionado. La acción `Añadir ingreso` en verde o `Añadir gasto` en
+rojo flota sobre el listado, anclada al pie del modal, para que nunca se pierda
+por mucho que se baje.
+
+Al terminar los movimientos del periodo elegido, el listado sigue hacia atrás
+con los del periodo anterior, sin título propio, y al acercarse al final se
+añade el siguiente. Se saltan los periodos sin movimientos y se detiene en el
+primero registrado. El selector de periodo queda fijo arriba y, al bajar, pasa
+al periodo que se está viendo (por ejemplo, de `Octubre 2026` a
+`Septiembre 2026`); usar sus flechas u opciones desde ahí elige ese periodo y
+vuelve el listado arriba. Así se revisan meses anteriores sin subir a cambiar
+el selector; la tarjeta de total sigue refiriéndose solo al periodo elegido.
+Con `Todos` no hay periodos anteriores.
+
+Los movimientos de estos modales admiten la misma pulsación larga que en
+Inicio y Actividad: abre sus acciones (editar, copiar, eliminar) y eliminar o
+copiar pasan a la selección múltiple para actuar sobre varios a la vez.
 
 El bloque completo de `Balance disponible`, incluidos su texto y su importe, es
 accionable y abre una tercera variante del mismo modal. Esta combina ingresos y
 gastos en un único listado, conserva los mismos filtros y navegador temporal y
-muestra en la tarjeta resumen el balance del periodo. Su acción inferior dice
+muestra en la tarjeta resumen el balance del periodo. Su acción flotante dice
 `Añadir movimiento` y abre el formulario con la posibilidad de alternar el tipo.
+
+En un espacio juntos, las tres variantes muestran en la cabecera, a la izquierda
+del botón de cerrar, el mismo botón de filtros de Actividad. Abre la variante
+del modal de filtros que contiene solo `Autor`, porque el periodo ya vive a la
+vista; el filtro elegido afecta al total, a la comparación y al listado. Al
+abrir el modal se toma el autor filtrado en Actividad, o `Ambos` desde Inicio.
 
 Las vistas previas de categoría y de movimiento con datos son accionables. Al
 tocarlas abren directamente el modal de detalle del elemento elegido, sin
@@ -395,11 +456,38 @@ Nombre de trabajo para agrupar:
 - Balance.
 - Distribución por categoría con selector de gastos e ingresos.
 - Búsqueda.
-- Filtro por fecha.
+- Filtro por fecha fuera del modal: el selector de periodo de Categoría va
+  justo encima de los badges de balance, ingresos y gastos de Movimientos y se
+  aplica al momento. No cuenta como filtro activo del botón de filtros.
+  Empieza en el mes en curso; «Desde el inicio» (`Todos`) se elige a mano.
+- Con «Desde el inicio», la lista va por meses, cada uno con su subtítulo
+  («Noviembre 2026»): primero el mes en curso, al bajar los doce meses
+  siguientes con lo previsto (recurrencias proyectadas y movimientos con fecha
+  futura) y, tras el último, los meses anteriores hacia atrás. Dentro de cada
+  mes, del día más reciente al más antiguo. Con cualquier otro periodo la
+  lista es solo la de ese periodo, sin subtítulos.
+- Cada subtítulo de mes es un botón con la flecha de las secciones de
+  Actividad a la derecha, en la misma línea: pulsarlo pliega o despliega los
+  movimientos de ese mes con la misma animación. Los meses plegados se
+  recuerdan mientras Actividad sigue abierta.
 - Filtro por tipo.
 - Filtro por categoría.
 - Filtro por recurrencia.
 - Filtro por moneda cuando el espacio contiene movimientos en dos o más monedas.
+- Filtro por autor en un espacio juntos: `Ambos`, `Yo` y el nombre de la
+  pareja, en tres botones de una misma fila. Cuenta como de la pareja solo lo
+  que firmó ella; lo creado antes de iniciar sesión o sin conexión es propio.
+  El autor elegido se hereda al abrir desde Actividad los modales de gastos,
+  ingresos y balance y el detalle de categoría.
+- Con algún filtro aplicado, el botón de filtros —en cualquier pantalla— pinta
+  su icono y su borde en violeta. Al aplicar, un aviso inferior como el de un movimiento
+  creado confirma `Filtro aplicado` (o `Filtros quitados` si se limpian).
+- Mapa filtra su calendario y su resumen mensual por tipo, categoría,
+  recurrencia y, en un espacio juntos, autor; el mes y la moneda se eligen
+  fuera del modal.
+- Los filtros de Actividad y de Mapa se conservan al cambiar de pantalla o de
+  pestaña y vuelven a su estado inicial al cerrar la app; solo viven en
+  memoria.
 - Detalle de movimiento.
 - Categorías.
 - Detalle de categoría.
@@ -419,7 +507,10 @@ transición breve que respeta el movimiento reducido del sistema.
 Debajo del título `Movimientos`, Actividad muestra un resumen compacto de
 ingresos, gastos y balance. Las tres cifras se calculan sobre el mismo conjunto
 de movimientos que presenta el listado y se actualizan al combinar o limpiar
-sus filtros. Cuando el resumen alcanza la parte superior al recorrer los
+sus filtros. Con «Desde el inicio» resumen el mes que se está viendo: cambia
+cuando el subtítulo de un mes llega bajo el resumen fijo, y muestra los
+ingresos y gastos de ese mes y el balance acumulado hasta su último día, que
+arrastra el de los meses anteriores. Cuando el resumen alcanza la parte superior al recorrer los
 movimientos, permanece flotando en la franja del selector de espacio y lo
 sustituye temporalmente: el mismo bloque de badges pasa a sticky con una
 transición breve y un borde visible, mientras el selector sale hacia la
@@ -433,8 +524,8 @@ Debajo de la sección de categorías aparece la sección `Cuentas`, también
 plegable. La encabeza el mismo donut que reparte las categorías, aquí repartido
 por cuenta: el arco de cada una crece con su importe y la leyenda de badges
 lleva su color y su nombre. Su selector alterna entre gastos e ingresos —para
-saber qué cuenta genera más de cada uno— y su encabezado recorre meses
-anteriores sin permitir navegar a meses futuros. Reparte solo la moneda
+saber qué cuenta genera más de cada uno— y su encabezado usa el mismo selector
+de periodo que la gráfica de categorías. Reparte solo la moneda
 seleccionada en los movimientos, nunca suma divisas distintas, y deja fuera los
 movimientos sin cuenta. Tocar un badge abre el detalle de esa cuenta. Debajo,
 presenta el encabezado `Detalles por cuenta` con un botón que alterna entre la
@@ -461,10 +552,19 @@ tarjetas: su enlace `Ver más` lleva a la sección de cuentas de Actividad.
 La gráfica y el listado forman una única sección plegable antes de los
 movimientos: el donut aparece primero y debajo se muestra el detalle por
 categoría. La gráfica siempre ofrece el total y los porcentajes como alternativa
-textual accesible. El encabezado de la gráfica permite recorrer meses anteriores
-y volver hacia el mes actual, sin permitir navegar a meses futuros. Sus segmentos
-se trazan al entrar en Actividad, cambiar de mes y alternar entre gastos e
-ingresos. Cuando el tipo y mes elegidos no tienen movimientos asociados a
+textual accesible. Su leyenda de badges ocupa como máximo tres filas; los que no
+caben siguen en horizontal y se desplazan a todo el ancho de la pantalla, sin
+cortarse en los márgenes. La vista de cuadrícula de `Detalle por categoría`
+sigue la misma regla: tres columnas y hasta tres filas, y el resto se desplaza
+hacia la derecha. La vista de lista agrupa las categorías de cuatro en cuatro:
+con más de cuatro, cada grupo es una tarjeta que se desliza en horizontal y deja
+asomar la siguiente. El encabezado de la gráfica reutiliza el selector de periodo
+del detalle de categoría: abre en el mes en curso y, al pulsar el texto del
+periodo, despliega `Todos`, semana, quincena, mes, año o un rango
+`Personalizado`. Las flechas recorren periodos anteriores y vuelven hacia el
+actual, sin permitir avanzar más allá del periodo en curso. Sus segmentos
+se trazan al entrar en Actividad, cambiar de periodo y alternar entre gastos e
+ingresos. Cuando el tipo y periodo elegidos no tienen movimientos asociados a
 categorías, la pantalla indica que debe registrarse y asociarse uno. Las vistas
 previas de categoría de esta pantalla muestran el icono y el nombre y, cuando
 existe presupuesto, el gasto acumulado y su progreso lineal. No muestran la
@@ -530,7 +630,23 @@ por lo que estos importes cambian entre las monedas reales del espacio sin
 sumarlas ni convertirlas entre sí. Al pulsar cada indicador se abre el detalle
 reutilizado de Ingresos, Gastos o Balance, ya situado en ese mes y moneda.
 
-Cada movimiento se representa con la mini tarjeta de su categoría. Su título
+El balance de Mapa no es solo el del mes: suma el saldo que arrastran los meses
+anteriores —lo que sobró o la deuda acumulada— para indicar el dinero disponible
+al cerrar el mes enfocado. Los indicadores de ingresos y gastos siguen mostrando
+únicamente ese mes. El detalle de Balance abierto desde Mapa aplica la misma
+regla a cualquier periodo elegido, titula su total `Balance disponible`, indica
+debajo cuánto procede de periodos anteriores y compara con el balance disponible
+del periodo previo. Con `Todos` no hay nada anterior que arrastrar.
+
+En un espacio juntos, Mapa muestra a la derecha de la cabecera flotante, a su
+misma altura, el botón de filtros de Actividad. Abre la variante con solo
+`Autor` (`Ambos`, `Yo` y el nombre de la pareja) y filtra los movimientos del
+calendario, los indicadores del mes y la hoja de cada día. El detalle de
+Ingresos, Gastos o Balance abre con el mismo autor. La cabecera reserva ese
+hueco solo en Mapa para que el nombre del espacio y la bandera de moneda no
+pisen el botón. En un espacio personal el botón no aparece.
+
+Cada movimiento se representa con la mini tarjeta de su categoría. Por defecto se muestra la vista de pastillas horizontales y la sección `Visualización` de filtros permite elegir `Medianas` o `Pequeñas` con una transición breve que conserva la posición del calendario y respeta el movimiento reducido: muestra hasta tres movimientos por día y, si hay más, el número restante debajo. En esta vista la pulsación larga no abre acciones; la vista de tarjetas conserva su comportamiento. Su título
 ocupa una única línea y, cuando no cabe, se desplaza horizontalmente en bucle
 dentro de una tarjeta de altura fija; con movimiento reducido permanece estático
 y truncado. Al elegir un día, se abre una hoja con sus movimientos reutilizando
@@ -547,8 +663,7 @@ tanto el pasado persistido como el futuro planificado sin crear por adelantado
 todas esas filas en la base local.
 
 Los números de todos los meses mantienen el mismo contraste, sin cambios de
-opacidad ligados al foco o al scroll. El día actual y el seleccionado conservan
-estados visuales diferenciados.
+opacidad ligados al foco o al scroll. El día actual se destaca con fondo morado; abrir un día no deja una selección visual. Entre meses aparece el nombre del nuevo mes, y las semanas se separan con líneas horizontales.
 
 El selector fijo del mes conserva además una separación
 superior amplia para no quedar cubierto por el selector flotante de espacio. Al
@@ -575,11 +690,46 @@ abre el menú lateral desde esta pantalla.
 Reúne:
 
 - Estado del perfil y de la cuenta.
-- Preferencias de moneda, idioma, apariencia y privacidad de importes.
+- Preferencias de moneda, idioma y privacidad de importes.
 - Gestión de espacios, categorías archivadas y recurrencias.
 - Notificaciones.
 - Estado local de los datos, importación, exportación y privacidad.
 - Ayuda, soporte, política de privacidad y versión de la aplicación.
+- Analítica de Microsoft Clarity activada por defecto, con desactivación
+  persistente desde Preferencias de privacidad. Si el módulo nativo no está
+  disponible (Expo Go), se conserva la preferencia sin cargar ni capturar con
+  el SDK.
+
+El modo oscuro se controla desde el menú lateral de espacios.
+
+### Bandeja de notificaciones
+
+Una campana flota en la esquina superior derecha de las pestañas principales,
+a la altura del botón del espacio activo, y abre un modal con avisos de los gastos e ingresos futuros de todos los
+espacios: movimientos guardados con fecha futura y ocurrencias proyectadas de
+series recurrentes. Cada movimiento aparece dos días antes y el día anterior;
+el día del movimiento deja de mostrarse. El modal los reparte en dos secciones,
+«En 1 día» y «En 2 días», con un máximo de cinco movimientos cada una.
+
+Cada aviso usa la tarjeta de movimiento habitual (importe y flecha de gasto o
+ingreso) y, si hay más de un espacio, añade el espacio tras la fecha
+(«29/11/2026 · Juntos»). El mismo movimiento copiado en varios espacios se
+muestra como un hilo, igual que una recurrencia personalizada: arriba el de
+Personal y, al desplegarlo, el de Juntos y los demás. Tocar una tarjeta abre el
+detalle del movimiento, cambiando antes al espacio del aviso si no es el
+activo. Las tarjetas de Juntos muestran la miniatura de quien creó el
+movimiento, aunque el espacio activo sea Personal. La pulsación larga ofrece
+eliminar, editar y copiar, con selección múltiple, como en el resto de la app;
+igual que allí, solo actúa sobre los movimientos del espacio activo, así que
+los avisos de otro espacio no la abren. La bandeja se calcula en el
+dispositivo y no depende de las reglas de recordatorios push ni de los
+permisos de notificación.
+
+Mientras haya avisos sin ver, la campana muestra un punto morado sobre su
+borde. Si la pestaña tiene botón de moneda, este queda a la izquierda de la
+campana; en Mapa, su botón de filtros también. Abrir la bandeja marca como vistos los avisos actuales. Lo
+visto se guarda localmente; el aviso del día anterior cuenta como nuevo aunque
+se viera el de dos días antes.
 
 La preferencia «Símbolos de moneda» pertenece al perfil y se conserva en el
 dispositivo. Al desactivarla, todos los importes visibles muestran únicamente
@@ -671,8 +821,9 @@ flotante o acción central. La navegación principal se presenta como un menú
 flotante: Inicio, Actividad, Mapa y Pronto comparten una cápsula, y el botón morado `+`
 permanece separado a su lado en la misma línea. La franja que contiene ambos es
 transparente y se superpone al contenido; la cápsula conserva su superficie y
-la pestaña seleccionada usa una forma completamente redondeada. El conjunto
-permanece visible al desplazarse y al cambiar entre las pestañas principales.
+la pestaña seleccionada se distingue solo por su icono relleno, sin fondo. El
+conjunto permanece visible al desplazarse y al cambiar entre las pestañas
+principales.
 No queda disponible mientras hay un modal o el menú lateral abierto y no
 aparece en Ajustes.
 
@@ -865,9 +1016,19 @@ calendario de rango de Actividad. El periodo filtra los totales, `Movimientos` y
 `Movimientos futuros` por igual: los totales de un periodo suman también sus
 movimientos programados, así que un mes futuro muestra lo que ya está previsto.
 Vuelve al mes en curso cada vez que se abre el detalle. Un total de ingresos o gastos igual a cero se omite. El presupuesto solo aparece
-en el resumen cuando existe y muestra mediante una barra lineal el progreso, el
-importe original y cuánto queda disponible. Desde el mismo modal se puede añadir
-o retirar un presupuesto simple mediante un submodal con teclado numérico propio,
+en el resumen cuando existe y muestra mediante una barra lineal el progreso del
+periodo en curso, su importe, cuánto queda disponible y la periodicidad. Desde
+el mismo modal se puede añadir, editar o retirar el presupuesto y elegir su
+periodicidad mediante un submodal con teclado numérico propio. Pulsar el
+resumen abre `Detalle de Presupuesto`, que recorre los periodos del propio
+presupuesto con flechas; al pulsar el periodo se despliegan las mismas opciones
+que en el detalle (semana, quincena, mes, año o un rango personalizado), con el
+presupuesto proporcional a los días cuando la vista no coincide con su
+periodicidad. Muestra gastado (o previsto, en periodos futuros) frente al
+presupuesto y, en un periodo del presupuesto, `Editar este periodo`: con la
+misma periodicidad cambia solo ese importe; con otra, la nueva periodicidad e
+importe rigen desde ese periodo en adelante y los anteriores se conservan.
+`Hoy` vuelve al periodo en curso. También se puede
 crear un movimiento con la categoría preseleccionada y copiar la categoría a otro
 espacio disponible mediante otro submodal. La acción de copia solo aparece cuando
 existe al menos un espacio de destino. La copia es independiente y no traslada
@@ -893,6 +1054,20 @@ el resultado con una tarjeta flotante oscura sobre la interfaz. La tarjeta nombr
 el elemento y el espacio de destino, y destaca en verde un icono de confirmación
 y la palabra «exitosamente». Esta confirmación se anuncia también a tecnologías
 de asistencia y desaparece automáticamente sin bloquear la interacción.
+
+Los movimientos usan esa misma tarjeta en la parte inferior, sobre el menú
+flotante, con el icono de su categoría a la izquierda: al crearlos («Gasto
+agregado», «Ingreso agregado» o «Movimientos agregados» para el par de una
+compra o venta de dólares) y al copiarlos a otro espacio («Movimiento
+copiado»). Un aviso nuevo sustituye al anterior. Permanece 3,5 segundos y, si
+confirma un único movimiento creado, toda la tarjeta se puede tocar para abrir
+su detalle; en ese caso muestra una flecha a la derecha que lo indica.
+
+Regla para toda tarjeta informativa flotante, arriba o abajo: al aparecer, el
+teléfono vibra de forma sutil (impacto ligero), una sola vez por aviso, para
+dar peso a la confirmación. Su duración no depende de la pantalla que la lanzó:
+si el usuario cambia de pestaña mientras está a la vista, se retira a su hora
+igualmente.
 
 Los movimientos asociados se dividen en dos secciones dentro del mismo bloque,
 en el mismo orden y ubicación de siempre. `Movimientos` reúne los que ya
@@ -956,7 +1131,68 @@ título, fecha y recurrencia, y siempre queda asociada a una categoría válida
 del espacio de destino. Si allí existe una categoría equivalente se reutiliza;
 si no, se crea una copia de la categoría sin presupuesto. La operación no
 modifica ni elimina el movimiento original y utiliza la confirmación flotante
-común de las copias entre espacios.
+común de las copias entre espacios. Al completarse la copia, el detalle del
+movimiento se cierra para dejar a la vista esa confirmación.
+
+Copiar nunca duplica en el destino. Copiar una repetición de una serie
+semanal, quincenal o mensual crea en el destino la serie entera desde esa
+fecha, así que todas las repeticiones de la serie cuentan como la misma copia:
+- En la selección múltiple, al marcar una repetición las demás de su serie
+  quedan atenuadas en cualquier mes, y vuelven a estar disponibles al
+  desmarcarla.
+- Copiar no se ofrece hacia un espacio donde el movimiento (o su serie) ya
+  existe por una copia anterior, en ningún sentido: tampoco se puede devolver
+  una copia al espacio de su original. Si se elimina la copia, se puede volver
+  a copiar.
+- Como red de seguridad, si llegaran varias repeticiones de una misma serie
+  solo se copia la más antigua, y se omite lo que ya existe en el destino.
+
+### Acciones rápidas de una tarjeta
+
+Mantener pulsada la tarjeta de vista previa de un movimiento, una categoría o
+una cuenta (tarjeta o fila) abre sus acciones sin pasar por el detalle. Vale en cualquier lugar donde
+aparezca la tarjeta: Inicio, Actividad, Mapa (también las tarjetas pequeñas
+del calendario) y las listas dentro de hojas, como el detalle de categoría o de
+cuenta y el día del mapa.
+
+- Todo se desenfoca salvo la tarjeta pulsada, que se eleva ligeramente en su
+  sitio.
+- Tres botones circulares brotan de la tarjeta y forman un arco encima de
+  ella: eliminar, editar y copiar a otro espacio. Si la tarjeta está pegada al
+  borde superior, el arco pasa por debajo.
+- Eliminar pide la misma confirmación que el detalle, con el mismo texto, en
+  la propia superposición. Editar abre el mismo formulario precargado que el
+  detalle. Copiar abre el mismo selector de espacio de destino.
+- En las tarjetas horizontales de movimientos (las filas de las listas),
+  eliminar y copiar abren la selección múltiple en vez de actuar solo sobre
+  esa tarjeta. La tarjeta pulsada queda marcada. Las demás tarjetas de
+  movimiento, encima y debajo, se encogen ligeramente y abren a su izquierda
+  un círculo animado. Tocar una tarjeta o su círculo la marca o desmarca, en
+  lugar de abrir su detalle. Mientras dura la selección, el menú principal
+  y el botón `+` bajan fuera de la pantalla, y vuelven a subir al salir. El
+  círculo marcado usa el morado de la app (`cta`) al copiar y el mismo rojo
+  de la confirmación al eliminar. Una barra inferior cuenta
+  lo marcado y ofrece cancelar y la acción elegida, con el color de los
+  círculos: morado al copiar y rojo al eliminar, con texto e icono blancos. Eliminar pide confirmación para todos a la
+  vez. Copiar abre el selector de espacio con «N movimientos» y confirma con
+  un solo aviso, «N movimientos copiados». El selector muestra hasta cinco
+  iconos de los movimientos marcados, apilados sin separación ni borde y
+  levemente girados. Mientras está abierto, la barra de la selección baja para no
+  taparlo; cerrarlo sin copiar la devuelve con lo marcado intacto. Las tarjetas que no admiten la
+  acción aparecen atenuadas y no se marcan, como una repetición proyectada al
+  copiar o un grupo plegado; al copiar, tampoco otra repetición de una serie
+  ya marcada ni un movimiento ya copiado al otro espacio. El gesto de volver de Android o cancelar salen de
+  la selección. Editar sigue siendo de una sola tarjeta. Las categorías y las
+  cuentas, en tarjeta grande, mini o fila, mantienen la acción individual.
+- Se aplican las reglas del detalle: copiar solo aparece si existe otro
+  espacio, y una repetición proyectada no se copia y al eliminarse solo se
+  omite esa fecha. Una cuenta, como en su detalle, solo ofrece eliminar y
+  editar.
+- Tocar fuera, tocar la tarjeta o el gesto de volver de Android cierran sin
+  hacer nada.
+- Un grupo plegado de movimientos no abre acciones, porque representa varios
+  movimientos a la vez.
+- Lectores de pantalla: la tarjeta ofrece la acción «Mostrar acciones».
 
 ---
 
@@ -1050,7 +1286,13 @@ Los estados vacíos deben dirigir a una acción útil.
 - No depender solo del color.
 - Respetar tamaños de texto cuando sea viable.
 - Formatos locales de moneda y fecha.
-- Español como idioma inicial sin cerrar otros idiomas.
+- Español e inglés. Por defecto se usa el idioma del dispositivo (español si
+  no es ninguno de los dos), y se puede cambiar en Ajustes › Idioma.
+- En el onboarding, al elegir Estados Unidos, Reino Unido o Canadá, un popup
+  pregunta si la app se usa en inglés o en español. La elección se aplica al
+  continuar a la siguiente lámina y se puede cambiar después en Ajustes.
+- En inglés también se traducen las categorías predefinidas, los países, las
+  monedas, las notificaciones y los documentos legales.
 - Compatibilidad con modo claro y oscuro, seleccionable mediante un interruptor en Ajustes.
 
 ---

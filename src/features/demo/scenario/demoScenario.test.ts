@@ -106,19 +106,39 @@ describe('buildDemoScenario', () => {
       scenario.couple.transactions.find((t) => t.title === 'Alquiler')!
         .amountMinor;
 
-    expect(rent(eur)).toBe(95_000);
-    expect(rent(cop)).toBe(190_000_000);
+    expect(rent(eur)).toBe(80_000);
+    expect(rent(cop)).toBe(114_000_000);
     // Un peso colombiano se apunta en centenas, nunca con céntimos.
     expect(
       cop.couple.transactions.every((t) => t.amountMinor % 10_000 === 0),
     ).toBe(true);
-    // El precio comercial termina en 9: 13,99 € o 27.900 COP.
+    // El precio comercial termina en 9: 13,99 € o 19.900 COP.
     const netflix = (scenario: typeof eur) =>
       scenario.couple.transactions.find((t) => t.title === 'Netflix')!
         .amountMinor;
     expect(netflix(eur)).toBe(1_399);
-    expect(netflix(cop)).toBe(2_790_000);
+    expect(netflix(cop)).toBe(1_990_000);
   });
+
+  // Nómina neta mínima de cada país en 2026, en unidades mayores.
+  it.each([
+    ['EUR', 1_330],
+    ['MXN', 9_500],
+    ['COP', 1_860_000],
+    ['ARS', 325_000],
+    ['CLP', 440_000],
+    ['PEN', 1_070],
+    ['GBP', 1_800],
+  ] as const)(
+    'paga en %s una nómina algo por encima del mínimo',
+    (currency, minimum) => {
+      const { personal } = buildDemoScenario({ currency, today, seed: 6 });
+      const salary = personal.transactions.find((t) => t.title === 'Nómina')!;
+
+      expect(salary.amountMinor).toBeGreaterThanOrEqual(minimum * 100);
+      expect(salary.amountMinor).toBeLessThanOrEqual(minimum * 100 * 1.25);
+    },
+  );
 
   it('mantiene la casa en números razonables cada mes', () => {
     const { couple } = buildDemoScenario({ currency: 'EUR', today, seed: 2 });
@@ -151,10 +171,10 @@ describe('buildDemoScenario', () => {
     expect(inBolivars.length).toBeGreaterThan(20);
     // Las cuentas venezolanas solo tienen saldo en USD.
     expect(inBolivars.every((t) => t.accountKey === undefined)).toBe(true);
-    // Lo fijo sigue en dólares: nómina de unos 870 $ y alquiler de unos 360 $.
+    // Lo fijo sigue en dólares: nómina de unos 870 $ y alquiler de unos 300 $.
     const byTitle = (title: string) => all.find((t) => t.title === title)!;
     expect(byTitle('Nómina')).toMatchObject({ amountMinor: 87_000 });
-    expect(byTitle('Alquiler')).toMatchObject({ amountMinor: 36_000 });
+    expect(byTitle('Alquiler')).toMatchObject({ amountMinor: 30_000 });
     expect(byTitle('Nómina').currency).toBeUndefined();
     // Un café cuesta cientos de bolívares, no centavos.
     const coffee = all.find(

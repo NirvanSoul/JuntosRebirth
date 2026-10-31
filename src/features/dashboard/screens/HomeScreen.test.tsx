@@ -90,7 +90,7 @@ const categories: Category[] = [
     name: 'Vivienda',
     icon: 'house',
     colorToken: 'blue',
-    budgetMinor: 100_000,
+    budgets: { EUR: { budgetMinor: 100_000 } },
     isDefault: true,
     isArchived: false,
   },
@@ -123,7 +123,8 @@ describe('HomeScreen', () => {
     ).toBe(spacing.none);
     expect(screen.getAllByText(/^0\s*€$/)).toHaveLength(3);
     expect(screen.getByText('Crea una categoría')).toBeTruthy();
-    expect(screen.getByText('Crea un movimiento')).toBeTruthy();
+    expect(screen.getByText('Crear movimiento')).toBeTruthy();
+    expect(screen.queryByText('Crea un movimiento')).toBeNull();
     expect(screen.getByText('Crear cuenta')).toBeTruthy();
     expect(screen.queryByText('Crea una cuenta')).toBeNull();
     expect(
@@ -175,6 +176,85 @@ describe('HomeScreen', () => {
     expect(
       screen.queryByText('Crea una categoría para organizar tus movimientos.'),
     ).toBeNull();
+  });
+
+  it('cambia el periodo del arco y los indicadores desde el selector', async () => {
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <HomeScreen categories={categories} transactions={transactions} />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+    const periodSelector = screen.getByTestId('home-period-selector');
+
+    expect(
+      within(periodSelector).getByText(
+        formatTransactionPeriod('month', new Date()),
+      ),
+    ).toBeTruthy();
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', {
+        name: 'Ver periodo anterior',
+      }),
+    );
+
+    // El mes anterior no tiene movimientos: no quedaba balance al cerrarlo.
+    expect(screen.getByLabelText(/Ingresos del periodo:.*0/)).toBeTruthy();
+    expect(screen.getByLabelText(/Gastos del periodo:.*0/)).toBeTruthy();
+    expect(screen.getByTestId('home-balance').props.children).toMatch(
+      /^0\s*€$/,
+    );
+
+    // Volver al mes en curso recupera el balance acumulado.
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', {
+        name: 'Ver periodo siguiente',
+      }),
+    );
+    expect(screen.getByTestId('home-balance').props.children).toContain(
+      '2.000',
+    );
+
+    // El mes siguiente suma la nómina recurrente prevista a lo que sobró.
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', {
+        name: 'Ver periodo siguiente',
+      }),
+    );
+    expect(screen.getByTestId('home-balance').props.children).toContain(
+      '4.500',
+    );
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', {
+        name: 'Ver periodo anterior',
+      }),
+    );
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', {
+        name: 'Ver periodo anterior',
+      }),
+    );
+
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', {
+        name: formatTransactionPeriod(
+          'month',
+          new Date(new Date().getFullYear(), new Date().getMonth() - 1, 15),
+        ),
+      }),
+    );
+    await fireEvent.press(
+      within(periodSelector).getByLabelText('Periodo: Todos'),
+    );
+    expect(
+      screen.getByLabelText('Ingresos 83%, gastos 17% desde el inicio'),
+    ).toBeTruthy();
   });
 
   it('muestra el balance, los totales del mes y la actividad recibida', async () => {
@@ -553,11 +633,11 @@ describe('HomeScreen', () => {
     const incomeModal = await screen.findByTestId('income-period-modal');
     // Las opciones se despliegan al pulsar el periodo, como en Categoría.
     await fireEvent.press(
-      screen.getByRole('button', {
+      within(incomeModal).getByRole('button', {
         name: formatTransactionPeriod('month', new Date()),
       }),
     );
-    const monthlyFilter = screen.getByRole('radio', {
+    const monthlyFilter = within(incomeModal).getByRole('radio', {
       name: 'Periodo: Mensual',
     });
     expect(monthlyFilter.props.accessibilityState).toMatchObject({
@@ -582,12 +662,14 @@ describe('HomeScreen', () => {
       ).borderColor,
     ).toBe(colors.cta);
     expect(
-      screen.getByText(formatTransactionPeriod('month', new Date())),
+      within(incomeModal).getByText(
+        formatTransactionPeriod('month', new Date()),
+      ),
     ).toBeTruthy();
     expect(screen.getByTestId('income-period-total').props.children).toContain(
       '2.500',
     );
-    const nextPeriodButton = screen.getByRole('button', {
+    const nextPeriodButton = within(incomeModal).getByRole('button', {
       name: 'Ver periodo siguiente',
     });
     expect(nextPeriodButton.props.accessibilityState).toMatchObject({
@@ -595,7 +677,7 @@ describe('HomeScreen', () => {
     });
     await fireEvent.press(nextPeriodButton);
     expect(
-      screen.getByText(
+      within(incomeModal).getByText(
         formatTransactionPeriod(
           'month',
           shiftTransactionPeriod('month', new Date(), 1),
@@ -605,15 +687,20 @@ describe('HomeScreen', () => {
     expect(screen.getByTestId('income-period-total').props.children).toContain(
       '2.500',
     );
-    expect(within(incomeModal).getByText('Nómina')).toBeTruthy();
+    // El mes en curso asoma debajo, así que se busca en la lista del periodo.
+    expect(
+      within(screen.getByTestId('income-period-transaction-list')).getByText(
+        'Nómina',
+      ),
+    ).toBeTruthy();
     await fireEvent.press(
-      screen.getByRole('button', { name: 'Ver periodo anterior' }),
+      within(incomeModal).getByRole('button', { name: 'Ver periodo anterior' }),
     );
     await fireEvent.press(
-      screen.getByRole('button', { name: 'Ver periodo anterior' }),
+      within(incomeModal).getByRole('button', { name: 'Ver periodo anterior' }),
     );
     expect(
-      screen.getByText(
+      within(incomeModal).getByText(
         formatTransactionPeriod(
           'month',
           shiftTransactionPeriod('month', new Date(), -1),
@@ -626,48 +713,54 @@ describe('HomeScreen', () => {
       ).backgroundColor,
     ).toBe(colors.income);
     await fireEvent.press(
-      screen.getByRole('button', { name: 'Añadir ingreso' }),
+      within(incomeModal).getByRole('button', { name: 'Añadir ingreso' }),
     );
     expect(onCreateIncome).toHaveBeenCalledTimes(1);
 
     await fireEvent.press(
       screen.getByRole('button', { name: /Gastos de este mes/ }),
     );
-    expect(await screen.findByTestId('expense-period-modal')).toBeTruthy();
+    const expenseModal = await screen.findByTestId('expense-period-modal');
     expect(screen.getByTestId('expense-period-total').props.children).toContain(
       '500',
     );
     await fireEvent.press(
-      screen.getByRole('button', {
+      within(expenseModal).getByRole('button', {
         name: formatTransactionPeriod('month', new Date()),
       }),
     );
     await fireEvent.press(
-      screen.getByRole('radio', { name: 'Periodo: Quincenal' }),
+      within(expenseModal).getByRole('radio', { name: 'Periodo: Quincenal' }),
     );
     expect(
-      screen.getByText(formatTransactionPeriod('fortnight', new Date())),
+      within(expenseModal).getByText(
+        formatTransactionPeriod('fortnight', new Date()),
+      ),
     ).toBeTruthy();
     await fireEvent.press(
-      screen.getByRole('button', {
+      within(expenseModal).getByRole('button', {
         name: formatTransactionPeriod('fortnight', new Date()),
       }),
     );
     await fireEvent.press(
-      screen.getByRole('radio', { name: 'Periodo: Anual' }),
+      within(expenseModal).getByRole('radio', { name: 'Periodo: Anual' }),
     );
     await fireEvent.press(
-      screen.getByRole('button', { name: String(new Date().getFullYear()) }),
+      within(expenseModal).getByRole('button', {
+        name: String(new Date().getFullYear()),
+      }),
     );
     expect(
-      screen.getByRole('radio', { name: 'Periodo: Anual' }).props
+      within(expenseModal).getByRole('radio', { name: 'Periodo: Anual' }).props
         .accessibilityState,
     ).toMatchObject({ checked: true });
-    expect(screen.getByText(String(new Date().getFullYear()))).toBeTruthy();
+    expect(
+      within(expenseModal).getByText(String(new Date().getFullYear())),
+    ).toBeTruthy();
     await fireEvent.press(
-      screen.getByRole('radio', { name: 'Periodo: Todos' }),
+      within(expenseModal).getByRole('radio', { name: 'Periodo: Todos' }),
     );
-    expect(screen.getByText('Desde el inicio')).toBeTruthy();
+    expect(within(expenseModal).getByText('Desde el inicio')).toBeTruthy();
     expect(screen.getByTestId('expense-period-total').props.children).toContain(
       '500',
     );
@@ -677,7 +770,9 @@ describe('HomeScreen', () => {
         screen.getByTestId('expense-period-add-gradient').props.style,
       ).backgroundColor,
     ).toBe(colors.expense);
-    await fireEvent.press(screen.getByRole('button', { name: 'Añadir gasto' }));
+    await fireEvent.press(
+      within(expenseModal).getByRole('button', { name: 'Añadir gasto' }),
+    );
     expect(onCreateExpense).toHaveBeenCalledTimes(1);
 
     await fireEvent.press(
@@ -733,7 +828,7 @@ describe('HomeScreen', () => {
     expect(onViewCategories).toHaveBeenCalledTimes(1);
     expect(onViewMovements).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('home-empty-categories-arrow')).toBeTruthy();
-    expect(screen.getByTestId('home-empty-activity-arrow')).toBeTruthy();
+    expect(screen.getByTestId('home-empty-activity-glyph')).toBeTruthy();
   });
 
   it('muestra las categorías creadas aunque todavía no tengan movimientos', async () => {
@@ -871,7 +966,7 @@ describe('HomeScreen', () => {
     ).toBeNull();
   });
 
-  it('calcula el presupuesto con spaceCurrency (VES) mientras muestra el gasto en displayCurrency (EUR)', async () => {
+  it('usa el presupuesto de la moneda visible (EUR) e ignora el de otras monedas', async () => {
     const multiCurrencyTransactions: SessionTransaction[] = [
       {
         id: 'tx-eur',
@@ -907,7 +1002,8 @@ describe('HomeScreen', () => {
       name: 'Vivienda',
       icon: 'house',
       colorToken: 'blue',
-      budgetMinor: 10000, // 100 VES de presupuesto
+      // 25 € y 100 Bs.: cada moneda con su propio presupuesto.
+      budgets: { EUR: { budgetMinor: 2500 }, VES: { budgetMinor: 10000 } },
       isDefault: true,
       isArchived: false,
     };
@@ -923,7 +1019,6 @@ describe('HomeScreen', () => {
           <HomeScreen
             categories={[categoryWithBudget]}
             currency="EUR"
-            spaceCurrency="VES"
             transactions={multiCurrencyTransactions}
           />
         </ThemeProvider>
@@ -937,7 +1032,7 @@ describe('HomeScreen', () => {
       }),
     ).toBeTruthy();
 
-    // Anillo de progreso de presupuesto calculado en VES (40 VES / 100 VES = 40%)
+    // Anillo de progreso en EUR: 10 € de 25 € = 40%; el gasto en VES no cuenta.
     expect(screen.getByLabelText('Presupuesto utilizado 40%')).toBeTruthy();
   });
   describe('sección de cuentas', () => {

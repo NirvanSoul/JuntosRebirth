@@ -1,5 +1,6 @@
 import { render, type RenderOptions } from '@testing-library/react-native';
 import type { PropsWithChildren, ReactElement } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ThemeProvider } from '@/theme/ThemeProvider';
@@ -20,9 +21,13 @@ export function renderWithTheme(
 ) {
   function Wrapper({ children }: PropsWithChildren) {
     return (
-      <SafeAreaProvider initialMetrics={defaultMetrics}>
-        <ThemeProvider initialAppearance={appearance}>{children}</ThemeProvider>
-      </SafeAreaProvider>
+      <GestureHandlerRootView>
+        <SafeAreaProvider initialMetrics={defaultMetrics}>
+          <ThemeProvider initialAppearance={appearance}>
+            {children}
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     );
   }
 

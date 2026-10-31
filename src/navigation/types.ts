@@ -1,7 +1,10 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { TransactionAuthorFilter } from '@/features/activity/components/TransactionFiltersModal';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
 export type CategoryDetailRequest = {
+  /** Autor con el que abre; Actividad pasa el que está filtrando. */
+  author?: TransactionAuthorFilter;
   categoryId: string;
   displayCurrency: CurrencyCode;
 };

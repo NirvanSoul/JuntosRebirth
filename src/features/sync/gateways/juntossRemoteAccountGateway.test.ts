@@ -160,8 +160,59 @@ describe('juntossRemoteAccountGateway', () => {
     // Antes solo existía un presupuesto por categoría y no se sincronizaba.
     expect((await fetchRemoteAccountSnapshot()).categories[0]?.budgets).toEqual(
       [
-        { currency: 'EUR', budgetMinor: 25000 },
-        { currency: 'USD', budgetMinor: 30000 },
+        { currency: 'EUR', budgetMinor: 25000, overrides: [], history: [] },
+        { currency: 'USD', budgetMinor: 30000, overrides: [], history: [] },
+      ],
+    );
+  });
+
+  it('trae la periodicidad y los importes por periodo del presupuesto', async () => {
+    mockedGet.mockResolvedValue(
+      snapshot({
+        categories: [
+          {
+            id: 'cat-1',
+            spaceId: 'space-1',
+            name: 'Ocio',
+            budgets: [
+              {
+                currency: 'EUR',
+                budgetAmountMinor: '25000',
+                period: 'custom',
+                intervalDays: 14,
+                anchorOn: '2026-08-03',
+                overrides: [
+                  { periodStartOn: '2026-08-17', budgetAmountMinor: '40000' },
+                  { periodStartOn: 'roto', budgetAmountMinor: '1' },
+                ],
+              },
+              { currency: 'USD', budgetAmountMinor: '30000', period: 'week' },
+            ],
+          },
+        ],
+      }) as never,
+    );
+
+    expect((await fetchRemoteAccountSnapshot()).categories[0]?.budgets).toEqual(
+      [
+        {
+          currency: 'EUR',
+          budgetMinor: 25000,
+          schedule: {
+            period: 'custom',
+            intervalDays: 14,
+            anchorOn: '2026-08-03',
+          },
+          overrides: [{ periodStartOn: '2026-08-17', amountMinor: 40000 }],
+          history: [],
+        },
+        {
+          currency: 'USD',
+          budgetMinor: 30000,
+          schedule: { period: 'week' },
+          overrides: [],
+          history: [],
+        },
       ],
     );
   });

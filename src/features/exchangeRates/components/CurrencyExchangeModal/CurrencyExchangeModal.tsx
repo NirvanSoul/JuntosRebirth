@@ -14,7 +14,7 @@ import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
-import type { MoneyAccount } from '@/features/accounts/types';
+import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
 import { CurrencyExchangeAmountBlock } from '@/features/exchangeRates/components/CurrencyExchangeModal/CurrencyExchangeAmountBlock';
 import { createStyles } from '@/features/exchangeRates/components/CurrencyExchangeModal/CurrencyExchangeModal.styles';
 import { RateSourceSelector } from '@/features/exchangeRates/components/RateSourceSelector';
@@ -37,7 +37,7 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type CurrencyExchangeModalProps = {
   /** Cuentas activas del espacio; sin ninguna no se ofrece elegir cuenta. */
-  moneyAccounts: readonly MoneyAccount[];
+  moneyAccounts: readonly MoneyAccountSummary[];
   visible: boolean;
   onClose: () => void;
   /** Devuelve `true` cuando los dos movimientos quedaron guardados. */

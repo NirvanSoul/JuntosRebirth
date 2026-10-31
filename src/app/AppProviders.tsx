@@ -3,6 +3,9 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+// Inicializa i18next antes del primer render de cualquier pantalla.
+import '@/lib/i18n/i18n';
+import { installTranslationHooks } from '@/lib/i18n/installTranslationHooks';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
 export function AppProviders({ children }: PropsWithChildren) {
@@ -14,6 +17,8 @@ export function AppProviders({ children }: PropsWithChildren) {
     </GestureHandlerRootView>
   );
 }
+
+installTranslationHooks();
 
 const styles = StyleSheet.create({
   root: {

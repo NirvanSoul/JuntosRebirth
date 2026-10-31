@@ -5,6 +5,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
 import { ActiveSpaceHeader } from '@/components/navigation/ActiveSpaceHeader/ActiveSpaceHeader';
+import { getMapHeaderInset } from '@/features/map/components/MapFilterButton';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
 import { ActivityTabContent } from '@/navigation/components/ActivityTabContent';
 import { HomeTabContent } from '@/navigation/components/HomeTabContent';
@@ -12,7 +13,7 @@ import { MainAppTabBar } from '@/navigation/components/MainAppTabBar';
 import { ComingSoonScreen } from '@/features/comingSoon/ComingSoonScreen';
 import { useTransactionDetailModal } from '@/navigation/useTransactionDetailModal';
 import {
-  getHomeCurrencyButtonLabel,
+  getHeaderCurrencyFlag,
   resolveHomeCurrencies,
   useHomeCurrencyPress,
 } from '@/navigation/homeCurrencyControls';
@@ -25,7 +26,6 @@ import { CategoryDetailModal } from '@/features/categories/components/CategoryDe
 import { CreateCategoryModal } from '@/features/categories/components/CreateCategoryModal/CreateCategoryModal';
 import { MoneyAccountModals } from '@/features/accounts/components/MoneyAccountModals';
 import { useMoneyAccounts } from '@/features/accounts/hooks/useMoneyAccounts';
-import { moneyAccountSupportsCurrency } from '@/features/accounts/types';
 import {
   createDefaultCategoryInputForSpace,
   type DefaultCategoryDefinition,
@@ -37,6 +37,7 @@ import {
   updateLocalCategory,
   updateLocalCategoryNote,
 } from '@/features/categories/repositories/localCategoryRepository';
+import { saveLocalCategoryBudget } from '@/features/categories/repositories/localCategoryBudgetRepository';
 import type {
   Category,
   CategoryEditorTarget,
@@ -58,16 +59,14 @@ import { useLocalDisplayName } from '@/features/profile/hooks/useLocalDisplayNam
 import { useSpaceMemberAvatars } from '@/features/profile/hooks/useSpaceMemberAvatars';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { SpaceMembershipProvider } from '@/features/profile/state/SpaceMembershipContext';
-import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
 import { useCancelPendingInvitationAction } from '@/features/spaces/hooks/useCancelPendingInvitationAction';
 import { useSpaceCurrencies } from '@/features/spaces/hooks/useSpaceCurrencies';
 import {
   filterByVisibleCurrencies,
   filterMoneyAccountsByVisibleCurrencies,
 } from '@/features/spaces/utils/spaceCurrencies';
-import { CopyNoticeToast } from '@/features/spaces/components/CopyNoticeToast';
 import { useCopyToSpace } from '@/features/spaces/hooks/useCopyToSpace';
-import { useSpaceSwitchLoading } from '@/features/spaces/hooks/useSpaceSwitchLoading';
+import { SpaceSideMenu } from '@/features/spaces/components/SpaceSideMenu';
 import { useCoupleSpacePublisher } from '@/features/spaces/hooks/useCoupleSpacePublisher';
 import { useSpaces } from '@/features/spaces/hooks/useSpaces';
 import { AcceptInvitationScreen } from '@/features/spaces/screens/AcceptInvitationScreen';
@@ -79,14 +78,18 @@ import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPrefer
 import { useActivitySectionsPreference } from '@/state/appPreferences/useActivitySectionsPreference';
 import { useHomeComparisonIndicatorsPreference } from '@/state/appPreferences/useHomeComparisonIndicatorsPreference';
 import { useHomeCurrencySelection } from '@/state/appPreferences/useHomeCurrencySelection';
+import { PreviewActionsLayer } from '@/navigation/components/PreviewActionsLayer';
+import { resolvePreviewItemActions } from '@/navigation/previewItemActions';
+import { useDetailTransactionReminder } from '@/navigation/useDetailTransactionReminder';
 import { useSaveErrorAlert } from '@/navigation/useSaveErrorAlert';
+import { NotificationsBellButton } from '@/features/notifications/components/NotificationsBellButton';
 import { CreateTransactionModal } from '@/features/transactions/components/CreateTransactionModal/CreateTransactionModal';
+import { MovementNoticeToast } from '@/features/transactions/components/MovementNoticeToast/MovementNoticeToast';
 import { TransactionDetailModal } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal';
 import type {
   SessionTransaction,
   TransactionEditorTarget,
   TransactionNotificationRule,
-  TransactionReminder,
   TransactionType,
 } from '@/features/transactions/types';
 import {
@@ -101,14 +104,12 @@ import {
 } from '@/features/transactions/repositories/localTransactionNotificationRuleRepository';
 import { reconcileDailyReminder } from '@/features/transactions/services/dailyReminderService';
 import { reconcileNotificationRules } from '@/features/transactions/services/notificationRuleService';
-import {
-  cancelTransactionReminder,
-  getTransactionReminder,
-  scheduleTransactionReminder,
-} from '@/features/transactions/services/transactionReminderService';
+import { cancelTransactionReminder } from '@/features/transactions/services/transactionReminderService';
+import { useMovementNotice } from '@/features/transactions/hooks/useMovementNotice';
 import { useTransactionEditing } from '@/features/transactions/hooks/useTransactionEditing';
 import { useTransactionSubmit } from '@/features/transactions/hooks/useTransactionSubmit';
 import { resolveTransactionForDetail } from '@/features/transactions/utils/transactionDetailResolution';
+import { indexCopiedTransactionSpaces } from '@/features/transactions/utils/transactionCopyIdentity';
 import { useAppForeground } from '@/hooks/useAppForeground';
 import { useStableCallback } from '@/hooks/useStableCallback';
 import {
@@ -124,8 +125,9 @@ const Tabs = createBottomTabNavigator<Routes.MainTabParamList>();
 const Drawer = createDrawerNavigator<Routes.RootDrawerParamList>();
 const drawerWidthRatio = 0.88,
   drawerMaxWidth = 380;
+const mainSceneStyle = { flex: 1, backgroundColor: 'transparent' } as const;
 
-type CategoryCreationContext = 'quick' | 'transaction';
+type CategoryCreationContext = 'quick' | 'transaction' | 'detail';
 
 export function MainTabsNavigator() {
   const { width } = useWindowDimensions();
@@ -149,21 +151,9 @@ export function MainTabsNavigator() {
   const userDisplayName =
     localDisplayName?.trim() || session?.user.name?.trim() || null;
   const activeSpaceName =
-    activeSpace.type === 'personal' && userDisplayName
-      ? userDisplayName
-      : activeSpace.name;
-  const displayedSpaces = useMemo(
-    () =>
-      userDisplayName
-        ? spaces.map((s) =>
-            s.type === 'personal' ? { ...s, name: userDisplayName } : s,
-          )
-        : spaces,
-    [spaces, userDisplayName],
-  );
+    activeSpace.type === 'personal' ? 'Personal' : activeSpace.name;
 
   const [isInvitePartnerVisible, setInvitePartnerVisible] = useState(false);
-  const { isSwitchingSpace, runSpaceSwitch } = useSpaceSwitchLoading();
   const coupleSpace = spaces.find((space) => space.type === 'couple') ?? null;
   const isAwaitingPartner = isAwaitingPartnerSpace(activeSpace);
   const areSpaceActionsBlocked = isAwaitingPartner || isInvitePartnerVisible;
@@ -234,8 +224,6 @@ export function MainTabsNavigator() {
     useState<Routes.CategoryDetailRequest | null>(null);
   /** La solicitud se conserva mientras la hoja termina de cerrarse. */
   const [isCategoryDetailVisible, setCategoryDetailVisible] = useState(false);
-  const [detailTransactionReminder, setDetailTransactionReminder] =
-    useState<TransactionReminder | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<
     string | null
   >(null);
@@ -269,6 +257,8 @@ export function MainTabsNavigator() {
   const moneyAccountsController = useMoneyAccounts({
     activeSpaceId: activeSpace.id,
     categories: spaceCategories,
+    onArchived: () => announceDeleted('moneyAccount'),
+    onCreated: (account) => announceCreatedMoneyAccount(account),
     onChangesPublished: () => publishActiveCoupleChanges(),
     onError: () => showSaveError(),
     onTransactionsCreated: (created) =>
@@ -287,7 +277,7 @@ export function MainTabsNavigator() {
     transaction: detailTransaction,
     visible: isTransactionDetailVisible,
   } = useTransactionDetailModal({
-    assignableMoneyAccounts: moneyAccountsController.activeSpaceMoneyAccounts,
+    assignableMoneyAccounts: moneyAccountsController.accountSummaries,
     categories: spaceCategories,
     moneyAccounts: moneyAccountsController.spaceMoneyAccounts,
     transactions: activeSpaceTransactions,
@@ -301,6 +291,10 @@ export function MainTabsNavigator() {
     userId,
     activeSpaceTransactions,
   );
+  // Moneda propuesta al crear: la primera activa de la persona. La moneda con
+  // la que nació el espacio puede ser el EUR por defecto del catálogo (se
+  // siembra antes de elegir país) y no debe aparecer si nadie la activó.
+  const entryCurrency = spaceCurrencies[0] ?? activeSpace.currency;
   const homeCurrencies = resolveHomeCurrencies(
     spaceCurrencies,
     venezuelaCurrencyMode,
@@ -346,6 +340,10 @@ export function MainTabsNavigator() {
   const shareTargets = spaces
     .filter((space) => space.id !== activeSpace.id)
     .map((space) => ({ id: space.id, name: space.name }));
+  const copiedSpaceIds = useMemo(
+    () => indexCopiedTransactionSpaces(transactions),
+    [transactions],
+  );
   const { applyTransactionUpdate, quickEditTransaction: quickEditLatest } =
     useTransactionEditing({
       categories,
@@ -355,20 +353,20 @@ export function MainTabsNavigator() {
       setTransactions,
       spaceTransactions: activeSpaceTransactions,
     });
-  /** Al abrir la cuenta desde detalle, conserva la regla de no cambiar moneda. */
-  const transactionMoneyAccountOptions =
-    transactionInitialEditor === 'money-account' && editingTransaction
-      ? moneyAccountsController.activeSpaceMoneyAccounts.filter((account) =>
-          moneyAccountSupportsCurrency(account, editingTransaction.currency),
-        )
-      : moneyAccountsController.activeSpaceMoneyAccounts;
+  const {
+    announce: announceMovement,
+    announceCreated: announceCreatedMovement,
+    announceCreatedMoneyAccount,
+    announceDeleted,
+    dismissNotice: handleDismissMovementNotice,
+    notice: movementNotice,
+  } = useMovementNotice(openTransactionDetail);
   const {
     copyCategory: copyCategoryLatest,
     copyTransaction: copyTransactionLatest,
-    dismissNotice: handleDismissCopyNotice,
-    notice: copySuccessNotice,
   } = useCopyToSpace({
     activeSpaceId: activeSpace.id,
+    announce: announceMovement,
     categories,
     onCategoryCopied: (category) =>
       setCategories((current) => [...current, category]),
@@ -402,29 +400,24 @@ export function MainTabsNavigator() {
   const { dismissSyncIssue, isFinanceReady, retrySession, syncIssue } =
     useSessionStartup({
       refreshSharedCoupleData,
+      reloadCurrencyPreferences,
       reloadLocalFinance,
       reloadSpaces,
       session,
       setNotificationRules,
     });
 
-  useEffect(() => {
-    const transactionId = detailTransaction?.id;
-    if (!transactionId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpia junto al fetch con cleanup de abajo
-      setDetailTransactionReminder(null);
-      return;
-    }
-
-    let isMounted = true;
-    void getTransactionReminder(transactionId).then((reminder) => {
-      if (isMounted) setDetailTransactionReminder(reminder);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [detailTransaction?.id]);
+  const {
+    clearReminder: clearDetailTransactionReminder,
+    reminder: detailTransactionReminder,
+    removeReminder: handleRemoveTransactionReminder,
+    saveReminder: handleSaveTransactionReminder,
+  } = useDetailTransactionReminder({
+    activeSpaceId: activeSpace.id,
+    detailTransactionId: detailTransaction?.id,
+    spaceCategories,
+    transactions,
+  });
 
   useEffect(() => {
     if (!isFinanceReady) return;
@@ -472,15 +465,15 @@ export function MainTabsNavigator() {
       return;
     }
 
-    setCategoryCreationContext('quick');
-    setCategoryPickerVisible(true);
+    openCategoryPicker('quick');
   };
 
   const openCategoryDetail = (
     categoryId: string,
-    displayCurrency: CurrencyCode,
+    displayCurrency: CurrencyCode = entryCurrency,
+    author?: Routes.CategoryDetailRequest['author'],
   ) => {
-    setDetailRequest({ categoryId, displayCurrency });
+    setDetailRequest({ author, categoryId, displayCurrency });
     setCategoryDetailVisible(true);
   };
 
@@ -499,22 +492,35 @@ export function MainTabsNavigator() {
     setTransactionModalVisible(true);
   };
 
+  const openCategoryPicker = (context: CategoryCreationContext) => {
+    setCategoryCreationContext(context);
+    setCategoryPickerVisible(true);
+  };
+
   const closeCategoryPicker = () => {
     setCategoryPickerVisible(false);
     setCategoryCreationContext(null);
   };
 
+  const pickCategory = (categoryId: string) => {
+    if (categoryCreationContext === 'transaction') {
+      setSelectedCategoryId(categoryId);
+    } else if (categoryCreationContext === 'detail' && detailTransaction) {
+      void quickEditTransaction(detailTransaction.id, {
+        categoryId,
+        field: 'category',
+      });
+    }
+    closeCategoryPicker();
+  };
+
   const finishCategoryCreation = (category: Category) => {
     setCategories((current) => [...current, category]);
-
-    if (categoryCreationContext === 'transaction') {
-      setSelectedCategoryId(category.id);
-    }
+    pickCategory(category.id);
 
     setCustomCategoryVisible(false);
     setEditingCategoryId(null);
     setCategoryInitialEditor(undefined);
-    closeCategoryPicker();
   };
 
   const handleCreateCategory = async (input: CreateCategoryInput) => {
@@ -585,11 +591,7 @@ export function MainTabsNavigator() {
     }
 
     triggerHaptic('categorySelect');
-
-    if (categoryCreationContext === 'transaction') {
-      setSelectedCategoryId(selection.categoryId);
-    }
-    closeCategoryPicker();
+    pickCategory(selection.categoryId);
   };
 
   const handleCreateDefaultCategories = async (
@@ -611,10 +613,7 @@ export function MainTabsNavigator() {
       );
       setCategories((current) => [...current, ...createdCategories]);
       publishActiveCoupleChanges();
-      if (categoryCreationContext === 'transaction') {
-        setSelectedCategoryId(createdCategories[0]!.id);
-      }
-      closeCategoryPicker();
+      pickCategory(createdCategories[0]!.id);
     } catch {
       showSaveError();
     }
@@ -642,6 +641,7 @@ export function MainTabsNavigator() {
         setSelectedCategoryId(null);
         setSelectedMoneyAccountId(null);
       },
+      onTransactionsCreated: announceCreatedMovement,
       setTransactions,
     });
   // Estos hooks no pasan por React Compiler (sus `try/catch` lo impiden):
@@ -649,7 +649,14 @@ export function MainTabsNavigator() {
   const submitTransaction = useStableCallback(submitTransactionLatest);
   const quickEditTransaction = useStableCallback(quickEditLatest);
   const handleShareCategory = useStableCallback(copyCategoryLatest);
-  const handleCopyTransaction = useStableCallback(copyTransactionLatest);
+  // Tras copiar se cierra el detalle para dejar a la vista la confirmación.
+  const handleCopyTransaction = useStableCallback(
+    async (ids: string | readonly string[], targetSpaceId: string) => {
+      const copied = await copyTransactionLatest(ids, targetSpaceId);
+      if (copied) closeTransactionDetail();
+      return copied;
+    },
+  );
 
   const handleDeleteTransaction = async (transactionId: string) => {
     try {
@@ -657,54 +664,39 @@ export function MainTabsNavigator() {
       const nextTransactions = await listLocalTransactions();
       setTransactions(() => nextTransactions);
       closeTransactionDetail();
-      setDetailTransactionReminder(null);
+      clearDetailTransactionReminder();
       void cancelTransactionReminder(transactionId).catch(() => undefined);
       void reconcileNotificationRules({
         categories,
         transactions: nextTransactions,
       }).catch(() => undefined);
       publishActiveCoupleChanges();
+      announceDeleted('transaction');
     } catch {
       showSaveError();
     }
   };
 
-  const handleSaveTransactionReminder = (
-    transactionId: string,
-    remindOn: string,
-    times: readonly string[],
-  ): Promise<boolean> => {
-    const source = transactions.find((t) => t.id === transactionId);
-    if (!source || source.spaceId !== activeSpace.id) {
-      return Promise.resolve(false);
-    }
-
-    const categoryName = spaceCategories.find(
-      (category) => category.id === source.categoryId,
-    )?.name;
-
-    return scheduleTransactionReminder({
-      remindOn,
-      spaceId: activeSpace.id,
-      times,
-      transaction: { ...source, categoryName },
-    })
-      .then((reminder) => {
-        setDetailTransactionReminder(reminder);
-        return true;
-      })
-      .catch(() => false);
+  /** Abre la hoja de edición del movimiento, desde el detalle o una tarjeta. */
+  const startTransactionEdit = (
+    transaction: SessionTransaction,
+    initialEditor?: TransactionEditorTarget,
+  ) => {
+    openTransactionCreation({
+      categoryId: transaction.categoryId,
+      type: transaction.type,
+    });
+    setEditingTransactionId(transaction.id);
+    setTransactionInitialEditor(initialEditor);
   };
-
-  const handleRemoveTransactionReminder = (
-    transactionId: string,
-  ): Promise<boolean> =>
-    cancelTransactionReminder(transactionId)
-      .then(() => {
-        setDetailTransactionReminder(null);
-        return true;
-      })
-      .catch(() => false);
+  const startCategoryEdit = (
+    categoryId: string,
+    initialEditor?: CategoryEditorTarget,
+  ) => {
+    setEditingCategoryId(categoryId);
+    setCategoryInitialEditor(initialEditor);
+    setCustomCategoryVisible(true);
+  };
 
   const handleSaveNotificationRule = (
     input: SaveLocalNotificationRuleInput,
@@ -732,18 +724,17 @@ export function MainTabsNavigator() {
         ),
       );
       publishActiveCoupleChanges();
+      announceDeleted('category');
     } catch {
       showSaveError();
     }
   };
 
   const handleSaveCategoryBudget = (
-    categoryId: string,
-    budgetMinor?: number,
-  ) => {
-    const category = categories.find((current) => current.id === categoryId);
-    if (!category) return;
-    void updateLocalCategory({ ...category, budgetMinor })
+    category: Category,
+    currency: CurrencyCode,
+  ) =>
+    saveLocalCategoryBudget(category, currency)
       .then((updated) => {
         setCategories((current) =>
           current.map((item) => (item.id === updated.id ? updated : item)),
@@ -751,7 +742,6 @@ export function MainTabsNavigator() {
         publishActiveCoupleChanges();
       })
       .catch(showSaveError);
-  };
 
   const handleSaveCategoryNote = (categoryId: string, note: string | null) => {
     void updateLocalCategoryNote(categoryId, activeSpace.id, note)
@@ -810,7 +800,13 @@ export function MainTabsNavigator() {
             ? 'couple-pending'
             : 'space-ready'
       }
-      screenOptions={{ headerShown: false, animation: 'fade' }}
+      // Solo se pinta la pestaña visible: al cambiar de espacio, las demás se
+      // ponen al día cuando se vuelve a ellas en vez de retrasar el cambio.
+      screenOptions={{
+        headerShown: false,
+        animation: 'fade',
+        freezeOnBlur: true,
+      }}
       tabBar={(props) => (
         <MainAppTabBar
           {...props}
@@ -883,8 +879,12 @@ export function MainTabsNavigator() {
             onCreateAction={handleCreateAction}
             onCreateMoneyAccount={moneyAccountsController.openCreation}
             onImport={() => setImportVisible(true)}
-            onOpenCategoryDetail={(categoryId, currency) =>
-              openCategoryDetail(categoryId, currency ?? effectiveHomeCurrency)
+            onOpenCategoryDetail={(categoryId, currency, author) =>
+              openCategoryDetail(
+                categoryId,
+                currency ?? effectiveHomeCurrency,
+                author,
+              )
             }
             onOpenMoneyAccountDetail={moneyAccountsController.openDetail}
             onOpenTransactionDetail={openTransactionDetail}
@@ -893,7 +893,6 @@ export function MainTabsNavigator() {
             savePreference={(preference) =>
               void activitySections.setPreference(preference)
             }
-            spaceCurrency={activeSpace.currency}
             summaryPinned={isActivitySummaryPinned}
             targetRequestId={route.params?.requestId}
             targetSection={route.params?.section}
@@ -947,7 +946,7 @@ export function MainTabsNavigator() {
         initialDraft={editingTransaction ?? undefined}
         initialEditor={transactionInitialEditor}
         initialMoneyAccountId={selectedMoneyAccountId ?? undefined}
-        moneyAccounts={transactionMoneyAccountOptions}
+        moneyAccounts={moneyAccountsController.accountSummaries}
         onClose={() => {
           setEditingTransactionId(null);
           setTransactionInitialEditor(undefined);
@@ -955,19 +954,16 @@ export function MainTabsNavigator() {
           setTransactionModalVisible(false);
         }}
         onCreateMoneyAccount={moneyAccountsController.openCreation}
-        onOpenCategoryPicker={() => {
-          setCategoryCreationContext('transaction');
-          setCategoryPickerVisible(true);
-        }}
+        onOpenCategoryPicker={() => openCategoryPicker('transaction')}
         onSubmit={submitTransaction}
         onTypeChange={setTransactionType}
         selectedCategory={selectedCategory}
-        spaceCurrency={activeSpace.currency}
+        spaceCurrency={entryCurrency}
         type={transactionType}
         visible={isTransactionModalVisible}
       />
       <CurrencyExchangeModal
-        moneyAccounts={moneyAccountsController.activeSpaceMoneyAccounts}
+        moneyAccounts={moneyAccountsController.accountSummaries}
         onClose={() => setCurrencyExchangeVisible(false)}
         onSubmit={async (submission) => {
           const saved = await submitCurrencyExchange(submission);
@@ -982,7 +978,7 @@ export function MainTabsNavigator() {
         availableCurrencies={spaceCurrencies}
         categories={categories}
         existingTransactions={activeSpaceTransactions}
-        fallbackCurrency={activeSpace.currency}
+        fallbackCurrency={entryCurrency}
         onCategoriesCreated={(created) =>
           setCategories((current) => [...current, ...created])
         }
@@ -1007,7 +1003,11 @@ export function MainTabsNavigator() {
         onCreateCategory={() => setCustomCategoryVisible(true)}
         onCreateTemplates={handleCreateDefaultCategories}
         onSelect={handleCategorySelection}
-        selectedCategoryId={selectedCategoryId}
+        selectedCategoryId={
+          categoryCreationContext === 'detail'
+            ? (detailTransaction?.categoryId ?? null)
+            : selectedCategoryId
+        }
         visible={isCategoryPickerVisible}
       />
       <CreateCategoryModal
@@ -1029,6 +1029,7 @@ export function MainTabsNavigator() {
         displayCurrency={
           detailRequest?.displayCurrency ?? effectiveHomeCurrency
         }
+        initialAuthor={detailRequest?.author}
         onAddTransaction={(categoryId) => {
           setCategoryDetailVisible(false);
           openTransactionCreation({ categoryId });
@@ -1040,16 +1041,13 @@ export function MainTabsNavigator() {
         }}
         onEdit={(categoryId, initialEditor) => {
           setCategoryDetailVisible(false);
-          setEditingCategoryId(categoryId);
-          setCategoryInitialEditor(initialEditor);
-          setCustomCategoryVisible(true);
+          startCategoryEdit(categoryId, initialEditor);
         }}
         onOpenTransactionDetail={openTransactionDetail}
         onSaveBudget={handleSaveCategoryBudget}
         onSaveNote={handleSaveCategoryNote}
         onShare={handleShareCategory}
         shareTargets={shareTargets}
-        spaceCurrency={activeSpace.currency}
         transactions={visibleSpaceTransactions}
         visible={isCategoryDetailVisible && detailCategory !== null}
       />
@@ -1062,16 +1060,17 @@ export function MainTabsNavigator() {
         }
         onOpenTransactionDetail={openTransactionDetail}
         spaceId={activeSpace.id}
-        spaceCurrency={activeSpace.currency}
+        spaceCurrency={entryCurrency}
         spaceName={activeSpace.name}
         transactions={activeSpaceTransactions}
       />
       <TransactionDetailModal
         assignableMoneyAccounts={detailMoneyAccountOptions}
         category={detailTransactionCategory}
+        copiedSpaceIds={copiedSpaceIds}
         moneyAccount={detailTransactionMoneyAccount}
         onClose={closeTransactionDetail}
-        onCreateMoneyAccount={moneyAccountsController.openCreation}
+        onCreateMoneyAccount={moneyAccountsController.openCreationFor}
         onCopy={handleCopyTransaction}
         onDelete={handleDeleteTransaction}
         onEdit={(transactionId, initialEditor) => {
@@ -1080,21 +1079,14 @@ export function MainTabsNavigator() {
             transactionId,
           );
           if (!transaction) return;
-          closeTransactionDetailThenRun(() => {
-            openTransactionCreation({
-              categoryId: transaction.categoryId,
-              type: transaction.type,
-            });
-            setEditingTransactionId(transaction.id);
-            setTransactionInitialEditor(initialEditor);
-          });
-        }}
-        onOpenCategoryDetail={(categoryId) => {
-          if (!detailTransaction) return;
           closeTransactionDetailThenRun(() =>
-            openCategoryDetail(categoryId, detailTransaction.currency),
+            startTransactionEdit(transaction, initialEditor),
           );
         }}
+        onOpenCategory={(id) =>
+          closeTransactionDetailThenRun(() => openCategoryDetail(id))
+        }
+        onOpenCategoryPicker={() => openCategoryPicker('detail')}
         onQuickEdit={quickEditTransaction}
         onRemoveReminder={handleRemoveTransactionReminder}
         onSaveNote={handleSaveTransactionNote}
@@ -1106,10 +1098,10 @@ export function MainTabsNavigator() {
         visible={isTransactionDetailVisible}
         onDismissed={handleTransactionDetailDismissed}
       />
-      <CopyNoticeToast
-        notice={copySuccessNotice}
-        onDismiss={handleDismissCopyNotice}
-        testID="copy-success-toast"
+      <MovementNoticeToast
+        notice={movementNotice}
+        onDismiss={handleDismissMovementNotice}
+        testID="movement-notice-toast"
       />
       <SyncIssueToast
         issue={syncIssue}
@@ -1131,27 +1123,44 @@ export function MainTabsNavigator() {
 
   const content = (
     <SpaceMembershipProvider space={activeSpace}>
-      <Drawer.Navigator
-        drawerContent={({ navigation }) => (
-          <SpaceSideMenu
-            activeSpaceId={isInvitePartnerVisible ? '' : activeSpace.id}
-            isInvitePartnerActive={isInvitePartnerVisible}
-            onClose={() => navigation.closeDrawer()}
-            onCreateSpace={createSpace}
-            onInvitePartner={() =>
-              void runSpaceSwitch(() => {
+      {/* Envuelve también el menú lateral: sus modales usan la pulsación larga. */}
+      <PreviewActionsLayer
+        resolveActions={(target) =>
+          resolvePreviewItemActions(target, {
+            categories: spaceCategories,
+            copiedSpaceIds,
+            moneyAccounts: moneyAccountsController.activeSpaceMoneyAccounts,
+            onArchiveCategory: handleArchiveCategory,
+            onArchiveMoneyAccount: moneyAccountsController.archive,
+            onCopyCategory: handleShareCategory,
+            onCopyTransaction: handleCopyTransaction,
+            onDeleteTransaction: handleDeleteTransaction,
+            onEditCategory: startCategoryEdit,
+            onEditMoneyAccount: moneyAccountsController.startEditing,
+            onEditTransaction: startTransactionEdit,
+            shareTargets,
+            transactions: activeSpaceTransactions,
+          })
+        }
+      >
+        <Drawer.Navigator
+          drawerContent={({ navigation }) => (
+            <SpaceSideMenu
+              activeSpaceId={isInvitePartnerVisible ? '' : activeSpace.id}
+              isInvitePartnerActive={isInvitePartnerVisible}
+              onClose={() => navigation.closeDrawer()}
+              onCreateSpace={createSpace}
+              onInvitePartner={() => {
                 setActiveMainTab('Home');
                 setActivitySummaryPinned(false);
                 setCreateMenuVisible(false);
                 setInvitePartnerVisible(true);
                 navigation.navigate('Main', { screen: 'Home' });
-              })
-            }
-            onOpenSettings={() => navigation.navigate('Settings')}
-            onSelectSpace={(spaceId) =>
-              runSpaceSwitch(async () => {
+              }}
+              onOpenSettings={() => navigation.navigate('Settings')}
+              onSelectSpace={async (spaceId) => {
                 setInvitePartnerVisible(false);
-                const target = displayedSpaces.find((s) => s.id === spaceId);
+                const target = spaces.find((s) => s.id === spaceId);
                 if (target?.type === 'couple' || spaceId === coupleSpace?.id) {
                   setActiveMainTab('Home');
                   setActivitySummaryPinned(false);
@@ -1159,100 +1168,97 @@ export function MainTabsNavigator() {
                   navigation.navigate('Main', { screen: 'Home' });
                 }
                 await selectSpace(spaceId);
-              })
-            }
-            profileAvatarUri={spaceMemberAvatarUris[0]}
-            profileName={userDisplayName}
-            spaces={displayedSpaces}
-            storageError={spacesError}
-          />
-        )}
-        initialRouteName="Main"
-        screenOptions={{
-          drawerStyle: {
-            width: Math.min(width * drawerWidthRatio, drawerMaxWidth),
-          },
-          drawerType: 'front',
-          headerShown: false,
-          overlayColor: colors.overlay,
-          sceneStyle: { backgroundColor: 'transparent' },
-        }}
-      >
-        <Drawer.Screen name="Main">
-          {({ navigation }) => (
-            <LoadingState
-              label="Cambiando de espacio"
-              loading={isSwitchingSpace}
-              overlay
-              testID="space-switch-loading"
-            >
-              <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+              }}
+              profileAvatarUri={spaceMemberAvatarUris[0]}
+              profileName={userDisplayName}
+              spaces={spaces}
+              storageError={spacesError}
+            />
+          )}
+          initialRouteName="Main"
+          screenOptions={{
+            drawerStyle: {
+              width: Math.min(width * drawerWidthRatio, drawerMaxWidth),
+            },
+            drawerType: 'front',
+            headerShown: false,
+            overlayColor: colors.overlay,
+            sceneStyle: { backgroundColor: 'transparent' },
+          }}
+        >
+          <Drawer.Screen name="Main">
+            {({ navigation }) => (
+              <View style={mainSceneStyle}>
                 <ActiveSpaceHeader
-                  currencyFlag={
-                    countryCode !== null &&
-                    (activeMainTab === 'Home' ||
-                      activeMainTab === 'Activity' ||
-                      activeMainTab === 'Map') &&
-                    homeCurrencies.length > 1
-                      ? getHomeCurrencyButtonLabel(
-                          effectiveHomeCurrency,
-                          venezuelaCurrencyMode,
-                        )
-                      : undefined
-                  }
+                  currencyFlag={getHeaderCurrencyFlag(
+                    activeMainTab,
+                    effectiveHomeCurrency,
+                    homeCurrencies,
+                    { countryCode, venezuelaCurrencyMode },
+                  )}
                   memberAvatarUris={headerMemberAvatarUris}
                   onCurrencyPress={handleHomeCurrencyPress}
                   onSpacePress={() => navigation.openDrawer()}
                   spaceName={headerSpaceName}
+                  trailingAction={
+                    <NotificationsBellButton
+                      activeSpaceId={activeSpace.id}
+                      categories={categories}
+                      onOpenTransaction={openTransactionDetail}
+                      onSelectSpace={selectSpace}
+                      spaces={spaces}
+                      transactions={transactions}
+                    />
+                  }
+                  trailingInset={getMapHeaderInset(activeMainTab)}
                   visible={
                     activeMainTab !== 'Activity' || !isActivitySummaryPinned
                   }
                 />
                 {mainTabs}
-
                 {mainModals}
               </View>
-            </LoadingState>
-          )}
-        </Drawer.Screen>
-        <Drawer.Screen name="Settings" options={{ swipeEnabled: false }}>
-          {({ navigation }) => (
-            <SettingsDrawerContent
-              activeSpaceId={activeSpace.id}
-              activeSpaceType={activeSpace.type}
-              currencyPreferences={currencyPreferences}
-              hasSharedSpace={
-                coupleSpace !== null && !coupleSpace.isAwaitingPartner
-              }
-              notificationRules={activeSpaceNotificationRules}
-              onBack={() => navigation.navigate('Main', { screen: 'Home' })}
-              onLeaveCoupleSpace={async () => {
-                await leaveCoupleSpace();
-                navigation.navigate('Main');
-              }}
-              onCountryChanged={refreshFinancialContext}
-              onSaveCurrencyPreferences={(next) => {
-                setCurrencyPreferences(next).catch(showSaveError);
-              }}
-              onSaveNotificationRule={handleSaveNotificationRule}
-              onToggleHomeComparisonIndicators={(enabled) => {
-                setShowHomeComparisonIndicators(enabled).catch(showSaveError);
-              }}
-              showHomeComparisonIndicators={showHomeComparisonIndicators}
-            />
-          )}
-        </Drawer.Screen>
-        <Drawer.Screen name="AcceptInvitation">
-          {({ navigation, route }) => (
-            <AcceptInvitationScreen
-              onFinished={() => navigation.navigate('Main')}
-              onOpenCountrySettings={() => navigation.navigate('Settings')}
-              refreshCoupleSpace={refreshCoupleSpaceAndData}
-              token={route.params.token}
-            />
-          )}
-        </Drawer.Screen>
-      </Drawer.Navigator>
+            )}
+          </Drawer.Screen>
+          <Drawer.Screen name="Settings" options={{ swipeEnabled: false }}>
+            {({ navigation }) => (
+              <SettingsDrawerContent
+                activeSpaceId={activeSpace.id}
+                activeSpaceType={activeSpace.type}
+                currencyPreferences={currencyPreferences}
+                hasSharedSpace={
+                  coupleSpace !== null && !coupleSpace.isAwaitingPartner
+                }
+                notificationRules={activeSpaceNotificationRules}
+                onBack={() => navigation.navigate('Main', { screen: 'Home' })}
+                onLeaveCoupleSpace={async () => {
+                  await leaveCoupleSpace();
+                  navigation.navigate('Main');
+                }}
+                onCountryChanged={refreshFinancialContext}
+                onSaveCurrencyPreferences={(next) => {
+                  setCurrencyPreferences(next).catch(showSaveError);
+                }}
+                onSaveNotificationRule={handleSaveNotificationRule}
+                onToggleHomeComparisonIndicators={(enabled) => {
+                  setShowHomeComparisonIndicators(enabled).catch(showSaveError);
+                }}
+                showHomeComparisonIndicators={showHomeComparisonIndicators}
+              />
+            )}
+          </Drawer.Screen>
+          <Drawer.Screen name="AcceptInvitation">
+            {({ navigation, route }) => (
+              <AcceptInvitationScreen
+                onFinished={() => navigation.navigate('Main')}
+                onOpenCountrySettings={() => navigation.navigate('Settings')}
+                refreshCoupleSpace={refreshCoupleSpaceAndData}
+                token={route.params.token}
+              />
+            )}
+          </Drawer.Screen>
+        </Drawer.Navigator>
+      </PreviewActionsLayer>
     </SpaceMembershipProvider>
   );
 

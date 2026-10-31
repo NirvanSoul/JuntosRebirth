@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
+import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import { Text } from '@/components/ui/Text/Text';
-import type { MoneyAccount } from '@/features/accounts/types';
+import { MoneyAccountPickerGrid } from '@/features/accounts/components/MoneyAccountPickerGrid/MoneyAccountPickerGrid';
+import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
 import {
   getCurrencyFlag,
   getCurrencyName,
@@ -34,7 +36,7 @@ export const recurrenceOptions: readonly (typeof defaultRecurrence)[] = [
 ];
 
 type TransactionMoneyAccountPickerModalProps = {
-  accounts: readonly MoneyAccount[];
+  accounts: readonly MoneyAccountSummary[];
   moneyAccountId: string | undefined;
   visible: boolean;
   onClose: () => void;
@@ -73,47 +75,32 @@ export function TransactionMoneyAccountPickerModal({
         </View>
 
         <View accessibilityRole="radiogroup" style={optionPickerStyles.list}>
-          <SelectableOption
-            accessibilityLabel="Sin cuenta"
-            indicatorTestID="transaction-money-account-none-check"
-            label="Sin cuenta"
-            onPress={() => setDraftMoneyAccountId(undefined)}
-            selected={draftMoneyAccountId === undefined}
+          <MoneyAccountPickerGrid
+            accounts={accounts}
+            onSelect={setDraftMoneyAccountId}
+            selectedId={draftMoneyAccountId}
           />
-          {accounts.map((account) => {
-            const currencies = account.balances
-              .map((balance) => balance.currency)
-              .join(', ');
 
-            return (
-              <SelectableOption
-                accessibilityLabel={`${account.name} · ${currencies}`}
-                indicatorTestID={`transaction-money-account-${account.id}-check`}
-                key={account.id}
-                label={`${account.name} · ${currencies}`}
-                onPress={() => setDraftMoneyAccountId(account.id)}
-                selected={draftMoneyAccountId === account.id}
+          <View style={optionPickerStyles.badgeRow}>
+            <CreatePreviewBadge
+              accessibilityLabel="Sin cuenta"
+              bordered
+              label="Sin cuenta"
+              onPress={() => setDraftMoneyAccountId(undefined)}
+              removeSelected={draftMoneyAccountId === undefined}
+              testID="money-account-picker-none"
+            />
+            {onCreateMoneyAccount ? (
+              <CreatePreviewBadge
+                accessibilityLabel="Crear cuenta"
+                bordered
+                label="Crear cuenta"
+                onPress={onCreateMoneyAccount}
+                testID="transaction-money-account-create"
               />
-            );
-          })}
+            ) : null}
+          </View>
         </View>
-
-        {onCreateMoneyAccount ? (
-          <Pressable
-            accessibilityLabel="Crear cuenta"
-            accessibilityRole="button"
-            onPress={onCreateMoneyAccount}
-            style={({ pressed }) => [
-              optionPickerStyles.secondaryAction,
-              pressed && { opacity: 0.64 },
-            ]}
-            testID="transaction-money-account-create"
-          >
-            <Text tone="secondary" variant="footnote" weight="semibold">
-              Crear cuenta
-            </Text>
-          </Pressable>
-        ) : null}
 
         <ModalPrimaryAction
           accessibilityLabel="Guardar cuenta"
@@ -223,10 +210,11 @@ export const optionPickerStyles = StyleSheet.create({
   list: {
     gap: spacing.sm,
   },
-  secondaryAction: {
-    minHeight: layout.minTouchTarget,
-    alignItems: 'center',
+  badgeRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   saveButton: { marginTop: spacing.md },
 });

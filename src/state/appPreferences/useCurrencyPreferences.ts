@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
 import { syncOwnDefaultCurrency } from '@/features/profile/services/syncOwnDefaultCurrency';
 import {
   loadCurrencyPreferences,
+  loadStoredCurrencyPreferences,
   saveCurrencyPreferences,
 } from '@/state/appPreferences/currencyPreferencesRepository';
 import {
+  currencyPreferencesForCountry,
   defaultCurrencyPreferences,
   type CurrencyPreferences,
 } from '@/state/appPreferences/currencyPreferences';
@@ -30,12 +33,25 @@ export function useCurrencyPreferences(): CurrencyPreferencesController {
   useEffect(() => {
     let isMounted = true;
 
-    void loadCurrencyPreferences()
-      .then((stored) => {
-        if (!isMounted) return;
-        setPreferences(stored);
-        const defaultCurrency = stored.currencies[0];
-        if (defaultCurrency) void syncOwnDefaultCurrency(defaultCurrency);
+    void loadStoredCurrencyPreferences()
+      .then(async (stored) => {
+        if (stored) {
+          if (!isMounted) return;
+          setPreferences(stored);
+          const defaultCurrency = stored.currencies[0];
+          if (defaultCurrency) void syncOwnDefaultCurrency(defaultCurrency);
+          return;
+        }
+        // Sin preferencias guardadas manda el país del perfil. No se publica
+        // nada: el EUR por defecto del catálogo no es una elección y no debe
+        // llegar al perfil remoto que ven los demás miembros.
+        const { countryCode } = await getLocalProfile().catch(() => ({
+          countryCode: null,
+        }));
+        const countryPreferences = countryCode
+          ? currencyPreferencesForCountry(countryCode)
+          : null;
+        if (isMounted && countryPreferences) setPreferences(countryPreferences);
       })
       .finally(() => {
         if (isMounted) setReady(true);

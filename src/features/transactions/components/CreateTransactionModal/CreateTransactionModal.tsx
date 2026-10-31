@@ -16,7 +16,8 @@ import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/Mod
 import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
-import type { MoneyAccount } from '@/features/accounts/types';
+import { listMoneyAccountsForCurrency } from '@/features/accounts/types';
+import type { MoneyAccountSummary } from '@/features/accounts/utils/moneyAccountSummary';
 import type { Category } from '@/features/categories/types';
 import {
   AmountKeypad,
@@ -80,7 +81,7 @@ type CreateTransactionModalProps = {
   /** Cuenta preseleccionada al abrir, por ejemplo desde su propio detalle. */
   initialMoneyAccountId?: string;
   /** Cuentas activas del espacio; sin ninguna, el selector no aparece. */
-  moneyAccounts?: readonly MoneyAccount[];
+  moneyAccounts?: readonly MoneyAccountSummary[];
   /** Abre la creación de una cuenta desde el propio selector. */
   onCreateMoneyAccount?: () => void;
   spaceCurrency: CurrencyCode;
@@ -111,7 +112,7 @@ const defaultAvailableCurrencies: readonly CurrencyCode[] = [
   defaultCurrencyCode,
 ];
 /** Referencia estable, por el mismo motivo que el array de monedas. */
-const defaultMoneyAccounts: readonly MoneyAccount[] = [];
+const defaultMoneyAccounts: readonly MoneyAccountSummary[] = [];
 /** Límites visuales que evitan el autoajuste defectuoso de texto en iOS. */
 const amountHeroMaxLength = 9;
 const amountMaxLength = 13;
@@ -170,7 +171,7 @@ export function CreateTransactionModal({
       return [...allowedTransactionInputCurrencies];
     }
     const list = availableCurrencies ?? defaultAvailableCurrencies;
-    return list.includes(spaceCurrency) ? list : [spaceCurrency, ...list];
+    return list.length > 0 ? list : [spaceCurrency];
   }, [allowedTransactionInputCurrencies, availableCurrencies, spaceCurrency]);
   const [title, setTitle] = useState('');
   const [amountInput, setAmountInput] = useState('0');
@@ -232,12 +233,14 @@ export function CreateTransactionModal({
         ? 'amount'
         : 'amountHero';
   const transactionTone = type === 'income' ? 'income' : 'expense';
+  const lockedCurrency =
+    initialEditor === 'money-account' ? initialDraft?.currency : undefined;
   const selectableMoneyAccounts = useMemo(
     () =>
-      moneyAccounts.filter(
+      listMoneyAccountsForCurrency(moneyAccounts, lockedCurrency).filter(
         (account) => account.spaceId === activeSpaceId && !account.isArchived,
       ),
-    [activeSpaceId, moneyAccounts],
+    [activeSpaceId, lockedCurrency, moneyAccounts],
   );
   /**
    * Puede ser una cuenta ya archivada si se está editando un movimiento

@@ -121,17 +121,28 @@ export function SpaceMenuRow({
       {raised ? (
         <Animated.View
           pointerEvents="none"
-          style={[styles.raisedSurface, restingLayerStyle]}
+          style={[
+            styles.raisedSurface,
+            active ? styles.hidden : styles.visible,
+            restingLayerStyle,
+          ]}
           testID={`${iconTestID}-surface`}
         />
       ) : null}
+      {/*
+        La capa en reposo siempre ocupa el sitio y la activa siempre va
+        encima: si la estructura cambiase con `active`, el re-render que llega
+        tras la animación devolvía las opacidades a su valor inicial y la fila
+        se quedaba en blanco sobre blanco. La opacidad base ya es la final, así
+        que un repintado nunca deja la capa equivocada a la vista.
+      */}
       <Animated.View
         {...hiddenFromAccessibility(active)}
         pointerEvents="none"
         style={[
           styles.content,
+          active ? styles.hidden : styles.visible,
           restingLayerStyle,
-          active && styles.contentOverlay,
         ]}
       >
         {renderContent(false)}
@@ -141,8 +152,9 @@ export function SpaceMenuRow({
         pointerEvents="none"
         style={[
           styles.content,
+          styles.contentOverlay,
+          active ? styles.visible : styles.hidden,
           activeLayerStyle,
-          !active && styles.contentOverlay,
         ]}
       >
         {renderContent(true)}
@@ -180,6 +192,8 @@ function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       paddingHorizontal: spacing.md,
     },
     contentOverlay: StyleSheet.absoluteFill,
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
     icon: {
       width: spaceIconSize,
       height: spaceIconSize,

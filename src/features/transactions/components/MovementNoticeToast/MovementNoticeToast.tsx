@@ -2,15 +2,16 @@ import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { NoticeToast } from '@/components/overlays/NoticeToast/NoticeToast';
+import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
-import type { CopyNotice } from '@/features/spaces/hooks/useCopyToSpace';
+import type { MovementNotice } from '@/features/transactions/hooks/useMovementNotice';
 import { categoryColors } from '@/theme/categoryColors';
 import { iconSize } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { useTheme } from '@/theme/useTheme';
 
-type CopyNoticeToastProps = {
-  notice: CopyNotice | null;
+type MovementNoticeToastProps = {
+  notice: MovementNotice | null;
   onDismiss: (noticeId: number) => void;
   testID?: string;
 };
@@ -18,19 +19,19 @@ type CopyNoticeToastProps = {
 const categoryBadgeSize = 32;
 
 /**
- * Confirmación de copia entre espacios. Si lo copiado es un movimiento, la
- * tarjeta muestra a la izquierda el icono de su categoría.
+ * Confirmación de movimientos creados o copiados entre espacios. Si el aviso
+ * trae categoría o cuenta, la tarjeta muestra a la izquierda su icono.
  */
-export function CopyNoticeToast({
+export function MovementNoticeToast({
   notice,
   onDismiss,
   testID,
-}: CopyNoticeToastProps) {
+}: MovementNoticeToastProps) {
   const { colors } = useTheme();
   // Memorizado: un aviso nuevo en cada render reiniciaría su temporizador.
   const toastNotice = useMemo(() => {
-    const category = notice?.category;
-    if (!notice || !category) return notice;
+    const iconSource = notice?.category ?? notice?.moneyAccount;
+    if (!notice || !iconSource) return notice;
 
     return {
       ...notice,
@@ -40,15 +41,27 @@ export function CopyNoticeToast({
           importantForAccessibility="no-hide-descendants"
           style={[
             styles.categoryBadge,
-            { backgroundColor: categoryColors[category.colorToken] },
+            { backgroundColor: categoryColors[iconSource.colorToken] },
           ]}
-          testID="copy-notice-category-icon"
+          testID={
+            notice.category
+              ? 'movement-notice-category-icon'
+              : 'movement-notice-money-account-icon'
+          }
         >
-          <CategoryIcon
-            color={colors.onBrand}
-            name={category.icon}
-            size={iconSize.sm}
-          />
+          {notice.category ? (
+            <CategoryIcon
+              color={colors.onBrand}
+              name={notice.category.icon}
+              size={iconSize.sm}
+            />
+          ) : notice.moneyAccount ? (
+            <MoneyAccountIcon
+              color={colors.onBrand}
+              name={notice.moneyAccount.icon}
+              size={iconSize.sm}
+            />
+          ) : null}
         </View>
       ),
     };

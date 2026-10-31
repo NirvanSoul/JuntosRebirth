@@ -37,7 +37,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function resolveEffectiveScheme(
   appearance: AppearancePreference,
-  systemScheme: ColorSchemeName,
+  systemScheme: ColorSchemeName | null,
 ): ColorScheme {
   if (appearance === 'system') {
     return systemScheme === 'dark' ? 'dark' : 'light';

@@ -131,17 +131,12 @@ export async function restoreRemoteAccount(input: {
     throw new Error('La cuenta remota no tiene espacios activos');
   }
 
-  const currencyBySpaceRemoteId = new Map(
-    input.snapshot.spaces.map((space) => [space.remoteId, space.currency]),
-  );
-
   let localCategoryIdByRemoteId = new Map<string, string>();
   await database.withExclusiveTransactionAsync(async (transaction) => {
     const result = await applyRemoteCollections(transaction, {
       userId: input.userId,
       collections: input.snapshot,
       localSpaceIdByRemoteId,
-      currencyBySpaceRemoteId,
       linkMode: 'full',
     });
     localCategoryIdByRemoteId = result.localCategoryIdByRemoteId;
@@ -270,10 +265,6 @@ export async function applyRemoteChanges(input: {
     { ifCatalogueRevision: catalogueRevision },
   );
 
-  const currencyBySpaceRemoteId = new Map(
-    input.changes.spaces.map((space) => [space.remoteId, space.currency]),
-  );
-
   const totalDeltaRows =
     input.changes.categories.length +
     input.changes.moneyAccounts.length +
@@ -310,7 +301,6 @@ export async function applyRemoteChanges(input: {
       userId: input.userId,
       collections: input.changes,
       localSpaceIdByRemoteId,
-      currencyBySpaceRemoteId,
       linkMode: 'delta',
     });
   });

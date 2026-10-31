@@ -26,6 +26,7 @@ type SessionStartupInput = {
     partition?: string,
     options?: { mode?: 'full' | 'delta'; propagateFailure?: boolean },
   ) => Promise<void>;
+  reloadCurrencyPreferences: () => Promise<void>;
   reloadLocalFinance: () => Promise<void>;
   reloadSpaces: () => Promise<void>;
   session: BetterAuthSession | null;
@@ -66,6 +67,7 @@ export function useSessionStartup(
 ): SessionStartupState {
   const {
     refreshSharedCoupleData,
+    reloadCurrencyPreferences,
     reloadLocalFinance,
     reloadSpaces,
     session,
@@ -81,9 +83,13 @@ export function useSessionStartup(
   // El efecto de apertura registra aquí cómo relanzarse; así el reintento
   // explícito y el de reconexión reutilizan la misma secuencia.
   const runOpenSessionRef = useRef<() => void>(() => undefined);
+  // Se mantiene aunque el aviso se retire: ocultarlo no cancela la
+  // sincronización pendiente al recuperar la red.
+  const shouldRetryOnReconnectRef = useRef(false);
   const { isOffline } = useNetworkAvailability();
 
   const retrySession = useCallback(() => {
+    shouldRetryOnReconnectRef.current = false;
     setSyncIssue(null);
     setSessionSynced(false);
     runOpenSessionRef.current();
@@ -115,6 +121,9 @@ export function useSessionStartup(
               if (preparation === 'kept' && isMounted) void showLocalFinance();
             },
           });
+          // La restauración del perfil puede haber sembrado las monedas del
+          // país; sin releerlas, la interfaz seguiría con el valor por defecto.
+          await reloadCurrencyPreferences();
           await reloadSpaces();
         }
       } finally {
@@ -152,6 +161,7 @@ export function useSessionStartup(
             void endExpiredSession(error);
             return;
           }
+          shouldRetryOnReconnectRef.current = kind === 'offline';
           nextIssueId.current += 1;
           setSyncIssue({ id: nextIssueId.current, kind });
         })
@@ -168,17 +178,23 @@ export function useSessionStartup(
       isMounted = false;
       runOpenSessionRef.current = () => undefined;
     };
-  }, [reloadLocalFinance, reloadSpaces, sessionUserId, setNotificationRules]);
+  }, [
+    reloadCurrencyPreferences,
+    reloadLocalFinance,
+    reloadSpaces,
+    sessionUserId,
+    setNotificationRules,
+  ]);
 
   // Recuperar la red es el momento natural de reintentar sin pedirlo.
   const wasOfflineRef = useRef(isOffline);
   useEffect(() => {
     const wasOffline = wasOfflineRef.current;
     wasOfflineRef.current = isOffline;
-    if (wasOffline && !isOffline && syncIssue?.kind === 'offline') {
+    if (wasOffline && !isOffline && shouldRetryOnReconnectRef.current) {
       retrySession();
     }
-  }, [isOffline, retrySession, syncIssue?.kind]);
+  }, [isOffline, retrySession]);
 
   useSharedDataPolling({
     enabled: isSessionSynced && Boolean(session) && !isDemoSessionActive(),

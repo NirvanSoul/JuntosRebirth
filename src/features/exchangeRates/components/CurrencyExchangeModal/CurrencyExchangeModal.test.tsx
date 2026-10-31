@@ -1,6 +1,6 @@
 import { fireEvent, waitFor } from '@testing-library/react-native';
 
-import type { MoneyAccount } from '@/features/accounts/types';
+import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
 import { CurrencyExchangeModal } from '@/features/exchangeRates/components/CurrencyExchangeModal/CurrencyExchangeModal';
 import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import { renderWithTheme } from '@/test/renderWithTheme';
@@ -45,18 +45,21 @@ const successRates = {
   },
 };
 
-const accounts: MoneyAccount[] = [
-  {
-    id: 'bank',
-    spaceId: 'space-1',
-    name: 'Banco Venezuela',
-    kind: 'bank',
-    icon: 'bank',
-    colorToken: 'blue',
-    balances: [{ currency: 'USD', openingBalanceMinor: 0 }],
-    isArchived: false,
-  },
-];
+const accounts = summarizeMoneyAccounts(
+  [
+    {
+      id: 'bank',
+      spaceId: 'space-1',
+      name: 'Banco Venezuela',
+      kind: 'bank',
+      icon: 'bank',
+      colorToken: 'blue',
+      balances: [{ currency: 'USD', openingBalanceMinor: 0 }],
+      isArchived: false,
+    },
+  ],
+  [],
+);
 
 type Screen = Awaited<ReturnType<typeof renderWithTheme>>;
 
@@ -217,7 +220,7 @@ describe('CurrencyExchangeModal', () => {
     const { onSubmit, screen } = await renderModal({ moneyAccounts: accounts });
 
     await fireEvent.press(screen.getByTestId('currency-exchange-give-account'));
-    await fireEvent.press(screen.getByLabelText('Banco Venezuela · USD'));
+    await fireEvent.press(screen.getByTestId('money-account-card-bank'));
     await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
 
     expect(screen.getByLabelText('Cuenta: Banco Venezuela')).toBeTruthy();

@@ -40,18 +40,28 @@ function parseStoredCurrencyPreferences(value: string): CurrencyPreferences {
   return normalizeCurrencyPreferences({ currencies: candidate.currencies });
 }
 
-export async function loadCurrencyPreferences(): Promise<CurrencyPreferences> {
+/**
+ * Monedas que la persona eligió de verdad, o `null` si nunca se guardaron.
+ * Distinguir ese caso evita tratar el valor por defecto del catálogo (EUR)
+ * como una elección: una cuenta de Colombia que todavía no tiene preferencias
+ * debe recibir COP por su país, no heredar EUR.
+ */
+export async function loadStoredCurrencyPreferences(): Promise<CurrencyPreferences | null> {
   const stored = await AsyncStorage.getItem(currencyPreferencesStorageKey);
 
   if (stored === null) {
-    return defaultCurrencyPreferences;
+    return null;
   }
 
   try {
     return parseStoredCurrencyPreferences(stored);
   } catch {
-    return defaultCurrencyPreferences;
+    return null;
   }
+}
+
+export async function loadCurrencyPreferences(): Promise<CurrencyPreferences> {
+  return (await loadStoredCurrencyPreferences()) ?? defaultCurrencyPreferences;
 }
 
 export async function saveCurrencyPreferences(

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -11,22 +11,20 @@ import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCl
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
 import { Text } from '@/components/ui/Text/Text';
-import { TransactionFilterGroup } from '@/features/activity/components/TransactionFilterGroup';
 import {
-  formatTransactionDateRangeDate,
-  TransactionDateRangePickerModal,
-} from '@/features/activity/components/TransactionDateRangePickerModal';
+  FilterNoticeToast,
+  useFilterNotice,
+} from '@/features/activity/components/FilterNoticeToast';
+import { TransactionChoiceFilterGroup } from '@/features/activity/components/TransactionChoiceFilterGroup';
+import { TransactionFilterGroup } from '@/features/activity/components/TransactionFilterGroup';
+import { TransactionRecurrenceFilterOptions } from '@/features/activity/components/TransactionRecurrenceFilterOptions';
+import { TransactionTypeFilterOptions } from '@/features/activity/components/TransactionTypeFilterOptions';
 import type { TransactionDateFilter } from '@/features/activity/utils/transactionDateFilter';
 import {
   CategorySelectionCard,
   categorySelectionCardHeight,
 } from '@/features/categories/components/CategorySelectionCard/CategorySelectionCard';
 import type { Category } from '@/features/categories/types';
-import {
-  shiftTransactionPeriod,
-  type TransactionPeriod,
-} from '@/features/dashboard/utils/transactionPeriod';
-import { TransactionPeriodSelector } from '@/features/transactions/components/TransactionPeriodSelector/TransactionPeriodSelector';
 import type { TransactionRecurrence } from '@/features/transactions/types';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
@@ -58,41 +56,34 @@ export type TransactionFilters = {
 };
 
 type TransactionFiltersModalProps = {
-  /** Acota los grupos de filtros sin cambiar el comportamiento del modal. */
+  /** Opciones de autor; sin ellas (espacio personal) no se muestra el grupo. */
   authorOptions?: readonly TransactionAuthorFilterOption[];
   categories: readonly Category[];
   currencies: readonly CurrencyCode[];
   filters: TransactionFilters;
   onApply: (filters: TransactionFilters) => void;
   onClose: () => void;
-  /** `author` deja solo el filtro de autor: el periodo vive fuera del modal. */
-  variant?: 'all' | 'author';
+  previewMode?: 'cards' | 'pills';
+  onApplyPreviewMode?: (mode: 'cards' | 'pills') => void;
+  /**
+   * Recibe el borrador en cuanto cambia, con el modal abierto, para que la
+   * pantalla lo muestre detrás. Quien lo usa revierte al cerrar sin aplicar.
+   */
+  onPreview?: (
+    filters: TransactionFilters,
+    previewMode: 'cards' | 'pills',
+  ) => void;
+  /**
+   * `author` deja solo el autor y `calendar` quita la moneda. La fecha nunca
+   * está aquí: cada pantalla la elige con su selector de periodo, fuera del
+   * modal, y el borrador la conserva tal cual.
+   */
+  variant?: 'all' | 'author' | 'calendar';
   visible: boolean;
 };
 
 type FilterGroup =
-  'type' | 'category' | 'recurrence' | 'date' | 'currency' | 'author';
-
-const typeOptions: readonly {
-  label: string;
-  value: TransactionTypeFilter;
-}[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'expense', label: 'Gastos' },
-  { value: 'income', label: 'Ingresos' },
-];
-
-const recurrenceOptions: readonly {
-  label: string;
-  value: RecurrenceFilter;
-}[] = [
-  { value: 'all', label: 'Todas' },
-  { value: 'once', label: 'Único' },
-  { value: 'weekly', label: 'Semanal' },
-  { value: 'biweekly', label: 'Quincenal' },
-  { value: 'monthly', label: 'Mensual' },
-  { value: 'custom', label: 'Personalizada' },
-];
+  'visualization' | 'type' | 'category' | 'recurrence' | 'currency' | 'author';
 
 const allCategoriesOption = {
   id: 'all',
@@ -111,16 +102,27 @@ export function TransactionFiltersModal({
   filters,
   onApply,
   onClose,
+  previewMode,
+  onApplyPreviewMode,
+  onPreview,
   variant = 'all',
   visible,
 }: TransactionFiltersModalProps) {
   const density = useLayoutDensity();
   const { width } = useWindowDimensions();
   const [draft, setDraft] = useState<TransactionFilters>(filters);
-  const [dateAnchor, setDateAnchor] = useState(() => new Date());
-  const [dateRangePickerVisible, setDateRangePickerVisible] = useState(false);
+  const [draftPreviewMode, setDraftPreviewMode] = useState(
+    previewMode ?? 'pills',
+  );
+  const hasAuthorFilter = (authorOptions?.length ?? 0) > 0;
+  const initialExpandedGroup: FilterGroup =
+    variant === 'calendar' && previewMode
+      ? 'visualization'
+      : variant === 'author' || hasAuthorFilter
+        ? 'author'
+        : 'type';
   const [expandedGroup, setExpandedGroup] = useState<FilterGroup | null>(
-    variant === 'author' ? 'author' : 'date',
+    initialExpandedGroup,
   );
   const gutter = layout.screenGutter[density];
   const categoryCardWidth =
@@ -129,81 +131,65 @@ export function TransactionFiltersModal({
   const categoryGridHeight =
     categorySelectionCardHeight[density] * filterGridRows + spacing.sm;
   const hasMultipleCurrencies = currencies.length >= 2;
-  const isLimitedVariant = variant !== 'all';
-  const hasAuthorFilter = variant === 'author';
-  const hasDateFilter = !hasAuthorFilter;
-  const initialExpandedGroup: FilterGroup = hasAuthorFilter ? 'author' : 'date';
+  const hasCurrencyFilter = variant === 'all';
+  const hasMovementFilters = variant !== 'author';
 
-  if (useDepsChanged([visible, filters])) {
+  // Reiniciar el borrador solo al abrir.
+  if (useDepsChanged([visible])) {
     if (visible) {
       setDraft(filters);
-      setDateAnchor(
-        filters.date === 'all' || filters.date.period === 'custom'
-          ? new Date()
-          : filters.date.selectedDate,
-      );
+      setDraftPreviewMode(previewMode ?? 'pills');
       setExpandedGroup(initialExpandedGroup);
-    } else {
-      setDateRangePickerVisible(false);
     }
   }
 
-  const hasDraftFilters =
-    (hasDateFilter && draft.date !== 'all') ||
-    (hasAuthorFilter
-      ? draft.author !== undefined && draft.author !== 'all'
-      : draft.type !== 'all' ||
-        draft.category.length > 0 ||
-        draft.recurrence !== 'all');
+  useEffect(() => {
+    if (visible) onPreview?.(draft, draftPreviewMode);
+  }, [draft, draftPreviewMode, onPreview, visible]);
 
-  const clearDraft = () => {
-    setDraft((current) => ({
+  const { announceFilters, dismissFilterNotice, filterNotice } =
+    useFilterNotice();
+  const countActive = (value: TransactionFilters) =>
+    Number(hasAuthorFilter && (value.author ?? 'all') !== 'all') +
+    (hasMovementFilters
+      ? Number(value.type !== 'all') +
+        Number(value.category.length > 0) +
+        Number(value.recurrence !== 'all')
+      : 0);
+  const appliedFilterCount = countActive(filters);
+  const canClear = countActive(draft) > 0 || appliedFilterCount > 0;
+
+  const applyDraft = (nextFilters: TransactionFilters) => {
+    announceFilters(countActive(nextFilters), appliedFilterCount);
+    onApply(nextFilters);
+  };
+
+  // Limpiar aplica al momento: quita también los filtros ya aplicados y lo
+  // avisa, sin pasar por «Aplicar filtros». La moneda no cuenta como filtro.
+  const clearFilters = () => {
+    const cleared: TransactionFilters = {
       type: 'all',
       category: [],
-      currency: current.currency,
+      currency: draft.currency,
       recurrence: 'all',
-      date: hasDateFilter ? 'all' : current.date,
-      author: hasAuthorFilter ? 'all' : current.author,
-    }));
+      date: draft.date,
+      author: hasAuthorFilter ? 'all' : draft.author,
+    };
+    setDraft(cleared);
+    applyDraft(cleared);
   };
 
   const toggleGroup = (group: FilterGroup) => {
     setExpandedGroup((current) => (current === group ? null : group));
   };
 
-  const selectDatePeriod = (period: TransactionPeriod) => {
-    setDraft((current) => ({
-      ...current,
-      date: { period, selectedDate: dateAnchor },
-    }));
-  };
-
-  const shiftDatePeriod = (offset: -1 | 1) => {
-    if (draft.date !== 'all' && draft.date.period === 'custom') {
-      setDateRangePickerVisible(true);
-      return;
-    }
-    const period = draft.date === 'all' ? 'month' : draft.date.period;
-    const nextDate = shiftTransactionPeriod(period, dateAnchor, offset);
-    setDateAnchor(nextDate);
-    setDraft((current) => ({
-      ...current,
-      date: { period, selectedDate: nextDate },
-    }));
-  };
-
-  const customDateRange =
-    draft.date !== 'all' && draft.date.period === 'custom'
-      ? draft.date
-      : undefined;
-  const customDateLabel = customDateRange
-    ? `${formatTransactionDateRangeDate(customDateRange.startDate)} — ${formatTransactionDateRangeDate(customDateRange.endDate)}`
-    : undefined;
-
   return (
     <>
       <AppModal
         onClose={onClose}
+        // Se abre también sobre otros modales (periodo, categoría): apilarlo
+        // evita que `replace` cierre la hoja de debajo.
+        stackBehavior="push"
         testID="transaction-filters-modal"
         visible={visible}
       >
@@ -221,71 +207,37 @@ export function TransactionFiltersModal({
           </View>
 
           <View style={styles.groups}>
-            {hasDateFilter ? (
-              <TransactionFilterGroup
-                expanded={expandedGroup === 'date'}
-                icon="calendar-outline"
-                iconTestID="date-filter-group-icon"
-                onToggle={() => toggleGroup('date')}
-                title="Fecha"
-              >
-                <TransactionPeriodSelector
-                  includeAllOption
-                  includeCustomOption
-                  customLabel={customDateLabel}
-                  customSelected={Boolean(customDateRange)}
-                  onNext={() => shiftDatePeriod(1)}
-                  onPrevious={() => shiftDatePeriod(-1)}
-                  onSelectAll={() =>
-                    setDraft((current) => ({ ...current, date: 'all' }))
-                  }
-                  onSelectPeriod={selectDatePeriod}
-                  onSelectCustom={() => setDateRangePickerVisible(true)}
-                  period={
-                    draft.date === 'all' || draft.date.period === 'custom'
-                      ? null
-                      : draft.date.period
-                  }
-                  selectedDate={dateAnchor}
-                  testID="activity-date-period-selector"
-                />
-              </TransactionFilterGroup>
+            {variant === 'calendar' && previewMode ? (
+              <TransactionChoiceFilterGroup
+                expanded={expandedGroup === 'visualization'}
+                icon="grid-outline"
+                onToggle={() => toggleGroup('visualization')}
+                onSelect={setDraftPreviewMode}
+                options={[
+                  { value: 'cards', label: 'Medianas' },
+                  { value: 'pills', label: 'Pequeñas' },
+                ]}
+                prefix="visualization"
+                selected={draftPreviewMode}
+                title="Visualización"
+              />
             ) : null}
-
             {hasAuthorFilter ? (
-              <TransactionFilterGroup
+              <TransactionChoiceFilterGroup
                 expanded={expandedGroup === 'author'}
                 icon="person-outline"
-                iconTestID="author-filter-group-icon"
                 onToggle={() => toggleGroup('author')}
+                onSelect={(author) =>
+                  setDraft((current) => ({ ...current, author }))
+                }
+                options={authorOptions ?? []}
+                prefix="author"
+                selected={draft.author ?? 'all'}
                 title="Autor"
-              >
-                <View
-                  accessibilityRole="radiogroup"
-                  style={styles.currencyOptions}
-                >
-                  {(authorOptions ?? []).map((option) => (
-                    <SelectableOption
-                      accessibilityLabel={`Autor: ${option.label}`}
-                      indicatorTestID={`author-filter-${option.value}-indicator`}
-                      indicator={false}
-                      key={option.value}
-                      label={option.label}
-                      onPress={() =>
-                        setDraft((current) => ({
-                          ...current,
-                          author: option.value,
-                        }))
-                      }
-                      selected={(draft.author ?? 'all') === option.value}
-                      testID={`author-filter-${option.value}`}
-                    />
-                  ))}
-                </View>
-              </TransactionFilterGroup>
+              />
             ) : null}
 
-            {hasMultipleCurrencies && !isLimitedVariant ? (
+            {hasMultipleCurrencies && hasCurrencyFilter ? (
               <TransactionFilterGroup
                 expanded={expandedGroup === 'currency'}
                 icon="cash-outline"
@@ -315,7 +267,7 @@ export function TransactionFiltersModal({
               </TransactionFilterGroup>
             ) : null}
 
-            {!isLimitedVariant ? (
+            {hasMovementFilters ? (
               <TransactionFilterGroup
                 expanded={expandedGroup === 'type'}
                 icon="swap-vertical-outline"
@@ -323,30 +275,16 @@ export function TransactionFiltersModal({
                 onToggle={() => toggleGroup('type')}
                 title="Tipo de movimiento"
               >
-                <View accessibilityRole="radiogroup" style={styles.typeOptions}>
-                  {typeOptions.map((option) => (
-                    <SelectableOption
-                      accessibilityLabel={`Tipo: ${option.label}`}
-                      indicatorTestID={`type-filter-${option.value}-indicator`}
-                      indicator={false}
-                      key={option.value}
-                      label={option.label}
-                      onPress={() =>
-                        setDraft((current) => ({
-                          ...current,
-                          type: option.value,
-                        }))
-                      }
-                      selected={draft.type === option.value}
-                      style={styles.typeOption}
-                      testID={`type-filter-${option.value}`}
-                    />
-                  ))}
-                </View>
+                <TransactionTypeFilterOptions
+                  onSelect={(type) =>
+                    setDraft((current) => ({ ...current, type }))
+                  }
+                  selected={draft.type}
+                />
               </TransactionFilterGroup>
             ) : null}
 
-            {!isLimitedVariant ? (
+            {hasMovementFilters ? (
               <TransactionFilterGroup
                 expanded={expandedGroup === 'category'}
                 icon="pie-chart-outline"
@@ -407,7 +345,7 @@ export function TransactionFiltersModal({
               </TransactionFilterGroup>
             ) : null}
 
-            {!isLimitedVariant ? (
+            {hasMovementFilters ? (
               <TransactionFilterGroup
                 expanded={expandedGroup === 'recurrence'}
                 icon="sync-outline"
@@ -415,35 +353,12 @@ export function TransactionFiltersModal({
                 onToggle={() => toggleGroup('recurrence')}
                 title="Recurrencia"
               >
-                <ScrollView
-                  accessibilityRole="radiogroup"
-                  contentContainerStyle={[
-                    styles.singleRow,
-                    { paddingHorizontal: gutter },
-                  ]}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{ width, marginLeft: -gutter, overflow: 'visible' }}
-                  testID="recurrence-filter-scroll"
-                >
-                  {recurrenceOptions.map((option) => (
-                    <SelectableOption
-                      accessibilityLabel={`Recurrencia: ${option.label}`}
-                      indicatorTestID={`recurrence-filter-${option.value}-indicator`}
-                      indicator={false}
-                      key={option.value}
-                      label={option.label}
-                      onPress={() =>
-                        setDraft((current) => ({
-                          ...current,
-                          recurrence: option.value,
-                        }))
-                      }
-                      selected={draft.recurrence === option.value}
-                      testID={`recurrence-filter-${option.value}`}
-                    />
-                  ))}
-                </ScrollView>
+                <TransactionRecurrenceFilterOptions
+                  onSelect={(recurrence) =>
+                    setDraft((current) => ({ ...current, recurrence }))
+                  }
+                  selected={draft.recurrence}
+                />
               </TransactionFilterGroup>
             ) : null}
           </View>
@@ -451,33 +366,29 @@ export function TransactionFiltersModal({
           <View style={styles.actions}>
             <ModalPrimaryAction
               accessibilityLabel="Limpiar"
-              disabled={!hasDraftFilters}
+              disabled={!canClear}
               label="Limpiar"
               mutedWhenDisabled
-              onPress={clearDraft}
+              onPress={clearFilters}
               style={styles.clearAction}
               variant="surface"
             />
             <ModalPrimaryAction
               accessibilityLabel="Aplicar filtros"
               label="Aplicar filtros"
-              onPress={() => onApply(draft)}
+              onPress={() => {
+                if (variant === 'calendar' && previewMode)
+                  onApplyPreviewMode?.(draftPreviewMode);
+                applyDraft(draft);
+              }}
               style={styles.applyAction}
             />
           </View>
         </View>
       </AppModal>
-      <TransactionDateRangePickerModal
-        initialRange={customDateRange}
-        onClose={() => setDateRangePickerVisible(false)}
-        onSelect={(range) => {
-          setDraft((current) => ({
-            ...current,
-            date: { ...range, period: 'custom' },
-          }));
-          setDateRangePickerVisible(false);
-        }}
-        visible={dateRangePickerVisible}
+      <FilterNoticeToast
+        notice={filterNotice}
+        onDismiss={dismissFilterNotice}
       />
     </>
   );
@@ -500,23 +411,8 @@ const styles = StyleSheet.create({
   groups: {
     gap: spacing.md,
   },
-  typeOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
   currencyOptions: {
     gap: spacing.sm,
-  },
-  typeOption: {
-    flexShrink: 0,
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  singleRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    overflow: 'visible',
   },
   twoRowGrid: {
     flexDirection: 'column',

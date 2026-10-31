@@ -8,6 +8,8 @@ import { useTheme } from '@/theme/useTheme';
 import { distributeDonutSegmentLengths } from '@/utils/donutGeometry';
 
 type IncomeExpenseArcProps = {
+  /** Periodo que se anuncia junto a la proporción, p. ej. «de este mes». */
+  accessibilityContext?: string;
   children?: ReactNode;
   expenseMinor: number;
   incomeMinor: number;
@@ -43,6 +45,7 @@ type ArcSegment = {
  * normalmente se coloca el balance disponible.
  */
 export function IncomeExpenseArc({
+  accessibilityContext = 'de este mes',
   children,
   expenseMinor,
   incomeMinor,
@@ -91,7 +94,7 @@ export function IncomeExpenseArc({
   return (
     <View style={styles.container} testID={testID}>
       <View
-        accessibilityLabel={`Ingresos ${incomePercentage}%, gastos ${expensePercentage}% de este mes`}
+        accessibilityLabel={`Ingresos ${incomePercentage}%, gastos ${expensePercentage}% ${accessibilityContext}`}
         accessible
         pointerEvents="none"
         style={StyleSheet.absoluteFill}

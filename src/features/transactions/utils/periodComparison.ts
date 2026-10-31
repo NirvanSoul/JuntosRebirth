@@ -1,7 +1,8 @@
 export type ComparisonDirection = 'down' | 'flat' | 'up';
 
 export type PeriodComparisonResult = {
-  changePercent: number;
+  /** Diferencia exacta en unidades menores: actual menos anterior. */
+  changeMinor: number;
   direction: ComparisonDirection;
 };
 
@@ -17,10 +18,44 @@ export function calculatePeriodComparison(
     return null;
   }
 
-  const changePercent =
-    ((currentMinor - previousMinor) / Math.abs(previousMinor)) * 100;
+  const changeMinor = currentMinor - previousMinor;
   const direction: ComparisonDirection =
-    changePercent === 0 ? 'flat' : changePercent > 0 ? 'up' : 'down';
+    changeMinor === 0 ? 'flat' : changeMinor > 0 ? 'up' : 'down';
 
-  return { changePercent, direction };
+  return { changeMinor, direction };
+}
+
+/** «menos que el mes anterior»: completa el importe de la diferencia. */
+export function describeComparisonDirection(
+  direction: ComparisonDirection,
+  previousPeriod: string,
+): string {
+  if (direction === 'flat') return `igual que ${previousPeriod}`;
+  return `${direction === 'up' ? 'más' : 'menos'} que ${previousPeriod}`;
+}
+
+type ComparableTotals = {
+  balanceMinor: number;
+  expenseMinor: number;
+  incomeMinor: number;
+};
+
+/** Compara ingresos, gastos y balance; sin periodo anterior no hay nada. */
+export function compareTransactionTotals(
+  current: ComparableTotals,
+  previous: ComparableTotals | null,
+): Partial<Record<'balance' | 'expense' | 'income', PeriodComparisonResult>> {
+  if (!previous) return {};
+
+  return {
+    balance:
+      calculatePeriodComparison(current.balanceMinor, previous.balanceMinor) ??
+      undefined,
+    expense:
+      calculatePeriodComparison(current.expenseMinor, previous.expenseMinor) ??
+      undefined,
+    income:
+      calculatePeriodComparison(current.incomeMinor, previous.incomeMinor) ??
+      undefined,
+  };
 }

@@ -59,8 +59,8 @@ describe('escala tipográfica', () => {
       getTypographyStyle('heading', 'compact'),
     );
 
-    expect(compactBody.fontSize).toBe(typography.body.fontSize);
-    expect(compactHeading.fontSize).toBeLessThan(typography.heading.fontSize);
+    expect(compactBody?.fontSize).toBe(typography.body.fontSize);
+    expect(compactHeading?.fontSize).toBeLessThan(typography.heading.fontSize);
   });
 
   it('asigna una rampa de Dynamic Type a cada variante', () => {

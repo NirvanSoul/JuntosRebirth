@@ -6,7 +6,7 @@ describe('correo de ideas para próximas funciones', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it('abre un borrador con destinatario y asunto de la función codificados', async () => {
-    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue();
     await openFeatureFeedback('Escáner de facturas');
     const url = new URL(openURL.mock.calls[0]?.[0] ?? '');
     expect(url.protocol).toBe('mailto:');

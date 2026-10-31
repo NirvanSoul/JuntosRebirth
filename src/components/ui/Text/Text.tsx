@@ -24,6 +24,7 @@ export type TextTone =
   | 'cta'
   | 'onBrand'
   | 'onBrandMuted'
+  | 'onInverse'
   | 'income'
   | 'expense';
 
@@ -43,6 +44,8 @@ function resolveToneColor(tone: TextTone, colors: ColorTokens): string {
       return colors.onBrand;
     case 'onBrandMuted':
       return colors.brandSoft;
+    case 'onInverse':
+      return colors.onInverse;
     case 'income':
       return colors.income;
     case 'expense':

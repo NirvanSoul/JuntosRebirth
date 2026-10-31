@@ -1,19 +1,18 @@
-import { useRef, useState } from 'react';
-
-import type { ToastNotice } from '@/components/overlays/NoticeToast/NoticeToast';
 import { copyCategoryToSpace } from '@/features/categories/services/copyCategoryToSpace';
 import type { Category } from '@/features/categories/types';
 import { copyTransactionToSpace } from '@/features/transactions/services/copyTransactionToSpace';
+import type { AnnounceMovement } from '@/features/transactions/hooks/useMovementNotice';
 import type { SessionTransaction } from '@/features/transactions/types';
+import {
+  getTransactionCopyKey,
+  indexCopiedTransactionSpaces,
+} from '@/features/transactions/utils/transactionCopyIdentity';
 import type { Space } from '@/features/spaces/types';
-
-/** Aviso de copia; los movimientos llevan el icono de su categoría. */
-export type CopyNotice = ToastNotice & {
-  category?: Pick<Category, 'colorToken' | 'icon'>;
-};
 
 type UseCopyToSpaceInput = {
   activeSpaceId: string;
+  /** Muestra la tarjeta de confirmación compartida con otros movimientos. */
+  announce: AnnounceMovement;
   categories: readonly Category[];
   onCategoryCopied: (category: Category) => void;
   onChangesPublished: (targetSpaceId: string) => void;
@@ -24,11 +23,12 @@ type UseCopyToSpaceInput = {
 };
 
 /**
- * Copia de categorías y movimientos hacia otro espacio, con la tarjeta
- * flotante de confirmación que ambas comparten.
+ * Copia de categorías y movimientos hacia otro espacio, con su tarjeta
+ * flotante de confirmación.
  */
 export function useCopyToSpace({
   activeSpaceId,
+  announce,
   categories,
   onCategoryCopied,
   onChangesPublished,
@@ -37,18 +37,6 @@ export function useCopyToSpace({
   spaces,
   transactions,
 }: UseCopyToSpaceInput) {
-  const [notice, setNotice] = useState<CopyNotice | null>(null);
-  const nextNoticeId = useRef(1);
-
-  const announce = (nextNotice: Omit<CopyNotice, 'id'>) => {
-    setNotice({ ...nextNotice, id: nextNoticeId.current });
-    nextNoticeId.current += 1;
-  };
-
-  const dismissNotice = (noticeId: number) => {
-    setNotice((current) => (current?.id === noticeId ? null : current));
-  };
-
   const copyCategory = async (
     categoryId: string,
     targetSpaceId: string,
@@ -68,44 +56,8 @@ export function useCopyToSpace({
       onCategoryCopied(result.copiedCategory);
       onChangesPublished(targetSpaceId);
       announce({
-        message: `${result.itemName} copiado en ${targetSpace.name} `,
-        emphasis: 'exitosamente.',
-        tone: 'success',
-      });
-      return true;
-    } catch {
-      onError();
-      return false;
-    }
-  };
-
-  const copyTransaction = async (
-    transactionId: string,
-    targetSpaceId: string,
-  ): Promise<boolean> => {
-    const targetSpace = spaces.find((space) => space.id === targetSpaceId);
-    if (!targetSpace) return false;
-    const sourceCategoryId = transactions.find(
-      (transaction) => transaction.id === transactionId,
-    )?.categoryId;
-    const category = categories.find(({ id }) => id === sourceCategoryId);
-
-    try {
-      const result = await copyTransactionToSpace({
-        categories,
-        sourceSpaceId: activeSpaceId,
-        targetSpaceId,
-        transactionId,
-        transactions,
-      });
-      if (result.status === 'rejected') return false;
-
-      if (result.createdCategory) onCategoryCopied(result.createdCategory);
-      onTransactionsCopied(result.copiedTransactions);
-      onChangesPublished(targetSpaceId);
-      announce({
-        category,
-        message: 'Movimiento copiado',
+        category: result.copiedCategory,
+        message: 'Categoría copiada',
         placement: 'bottom',
         tone: 'success',
       });
@@ -116,5 +68,82 @@ export function useCopyToSpace({
     }
   };
 
-  return { copyCategory, copyTransaction, dismissNotice, notice };
+  /**
+   * Copia uno o varios movimientos. Varios van uno tras otro, con las
+   * categorías que crean las copias anteriores, y comparten un solo aviso.
+   *
+   * Nunca duplica en el destino: de una serie automática solo viaja la
+   * repetición más antigua elegida (la copia ya crea la serie desde ahí) y se
+   * omite lo que ya existe en el destino por una copia anterior.
+   */
+  const copyTransaction = async (
+    transactionIds: string | readonly string[],
+    targetSpaceId: string,
+  ): Promise<boolean> => {
+    const targetSpace = spaces.find((space) => space.id === targetSpaceId);
+    if (!targetSpace) return false;
+    const ids =
+      typeof transactionIds === 'string' ? [transactionIds] : transactionIds;
+    const categoryIds = new Set(
+      ids.map(
+        (id) =>
+          transactions.find((transaction) => transaction.id === id)?.categoryId,
+      ),
+    );
+    const [sourceCategoryId] = categoryIds;
+    const category =
+      categoryIds.size === 1
+        ? categories.find(({ id }) => id === sourceCategoryId)
+        : undefined;
+    const copiedSpaceIds = indexCopiedTransactionSpaces(transactions);
+    const pending = new Map<string, SessionTransaction>();
+    for (const id of ids) {
+      const source = transactions.find((transaction) => transaction.id === id);
+      if (!source || copiedSpaceIds(source).has(targetSpaceId)) continue;
+      const key = getTransactionCopyKey(source);
+      const current = pending.get(key);
+      if (!current || source.occurredOn < current.occurredOn) {
+        pending.set(key, source);
+      }
+    }
+    let knownCategories = categories;
+    let copiedCount = 0;
+
+    try {
+      for (const source of pending.values()) {
+        const result = await copyTransactionToSpace({
+          categories: knownCategories,
+          sourceSpaceId: activeSpaceId,
+          targetSpaceId,
+          transactionId: source.id,
+          transactions,
+        });
+        if (result.status === 'rejected') continue;
+
+        if (result.createdCategory) {
+          knownCategories = [...knownCategories, result.createdCategory];
+          onCategoryCopied(result.createdCategory);
+        }
+        onTransactionsCopied(result.copiedTransactions);
+        copiedCount += 1;
+      }
+    } catch {
+      onError();
+    }
+    if (copiedCount === 0) return false;
+
+    onChangesPublished(targetSpaceId);
+    announce({
+      category,
+      message:
+        copiedCount === 1
+          ? 'Movimiento copiado'
+          : `${copiedCount} movimientos copiados`,
+      placement: 'bottom',
+      tone: 'success',
+    });
+    return copiedCount === pending.size;
+  };
+
+  return { copyCategory, copyTransaction };
 }

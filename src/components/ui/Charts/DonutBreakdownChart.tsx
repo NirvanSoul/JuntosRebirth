@@ -6,6 +6,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg from 'react-native-svg';
 
+import { RowLimitedScroll } from '@/components/layout/RowLimitedScroll/RowLimitedScroll';
 import { AnimatedArcSegment } from '@/components/ui/Charts/AnimatedArcSegment';
 import { chartStrokeWidth } from '@/components/ui/Charts/chartTokens';
 import {
@@ -13,7 +14,6 @@ import {
   getChartContentExiting,
   type MotionDirection,
 } from '@/components/ui/Charts/donutChartAnimations';
-import { MonthNavigator } from '@/components/ui/MonthNavigator/MonthNavigator';
 import { SegmentedControl } from '@/components/ui/SegmentedControl/SegmentedControl';
 import { Text } from '@/components/ui/Text/Text';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
@@ -23,6 +23,7 @@ import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
+import { useTheme } from '@/theme/useTheme';
 import { getTypographyStyle } from '@/theme/typography';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 import { distributeDonutSegmentLengths } from '@/utils/donutGeometry';
@@ -43,14 +44,14 @@ type DonutBreakdownChartProps = {
   emptyContent?: ReactNode;
   /** Identifica la variante y prefija sus testID: `category`, `account`. */
   idPrefix: string;
-  /** Bloquea la navegación hacia meses futuros. */
-  isCurrentMonth: boolean;
   mode: DonutBreakdownMode;
-  monthLabel: string;
   onModeChange: (mode: DonutBreakdownMode) => void;
-  onMonthChange: (offset: -1 | 1) => void;
   onDataAvailabilityChange?: (hasData: boolean) => void;
   onSlicePress?: (id: string) => void;
+  /** Selector del periodo repartido, sobre el control de gastos e ingresos. */
+  periodControl: ReactNode;
+  /** Identifica el periodo para reiniciar las animaciones al cambiarlo. */
+  periodKey: string;
   /** Cambia (p. ej. al reenfocar la pantalla) para reiniciar el revelado. */
   resetKey?: number;
   /** Pista de cada badge: «Abre el detalle de la cuenta». */
@@ -67,6 +68,8 @@ const defaultChartSize = 236;
 const segmentVisibleGap = spacing.md;
 const minimumDashLength = 1;
 const legendDotSize = 10;
+/** A partir de la cuarta fila, los badges siguen en horizontal. */
+const legendMaxRows = 3;
 const segmentedControlWidth = 216;
 const minimumTotalFontScale = 0.6;
 /** Ancho de sobra para medir el total en una línea sin que nada lo recorte. */
@@ -88,13 +91,12 @@ export function DonutBreakdownChart({
   currency,
   emptyContent,
   idPrefix,
-  isCurrentMonth,
   mode,
-  monthLabel,
   onModeChange,
-  onMonthChange,
   onDataAvailabilityChange,
   onSlicePress,
+  periodControl,
+  periodKey,
   resetKey,
   slicePressHint,
   size = defaultChartSize,
@@ -102,6 +104,7 @@ export function DonutBreakdownChart({
   strokeWidth = chartStrokeWidth,
 }: DonutBreakdownChartProps) {
   const { formatCurrency } = useCurrencySymbolPreference();
+  const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const density = useLayoutDensity();
   const [totalNaturalWidth, setTotalNaturalWidth] = useState<number | null>(
@@ -146,9 +149,9 @@ export function DonutBreakdownChart({
     const base = StyleSheet.flatten(getTypographyStyle('amount', density));
 
     return {
-      fontSize: Math.floor((base.fontSize ?? 0) * scale),
-      letterSpacing: (base.letterSpacing ?? 0) * scale,
-      lineHeight: base.lineHeight ? base.lineHeight * scale : undefined,
+      fontSize: Math.floor((base?.fontSize ?? 0) * scale),
+      letterSpacing: (base?.letterSpacing ?? 0) * scale,
+      lineHeight: base?.lineHeight ? base.lineHeight * scale : undefined,
     };
   }, [density, totalNaturalWidth, totalWidth]);
   const modeLabel = mode === 'expense' ? 'gastado' : 'ingresado';
@@ -159,7 +162,7 @@ export function DonutBreakdownChart({
   }, [hasData, onDataAvailabilityChange]);
 
   const motionDirection: MotionDirection = mode === 'expense' ? -1 : 1;
-  const animationKey = `${currency}-${mode}-${monthLabel}`;
+  const animationKey = `${currency}-${mode}-${periodKey}`;
   const dashOffsets = useMemo(
     () =>
       segmentLengths.map((_, index) =>
@@ -170,17 +173,11 @@ export function DonutBreakdownChart({
 
   return (
     <View style={styles.card} testID={`${idPrefix}-donut-chart`}>
-      <MonthNavigator
-        label={monthLabel}
-        nextAccessibilityLabel="Ver mes siguiente"
-        nextDisabled={isCurrentMonth}
-        onNext={() => onMonthChange(1)}
-        onPrevious={() => onMonthChange(-1)}
-        previousAccessibilityLabel="Ver mes anterior"
-        style={styles.monthNavigator}
-      />
+      <View style={styles.periodControl}>{periodControl}</View>
 
       <SegmentedControl
+        // Mismo gris que el selector de periodo de encima.
+        indicatorColor={colors.keypad}
         indicatorTestID={`${idPrefix}-mode-indicator`}
         onChange={onModeChange}
         options={[
@@ -298,45 +295,53 @@ export function DonutBreakdownChart({
           style={styles.legend}
           testID={`${idPrefix}-chart-legend`}
         >
-          {data.items.map((slice, index) => {
-            const percentage = Math.round(
-              (slice.valueMinor / data.totalMinor) * 100,
-            );
+          <RowLimitedScroll
+            columnGap={spacing.sm}
+            maxRows={legendMaxRows}
+            rowGap={spacing.sm}
+            testID={`${idPrefix}-chart-legend-scroll`}
+          >
+            {data.items.map((slice, index) => {
+              const percentage = Math.round(
+                (slice.valueMinor / data.totalMinor) * 100,
+              );
 
-            return (
-              <Animated.View
-                entering={getChartContentEntering(
-                  motionDirection,
-                  motion.chartContentEnterDelay +
-                    index * motion.chartContentStagger,
-                )}
-                exiting={getChartContentExiting(motionDirection)}
-                key={`${animationKey}-${slice.id}`}
-                layout={chartLayoutTransition}
-                style={styles.legendItemContainer}
-                testID={`${idPrefix}-chart-badge-${slice.id}`}
-              >
-                <Pressable
-                  accessibilityHint={slicePressHint}
-                  accessibilityLabel={`Abrir detalle de ${slice.label}, ${percentage}%`}
-                  accessibilityRole="button"
-                  disabled={!onSlicePress}
-                  onPress={() => onSlicePress?.(slice.id)}
-                  style={({ pressed }) => [
-                    styles.legendItem,
-                    pressed ? styles.legendItemPressed : null,
-                  ]}
+              return (
+                <Animated.View
+                  entering={getChartContentEntering(
+                    motionDirection,
+                    motion.chartContentEnterDelay +
+                      index * motion.chartContentStagger,
+                  )}
+                  exiting={getChartContentExiting(motionDirection)}
+                  key={`${animationKey}-${slice.id}`}
+                  testID={`${idPrefix}-chart-badge-${slice.id}`}
                 >
-                  <View
-                    style={[styles.legendDot, { backgroundColor: slice.color }]}
-                  />
-                  <Text numberOfLines={1} variant="footnote">
-                    {slice.label} · {percentage}%
-                  </Text>
-                </Pressable>
-              </Animated.View>
-            );
-          })}
+                  <Pressable
+                    accessibilityHint={slicePressHint}
+                    accessibilityLabel={`Abrir detalle de ${slice.label}, ${percentage}%`}
+                    accessibilityRole="button"
+                    disabled={!onSlicePress}
+                    onPress={() => onSlicePress?.(slice.id)}
+                    style={({ pressed }) => [
+                      styles.legendItem,
+                      pressed ? styles.legendItemPressed : null,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.legendDot,
+                        { backgroundColor: slice.color },
+                      ]}
+                    />
+                    <Text numberOfLines={1} variant="footnote">
+                      {slice.label} · {percentage}%
+                    </Text>
+                  </Pressable>
+                </Animated.View>
+              );
+            })}
+          </RowLimitedScroll>
         </Animated.View>
       )}
     </View>
@@ -348,8 +353,8 @@ function createStyles(colors: ColorTokens) {
     card: {
       alignItems: 'center',
     },
-    monthNavigator: {
-      marginBottom: spacing.md,
+    periodControl: {
+      alignSelf: 'stretch',
     },
     segmentedControl: {
       width: segmentedControlWidth,
@@ -379,9 +384,6 @@ function createStyles(colors: ColorTokens) {
     },
     legend: {
       width: '100%',
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.sm,
     },
     legendItem: {
       flexDirection: 'row',
@@ -393,9 +395,6 @@ function createStyles(colors: ColorTokens) {
       borderWidth: 1,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
-    },
-    legendItemContainer: {
-      maxWidth: '100%',
     },
     legendItemPressed: {
       backgroundColor: colors.surfaceMuted,

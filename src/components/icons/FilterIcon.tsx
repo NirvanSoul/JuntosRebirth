@@ -3,15 +3,16 @@ import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '@/theme/useTheme';
 
 type FilterIconProps = {
+  color?: string;
   size: number;
 };
 
-export function FilterIcon({ size }: FilterIconProps) {
+export function FilterIcon({ color, size }: FilterIconProps) {
   const { colors } = useTheme();
 
   return (
     <Svg
-      color={colors.textPrimary}
+      color={color ?? colors.textPrimary}
       height={size * (19 / 21)}
       testID="activity-filter-icon"
       viewBox="0 0 21 19"

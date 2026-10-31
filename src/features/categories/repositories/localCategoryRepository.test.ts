@@ -7,6 +7,7 @@ import {
   updateLocalCategory,
   updateLocalCategoryNote,
 } from '@/features/categories/repositories/localCategoryRepository';
+import { saveLocalCategoryBudget } from '@/features/categories/repositories/localCategoryBudgetRepository';
 
 const mockGetLocalDatabase = jest.fn<Promise<SQLiteDatabase>, []>();
 
@@ -16,6 +17,13 @@ jest.mock('@/lib/storage/localDatabase', () => ({
 
 jest.mock('@/lib/storage/localIdentity', () => ({
   getOrCreateInstallationId: jest.fn(async () => 'installation-id'),
+}));
+
+jest.mock('@/features/spaces/repositories/localSpaceRepository', () => ({
+  loadSpaces: jest.fn(async () => ({
+    activeSpaceId: 'personal',
+    spaces: [{ id: 'personal', currency: 'VES' }],
+  })),
 }));
 
 jest.mock('expo-crypto', () => ({
@@ -30,9 +38,23 @@ describe('localCategoryRepository', () => {
     runAsync,
     withExclusiveTransactionAsync: jest.fn(async (task) => task({ runAsync })),
   } as unknown as SQLiteDatabase;
+  /** Filas que devuelve cada consulta de `listLocalCategories`. */
+  const rowsFor = ({
+    categories = [] as unknown[],
+    budgets = [] as unknown[],
+    legacy = [] as unknown[],
+  }) =>
+    getAllAsync.mockImplementation(async (sql: string) =>
+      sql.includes('WHERE budget_minor IS NOT NULL')
+        ? legacy
+        : sql.includes('FROM category_budgets')
+          ? budgets
+          : categories,
+    );
 
   beforeEach(() => {
     jest.clearAllMocks();
+    getAllAsync.mockReset();
     mockGetLocalDatabase.mockResolvedValue(database);
   });
 
@@ -60,7 +82,6 @@ describe('localCategoryRepository', () => {
       'Salario',
       'money',
       'forest',
-      null,
       1,
       'salary',
       null,
@@ -70,43 +91,45 @@ describe('localCategoryRepository', () => {
       expect.any(String),
     );
 
-    getAllAsync.mockResolvedValueOnce([
-      {
-        id: created!.id,
-        space_id: 'personal',
-        name: 'Salario',
-        icon: 'money',
-        color_token: 'forest',
-        budget_minor: null,
-        is_default: 1,
-        template_key: 'salary',
-        note: null,
-        is_archived: 0,
-      },
-    ]);
+    rowsFor({
+      categories: [
+        {
+          id: created!.id,
+          space_id: 'personal',
+          name: 'Salario',
+          icon: 'money',
+          color_token: 'forest',
+          is_default: 1,
+          template_key: 'salary',
+          note: null,
+          is_archived: 0,
+        },
+      ],
+    });
     await expect(listLocalCategories()).resolves.toEqual([created]);
   });
 
   it('incluye categorías archivadas para resolver movimientos existentes', async () => {
-    getAllAsync.mockResolvedValueOnce([
-      {
-        id: 'category-id',
-        space_id: 'personal',
-        name: 'Casa',
-        icon: 'house',
-        color_token: 'slate',
-        budget_minor: null,
-        is_default: 0,
-        template_key: null,
-        is_archived: 1,
-      },
-    ]);
+    rowsFor({
+      categories: [
+        {
+          id: 'category-id',
+          space_id: 'personal',
+          name: 'Casa',
+          icon: 'house',
+          color_token: 'slate',
+          is_default: 0,
+          template_key: null,
+          is_archived: 1,
+        },
+      ],
+    });
 
     await expect(listLocalCategories()).resolves.toEqual([
       expect.objectContaining({ id: 'category-id', isArchived: true }),
     ]);
     expect(getAllAsync).toHaveBeenCalledWith(
-      expect.not.stringContaining('WHERE'),
+      expect.stringMatching(/FROM categories\s+ORDER BY/),
     );
   });
 
@@ -117,7 +140,7 @@ describe('localCategoryRepository', () => {
       name: 'Casa',
       icon: 'house' as const,
       colorToken: 'slate' as const,
-      budgetMinor: 50000,
+      budgets: { EUR: { budgetMinor: 50000 } },
       isDefault: false,
       isArchived: false,
     };
@@ -128,7 +151,6 @@ describe('localCategoryRepository', () => {
       'Casa',
       'house',
       'slate',
-      50000,
       expect.any(String),
       'category-id',
       'personal',
@@ -167,5 +189,139 @@ describe('localCategoryRepository', () => {
     await expect(
       updateLocalCategoryNote('missing', 'personal', 'Nota'),
     ).rejects.toThrow('La categoría local ya no está disponible');
+  });
+
+  it('carga un presupuesto por moneda con su periodicidad', async () => {
+    rowsFor({
+      categories: [
+        {
+          id: 'food',
+          space_id: 'personal',
+          name: 'Comida',
+          icon: 'fork-knife',
+          color_token: 'orange',
+          is_default: 0,
+          template_key: null,
+          note: null,
+          is_archived: 0,
+        },
+      ],
+      budgets: [
+        {
+          category_id: 'food',
+          currency: 'EUR',
+          budget_minor: 5000,
+          period: 'week',
+          interval_days: null,
+          anchor_on: null,
+          overrides_json: '[]',
+          history_json: '[]',
+        },
+        {
+          category_id: 'food',
+          currency: 'VES',
+          budget_minor: 90000,
+          period: 'month',
+          interval_days: null,
+          anchor_on: null,
+          overrides_json:
+            '[{"periodStartOn":"2026-07-01","amountMinor":95000}]',
+          history_json: '[]',
+        },
+      ],
+    });
+
+    const [food] = await listLocalCategories();
+
+    expect(food?.budgets).toEqual({
+      EUR: { budgetMinor: 5000, budgetSchedule: { period: 'week' } },
+      VES: {
+        budgetMinor: 90000,
+        budgetOverrides: [{ periodStartOn: '2026-07-01', amountMinor: 95000 }],
+      },
+    });
+  });
+
+  it('mueve un presupuesto heredado a la moneda del espacio', async () => {
+    rowsFor({
+      legacy: [
+        {
+          id: 'food',
+          space_id: 'personal',
+          budget_minor: 5000,
+          period: 'fortnight',
+          interval_days: null,
+          anchor_on: null,
+          overrides_json: '[]',
+          history_json: '[]',
+        },
+      ],
+    });
+
+    await listLocalCategories();
+
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO category_budgets'),
+      'food:VES',
+      'food',
+      'VES',
+      5000,
+      'fortnight',
+      null,
+      null,
+      '[]',
+      '[]',
+      'pending',
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('SET budget_minor = NULL'),
+      expect.any(String),
+      'food',
+    );
+  });
+
+  it('guarda o quita el presupuesto de una sola moneda', async () => {
+    const category = {
+      id: 'food',
+      spaceId: 'personal',
+      name: 'Comida',
+      icon: 'fork-knife' as const,
+      colorToken: 'orange' as const,
+      budgets: { USD: { budgetMinor: 3000 } },
+      isDefault: false,
+      isArchived: false,
+    };
+
+    await saveLocalCategoryBudget(category, 'USD');
+    expect(runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM category_budgets'),
+      'food',
+      'USD',
+    );
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('INSERT INTO category_budgets'),
+      'food:USD',
+      'food',
+      'USD',
+      3000,
+      'month',
+      null,
+      null,
+      '[]',
+      '[]',
+      'pending',
+      expect.any(String),
+      expect.any(String),
+    );
+
+    runAsync.mockClear();
+    await saveLocalCategoryBudget(category, 'EUR');
+    expect(runAsync).toHaveBeenLastCalledWith(
+      expect.stringContaining('DELETE FROM category_budgets'),
+      'food',
+      'EUR',
+    );
   });
 });

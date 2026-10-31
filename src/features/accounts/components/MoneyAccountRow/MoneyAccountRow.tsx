@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { usePreviewActionsTrigger } from '@/components/overlays/PreviewActions/previewActions';
 import { Text } from '@/components/ui/Text/Text';
 import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIcon/MoneyAccountIcon';
 import { getMoneyAccountKindLabel } from '@/features/accounts/constants/moneyAccountKindDefinitions';
@@ -23,6 +24,11 @@ type MoneyAccountRowProps = {
 };
 
 export function MoneyAccountRow({ account, onPress }: MoneyAccountRowProps) {
+  // La pulsación larga abre eliminar y editar sobre una copia elevada.
+  const previewActions = usePreviewActionsTrigger(
+    { kind: 'moneyAccount', id: account.id },
+    () => <MoneyAccountRow account={account} />,
+  );
   const { formatCurrency } = useCurrencySymbolPreference();
   const styles = useThemedStyles(createStyles);
   const accountColor = categoryColors[account.colorToken];
@@ -39,8 +45,9 @@ export function MoneyAccountRow({ account, onPress }: MoneyAccountRowProps) {
     <Pressable
       accessibilityLabel={`${account.name}, saldo ${balance}`}
       accessibilityRole={onPress ? 'button' : undefined}
-      disabled={!onPress}
+      disabled={!onPress && !previewActions}
       onPress={onPress}
+      {...previewActions}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       testID={`money-account-row-${account.id}`}
     >

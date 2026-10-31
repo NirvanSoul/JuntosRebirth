@@ -1,5 +1,11 @@
 import 'react-native-gesture-handler/jestSetup';
 
+import { clearSessionState } from '@/hooks/useSessionState';
+// Como en AppProviders: los componentes con `useTranslation` necesitan la
+// instancia inicializada aunque se rendericen sin el árbol de la app.
+import '@/lib/i18n/i18n';
+import '@/lib/i18n/installDateLocale';
+
 // Fija la zona horaria de las pruebas a una zona al oeste de UTC y sin horario
 // de verano (America/Bogota). Así los tests de fecha local no dependen de la
 // zona de la máquina ni del mes: en CI (TZ=UTC), una implementación basada en
@@ -7,6 +13,25 @@ import 'react-native-gesture-handler/jestSetup';
 // protegería. El cambio en tiempo de ejecución afecta a los Date posteriores.
 process.env.TZ = 'America/Bogota';
 process.env.EXPO_PUBLIC_API_URL ??= 'https://api.example.test';
+
+// RN 0.88 lee AssetRegistry desde un módulo privado que jest-expo 58 aún no
+// mockea; se reutiliza su mock de `react-native/asset-registry`.
+jest.mock('react-native/src/private/assets/AssetRegistry', () => ({
+  AssetRegistry: jest.requireMock('react-native/asset-registry'),
+}));
+
+// Gesture Handler 3 enlaza el runtime de UI de Worklets al cargar, pero en Jest
+// Worklets resuelve su implementación web, que no lo admite.
+jest.mock(
+  'react-native-gesture-handler/lib/module/handlers/gestures/installUIRuntimeBindings',
+  () => ({ installUIRuntimeBindings: jest.fn() }),
+);
+
+// Las pruebas fijan el español como idioma del dispositivo: el mock de
+// expo-localization devuelve en-US y los textos esperados están en español.
+jest.mock('expo-localization', () => ({
+  getLocales: jest.fn(() => [{ languageCode: 'es', languageTag: 'es-ES' }]),
+}));
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual(
@@ -63,8 +88,11 @@ jest.mock('@gorhom/bottom-sheet', () => {
   };
 });
 
+// Pinta el contenido en su sitio; NoticeToast.portal.test.tsx cubre el portal
+// real con la estructura de hosts de la app.
 jest.mock('@gorhom/portal', () => ({
   Portal: ({ children }: { children: React.ReactNode }) => children,
+  PortalHost: () => null,
 }));
 
 /**
@@ -154,3 +182,6 @@ jest.mock('expo-sqlite', () => ({
     ),
   })),
 }));
+
+// Los filtros viven en memoria toda la sesión: cada test empieza sin ellos.
+afterEach(clearSessionState);

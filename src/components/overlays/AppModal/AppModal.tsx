@@ -4,12 +4,16 @@ import {
   BottomSheetModal,
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
-import { BlurView } from 'expo-blur';
 import type { PropsWithChildren } from 'react';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BlurScrim } from '@/components/overlays/BlurScrim/BlurScrim';
+import {
+  PreviewActionsScope,
+  usePreviewActionsScope,
+} from '@/components/overlays/PreviewActions/PreviewActionsScope';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import {
   CurrencySymbolPreferenceScope,
@@ -19,7 +23,6 @@ import { layout } from '@/theme/layout';
 import { motion } from '@/theme/motion';
 import { radii } from '@/theme/radii';
 import type { ColorTokens } from '@/theme/types';
-import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type AppModalProps = PropsWithChildren<{
@@ -41,6 +44,11 @@ type AppModalProps = PropsWithChildren<{
    * Evita registrar además un BottomSheetView estático que sobrescriba su offset.
    */
   containsScrollable?: boolean;
+  /**
+   * Mantiene la pulsación larga y la selección múltiple de las tarjetas de
+   * vista previa dentro de la hoja, que se pinta en un portal sin ese contexto.
+   */
+  previewActions?: boolean;
   stackBehavior?: 'push' | 'switch' | 'replace';
   testID?: string;
 }>;
@@ -77,15 +85,16 @@ export function AppModal({
   contentHeight,
   hideHandle = false,
   containsScrollable = false,
+  previewActions = false,
   stackBehavior = 'replace',
   testID,
 }: AppModalProps) {
   const currencySymbolPreference = useCurrencySymbolPreference();
+  const previewActionsScope = usePreviewActionsScope();
   const modalRef = useRef<BottomSheetModal>(null);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const density = useLayoutDensity();
-  const { isDark } = useTheme();
   const themedStyles = useThemedStyles(createThemedStyles);
   const isExpanded = variant === 'expanded';
   const isCatalog = variant === 'catalog';
@@ -113,6 +122,8 @@ export function AppModal({
    * obsoleto y volvería a cerrar lo que el usuario acaba de reabrir.
    */
   const dismissRequestedByParentRef = useRef(false);
+  /** El cierre por gesto ya se notificó con `onClose` al empezar a animarse. */
+  const closeNotifiedRef = useRef(false);
   const hasPresentedRef = useRef(false);
   const visibleRef = useRef(visible);
   useLayoutEffect(() => {
@@ -141,6 +152,7 @@ export function AppModal({
     // no es un derivado puro de render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setContentVisible(true);
+    closeNotifiedRef.current = false;
     // Se presenta aunque haya un cierre pendiente: si la librería descartó ese
     // cierre sin animarlo (`forceClose` sale antes de tiempo) nunca llega
     // `onDismiss` y la hoja quedaría sin volver a abrirse. Si el cierre sí está
@@ -162,20 +174,45 @@ export function AppModal({
     if (visibleRef.current) {
       // Abierta y deseada: un cierre pendiente ya no llegará.
       dismissRequestedByParentRef.current = false;
+      closeNotifiedRef.current = false;
       return;
     }
     dismissRequestedByParentRef.current = true;
     modalRef.current?.dismiss();
   }, []);
 
+  /**
+   * La librería solo emite `onDismiss` si la animación de cierre termina
+   * completa; si se interrumpe, un cierre por gesto nunca llegaba al padre.
+   * Este seguía con `visible` en `true`, así que las aperturas siguientes no
+   * cambiaban nada y la hoja no volvía a presentarse. Se avisa al empezar.
+   */
+  const handleAnimate = useCallback(
+    (_fromIndex: number, toIndex: number) => {
+      if (
+        toIndex !== -1 ||
+        !visibleRef.current ||
+        dismissRequestedByParentRef.current ||
+        closeNotifiedRef.current
+      ) {
+        return;
+      }
+      closeNotifiedRef.current = true;
+      onClose();
+    },
+    [onClose],
+  );
+
   const handleDismiss = useCallback(() => {
     hasPresentedRef.current = false;
     const wasRequestedByParent = dismissRequestedByParentRef.current;
+    const wasCloseNotified = closeNotifiedRef.current;
     dismissRequestedByParentRef.current = false;
+    closeNotifiedRef.current = false;
 
     if (!wasRequestedByParent) {
       setContentVisible(false);
-      onClose();
+      if (!wasCloseNotified) onClose();
       onDismissed?.();
       return;
     }
@@ -200,20 +237,10 @@ export function AppModal({
         pressBehavior="close"
         style={[props.style, styles.transparentBackdrop]}
       >
-        <BlurView
-          blurReductionFactor={2}
-          experimentalBlurMethod={
-            Platform.OS === 'android' ? 'dimezisBlurView' : undefined
-          }
-          intensity={20}
-          pointerEvents="none"
-          style={StyleSheet.absoluteFill}
-          tint={isDark ? 'dark' : 'light'}
-        />
-        <View pointerEvents="none" style={themedStyles.backdropShade} />
+        <BlurScrim />
       </BottomSheetBackdrop>
     ),
-    [isDark, themedStyles.backdropShade],
+    [],
   );
 
   const contentStyle = [
@@ -234,7 +261,13 @@ export function AppModal({
         ]}
         testID={testID ? `${testID}-content` : undefined}
       >
-        {isContentVisible ? children : null}
+        {!isContentVisible ? null : previewActions ? (
+          <PreviewActionsScope value={previewActionsScope}>
+            {children}
+          </PreviewActionsScope>
+        ) : (
+          children
+        )}
       </View>
     </CurrencySymbolPreferenceScope>
   );
@@ -260,6 +293,7 @@ export function AppModal({
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       maxDynamicContentSize={height * 0.86}
+      onAnimate={handleAnimate}
       onChange={handleChange}
       onDismiss={handleDismiss}
       ref={modalRef}
@@ -308,10 +342,6 @@ function createThemedStyles(colors: ColorTokens) {
       width: 42,
       height: 5,
       backgroundColor: colors.border,
-    },
-    backdropShade: {
-      ...StyleSheet.absoluteFill,
-      backgroundColor: colors.overlaySoft,
     },
   });
 }

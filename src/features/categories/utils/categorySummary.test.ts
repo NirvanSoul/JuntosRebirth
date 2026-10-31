@@ -4,7 +4,7 @@ import {
   listTransactionsByMonth,
   shiftMonthKey,
   summarizeCategories,
-  summarizeMonthlyBudgetExpenses,
+  summarizeBudgetExpenses,
 } from '@/features/categories/utils/categorySummary';
 import type { SessionTransaction } from '@/features/transactions/types';
 
@@ -15,7 +15,7 @@ const categories: Category[] = [
     name: 'Comida',
     icon: 'fork-knife',
     colorToken: 'orange',
-    budgetMinor: 5000,
+    budgets: { EUR: { budgetMinor: 5000 } },
     isDefault: false,
     isArchived: false,
   },
@@ -76,6 +76,22 @@ describe('summarizeCategories', () => {
         expenseMinor: 0,
       }),
     ]);
+  });
+
+  it('usa el presupuesto de la moneda solicitada y ninguno si no lo hay', () => {
+    const [food] = summarizeCategories(
+      [{ ...categories[0]!, budgets: { USD: { budgetMinor: 900 } } }],
+      transactions,
+      'USD',
+    );
+    const [withoutEur] = summarizeCategories(
+      [{ ...categories[0]!, budgets: { USD: { budgetMinor: 900 } } }],
+      transactions,
+      'EUR',
+    );
+
+    expect(food?.budgetMinor).toBe(900);
+    expect(withoutEur?.budgetMinor).toBeUndefined();
   });
 
   it('aislamiento: filtra por la moneda solicitada e ignora movimientos en otras divisas', () => {
@@ -147,7 +163,7 @@ describe('utilidades mensuales de categorías', () => {
   });
 });
 
-describe('summarizeMonthlyBudgetExpenses', () => {
+describe('summarizeBudgetExpenses', () => {
   const expense = (
     id: string,
     occurredOn: string,
@@ -160,7 +176,8 @@ describe('summarizeMonthlyBudgetExpenses', () => {
   });
 
   it('solo cuenta los gastos del mes en curso en la moneda del presupuesto', () => {
-    const expenses = summarizeMonthlyBudgetExpenses(
+    const expenses = summarizeBudgetExpenses(
+      categories,
       [
         expense('previous-month', '2026-06-30'),
         expense('this-month', '2026-07-02', { amountMinor: 700 }),
@@ -178,7 +195,8 @@ describe('summarizeMonthlyBudgetExpenses', () => {
   });
 
   it('incluye las ocurrencias recurrentes programadas dentro del mes', () => {
-    const expenses = summarizeMonthlyBudgetExpenses(
+    const expenses = summarizeBudgetExpenses(
+      categories,
       [
         expense('rent', '2026-05-10', {
           amountMinor: 400,
@@ -192,5 +210,49 @@ describe('summarizeMonthlyBudgetExpenses', () => {
     );
 
     expect(expenses.get('food')).toBe(400);
+  });
+
+  it('usa el periodo propio de cada categoría', () => {
+    const expenses = summarizeBudgetExpenses(
+      [
+        {
+          ...categories[0]!,
+          budgets: {
+            EUR: { budgetMinor: 5000, budgetSchedule: { period: 'week' } },
+          },
+        },
+      ],
+      [
+        expense('last-week', '2026-07-12', { amountMinor: 100 }),
+        expense('this-week', '2026-07-13', { amountMinor: 200 }),
+        expense('next-week', '2026-07-20', { amountMinor: 400 }),
+      ],
+      'EUR',
+      new Date(2026, 6, 15, 12),
+    );
+
+    expect(expenses.get('food')).toBe(200);
+  });
+
+  it('ignora las categorías sin presupuesto', () => {
+    const expenses = summarizeBudgetExpenses(
+      [categories[1]!],
+      [expense('salary-expense', '2026-07-02', { categoryId: 'salary' })],
+      'EUR',
+      new Date(2026, 6, 15, 12),
+    );
+
+    expect(expenses.size).toBe(0);
+  });
+
+  it('solo cuenta las categorías con presupuesto en esa moneda', () => {
+    const expenses = summarizeBudgetExpenses(
+      [{ ...categories[0]!, budgets: { USD: { budgetMinor: 900 } } }],
+      [expense('eur', '2026-07-02', { amountMinor: 700 })],
+      'EUR',
+      new Date(2026, 6, 15, 12),
+    );
+
+    expect(expenses.size).toBe(0);
   });
 });

@@ -5,7 +5,8 @@ type ForeignKeyViolation = {
 };
 
 /**
- * Ejecuta la reconstrucción histórica de cuentas en la conexión principal.
+ * Ejecuta en la conexión principal las migraciones que reconstruyen tablas
+ * referenciadas (cuentas en la versión 22, series en la 32).
  * `withExclusiveTransactionAsync` abre otra conexión y los PRAGMA de SQLite
  * son locales a cada una; por eso el BEGIN EXCLUSIVE y los PRAGMA viven aquí.
  */

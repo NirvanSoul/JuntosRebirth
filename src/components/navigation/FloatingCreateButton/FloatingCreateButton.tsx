@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   Easing,
   ReduceMotion,
@@ -39,6 +40,7 @@ export function FloatingCreateButton({
   onPress,
 }: FloatingCreateButtonProps) {
   const { colors, shadows } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles((palette) => createStyles(palette, shadows));
   const visibilityProgress = useSharedValue(visible ? 1 : 0);
 
@@ -71,8 +73,8 @@ export function FloatingCreateButton({
       testID="floating-create-button-container"
     >
       <Pressable
-        accessibilityHint="Abre las opciones para crear un ingreso, gasto o categoría"
-        accessibilityLabel="Crear"
+        accessibilityHint={t('navigation.createButton.hint')}
+        accessibilityLabel={t('navigation.createButton.label')}
         accessibilityRole="button"
         onPress={() => {
           triggerHaptic('fabPress');

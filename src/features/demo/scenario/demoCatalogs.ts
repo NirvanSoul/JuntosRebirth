@@ -18,7 +18,7 @@ export function buildPersonalCatalog(amounts: DemoAmounts): DemoCatalog {
         kind: 'bank',
         icon: 'bank',
         colorToken: 'blue',
-        openingBalanceMinor: amounts.round(1450),
+        openingBalanceMinor: amounts.round(600),
       },
       {
         key: 'savings',
@@ -26,7 +26,7 @@ export function buildPersonalCatalog(amounts: DemoAmounts): DemoCatalog {
         kind: 'bank',
         icon: 'piggy-bank',
         colorToken: 'pink',
-        openingBalanceMinor: amounts.round(3200),
+        openingBalanceMinor: amounts.round(1500),
       },
       {
         key: 'card',
@@ -174,7 +174,7 @@ export function buildCoupleCatalog(amounts: DemoAmounts): DemoCatalog {
         kind: 'bank',
         icon: 'bank',
         colorToken: 'teal',
-        openingBalanceMinor: amounts.round(1200),
+        openingBalanceMinor: amounts.round(500),
       },
       {
         key: 'vacation',
@@ -182,7 +182,7 @@ export function buildCoupleCatalog(amounts: DemoAmounts): DemoCatalog {
         kind: 'bank',
         icon: 'piggy-bank',
         colorToken: 'yellow',
-        openingBalanceMinor: amounts.round(900),
+        openingBalanceMinor: amounts.round(700),
       },
       {
         key: 'cash',

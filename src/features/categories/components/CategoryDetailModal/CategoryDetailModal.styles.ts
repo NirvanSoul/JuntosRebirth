@@ -77,20 +77,6 @@ export function createStyles(
       paddingVertical: spacing.md,
     },
     noteButtonCopy: { flex: 1, minWidth: 0, gap: spacing.xxs },
-    budgetCard: {
-      gap: spacing.md,
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      marginTop: spacing.lg,
-      padding: spacing.lg,
-    },
-    budgetHeader: {
-      flexDirection: 'row',
-      alignItems: 'flex-end',
-      justifyContent: 'space-between',
-      gap: spacing.md,
-    },
-    budgetTotal: { flexShrink: 1 },
     actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
     movementsHeader: {
       flexDirection: 'row',

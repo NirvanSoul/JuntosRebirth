@@ -1,3 +1,4 @@
+import type { TransactionAuthorFilter } from '@/features/activity/components/TransactionFiltersModal';
 import { ActivityScreen } from '@/features/activity/screens/ActivityScreen';
 import type { MoneyAccount } from '@/features/accounts/types';
 import type { Category } from '@/features/categories/types';
@@ -14,13 +15,16 @@ type ActivityTabContentProps = {
   onCreateAction: (type: CreateActionType) => void;
   onCreateMoneyAccount: () => void;
   onImport: () => void;
-  onOpenCategoryDetail: (categoryId: string, currency?: CurrencyCode) => void;
+  onOpenCategoryDetail: (
+    categoryId: string,
+    currency?: CurrencyCode,
+    author?: TransactionAuthorFilter,
+  ) => void;
   onOpenMoneyAccountDetail: (moneyAccountId: string) => void;
   onOpenTransactionDetail: (transactionId: string) => void;
   onSummaryPinnedChange: (pinned: boolean) => void;
   preference: ActivitySectionsPreference;
   savePreference: (preference: ActivitySectionsPreference) => void;
-  spaceCurrency: CurrencyCode;
   summaryPinned: boolean;
   targetRequestId?: number;
   targetSection?: 'accounts' | 'categories' | 'movements';
@@ -41,7 +45,6 @@ export function ActivityTabContent({
   onSummaryPinnedChange,
   preference,
   savePreference,
-  spaceCurrency,
   summaryPinned,
   targetRequestId,
   targetSection,
@@ -75,7 +78,6 @@ export function ActivityTabContent({
       onOpenMoneyAccountDetail={onOpenMoneyAccountDetail}
       onOpenTransactionDetail={onOpenTransactionDetail}
       onSummaryPinnedChange={onSummaryPinnedChange}
-      spaceCurrency={spaceCurrency}
       summaryPinned={summaryPinned}
       targetRequestId={targetRequestId}
       targetSection={targetSection}

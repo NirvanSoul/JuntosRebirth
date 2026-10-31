@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import {
   SettingsDivider,
@@ -8,6 +9,7 @@ import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymb
 import { categoryColors } from '@/theme/categoryColors';
 
 export function CurrencySymbolsToggleRow() {
+  const { t } = useTranslation();
   const { setShowCurrencySymbols, showCurrencySymbols } =
     useCurrencySymbolPreference();
 
@@ -16,16 +18,19 @@ export function CurrencySymbolsToggleRow() {
       <SettingsToggleRow
         description={
           showCurrencySymbols
-            ? 'Visibles junto a los importes'
-            : 'Solo se muestran los números'
+            ? t('settings.rows.currencySymbolsOn')
+            : t('settings.rows.currencySymbolsOff')
         }
         enabled={showCurrencySymbols}
         icon="eye-outline"
         iconBackgroundColor={categoryColors.violet}
-        label="Símbolos de moneda"
+        label={t('settings.rows.currencySymbols')}
         onToggle={(enabled) => {
           void setShowCurrencySymbols(enabled).catch(() => {
-            Alert.alert('No pudimos guardar el ajuste', 'Inténtalo de nuevo.');
+            Alert.alert(
+              t('settings.saveSettingError.title'),
+              t('settings.saveSettingError.message'),
+            );
           });
         }}
         testID="currency-symbols-toggle"

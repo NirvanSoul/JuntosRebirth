@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
@@ -15,6 +16,8 @@ export function CountryChangeBlockedModal({
   onClose,
   visible,
 }: CountryChangeBlockedModalProps) {
+  const { t } = useTranslation();
+
   return (
     <AppModal
       onClose={onClose}
@@ -24,16 +27,14 @@ export function CountryChangeBlockedModal({
     >
       <View style={styles.content}>
         <Text accessibilityRole="header" variant="heading">
-          No puedes cambiar tu país todavía
+          {t('settings.countryBlocked.title')}
         </Text>
         <Text tone="secondary" variant="body">
-          Tu país debe coincidir con las personas de tus espacios compartidos.
-          Sal del espacio compartido o coordina el cambio con la otra persona
-          antes de intentarlo de nuevo.
+          {t('settings.countryBlocked.message')}
         </Text>
         <ModalPrimaryAction
-          accessibilityLabel="Entendido"
-          label="Entendido"
+          accessibilityLabel={t('common.understood')}
+          label={t('common.understood')}
           onPress={onClose}
           variant="cta"
         />

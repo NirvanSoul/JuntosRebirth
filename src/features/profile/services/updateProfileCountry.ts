@@ -17,6 +17,7 @@ export async function updateProfileCountry(
   if (sync === 'required') {
     await syncOwnCountry(normalized, { throwOnFailure: true });
   }
-  await saveCurrencyPreferences(currencyPreferencesForCountry(normalized));
+  const countryPreferences = currencyPreferencesForCountry(normalized);
+  if (countryPreferences) await saveCurrencyPreferences(countryPreferences);
   return saveLocalProfileCountry(normalized);
 }

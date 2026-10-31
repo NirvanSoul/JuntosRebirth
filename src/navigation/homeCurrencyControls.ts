@@ -27,6 +27,29 @@ export function getHomeCurrencyButtonLabel(
   return currency === 'VES' ? 'Bs' : '$';
 }
 
+/** Pantallas cuya cabecera muestra el botón de moneda. */
+const currencyHeaderTabs = new Set(['Home', 'Activity', 'Map']);
+
+/**
+ * Bandera del botón de moneda de la cabecera, o nada si la pestaña no es
+ * financiera o el usuario no tiene otra moneda a la que cambiar.
+ */
+export function getHeaderCurrencyFlag(
+  activeTab: string,
+  currency: CurrencyCode,
+  currencies: readonly CurrencyCode[],
+  {
+    countryCode,
+    venezuelaCurrencyMode,
+  }: { countryCode: string | null; venezuelaCurrencyMode: boolean },
+): string | undefined {
+  return countryCode !== null &&
+    currencyHeaderTabs.has(activeTab) &&
+    currencies.length > 1
+    ? getHomeCurrencyButtonLabel(currency, venezuelaCurrencyMode)
+    : undefined;
+}
+
 export function useHomeCurrencyPress({
   currencies,
   currentCurrency,

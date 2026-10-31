@@ -20,7 +20,7 @@ export function getComparisonPeriodLabel(
 ): string | undefined {
   if (filter === 'all') return undefined;
   return filter.period === 'custom'
-    ? 'vs. periodo anterior'
+    ? 'el periodo anterior'
     : describePreviousPeriod(filter.period);
 }
 
@@ -132,4 +132,43 @@ export function listTransactionsByDateFilter(
         transaction.occurredOn <= filter.endDate,
     )
     .sort((left, right) => right.occurredOn.localeCompare(left.occurredOn));
+}
+
+function getDateFilterStartKey(filter: TransactionDateFilter): string | null {
+  if (filter === 'all') return null;
+  if (filter.period === 'custom') return filter.startDate;
+
+  return toLocalDateKey(
+    getTransactionPeriodRange(filter.period, filter.selectedDate).start,
+  );
+}
+
+/** Último día que abarca el filtro; `'all'` no tiene fin. */
+export function getDateFilterEndKey(
+  filter: TransactionDateFilter,
+): string | null {
+  if (filter === 'all') return null;
+  if (filter.period === 'custom') return filter.endDate;
+
+  return toLocalDateKey(
+    getTransactionPeriodRange(filter.period, filter.selectedDate).end,
+  );
+}
+
+/**
+ * Movimientos anteriores al inicio del filtro, con las recurrencias
+ * proyectadas: son el saldo que arrastra el periodo. `'all'` no tiene nada
+ * antes.
+ */
+export function listTransactionsBeforeDateFilter(
+  transactions: readonly SessionTransaction[],
+  filter: TransactionDateFilter,
+): SessionTransaction[] {
+  const startOn = getDateFilterStartKey(filter);
+  if (!startOn) return [];
+
+  return projectRecurringTransactions({
+    transactions,
+    endOn: toLocalDateKey(addDays(parseDateKey(startOn), -1)),
+  }).filter((transaction) => transaction.occurredOn < startOn);
 }

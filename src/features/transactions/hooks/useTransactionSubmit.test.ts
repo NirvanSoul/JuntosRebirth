@@ -97,6 +97,7 @@ async function setup(
     onChangesPublished: jest.fn(),
     onError: jest.fn(),
     onTransactionSaved: jest.fn(),
+    onTransactionsCreated: jest.fn(),
     setTransactions: jest.fn(),
   };
   const { result } = await renderHook(() =>
@@ -133,6 +134,10 @@ describe('useTransactionSubmit', () => {
       expect(reconcileNotificationRules).toHaveBeenCalled();
       expect(callbacks.onChangesPublished).toHaveBeenCalledTimes(1);
       expect(callbacks.onTransactionSaved).toHaveBeenCalledWith('created');
+      expect(callbacks.onTransactionsCreated).toHaveBeenCalledWith(
+        created,
+        foodCategory,
+      );
       expect(callbacks.onError).not.toHaveBeenCalled();
     });
 
@@ -244,6 +249,13 @@ describe('useTransactionSubmit', () => {
       expect(callbacks.setTransactions).toHaveBeenCalledTimes(1);
       expect(callbacks.onChangesPublished).toHaveBeenCalledTimes(1);
       expect(callbacks.onTransactionSaved).not.toHaveBeenCalled();
+      expect(callbacks.onTransactionsCreated).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({ id: 'ves' }),
+          expect.objectContaining({ id: 'usd' }),
+        ],
+        exchangeCategory,
+      );
     });
 
     it('reutiliza la categoría de cambio existente y titula la venta', async () => {

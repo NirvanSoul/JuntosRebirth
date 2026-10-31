@@ -7,6 +7,10 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import {
+  type PreviewActionTarget,
+  usePreviewActionsTrigger,
+} from '@/components/overlays/PreviewActions/previewActions';
 import { Text } from '@/components/ui/Text/Text';
 import { CategoryBudgetProgress } from '@/features/categories/components/CategoryBudgetProgress/CategoryBudgetProgress';
 import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
@@ -33,19 +37,21 @@ type BaseCategoryPreviewCardProps = {
   icon: CategoryIconName;
   colorToken: CategoryColorToken;
   onPress?: () => void;
+  /** Elemento sobre el que actúan las acciones de la pulsación larga. */
+  actionTarget?: PreviewActionTarget;
   accessibilityHint?: string;
   testID?: string;
 };
 
-type CompactCategoryPreviewCardProps = BaseCategoryPreviewCardProps & {
-  variant: 'compact';
-  displayCurrency?: CurrencyCode;
-  spaceCurrency?: CurrencyCode;
-  budgetMinor?: number;
-  incomeMinor?: number;
-  expenseMinor?: number;
-  budgetExpenseMinor?: number;
-};
+type CompactCategoryPreviewCardProps = BaseCategoryPreviewCardProps &
+  ({ variant: 'compact' } | { variant: 'pill' }) & {
+    displayCurrency?: CurrencyCode;
+    spaceCurrency?: CurrencyCode;
+    budgetMinor?: number;
+    incomeMinor?: number;
+    expenseMinor?: number;
+    budgetExpenseMinor?: number;
+  };
 
 type DetailedCategoryPreviewCardProps = BaseCategoryPreviewCardProps & {
   variant?: 'grid' | 'row' | 'tile';
@@ -63,6 +69,7 @@ export type CategoryPreviewCardProps =
 
 const compactIconSize = 28;
 export const compactCardHeight = 74;
+export const pillCardHeight = 24;
 
 export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
   const { formatCurrency } = useCurrencySymbolPreference();
@@ -70,8 +77,15 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
   const themedStyles = useThemedStyles((palette) =>
     createThemedStyles(palette, shadows),
   );
+  const isTile = props.variant === 'grid' || props.variant === 'tile';
+  // Las baldosas gestionan su propia pulsación larga en `CategoryTile`.
+  const previewActions = usePreviewActionsTrigger(
+    isTile ? undefined : props.actionTarget,
+    () => <CategoryPreviewCard {...props} />,
+  );
 
-  if (props.variant === 'compact') {
+  if (props.variant === 'compact' || props.variant === 'pill') {
+    const isPill = props.variant === 'pill';
     const {
       accessibilityHint = 'Abre el detalle',
       colorToken,
@@ -86,23 +100,30 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
         accessibilityHint={accessibilityHint}
         accessibilityLabel={name}
         accessibilityRole="button"
-        disabled={!onPress}
+        disabled={!onPress && !previewActions}
         onPress={onPress}
+        {...previewActions}
         style={({ pressed }) => [
-          themedStyles.compactCard,
+          isPill ? themedStyles.pillCard : themedStyles.compactCard,
           pressed && styles.cardPressed,
         ]}
         testID={testID}
       >
         <View
           style={[
-            styles.compactIcon,
+            isPill ? styles.pillIcon : styles.compactIcon,
             { backgroundColor: categoryColors[colorToken] },
           ]}
         >
-          <CategoryIcon color={colors.onBrand} name={icon} size={iconSize.xs} />
+          <CategoryIcon
+            color={colors.onBrand}
+            name={icon}
+            size={isPill ? 12 : iconSize.xs}
+          />
         </View>
-        <CompactPreviewMarqueeText>{name}</CompactPreviewMarqueeText>
+        <View style={isPill ? styles.pillText : styles.compactText}>
+          <CompactPreviewMarqueeText>{name}</CompactPreviewMarqueeText>
+        </View>
       </Pressable>
     );
   }
@@ -111,6 +132,7 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
     return (
       <CategoryTile
         accessibilityHint={props.accessibilityHint}
+        actionTarget={props.actionTarget}
         budgetExpenseMinor={props.budgetExpenseMinor}
         budgetMinor={props.budgetMinor}
         colorToken={props.colorToken}
@@ -178,8 +200,9 @@ export function CategoryPreviewCard(props: CategoryPreviewCardProps) {
             : name
       }
       accessibilityRole="button"
-      disabled={!onPress}
+      disabled={!onPress && !previewActions}
       onPress={onPress}
+      {...previewActions}
       style={({ pressed }) => [
         themedStyles.card,
         pressed && styles.cardPressed,
@@ -261,6 +284,17 @@ function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
       paddingHorizontal: previewCardLayout.paddingHorizontal,
       paddingVertical: previewCardLayout.paddingVertical,
     },
+    pillCard: {
+      height: pillCardHeight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xxs,
+      borderRadius: radii.round,
+      borderColor: colors.border,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.xxs,
+    },
     compactCard: {
       ...shadows.subtle,
       height: compactCardHeight,
@@ -280,6 +314,15 @@ function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
 
 const styles = StyleSheet.create({
   cardPressed: { opacity: 0.64 },
+  pillText: { flex: 1, minWidth: 0 },
+  compactText: { width: '100%' },
+  pillIcon: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.round,
+  },
   compactIcon: {
     width: compactIconSize,
     height: compactIconSize,

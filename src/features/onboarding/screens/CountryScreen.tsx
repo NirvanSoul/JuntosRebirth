@@ -1,5 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, Keyboard, StyleSheet, View } from 'react-native';
 
 import { SelectableOption } from '@/components/ui/SelectableOption/SelectableOption';
@@ -9,6 +10,9 @@ import { OnboardingScreenLayout } from '@/features/onboarding/components/Onboard
 import { SelectedCountryField } from '@/features/onboarding/components/SelectedCountryField';
 import type { OnboardingStackParamList } from '@/features/onboarding/OnboardingNavigator';
 import { updateProfileCountry } from '@/features/profile/services/updateProfileCountry';
+import type { AppLanguage } from '@/lib/i18n/languages';
+import { useAppLanguage } from '@/lib/i18n/useAppLanguage';
+import { LanguagePreferenceModal } from '@/features/settings/components/LanguagePreferenceModal/LanguagePreferenceModal';
 import {
   getCountryFlag,
   searchCountryCatalog,
@@ -20,12 +24,21 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'Country'>;
 
 const countryIllustrationAspectRatio = 1300 / 1148;
 
+/** Países de habla inglesa donde se pregunta en qué idioma usar la app. */
+const languagePromptCountryCodes = new Set(['US', 'GB', 'CA']);
+
 export function CountryScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<CountryCatalogEntry | null>(null);
   const [isSaving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFocused, setFocused] = useState(false);
+  const [isLanguagePromptVisible, setLanguagePromptVisible] = useState(false);
+  const [pendingLanguage, setPendingLanguage] = useState<AppLanguage | null>(
+    null,
+  );
+  const { setLanguage } = useAppLanguage();
   const countries = useMemo(
     () => (query.trim() ? searchCountryCatalog(query) : []),
     [query],
@@ -36,6 +49,9 @@ export function CountryScreen({ navigation }: Props) {
     setQuery('');
     setFocused(false);
     Keyboard.dismiss();
+    if (languagePromptCountryCodes.has(country.iso2)) {
+      setLanguagePromptVisible(true);
+    }
   };
 
   const handleContinue = async () => {
@@ -45,9 +61,12 @@ export function CountryScreen({ navigation }: Props) {
     try {
       await updateProfileCountry(selected.iso2, { sync: 'deferred' });
       navigation.navigate('Juntos');
+      // Al cambiar de idioma se vuelve a montar la navegación, ya en la
+      // siguiente lámina.
+      if (pendingLanguage) await setLanguage(pendingLanguage);
     } catch (error) {
       console.error('[onboarding] No se pudo guardar el país/moneda', error);
-      setError('No pudimos guardar tu moneda. Inténtalo de nuevo.');
+      setError(t('onboarding.country.saveError'));
     } finally {
       setSaving(false);
     }
@@ -56,16 +75,16 @@ export function CountryScreen({ navigation }: Props) {
   return (
     <OnboardingScreenLayout
       actionDisabled={!selected || isSaving}
-      actionLabel={isSaving ? 'Guardando…' : 'Continuar'}
+      actionLabel={isSaving ? t('common.saving') : t('common.continue')}
       onAction={() => void handleContinue()}
       onBack={() => navigation.goBack()}
       currentStep={2}
       illustrationAspectRatio={countryIllustrationAspectRatio}
       illustrationSource={require('../../../../assets/Onboarding/2_Pais.png')}
       isCompact={isFocused}
-      subtitle="Escribe el nombre de tu país y te mostraremos opciones similares."
+      subtitle={t('onboarding.country.subtitle')}
       testID="onboarding-country"
-      title="¿Desde dónde usarás Juntos?"
+      title={t('onboarding.country.title')}
     >
       <View style={styles.listArea}>
         {selected ? (
@@ -108,11 +127,20 @@ export function CountryScreen({ navigation }: Props) {
             />
           ) : (
             <Text align="center" tone="secondary" variant="body">
-              No encontramos un país con ese nombre.
+              {t('onboarding.country.noResults')}
             </Text>
           )
         ) : null}
       </View>
+      <LanguagePreferenceModal
+        onClose={() => setLanguagePromptVisible(false)}
+        onSelectLanguage={setPendingLanguage}
+        selectedLanguage={pendingLanguage ?? undefined}
+        subtitle={t('onboarding.country.languagePromptSubtitle')}
+        testID="onboarding-language-prompt"
+        title={t('onboarding.country.languagePromptTitle')}
+        visible={isLanguagePromptVisible}
+      />
     </OnboardingScreenLayout>
   );
 }

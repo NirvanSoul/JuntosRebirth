@@ -25,7 +25,7 @@ it('abre la propuesta seleccionada y permite consultar otra tras cerrar', async 
 });
 
 it('permite enviar una idea general sin abrir una función', async () => {
-  const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+  const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue();
   try {
     const screen = await renderWithTheme(<ComingSoonScreen />, {
       appearance: 'dark',

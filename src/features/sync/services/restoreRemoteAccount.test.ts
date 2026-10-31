@@ -238,7 +238,6 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
       'Salario',
       'briefcase',
       'coral',
-      null,
       0,
       null,
       'cat-remote-1',

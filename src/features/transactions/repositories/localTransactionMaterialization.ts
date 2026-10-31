@@ -49,7 +49,8 @@ async function findActiveSeries(
             amount_minor, currency, title, frequency, starts_on,
             generated_occurrences, next_occurrence_on
        FROM recurring_transaction_series
-      WHERE id = ? AND space_id = ? AND is_archived = 0`,
+      WHERE id = ? AND space_id = ? AND is_archived = 0
+        AND next_occurrence_on IS NOT NULL`,
     seriesId,
     spaceId,
   );

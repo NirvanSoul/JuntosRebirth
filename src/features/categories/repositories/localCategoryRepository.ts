@@ -1,5 +1,11 @@
 import { randomUUID } from 'expo-crypto';
 import {
+  assertCategoryBudgets,
+  listLocalCategoryBudgets,
+  migrateLegacyCategoryBudgets,
+  writeCategoryBudgets,
+} from '@/features/categories/repositories/localCategoryBudgetRepository';
+import {
   categoryIconNames,
   type Category,
   type CategoryIconName,
@@ -14,7 +20,6 @@ type CategoryRow = {
   name: string;
   icon: string;
   color_token: string;
-  budget_minor: number | null;
   is_default: number;
   template_key: string | null;
   note: string | null;
@@ -41,7 +46,6 @@ function mapCategory(row: CategoryRow): Category {
     name: row.name,
     icon: row.icon as CategoryIconName,
     colorToken,
-    ...(row.budget_minor === null ? {} : { budgetMinor: row.budget_minor }),
     isDefault: row.is_default === 1,
     ...(row.template_key === null ? {} : { templateKey: row.template_key }),
     ...(row.note === null || row.note === undefined ? {} : { note: row.note }),
@@ -53,9 +57,7 @@ function assertCategory(input: CreateLocalCategoryInput): void {
   if (!input.spaceId || !input.name.trim()) {
     throw new Error('La categoría local no es válida');
   }
-  if (input.budgetMinor !== undefined && input.budgetMinor <= 0) {
-    throw new Error('El presupuesto debe ser mayor que cero');
-  }
+  assertCategoryBudgets(input.budgets);
 }
 
 /**
@@ -66,14 +68,21 @@ function assertCategory(input: CreateLocalCategoryInput): void {
  */
 export async function listLocalCategories(): Promise<Category[]> {
   const database = await getLocalDatabase();
-  const rows = await database.getAllAsync<CategoryRow>(
-    `SELECT id, space_id, name, icon, color_token, budget_minor,
-            is_default, template_key, note, is_archived
-       FROM categories
-      ORDER BY created_at ASC`,
-  );
+  await migrateLegacyCategoryBudgets(database);
+  const [rows, budgetsByCategory] = await Promise.all([
+    database.getAllAsync<CategoryRow>(
+      `SELECT id, space_id, name, icon, color_token, is_default,
+              template_key, note, is_archived
+         FROM categories
+        ORDER BY created_at ASC`,
+    ),
+    listLocalCategoryBudgets(database),
+  ]);
 
-  return rows.map(mapCategory);
+  return rows.map((row) => {
+    const budgets = budgetsByCategory.get(row.id);
+    return { ...mapCategory(row), ...(budgets ? { budgets } : {}) };
+  });
 }
 
 export async function createLocalCategories(
@@ -95,13 +104,12 @@ export async function createLocalCategories(
            id, space_id, name, icon, color_token, budget_minor, is_default,
            template_key, note, source_category_id, created_by, sync_status,
            is_archived, created_at, updated_at, archived_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
+         ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
         id,
         input.spaceId,
         input.name.trim(),
         input.icon,
         input.colorToken,
-        input.budgetMinor ?? null,
         input.isDefault ? 1 : 0,
         input.templateKey ?? null,
         input.note ?? null,
@@ -110,15 +118,17 @@ export async function createLocalCategories(
         now,
         now,
       );
+      await writeCategoryBudgets(transaction, id, input.budgets, 'local_only', {
+        createdAt: now,
+        updatedAt: now,
+      });
       created.push({
         id,
         spaceId: input.spaceId,
         name: input.name.trim(),
         icon: input.icon,
         colorToken: input.colorToken,
-        ...(input.budgetMinor === undefined
-          ? {}
-          : { budgetMinor: input.budgetMinor }),
+        ...(input.budgets ? { budgets: input.budgets } : {}),
         isDefault: input.isDefault,
         ...(input.templateKey === undefined
           ? {}
@@ -140,15 +150,16 @@ export async function createLocalCategory(
   return created;
 }
 
+/** Nombre, icono y color. El presupuesto se guarda con `saveLocalCategoryBudget`. */
 export async function updateLocalCategory(
   category: Category,
 ): Promise<Category> {
+  assertCategory(category);
   const database = await getLocalDatabase();
   const now = new Date().toISOString();
   const result = await database.runAsync(
     `UPDATE categories
-        SET name = ?, icon = ?, color_token = ?, budget_minor = ?,
-            updated_at = ?,
+        SET name = ?, icon = ?, color_token = ?, updated_at = ?,
             sync_status = CASE
               WHEN sync_status = 'local_only' THEN 'local_only'
               ELSE 'pending'
@@ -157,7 +168,6 @@ export async function updateLocalCategory(
     category.name.trim(),
     category.icon,
     category.colorToken,
-    category.budgetMinor ?? null,
     now,
     category.id,
     category.spaceId,

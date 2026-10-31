@@ -55,4 +55,35 @@ describe('HomeEntrance', () => {
     expect(onMount).toHaveBeenCalledTimes(1);
     expect(getByText('Juntos')).toBeTruthy();
   });
+
+  it('vuelve a montar cada bloque al cambiar de espacio para repetir la entrada', async () => {
+    const onMount = jest.fn();
+    function Block() {
+      useEffect(() => {
+        onMount();
+      }, []);
+      return <Text>Bloque</Text>;
+    }
+
+    const { rerender } = await render(
+      <HomeEntrance revealKey="personal">
+        <Block />
+      </HomeEntrance>,
+    );
+    expect(onMount).toHaveBeenCalledTimes(1);
+
+    await rerender(
+      <HomeEntrance revealKey="personal">
+        <Block />
+      </HomeEntrance>,
+    );
+    expect(onMount).toHaveBeenCalledTimes(1);
+
+    await rerender(
+      <HomeEntrance revealKey="juntos">
+        <Block />
+      </HomeEntrance>,
+    );
+    expect(onMount).toHaveBeenCalledTimes(2);
+  });
 });

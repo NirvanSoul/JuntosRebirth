@@ -322,4 +322,39 @@ describe('CreateCategoryModal', () => {
       colorToken: 'red',
     });
   });
+
+  it('conserva el nombre que se escribe aunque la sincronización traiga la categoría de nuevo', async () => {
+    const category: Category = {
+      id: 'home',
+      spaceId: 'personal',
+      name: 'Hogar',
+      icon: 'house',
+      colorToken: 'blue',
+      isDefault: false,
+      isArchived: false,
+    };
+    const renderModal = (current: Category) => (
+      <CreateCategoryModal
+        categories={[current]}
+        category={current}
+        onClose={jest.fn()}
+        onSubmit={jest.fn()}
+        spaceId="personal"
+        spaceName="Personal"
+        visible
+      />
+    );
+    const screen = await renderWithTheme(renderModal(category));
+
+    await fireEvent.changeText(
+      screen.getByLabelText('Nombre de la categoría'),
+      'Casa',
+    );
+    // El sync recarga el catálogo: misma categoría, objeto nuevo.
+    await screen.rerender(renderModal({ ...category }));
+
+    expect(screen.getByLabelText('Nombre de la categoría').props.value).toBe(
+      'Casa',
+    );
+  });
 });

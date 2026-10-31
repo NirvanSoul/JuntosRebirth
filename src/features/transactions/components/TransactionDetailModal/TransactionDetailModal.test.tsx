@@ -1,10 +1,12 @@
-import { fireEvent, render, within } from '@testing-library/react-native';
+import { act, fireEvent, render, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import type { Category } from '@/features/categories/types';
 import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
+import { SpaceMembershipScope } from '@/features/profile/state/SpaceMembershipContext';
+import type { SpaceMemberProfile } from '@/features/profile/types';
 import { TransactionDetailModal } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailModal';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { createProjectedTransactionId } from '@/features/transactions/utils/transactionRecurrence';
@@ -13,6 +15,10 @@ import { colors } from '@/theme/colors';
 import { layout } from '@/theme/layout';
 import { shadows } from '@/theme/shadows';
 import { spacing } from '@/theme/spacing';
+import {
+  summarizeMoneyAccounts,
+  type MoneyAccountSummary,
+} from '@/features/accounts/utils/moneyAccountSummary';
 
 jest.mock('@/features/exchangeRates/hooks/useExchangeRates');
 jest.mock('@/features/profile/hooks/useCurrencyCapabilities');
@@ -23,7 +29,7 @@ const category: Category = {
   name: 'Comida',
   icon: 'fork-knife',
   colorToken: 'orange',
-  budgetMinor: 50_000,
+  budgets: { EUR: { budgetMinor: 50_000 } },
   isDefault: false,
   isArchived: false,
 };
@@ -220,10 +226,59 @@ describe('TransactionDetailModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('muestra primero el autor en un espacio compartido', async () => {
+    const sharedTransaction = { ...transaction, createdBy: 'partner' };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <SpaceMembershipScope
+            value={{
+              isSharedSpace: true,
+              ownUserId: 'me',
+              profilesByUserId: {
+                partner: {
+                  userId: 'partner',
+                  displayName: 'Sam',
+                } as SpaceMemberProfile,
+              },
+            }}
+          >
+            <TransactionDetailModal
+              category={category}
+              onClose={jest.fn()}
+              onCopy={jest.fn(() => true)}
+              onDelete={jest.fn()}
+              onEdit={jest.fn()}
+              onRemoveReminder={jest.fn(() => true)}
+              onSaveNote={jest.fn()}
+              onSaveReminder={jest.fn(() => true)}
+              reminder={null}
+              shareTargets={[]}
+              transaction={sharedTransaction}
+              transactions={[sharedTransaction]}
+              visible
+            />
+          </SpaceMembershipScope>
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const authorRow = screen.getByTestId('transaction-detail-author-row');
+    // Es la única fila que no se toca: va antes de las editables.
+    expect(authorRow.parent?.children[0]).toBe(authorRow);
+    expect(within(authorRow).getByText('Sam')).toBeTruthy();
+  });
+
   it('distribuye los datos del movimiento sin mostrar presupuesto', async () => {
     const onDelete = jest.fn();
     const onEdit = jest.fn();
-    const onOpenCategoryDetail = jest.fn();
+    const onOpenCategory = jest.fn();
+    const onOpenCategoryPicker = jest.fn();
     const screen = await render(
       <SafeAreaProvider
         initialMetrics={{
@@ -238,7 +293,8 @@ describe('TransactionDetailModal', () => {
             onCopy={jest.fn(() => true)}
             onDelete={onDelete}
             onEdit={onEdit}
-            onOpenCategoryDetail={onOpenCategoryDetail}
+            onOpenCategory={onOpenCategory}
+            onOpenCategoryPicker={onOpenCategoryPicker}
             onRemoveReminder={jest.fn(() => true)}
             onSaveNote={jest.fn()}
             onSaveReminder={jest.fn(() => true)}
@@ -327,22 +383,24 @@ describe('TransactionDetailModal', () => {
     );
     expect(onEdit).toHaveBeenCalledWith('lunch');
 
-    // El importe abre el formulario completo; la categoría, su detalle.
+    // El importe abre el formulario completo; la categoría, su selector.
     await fireEvent.press(
       within(detail).getByTestId('transaction-detail-amount'),
     );
     expect(onEdit).toHaveBeenCalledTimes(2);
     expect(onEdit).not.toHaveBeenCalledWith('lunch', 'category');
 
+    // El icono de arriba lleva a la categoría; la fila, a cambiarla.
     await fireEvent.press(
       within(detail).getByTestId('transaction-detail-category-editor'),
     );
-    expect(onOpenCategoryDetail).toHaveBeenCalledWith('food');
+    expect(onOpenCategory).toHaveBeenCalledWith(category.id);
+    expect(onOpenCategoryPicker).not.toHaveBeenCalled();
 
     await fireEvent.press(
       within(detail).getByTestId('transaction-detail-category-row'),
     );
-    expect(onOpenCategoryDetail).toHaveBeenCalledTimes(2);
+    expect(onOpenCategoryPicker).toHaveBeenCalledTimes(1);
 
     // Fecha y recurrencia no pasan por el formulario: abren su propio
     // selector encima del detalle.
@@ -588,7 +646,7 @@ describe('TransactionDetailModal', () => {
     const noteInput = within(noteModal).getByTestId(
       'transaction-note-modal-input',
     );
-    expect(noteInput.props.value).toBe('Nota previa');
+    expect(noteInput.props.defaultValue).toBe('Nota previa');
 
     await fireEvent.changeText(noteInput, '');
     await fireEvent.press(
@@ -640,45 +698,50 @@ describe('TransactionDetailModal', () => {
     expect(onDelete).toHaveBeenCalledWith(projectedId);
   });
   describe('cuenta del movimiento', () => {
-    const bankAccount = {
-      id: 'account-1',
-      spaceId: 'personal',
-      name: 'Cuenta nómina',
-      kind: 'bank' as const,
-      icon: 'bank' as const,
-      colorToken: 'blue' as const,
-      balances: [{ currency: 'EUR' as const, openingBalanceMinor: 0 }],
-      isArchived: false,
-    };
+    const [bankAccount] = summarizeMoneyAccounts(
+      [
+        {
+          id: 'account-1',
+          spaceId: 'personal',
+          name: 'Cuenta nómina',
+          kind: 'bank' as const,
+          icon: 'bank' as const,
+          colorToken: 'blue' as const,
+          balances: [{ currency: 'EUR' as const, openingBalanceMinor: 0 }],
+          isArchived: false,
+        },
+      ],
+      [],
+    ) as [MoneyAccountSummary];
 
-    const renderDetail = (props = {}) =>
-      render(
-        <SafeAreaProvider
-          initialMetrics={{
-            frame: { x: 0, y: 0, width: 390, height: 844 },
-            insets: { top: 47, right: 0, bottom: 34, left: 0 },
-          }}
-        >
-          <ThemeProvider initialAppearance="light">
-            <TransactionDetailModal
-              category={category}
-              onClose={jest.fn()}
-              onCopy={jest.fn(() => true)}
-              onDelete={jest.fn()}
-              onEdit={jest.fn()}
-              onRemoveReminder={jest.fn(() => true)}
-              onSaveNote={jest.fn()}
-              onSaveReminder={jest.fn(() => true)}
-              reminder={null}
-              shareTargets={[]}
-              transaction={transaction}
-              transactions={[transaction]}
-              visible
-              {...props}
-            />
-          </ThemeProvider>
-        </SafeAreaProvider>,
-      );
+    const detail = (props = {}) => (
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={transaction}
+            transactions={[transaction]}
+            visible
+            {...props}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>
+    );
+    const renderDetail = (props = {}) => render(detail(props));
 
     it('muestra la fila también cuando el movimiento no tiene cuenta', async () => {
       const screen = await renderDetail();
@@ -707,6 +770,23 @@ describe('TransactionDetailModal', () => {
         screen.getByTestId('transaction-money-account-picker'),
       ).toBeTruthy();
       expect(onEdit).not.toHaveBeenCalled();
+    });
+
+    it('mantiene abierto el selector de cuenta cuando la sincronización vuelve a crear el movimiento', async () => {
+      const screen = await renderDetail();
+
+      await fireEvent.press(
+        screen.getByLabelText('Añadir una cuenta a este movimiento'),
+      );
+      // El mismo movimiento llega como un objeto nuevo tras sincronizar.
+      const refreshed = { ...transaction };
+      await screen.rerender(
+        detail({ transaction: refreshed, transactions: [refreshed] }),
+      );
+
+      expect(
+        screen.getByTestId('transaction-money-account-picker'),
+      ).toBeTruthy();
     });
 
     it('guarda la recurrencia desde su selector sin abrir el formulario', async () => {
@@ -739,12 +819,43 @@ describe('TransactionDetailModal', () => {
       await fireEvent.press(
         screen.getByLabelText('Añadir una cuenta a este movimiento'),
       );
-      await fireEvent.press(screen.getByLabelText('Cuenta nómina · EUR'));
+      await fireEvent.press(screen.getByTestId('money-account-card-account-1'));
       await fireEvent.press(screen.getByLabelText('Guardar cuenta'));
 
       expect(onQuickEdit).toHaveBeenCalledWith('lunch', {
         field: 'money-account',
         moneyAccountId: 'account-1',
+      });
+      expect(
+        screen.queryByTestId('transaction-money-account-picker'),
+      ).toBeNull();
+    });
+
+    it('asigna al movimiento la cuenta creada desde su selector', async () => {
+      const onQuickEdit = jest.fn();
+      const onCreateMoneyAccount = jest.fn();
+      const screen = await renderDetail({
+        assignableMoneyAccounts: [bankAccount],
+        onCreateMoneyAccount,
+        onQuickEdit,
+      });
+
+      await fireEvent.press(
+        screen.getByLabelText('Añadir una cuenta a este movimiento'),
+      );
+      await fireEvent.press(screen.getByLabelText('Crear cuenta'));
+
+      // La cuenta nace con la moneda del movimiento para poder asignarse.
+      expect(onCreateMoneyAccount).toHaveBeenCalledWith(
+        expect.objectContaining({ currency: 'EUR' }),
+      );
+      await act(() =>
+        onCreateMoneyAccount.mock.calls[0][0].onCreated('new-account'),
+      );
+
+      expect(onQuickEdit).toHaveBeenCalledWith('lunch', {
+        field: 'money-account',
+        moneyAccountId: 'new-account',
       });
       expect(
         screen.queryByTestId('transaction-money-account-picker'),

@@ -8,9 +8,12 @@ async function applyClarityPreference(enabled: boolean): Promise<void> {
   try {
     await setClarityAnalyticsEnabled(enabled);
   } catch (error) {
-    // Expo Go no carga módulos nativos de terceros. La preferencia se conserva
-    // y se aplicará automáticamente en el siguiente development/release build.
-    console.error('[clarityAnalytics] SDK no disponible en este build', error);
+    // La ausencia del módulo nativo se resuelve en el adaptador. Registrar
+    // únicamente fallos inesperados al aplicar la preferencia.
+    console.error(
+      '[clarityAnalytics] No se pudo aplicar la preferencia',
+      error,
+    );
   }
 }
 

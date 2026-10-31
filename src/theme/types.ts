@@ -10,6 +10,8 @@ export type ColorTokens = {
   brandPressed: string;
   brandSoft: string;
   onBrand: string;
+  /** Texto e iconos sobre una superficie invertida (fondo `textPrimary`). */
+  onInverse: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;

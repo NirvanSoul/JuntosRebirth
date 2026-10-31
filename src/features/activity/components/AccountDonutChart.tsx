@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { StyleSheet } from 'react-native';
 
 import {
   DonutBreakdownChart,
@@ -7,15 +8,12 @@ import {
 import { CreatePreviewBadge } from '@/components/ui/CreatePreviewBadge/CreatePreviewBadge';
 import type { MoneyAccount } from '@/features/accounts/types';
 import { summarizeMoneyAccountTotals } from '@/features/accounts/utils/moneyAccountSummary';
-import {
-  formatMonthKey,
-  getCurrentMonthKey,
-  listTransactionsByMonth,
-  shiftMonthKey,
-} from '@/features/categories/utils/categorySummary';
+import { useBreakdownPeriod } from '@/features/activity/components/useBreakdownPeriod';
+import { CategoryDetailPeriodFilter } from '@/features/categories/components/CategoryDetailModal/CategoryDetailPeriodFilter';
 import type { SessionTransaction } from '@/features/transactions/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { categoryColors } from '@/theme/categoryColors';
+import { spacing } from '@/theme/spacing';
 
 type AccountDonutChartProps = {
   accounts: readonly MoneyAccount[];
@@ -43,22 +41,20 @@ export function AccountDonutChart({
   transactions,
 }: AccountDonutChartProps) {
   const [mode, setMode] = useState<DonutBreakdownMode>('expense');
-  const currentMonthKey = getCurrentMonthKey();
-  const [monthKey, setMonthKey] = useState(currentMonthKey);
+  const { filter, nextDisabled, periodKey, periodTransactions, setFilter } =
+    useBreakdownPeriod(transactions);
   const slices = useMemo(
     () =>
-      summarizeMoneyAccountTotals(
-        accounts,
-        listTransactionsByMonth(transactions, monthKey),
-        currency,
-      ).map((account) => ({
-        color: categoryColors[account.colorToken],
-        id: account.id,
-        label: account.name,
-        valueMinor:
-          mode === 'expense' ? account.expenseMinor : account.incomeMinor,
-      })),
-    [accounts, currency, mode, monthKey, transactions],
+      summarizeMoneyAccountTotals(accounts, periodTransactions, currency).map(
+        (account) => ({
+          color: categoryColors[account.colorToken],
+          id: account.id,
+          label: account.name,
+          valueMinor:
+            mode === 'expense' ? account.expenseMinor : account.incomeMinor,
+        }),
+      ),
+    [accounts, currency, mode, periodTransactions],
   );
 
   return (
@@ -74,18 +70,27 @@ export function AccountDonutChart({
         />
       }
       idPrefix="account"
-      isCurrentMonth={monthKey === currentMonthKey}
       mode={mode}
-      monthLabel={formatMonthKey(monthKey)}
       onModeChange={setMode}
       onDataAvailabilityChange={onDataAvailabilityChange}
-      onMonthChange={(offset) =>
-        setMonthKey((current) => shiftMonthKey(current, offset))
-      }
       onSlicePress={onOpenMoneyAccountDetail}
+      periodControl={
+        <CategoryDetailPeriodFilter
+          filter={filter}
+          nextDisabled={nextDisabled}
+          onChange={setFilter}
+          optionsStyle={styles.periodOptions}
+          testID="account-period-selector"
+        />
+      }
+      periodKey={periodKey}
       resetKey={resetKey}
       slicePressHint="Abre el detalle de la cuenta"
       slices={slices}
     />
   );
 }
+
+const styles = StyleSheet.create({
+  periodOptions: { marginBottom: spacing.lg },
+});

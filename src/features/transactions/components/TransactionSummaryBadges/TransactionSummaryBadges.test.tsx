@@ -17,7 +17,6 @@ describe('TransactionSummaryBadges', () => {
 
     expect(queryByTestId('badges-income-comparison')).toBeNull();
     expect(queryByTestId('badges-expense-comparison')).toBeNull();
-    expect(queryByTestId('badges-comparison-label')).toBeNull();
   });
 
   it('conserva el estilo del contenedor de badges pasado por props', async () => {
@@ -36,29 +35,35 @@ describe('TransactionSummaryBadges', () => {
     ).toBe(spacing.lg);
   });
 
-  it('muestra el porcentaje de cambio y la etiqueta del periodo cuando hay comparación', async () => {
-    const { getByText } = await renderWithTheme(
+  it('alterna el importe con la diferencia exacta dentro de cada badge, sin etiqueta de periodo', async () => {
+    const { getByTestId, getByText, queryByText } = await renderWithTheme(
       <TransactionSummaryBadges
         accessibilityContext="del mes"
-        comparisonPeriodLabel="vs. mes anterior"
         expenseMinor={800}
-        expenseComparison={{ changePercent: 60, direction: 'up' }}
+        expenseComparison={{ changeMinor: 300, direction: 'up' }}
         incomeMinor={1000}
-        incomeComparison={{ changePercent: -10, direction: 'down' }}
+        incomeComparison={{ changeMinor: -100, direction: 'down' }}
         testIDPrefix="badges"
       />,
     );
 
-    expect(getByText('vs. mes anterior')).toBeTruthy();
-    expect(getByText('60%')).toBeTruthy();
-    expect(getByText('10%')).toBeTruthy();
+    expect(queryByText('vs. mes anterior')).toBeNull();
+    expect(getByTestId('badges-income-badge')).toContainElement(
+      getByTestId('badges-income-comparison'),
+    );
+    expect(getByText('3\u00a0€ más')).toBeTruthy();
+    expect(getByTestId('badges-expense-comparison-arrow')).toBeTruthy();
+    expect(getByTestId('badges-expense-badge').props.accessibilityLabel).toBe(
+      'Gastos del mes: 8\u00a0€, 3\u00a0€ más que el periodo anterior',
+    );
+    expect(getByText('1\u00a0€ menos')).toBeTruthy();
   });
 
   it('muestra la comparación de balance solo cuando se pasa balanceMinor', async () => {
     const { getByTestId } = await renderWithTheme(
       <TransactionSummaryBadges
         accessibilityContext="del mes"
-        balanceComparison={{ changePercent: 0, direction: 'flat' }}
+        balanceComparison={{ changeMinor: 0, direction: 'flat' }}
         balanceMinor={200}
         expenseMinor={800}
         incomeMinor={1000}

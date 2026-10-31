@@ -1,4 +1,5 @@
 import { fireEvent } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { ActivityMovementsHeader } from '@/features/activity/components/ActivityMovementsHeader';
 import { darkColors, lightColors } from '@/theme/colors';
@@ -40,9 +41,15 @@ describe('ActivityMovementsHeader', () => {
       { appearance: 'dark' },
     );
 
+    // Con filtros activos, solo el icono pasa al color de acción.
     expect(screen.getByTestId('activity-filter-icon').props.color).toBe(
-      darkColors.textPrimary,
+      darkColors.cta,
     );
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId('activity-filter-button').props.style,
+      ),
+    ).toMatchObject({ borderColor: darkColors.border });
     expect(screen.getByTestId('activity-import-icon').props.color).toBe(
       darkColors.textPrimary,
     );

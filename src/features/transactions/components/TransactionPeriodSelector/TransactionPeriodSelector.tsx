@@ -1,9 +1,11 @@
 import { type ReactNode, useState } from 'react';
 import {
   ScrollView,
+  type StyleProp,
   StyleSheet,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from 'react-native';
 
 import Animated, { FadeOutUp, ReduceMotion } from 'react-native-reanimated';
@@ -30,11 +32,15 @@ type TransactionPeriodSelectorProps = {
   includeCustomOption?: boolean;
   customLabel?: string;
   customSelected?: boolean;
+  /** Bloquea avanzar, p. ej. hacia periodos futuros. */
+  nextDisabled?: boolean;
   onNext: () => void;
   onPrevious: () => void;
   onSelectAll?: () => void;
   onSelectCustom?: () => void;
   onSelectPeriod: (period: TransactionPeriod) => void;
+  /** Estilo de las opciones desplegadas, p. ej. para separarlas de lo que sigue. */
+  optionsStyle?: StyleProp<ViewStyle>;
   period: TransactionPeriod | null;
   selectedDate: Date;
   /** Ubica las opciones en una única fila horizontal desplazable. */
@@ -48,11 +54,13 @@ export function TransactionPeriodSelector({
   includeCustomOption = false,
   customLabel,
   customSelected = false,
+  nextDisabled,
   onNext,
   onPrevious,
   onSelectAll,
   onSelectCustom,
   onSelectPeriod,
+  optionsStyle,
   period,
   selectedDate,
   singleRow = false,
@@ -74,6 +82,7 @@ export function TransactionPeriodSelector({
         <Animated.View
           entering={getDisclosureEntering()}
           exiting={FadeOutUp.duration(160).reduceMotion(ReduceMotion.System)}
+          style={optionsStyle}
         >
           {options}
         </Animated.View>
@@ -104,6 +113,7 @@ export function TransactionPeriodSelector({
             : undefined
         }
         nextAccessibilityLabel="Ver periodo siguiente"
+        nextDisabled={nextDisabled}
         onNext={onNext}
         onPrevious={onPrevious}
         previousAccessibilityLabel="Ver periodo anterior"

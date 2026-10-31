@@ -14,17 +14,51 @@ jest.mock('expo-sqlite', () => ({
   openDatabaseAsync: jest.fn(),
 }));
 
+/**
+ * Una base anterior a la versión 32 migra en la conexión principal, con las
+ * foráneas desactivadas. Lo que corre entre BEGIN EXCLUSIVE y COMMIT va al
+ * doble `transaction` de cada test, como haría `withExclusiveTransactionAsync`.
+ */
+function onMainConnection(
+  transaction: {
+    execAsync?: jest.Mock;
+    getFirstAsync?: jest.Mock;
+    getAllAsync?: jest.Mock;
+  },
+  outer: { execAsync: jest.Mock; getFirstAsync: jest.Mock },
+): SQLiteDatabase {
+  let inTransaction = false;
+  return {
+    execAsync: jest.fn(async (statement: string) => {
+      if (statement === 'BEGIN EXCLUSIVE') inTransaction = true;
+      else if (statement === 'COMMIT' || statement === 'ROLLBACK')
+        inTransaction = false;
+      else if (inTransaction) return transaction.execAsync?.(statement);
+      return outer.execAsync(statement);
+    }),
+    getFirstAsync: jest.fn(async (statement: string) => {
+      if (!inTransaction) return outer.getFirstAsync(statement);
+      return transaction.getFirstAsync
+        ? transaction.getFirstAsync(statement)
+        : null;
+    }),
+    getAllAsync: jest.fn(async (statement: string) => {
+      if (statement === 'PRAGMA foreign_key_check') return [];
+      return transaction.getAllAsync ? transaction.getAllAsync(statement) : [];
+    }),
+  } as unknown as SQLiteDatabase;
+}
+
 describe('migrateLocalDatabase', () => {
   it('crea un esquema versionado con integridad por espacio', async () => {
     const transaction = {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 0 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -67,11 +101,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 4 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -88,11 +121,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 5 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -112,11 +144,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 6 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -139,11 +170,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 3 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -165,11 +195,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 7 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -190,11 +219,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 8 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -211,11 +239,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 10 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -232,11 +259,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 11 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -254,11 +280,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 12 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -274,11 +299,10 @@ describe('migrateLocalDatabase', () => {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => null),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 19 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -366,11 +390,10 @@ describe('migrateLocalDatabase', () => {
       getFirstAsync: jest.fn(async () => ({ name: 'money_accounts' })),
       getAllAsync: jest.fn(async () => []),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 24 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -464,11 +487,10 @@ describe('migrateLocalDatabase', () => {
       getFirstAsync: jest.fn(async () => ({ name: 'money_accounts' })),
       getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 22 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -496,11 +518,10 @@ describe('migrateLocalDatabase', () => {
         user_version: localDatabaseVersion,
       })),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 0 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -520,11 +541,10 @@ describe('migrateLocalDatabase', () => {
       ),
       getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 30 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -546,11 +566,10 @@ describe('migrateLocalDatabase', () => {
           : { name: 'recurring_transaction_series' },
       ),
     };
-    const database = {
+    const database = onMainConnection(transaction, {
       execAsync: jest.fn(async () => undefined),
       getFirstAsync: jest.fn(async () => ({ user_version: 0 })),
-      withExclusiveTransactionAsync: jest.fn(async (task) => task(transaction)),
-    } as unknown as SQLiteDatabase;
+    });
 
     await migrateLocalDatabase(database);
 
@@ -558,13 +577,43 @@ describe('migrateLocalDatabase', () => {
       .map(([statement]) => statement)
       .join('\n');
     expect(migration).not.toContain(
-      'CREATE TABLE recurring_transaction_series',
+      'CREATE TABLE recurring_transaction_series (',
     );
     expect(migration).not.toContain(
       'ALTER TABLE transactions RENAME TO transactions_v1',
     );
     // El resto de la escalera sí corre y la base queda en la versión actual.
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS categories');
+    expect(transaction.execAsync).toHaveBeenLastCalledWith(
+      `PRAGMA user_version = ${localDatabaseVersion}`,
+    );
+  });
+
+  it('reconstruye las series con la próxima ocurrencia opcional desde la versión 31', async () => {
+    const transaction = {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ name: 'existing_table' })),
+      getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
+    };
+    const database = onMainConnection(transaction, {
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({ user_version: 31 })),
+    });
+
+    await migrateLocalDatabase(database);
+
+    const migration = (transaction.execAsync as jest.Mock).mock.calls
+      .map(([statement]) => statement)
+      .join('\n');
+    expect(migration).toContain('next_occurrence_on TEXT,');
+    expect(migration).toContain('DROP TABLE recurring_transaction_series;');
+    expect(migration).toContain('CREATE INDEX recurring_series_due_idx');
+    expect(database.execAsync).toHaveBeenCalledWith(
+      'PRAGMA foreign_keys = OFF',
+    );
+    expect(database.getAllAsync).toHaveBeenCalledWith(
+      'PRAGMA foreign_key_check',
+    );
     expect(transaction.execAsync).toHaveBeenLastCalledWith(
       `PRAGMA user_version = ${localDatabaseVersion}`,
     );

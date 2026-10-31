@@ -1,10 +1,10 @@
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, within } from '@testing-library/react-native';
+import { fireEvent, within } from '@testing-library/react-native';
 
 import type { MoneyAccount } from '@/features/accounts/types';
 import { AccountDonutChart } from '@/features/activity/components/AccountDonutChart';
 import type { SessionTransaction } from '@/features/transactions/types';
-import { ThemeProvider } from '@/theme/ThemeProvider';
+import { renderWithTheme } from '@/test/renderWithTheme';
 
 const testAccounts: MoneyAccount[] = [
   {
@@ -73,15 +73,13 @@ const testTransactions: SessionTransaction[] = [
 function renderChart(
   props: Partial<React.ComponentProps<typeof AccountDonutChart>> = {},
 ) {
-  return render(
-    <ThemeProvider initialAppearance="light">
-      <AccountDonutChart
-        accounts={testAccounts}
-        currency="USD"
-        transactions={testTransactions}
-        {...props}
-      />
-    </ThemeProvider>,
+  return renderWithTheme(
+    <AccountDonutChart
+      accounts={testAccounts}
+      currency="USD"
+      transactions={testTransactions}
+      {...props}
+    />,
   );
 }
 
@@ -175,7 +173,7 @@ describe('AccountDonutChart', () => {
     const chart = screen.getByTestId('account-donut-chart');
 
     await fireEvent.press(
-      within(chart).getByRole('button', { name: 'Ver mes anterior' }),
+      within(chart).getByRole('button', { name: 'Ver periodo anterior' }),
     );
 
     expect(within(chart).queryByText(/Para ver gastos por cuenta/)).toBeNull();

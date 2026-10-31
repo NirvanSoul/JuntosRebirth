@@ -44,7 +44,7 @@ export function buildPersonalScenario({
   // Fijos y recurrentes.
   add({
     type: 'income',
-    amountMinor: amounts.round(2300),
+    amountMinor: amounts.income(1400),
     title: 'Nómina',
     categoryKey: 'salary',
     accountKey: 'payroll',
@@ -53,7 +53,7 @@ export function buildPersonalScenario({
   });
   add({
     type: 'expense',
-    amountMinor: amounts.round(1000),
+    amountMinor: amounts.income(850),
     title: `Aporte a ${coupleSpaceName}`,
     categoryKey: 'household',
     accountKey: 'payroll',
@@ -217,7 +217,7 @@ export function buildPersonalScenario({
   for (const month of [-4, -1]) {
     addIfDue({
       type: 'income',
-      amountMinor: amounts.price(300, 550),
+      amountMinor: amounts.income(150 + random() * 150),
       title: 'Proyecto freelance',
       categoryKey: 'freelance',
       accountKey: 'payroll',

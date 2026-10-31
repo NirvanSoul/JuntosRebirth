@@ -64,7 +64,7 @@ const categories: Category[] = [
     name: 'General',
     icon: 'dots-three-circle',
     colorToken: 'slate',
-    budgetMinor: 5000,
+    budgets: { EUR: { budgetMinor: 5000 } },
     isDefault: false,
     isArchived: false,
   },
@@ -266,8 +266,8 @@ describe('ActivityScreen', () => {
     expect(
       screen.getByTestId('activity-screen-scroll-view').props
         .stickyHeaderIndices,
-      // La sección de cuentas desplaza un hijo el ancla del resumen fijo.
-    ).toEqual([3]);
+      // Cuentas y el selector de periodo desplazan el ancla del resumen fijo.
+    ).toEqual([4]);
     const chart = screen.getByTestId('category-donut-chart');
     expect(chart).toBeTruthy();
     expect(
@@ -311,10 +311,10 @@ describe('ActivityScreen', () => {
     ).toBeTruthy();
     expect(screen.getByText('Balance')).toBeTruthy();
     expect(
-      within(chart).getByRole('button', { name: 'Ver mes anterior' }),
+      within(chart).getByRole('button', { name: 'Ver periodo anterior' }),
     ).toBeTruthy();
     expect(
-      within(chart).getByRole('button', { name: 'Ver mes siguiente' }).props
+      within(chart).getByRole('button', { name: 'Ver periodo siguiente' }).props
         .accessibilityState,
     ).toMatchObject({ disabled: true });
 
@@ -325,9 +325,6 @@ describe('ActivityScreen', () => {
     ).toBeTruthy();
 
     await fireEvent.press(screen.getByRole('button', { name: 'Filtros' }));
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Tipo de movimiento' }),
-    );
     await fireEvent.press(screen.getByLabelText('Tipo: Gastos'));
     expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(2);
     await fireEvent.press(
@@ -423,7 +420,7 @@ describe('ActivityScreen', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: /^General,/ }));
 
-    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR');
+    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR', 'all');
   });
 
   it('abre el detalle al tocar el badge de una categoría en la gráfica', async () => {
@@ -452,7 +449,7 @@ describe('ActivityScreen', () => {
       }),
     );
 
-    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR');
+    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR', 'all');
   });
 
   it('mantiene el mismo tratamiento superior de Inicio y compensa dentro del sticky', async () => {
@@ -551,13 +548,13 @@ describe('ActivityScreen', () => {
     const chart = screen.getByTestId('category-donut-chart');
 
     await fireEvent.press(
-      within(chart).getByRole('button', { name: 'Ver mes anterior' }),
+      within(chart).getByRole('button', { name: 'Ver periodo anterior' }),
     );
 
     expect(within(chart).getByText('Junio 2026')).toBeTruthy();
     expect(within(chart).getByText(/^42\s*€$/)).toBeTruthy();
     expect(
-      within(chart).getByRole('button', { name: 'Ver mes siguiente' }).props
+      within(chart).getByRole('button', { name: 'Ver periodo siguiente' }).props
         .accessibilityState,
     ).toMatchObject({ disabled: false });
   });
@@ -628,7 +625,8 @@ describe('ActivityScreen', () => {
 
     expect(screen.getByTestId('activity-add-category')).toBeTruthy();
     expect(screen.queryByText('Aún no hay categorías')).toBeNull();
-    expect(screen.getByTestId('activity-empty-movements-arrow')).toBeTruthy();
+    expect(screen.getByTestId('activity-empty-movements-glyph')).toBeTruthy();
+    expect(screen.queryByText('Todavía no hay movimientos')).toBeNull();
 
     await fireEvent.press(screen.getByLabelText('Crear primera categoría'));
     await fireEvent.press(screen.getByLabelText('Crear primer gasto'));
@@ -703,7 +701,7 @@ describe('ActivityScreen', () => {
   it('muestra una barra vacía cuando la categoría no tiene presupuesto', async () => {
     const categoryWithoutBudget: Category = {
       ...categories[0]!,
-      budgetMinor: undefined,
+      budgets: undefined,
     };
     const screen = await render(
       <SafeAreaProvider
@@ -825,13 +823,12 @@ describe('ActivityScreen', () => {
     await fireEvent.press(
       screen.getByRole('button', { name: 'Filtros, 2 activos' }),
     );
+    // Limpiar aplica al momento, sin pasar por «Aplicar filtros», y lo avisa.
     await fireEvent.press(screen.getByRole('button', { name: 'Limpiar' }));
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Aplicar filtros' }),
-    );
 
     expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(3);
     expect(screen.getByRole('button', { name: 'Filtros' })).toBeTruthy();
+    expect(screen.getByText('Filtros quitados')).toBeTruthy();
   });
 
   it('muestra la gráfica como primer bloque de contenido', async () => {
@@ -965,7 +962,7 @@ describe('ActivityScreen', () => {
       StyleSheet.flatten(
         screen.getAllByTestId('category-preview-card')[0]!.props.style,
       ).width,
-    ).toBe('31.5%');
+    ).toEqual(expect.any(Number));
     expect(
       StyleSheet.flatten(
         screen.getAllByTestId('category-preview-card')[0]!.props.style,
@@ -1058,13 +1055,9 @@ describe('ActivityScreen', () => {
     const recurrenceToggle = screen.getByRole('button', {
       name: 'Recurrencia',
     });
-    const dateToggle = screen.getByRole('button', { name: 'Fecha' });
+    // La fecha se elige fuera, sobre el resumen de movimientos.
+    expect(screen.queryByRole('button', { name: 'Fecha' })).toBeNull();
 
-    expect(
-      screen.getByTestId('date-filter-group-icon').props.children,
-    ).toContain(
-      String.fromCodePoint(Number(Ionicons.glyphMap['calendar-outline'])),
-    );
     expect(
       screen.getByTestId('type-filter-group-icon').props.children,
     ).toContain(
@@ -1081,12 +1074,9 @@ describe('ActivityScreen', () => {
       String.fromCodePoint(Number(Ionicons.glyphMap['sync-outline'])),
     );
 
-    expect(
-      StyleSheet.flatten(dateToggle.parent?.props.style),
-    ).not.toHaveProperty('borderBottomWidth');
-
+    // Sin autor (espacio personal), el modal abre en el tipo.
     expect(typeToggle.props.accessibilityState).toMatchObject({
-      expanded: false,
+      expanded: true,
     });
     expect(categoryToggle.props.accessibilityState).toMatchObject({
       expanded: false,
@@ -1094,47 +1084,8 @@ describe('ActivityScreen', () => {
     expect(recurrenceToggle.props.accessibilityState).toMatchObject({
       expanded: false,
     });
-    expect(dateToggle.props.accessibilityState).toMatchObject({
-      expanded: true,
-    });
-    expect(
-      screen.getByLabelText('Periodo: Todos').props.accessibilityState,
-    ).toMatchObject({ checked: true });
-    expect(
-      StyleSheet.flatten(
-        screen.getByTestId('activity-date-period-selector-all').props.style,
-      ),
-    ).toMatchObject({
-      backgroundColor: colors.surface,
-      borderColor: colors.cta,
-      minHeight: 56,
-    });
-    expect(
-      StyleSheet.flatten(
-        within(
-          screen.getByTestId('activity-date-period-selector-all'),
-        ).getByText('Todos').props.style,
-      ).flex,
-    ).toBeUndefined();
-    expect(
-      StyleSheet.flatten(
-        screen.getByTestId('activity-date-period-selector-options-scroll').props
-          .contentContainerStyle,
-      ),
-    ).toMatchObject({
-      flexDirection: 'row',
-      flexWrap: 'nowrap',
-    });
-
-    await fireEvent.press(typeToggle);
     const allType = screen.getByTestId('type-filter-all');
     const incomeType = screen.getByTestId('type-filter-income');
-    expect(dateToggle.props.accessibilityState).toMatchObject({
-      expanded: false,
-    });
-    expect(typeToggle.props.accessibilityState).toMatchObject({
-      expanded: true,
-    });
     expect(StyleSheet.flatten(allType.props.style)).toMatchObject({
       minHeight: 56,
       backgroundColor: colors.surface,
@@ -1226,18 +1177,6 @@ describe('ActivityScreen', () => {
       flexDirection: 'row',
     });
 
-    await fireEvent.press(dateToggle);
-    expect(recurrenceToggle.props.accessibilityState).toMatchObject({
-      expanded: false,
-    });
-    expect(dateToggle.props.accessibilityState).toMatchObject({
-      expanded: true,
-    });
-    expect(screen.getByLabelText('Periodo: Semanal')).toBeTruthy();
-    expect(screen.getByLabelText('Periodo: Quincenal')).toBeTruthy();
-    expect(screen.getByLabelText('Periodo: Mensual')).toBeTruthy();
-    expect(screen.getByLabelText('Periodo: Anual')).toBeTruthy();
-    expect(screen.getByLabelText('Periodo: Personalizada')).toBeTruthy();
     const applyFilters = screen.getByRole('button', {
       name: 'Aplicar filtros',
     });
@@ -1251,7 +1190,7 @@ describe('ActivityScreen', () => {
     ).toBe(17);
 
     await fireEvent.press(typeToggle);
-    expect(dateToggle.props.accessibilityState).toMatchObject({
+    expect(recurrenceToggle.props.accessibilityState).toMatchObject({
       expanded: false,
     });
     expect(typeToggle.props.accessibilityState).toMatchObject({
@@ -1263,7 +1202,7 @@ describe('ActivityScreen', () => {
     expect(StyleSheet.flatten(reopenedIncomeType.props.style)).toMatchObject({
       minHeight: 56,
       backgroundColor: colors.surface,
-      borderColor: colors.cta,
+      borderColor: colors.income,
     });
     expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(2);
 
@@ -1272,7 +1211,7 @@ describe('ActivityScreen', () => {
     expect(StyleSheet.flatten(expenseType.props.style)).toMatchObject({
       minHeight: 56,
       backgroundColor: colors.surface,
-      borderColor: colors.cta,
+      borderColor: colors.expense,
     });
 
     await fireEvent.press(typeToggle);
@@ -1288,9 +1227,6 @@ describe('ActivityScreen', () => {
     expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(2);
 
     await fireEvent.press(filterButton);
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Tipo de movimiento' }),
-    );
     expect(
       screen.getByLabelText('Tipo: Todos').props.accessibilityState,
     ).toMatchObject({ checked: true });
@@ -1370,16 +1306,22 @@ describe('ActivityScreen', () => {
     );
 
     expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(3);
-    await fireEvent.press(screen.getByRole('button', { name: 'Filtros' }));
-    await fireEvent.press(screen.getByLabelText('Periodo: Semanal'));
+    // El periodo se elige sobre el resumen, sin pasar por el modal.
+    const periodSelector = screen.getByTestId('activity-date-period-selector');
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', { name: 'Julio 2026' }),
+    );
+    await fireEvent.press(
+      within(periodSelector).getByLabelText('Periodo: Semanal'),
+    );
     expect(screen.getByText('27 jul – 2 ago 2026')).toBeTruthy();
     await fireEvent.press(
-      screen.getByRole('button', { name: 'Ver periodo anterior' }),
+      within(screen.getByTestId('activity-date-period-selector')).getByRole(
+        'button',
+        { name: 'Ver periodo anterior' },
+      ),
     );
     expect(screen.getByText('20 jul – 26 jul 2026')).toBeTruthy();
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Aplicar filtros' }),
-    );
 
     expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(1);
     expect(screen.getByText('Compra anterior')).toBeTruthy();
@@ -1393,9 +1335,143 @@ describe('ActivityScreen', () => {
     expect(screen.getByTestId('activity-balance-amount').props.children).toBe(
       '-12,50\u00a0€',
     );
+    // El periodo no cuenta como filtro del modal.
+    expect(screen.getByRole('button', { name: 'Filtros' })).toBeTruthy();
+  });
+
+  it('muestra los recurrentes previstos al filtrar un mes futuro', async () => {
+    const salary: SessionTransaction = {
+      ...transactions[1]!,
+      id: 'salary',
+      title: 'Nómina',
+      recurrence: 'monthly',
+      nextOccurrenceOn: '2026-08-30',
+      recurrenceSeriesId: 'salary-series',
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen categories={categories} transactions={[salary]} />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const periodSelector = screen.getByTestId('activity-date-period-selector');
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', { name: 'Julio 2026' }),
+    );
+    await fireEvent.press(
+      within(periodSelector).getByLabelText('Periodo: Mensual'),
+    );
+    await fireEvent.press(
+      within(screen.getByTestId('activity-date-period-selector')).getByRole(
+        'button',
+        { name: 'Ver periodo siguiente' },
+      ),
+    );
+    expect(screen.getByText('Agosto 2026')).toBeTruthy();
+
+    expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(1);
+    expect(screen.getByText('Nómina')).toBeTruthy();
+    expect(screen.queryByText('No hay movimientos de este tipo')).toBeNull();
+    expect(screen.getByTestId('activity-income-amount').props.children).toBe(
+      '20\u00a0€',
+    );
+  });
+
+  it('empieza en el mes en curso y, desde el inicio, recorre el mes actual, los siguientes y luego los anteriores', async () => {
+    const salary: SessionTransaction = {
+      ...transactions[1]!,
+      id: 'salary',
+      title: 'Nómina',
+      recurrence: 'monthly',
+      nextOccurrenceOn: '2026-08-30',
+      recurrenceSeriesId: 'salary-series',
+    };
+    const june: SessionTransaction = {
+      ...transactions[0]!,
+      id: 'june',
+      amountMinor: 500,
+      occurredOn: '2026-06-10',
+      title: 'Compra de junio',
+    };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <ActivityScreen
+            categories={categories}
+            transactions={[transactions[0]!, salary, june]}
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const periodSelector = screen.getByTestId('activity-date-period-selector');
+    expect(screen.queryByText('Compra de junio')).toBeNull();
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', { name: 'Julio 2026' }),
+    );
+    await fireEvent.press(
+      within(periodSelector).getByLabelText('Periodo: Todos'),
+    );
+
+    const list = screen.getByTestId('activity-transaction-preview-list');
+    const headers = within(list)
+      .getAllByRole('header')
+      .map((header) => header.props.children);
+    expect(headers.slice(0, 3)).toEqual([
+      'Julio 2026',
+      'Agosto 2026',
+      'Septiembre 2026',
+    ]);
+    expect(headers.slice(-2)).toEqual(['Julio 2027', 'Junio 2026']);
+    expect(screen.getByText('Compra de junio')).toBeTruthy();
+
+    // Pulsar el subtítulo pliega el mes y volver a pulsarlo lo despliega.
+    const julyToggle = screen.getByTestId('activity-month-toggle-2026-07');
+    expect(julyToggle.props.accessibilityState).toEqual({ expanded: true });
+    await fireEvent.press(julyToggle);
+    expect(screen.queryByText('Compra semanal')).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Filtros, 1 activos' }),
-    ).toBeTruthy();
+      screen.getByTestId('activity-month-toggle-2026-07').props
+        .accessibilityState,
+    ).toEqual({ expanded: false });
+    await fireEvent.press(screen.getByTestId('activity-month-toggle-2026-07'));
+    expect(screen.getByText('Compra semanal')).toBeTruthy();
+
+    // Arriba, el mes en curso con el balance que arrastra junio.
+    const amount = (id: string) => screen.getByTestId(id).props.children;
+    expect(amount('activity-income-amount')).toBe('20\u00a0€');
+    expect(amount('activity-expense-amount')).toBe('12,50\u00a0€');
+    expect(amount('activity-balance-amount')).toBe('2,50\u00a0€');
+
+    // Al llegar agosto bajo el resumen fijo, el resumen pasa a agosto.
+    await fireEvent(screen.getByTestId('activity-summary-anchor'), 'layout', {
+      nativeEvent: { layout: { height: 100, y: 500 } },
+    });
+    await fireEvent(screen.getByTestId('activity-month-2026-08'), 'layout', {
+      nativeEvent: { layout: { height: 120, y: 300 } },
+    });
+    await fireEvent.scroll(screen.getByTestId('activity-screen-scroll-view'), {
+      nativeEvent: {
+        contentOffset: { y: 250 },
+        contentSize: { height: 4000, width: 390 },
+        layoutMeasurement: { height: 844, width: 390 },
+      },
+    });
+    expect(amount('activity-income-amount')).toBe('20\u00a0€');
+    expect(amount('activity-expense-amount')).toBe('0\u00a0€');
+    expect(amount('activity-balance-amount')).toBe('22,50\u00a0€');
   });
 
   it('filtra por un rango de fechas personalizado', async () => {
@@ -1412,8 +1488,13 @@ describe('ActivityScreen', () => {
       </SafeAreaProvider>,
     );
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Filtros' }));
-    await fireEvent.press(screen.getByLabelText('Periodo: Personalizada'));
+    const periodSelector = screen.getByTestId('activity-date-period-selector');
+    await fireEvent.press(
+      within(periodSelector).getByRole('button', { name: 'Julio 2026' }),
+    );
+    await fireEvent.press(
+      within(periodSelector).getByLabelText('Periodo: Personalizada'),
+    );
 
     expect(screen.getByText('Elige un rango')).toBeTruthy();
     await fireEvent.press(
@@ -1423,17 +1504,12 @@ describe('ActivityScreen', () => {
       screen.getByTestId('transaction-date-range-calendar.day_2026-07-30'),
     );
     await fireEvent.press(screen.getByLabelText('Guardar rango de fechas'));
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Aplicar filtros' }),
-    );
 
     expect(screen.getAllByTestId('transaction-preview-card')).toHaveLength(2);
-    expect(
-      screen.getByRole('button', { name: 'Filtros, 1 activos' }),
-    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filtros' })).toBeTruthy();
   });
 
-  it('calcula presupuesto en spaceCurrency (VES) mientras muestra gastos en displayCurrency (EUR) y propaga divisa a onOpenCategoryDetail', async () => {
+  it('usa el presupuesto de la moneda visible (EUR) y propaga la divisa a onOpenCategoryDetail', async () => {
     const onOpenCategoryDetail = jest.fn();
     const multiTransactions: SessionTransaction[] = [
       {
@@ -1470,7 +1546,8 @@ describe('ActivityScreen', () => {
       name: 'General',
       icon: 'dots-three-circle',
       colorToken: 'slate',
-      budgetMinor: 10000, // 100 VES
+      // 70 € y 100 Bs.: cada moneda con su propio presupuesto.
+      budgets: { EUR: { budgetMinor: 7000 }, VES: { budgetMinor: 10000 } },
       isDefault: false,
       isArchived: false,
     };
@@ -1487,14 +1564,13 @@ describe('ActivityScreen', () => {
             categories={[categoryWithBudget]}
             currency="EUR"
             onOpenCategoryDetail={onOpenCategoryDetail}
-            spaceCurrency="VES"
             transactions={multiTransactions}
           />
         </ThemeProvider>
       </SafeAreaProvider>,
     );
 
-    // Tarjeta muestra gastado 10 € y disponible Bs. 60
+    // Tarjeta muestra gastado 10 € y disponible 60 € (70 € − 10 €)
     expect(
       screen.getByRole('button', {
         name: /General, 10.*gastado,.*60.*disponible/,
@@ -1507,7 +1583,7 @@ describe('ActivityScreen', () => {
       }),
     );
 
-    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR');
+    expect(onOpenCategoryDetail).toHaveBeenCalledWith('general', 'EUR', 'all');
   });
   describe('sección de cuentas', () => {
     const account = {

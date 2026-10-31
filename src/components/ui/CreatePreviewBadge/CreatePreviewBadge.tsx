@@ -1,3 +1,4 @@
+import { Minus } from 'phosphor-react-native/src/icons/Minus';
 import { Plus } from 'phosphor-react-native/src/icons/Plus';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -14,6 +15,12 @@ type CreatePreviewBadgeProps = {
   bordered?: boolean;
   label: string;
   onPress?: () => void;
+  /**
+   * Convierte el badge en la opción de quitar la selección —«Sin cuenta»—:
+   * mismo formato con un signo menos sobre fondo oscuro, que se comporta como
+   * una opción elegible y, elegida, marca el borde del mismo tono oscuro.
+   */
+  removeSelected?: boolean;
   testID: string;
 };
 
@@ -28,8 +35,11 @@ export function CreatePreviewBadge({
   bordered = false,
   label,
   onPress,
+  removeSelected,
   testID,
 }: CreatePreviewBadgeProps) {
+  const isRemoveOption = removeSelected !== undefined;
+  const Glyph = isRemoveOption ? Minus : Plus;
   const { colors, shadows } = useTheme();
   const themedStyles = useThemedStyles((palette) =>
     createThemedStyles(palette, shadows),
@@ -37,21 +47,35 @@ export function CreatePreviewBadge({
 
   return (
     <Pressable
-      accessibilityHint={`Abre el formulario para ${label.toLocaleLowerCase('es-ES')}`}
+      accessibilityHint={
+        isRemoveOption
+          ? undefined
+          : `Abre el formulario para ${label.toLocaleLowerCase('es-ES')}`
+      }
       accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
+      accessibilityRole={isRemoveOption ? 'radio' : 'button'}
+      accessibilityState={
+        isRemoveOption ? { checked: removeSelected } : undefined
+      }
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [
         themedStyles.badge,
         bordered ? themedStyles.borderedBadge : null,
+        removeSelected ? themedStyles.selectedBadge : null,
         pressed ? styles.pressed : null,
       ]}
       testID={testID}
     >
-      <View style={themedStyles.icon} testID={`${testID}-icon-background`}>
-        <Plus
-          color={colors.onBrand}
+      <View
+        style={[
+          themedStyles.icon,
+          isRemoveOption ? themedStyles.removeIcon : null,
+        ]}
+        testID={`${testID}-icon-background`}
+      >
+        <Glyph
+          color={isRemoveOption ? colors.onInverse : colors.onBrand}
           size={iconSize.xs}
           testID={`${testID}-glyph`}
           weight="bold"
@@ -82,6 +106,10 @@ function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderColor: colors.categoryPreviewBorder,
       borderWidth: 1,
     },
+    selectedBadge: {
+      borderColor: colors.textPrimary,
+      borderWidth: 1,
+    },
     icon: {
       width: iconSize.md,
       height: iconSize.md,
@@ -90,6 +118,7 @@ function createThemedStyles(colors: ColorTokens, shadows: ThemeShadows) {
       borderRadius: previewCardLayout.directionIconRadius,
       backgroundColor: colors.cta,
     },
+    removeIcon: { backgroundColor: colors.textPrimary },
   });
 }
 

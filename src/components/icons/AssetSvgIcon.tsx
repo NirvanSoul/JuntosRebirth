@@ -19,10 +19,14 @@ export function AssetSvgIcon({
   height = size,
   width = size,
 }: AssetSvgIconProps) {
-  const uri = Image.resolveAssetSource(source).uri;
+  const uri = Image.resolveAssetSource(source)?.uri;
   const [xml, setXml] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!uri) {
+      return;
+    }
+
     let isMounted = true;
 
     void fetch(uri)

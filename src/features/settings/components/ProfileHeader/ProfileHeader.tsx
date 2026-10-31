@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +36,7 @@ const avatarEditBadgeSize = 32;
  */
 export function ProfileHeader() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const styles = useThemedStyles(createStyles);
   const avatar = useProfileAvatar();
   const name = useProfileDisplayName();
@@ -46,24 +48,27 @@ export function ProfileHeader() {
     if (avatar.isBusy) return;
 
     const options: AlertButton[] = [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Tomar foto', onPress: () => avatar.changeAvatar('camera') },
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Elegir de la galería',
+        text: t('settings.profile.takePhoto'),
+        onPress: () => avatar.changeAvatar('camera'),
+      },
+      {
+        text: t('settings.profile.chooseFromLibrary'),
         onPress: () => avatar.changeAvatar('library'),
       },
     ];
     if (avatar.avatarUri) {
       options.push({
-        text: 'Quitar foto',
+        text: t('settings.profile.removePhoto'),
         style: 'destructive',
         onPress: () => avatar.removeAvatar(),
       });
     }
 
     Alert.alert(
-      'Foto de perfil',
-      'Para elegir una imagen, Juntos necesita acceder a tus fotos o a la cámara. Se usará solo como tu foto de perfil.',
+      t('settings.profile.photoTitle'),
+      t('settings.profile.photoMessage'),
       options,
     );
   };
@@ -82,7 +87,7 @@ export function ProfileHeader() {
     <>
       <View style={styles.container}>
         <Pressable
-          accessibilityLabel="Cambiar foto de perfil"
+          accessibilityLabel={t('settings.profile.changePhotoLabel')}
           accessibilityRole="button"
           accessibilityState={{ disabled: avatar.isBusy }}
           disabled={avatar.isBusy}
@@ -110,7 +115,7 @@ export function ProfileHeader() {
         </Pressable>
 
         <Pressable
-          accessibilityLabel="Editar nombre"
+          accessibilityLabel={t('settings.profile.editNameLabel')}
           accessibilityRole="button"
           onPress={() => setNameModalVisible(true)}
           style={({ pressed }) => [
@@ -125,7 +130,7 @@ export function ProfileHeader() {
             variant="subheading"
             weight="semibold"
           >
-            {name.displayName ?? 'Agregar tu nombre'}
+            {name.displayName ?? t('settings.profile.addName')}
           </Text>
           <ProfileEditIcon color={colors.textSecondary} size={iconSize.sm} />
         </Pressable>
@@ -138,7 +143,7 @@ export function ProfileHeader() {
         >
           {avatar.errorCopy
             ? `${avatar.errorCopy.title}. ${avatar.errorCopy.message}`
-            : (avatar.progressLabel ?? 'Toca tu foto para cambiarla')}
+            : (avatar.progressLabel ?? t('settings.profile.tapToChangePhoto'))}
         </Text>
       </View>
 

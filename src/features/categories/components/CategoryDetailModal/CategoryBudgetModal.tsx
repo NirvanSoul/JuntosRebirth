@@ -6,6 +6,17 @@ import { AppModal } from '@/components/overlays/AppModal/AppModal';
 import { ModalCloseButton } from '@/components/overlays/ModalCloseButton/ModalCloseButton';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
+import {
+  CategoryBudgetScheduleFields,
+  getBudgetScheduleFieldsHeight,
+} from '@/features/categories/components/CategoryDetailModal/CategoryBudgetScheduleFields';
+import { CategoryIcon } from '@/features/categories/components/CategoryIcon/CategoryIcon';
+import type {
+  BudgetSchedule,
+  CategoryIconName,
+} from '@/features/categories/types';
+import { isSameBudgetSchedule } from '@/features/categories/utils/categoryBudgetPeriod';
+import { TransactionDatePickerModal } from '@/features/transactions/components/CreateTransactionModal/TransactionDatePickerModal';
 import { useDepsChanged } from '@/hooks/useDepsChanged';
 import { useLayoutDensity } from '@/hooks/useLayoutDensity';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
@@ -16,6 +27,7 @@ import {
   formatAmountInputForDisplay,
   parseAmountMinor,
 } from '@/lib/currency/amountInput';
+import { toLocalDateKey } from '@/lib/date/localDate';
 import { triggerHaptic } from '@/lib/haptics/haptics';
 import { iconSize, layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
@@ -27,12 +39,26 @@ import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymb
 
 type CategoryBudgetModalProps = {
   categoryColor: string;
+  categoryIcon: CategoryIconName;
   categoryName: string;
+  /** Avisa de que cambiar la periodicidad descarta los importes por periodo. */
+  hasPeriodOverrides?: boolean;
   initialBudgetMinor?: number;
+  initialSchedule?: BudgetSchedule;
   onClose: () => void;
   onRemove: () => void;
-  onSave: (budgetMinor: number) => void;
-  spaceCurrency: CurrencyCode;
+  onSave: (budgetMinor: number, schedule: BudgetSchedule) => void;
+  /**
+   * Edita un único periodo (p. ej. «Noviembre 2026»). Con la misma
+   * periodicidad cambia solo ese importe; con otra, la nueva se aplica desde
+   * ese periodo en adelante. «Quitar» devuelve el periodo al importe habitual.
+   */
+  periodLabel?: string;
+  /** Inicio del periodo editado: fecha de inicio por defecto del personalizado. */
+  periodStartOn?: string;
+  /** Solo en modo periodo: el periodo ya tiene un importe propio. */
+  removable?: boolean;
+  currency: CurrencyCode;
   visible: boolean;
 };
 
@@ -46,38 +72,60 @@ const budgetAmountHeight = 64;
 
 export function CategoryBudgetModal({
   categoryColor,
+  categoryIcon,
   categoryName,
+  hasPeriodOverrides,
   initialBudgetMinor,
+  initialSchedule,
   onClose,
   onRemove,
   onSave,
-  spaceCurrency,
+  periodLabel,
+  periodStartOn,
+  removable,
+  currency,
   visible,
 }: CategoryBudgetModalProps) {
+  const isPeriodMode = periodLabel !== undefined;
   const { showCurrencySymbols } = useCurrencySymbolPreference();
   const density = useLayoutDensity();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [amountInput, setAmountInput] = useState('0');
+  const [schedule, setSchedule] = useState<BudgetSchedule>({ period: 'month' });
+  const [isAnchorPickerVisible, setAnchorPickerVisible] = useState(false);
   const budgetMinor = parseAmountMinor(amountInput);
   const displayAmount = formatAmountInputForDisplay(amountInput);
-  const currencySymbol = getCurrencySymbol(spaceCurrency);
+  const currencySymbol = getCurrencySymbol(currency);
   const contentHeight = useMemo(
     () =>
       layout.minTouchTarget +
       spacing.md +
+      getBudgetScheduleFieldsHeight(schedule) +
       budgetAmountHeight +
       spacing.lg +
       layout.keypadKeyHeight[density] * budgetKeys.length +
       spacing.sm * (budgetKeys.length - 1) +
       spacing.lg +
       layout.actionHeight[density],
-    [density],
+    [density, schedule],
   );
 
-  if (useDepsChanged([visible, initialBudgetMinor]) && visible) {
+  if (
+    useDepsChanged([visible, initialBudgetMinor, initialSchedule]) &&
+    visible
+  ) {
     setAmountInput(amountMinorToInput(initialBudgetMinor ?? 0));
+    setSchedule(initialSchedule ?? { period: 'month' });
+    setAnchorPickerVisible(false);
   }
+
+  const todayKey = toLocalDateKey(new Date());
+  const changesSchedule =
+    initialSchedule !== undefined &&
+    !isSameBudgetSchedule(initialSchedule, schedule);
+  const resetsOverrides =
+    !isPeriodMode && hasPeriodOverrides === true && changesSchedule;
 
   const handleKey = (key: (typeof budgetKeys)[number][number]) => {
     triggerHaptic('keypadPress');
@@ -93,116 +141,165 @@ export function CategoryBudgetModal({
   };
 
   return (
-    <AppModal
-      contentHeight={contentHeight}
-      onClose={onClose}
-      stackBehavior="push"
-      testID="category-budget-modal"
-      variant="catalog"
-      visible={visible}
-    >
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerCopy}>
-            <Text accessibilityRole="header" variant="heading" weight="medium">
-              Presupuesto
-            </Text>
-            <Text
-              numberOfLines={1}
-              tone="secondary"
-              variant="footnote"
-              weight="medium"
+    <>
+      <AppModal
+        contentHeight={contentHeight}
+        onClose={onClose}
+        stackBehavior="push"
+        testID="category-budget-modal"
+        variant="catalog"
+        visible={visible}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <View
+              style={[styles.categoryIcon, { backgroundColor: categoryColor }]}
+              testID="category-budget-category-icon"
             >
-              {categoryName} ({spaceCurrency})
-            </Text>
-          </View>
-          <ModalCloseButton onPress={onClose} />
-        </View>
-
-        <View
-          accessibilityLabel={`${displayAmount} ${spaceCurrency} de presupuesto`}
-          accessibilityLiveRegion="polite"
-          style={styles.amountArea}
-          testID="category-budget-amount"
-        >
-          <Text
-            adjustsFontSizeToFit
-            numberOfLines={1}
-            variant="amountHero"
-            weight="medium"
-          >
-            {displayAmount}
-            {showCurrencySymbols ? ` ${currencySymbol}` : ''}
-          </Text>
-        </View>
-
-        <View style={styles.keypad} testID="category-budget-keypad">
-          {budgetKeys.map((row, rowIndex) => (
-            <View key={rowIndex} style={styles.keypadRow}>
-              {row.map((key) => (
-                <Pressable
-                  accessibilityLabel={key === 'backspace' ? 'Borrar' : key}
-                  accessibilityRole="button"
-                  key={key}
-                  onPress={() => handleKey(key)}
-                  style={({ pressed }) => [
-                    styles.key,
-                    { height: layout.keypadKeyHeight[density] },
-                    pressed && styles.keyPressed,
-                  ]}
-                >
-                  {key === 'backspace' ? (
-                    <Ionicons
-                      color={colors.textPrimary}
-                      name="backspace-outline"
-                      size={iconSize.lg}
-                    />
-                  ) : (
-                    <Text variant="title" weight="medium">
-                      {key}
-                    </Text>
-                  )}
-                </Pressable>
-              ))}
+              <CategoryIcon
+                color={colors.onBrand}
+                name={categoryIcon}
+                size={iconSize.md}
+              />
             </View>
-          ))}
-        </View>
-
-        <View style={styles.actions}>
-          {initialBudgetMinor ? (
-            <Pressable
-              accessibilityLabel="Quitar Presupuesto"
-              accessibilityRole="button"
-              onPress={onRemove}
-              style={[
-                styles.removeButton,
-                { minHeight: layout.actionHeight[density] },
-              ]}
-              testID="category-budget-remove-button"
-            >
+            <View style={styles.headerCopy}>
               <Text
-                testID="category-budget-remove-label"
-                variant="bodyStrong"
+                accessibilityRole="header"
+                variant="heading"
                 weight="medium"
               >
-                Quitar Presupuesto
+                Presupuesto
               </Text>
-            </Pressable>
-          ) : null}
-          <ModalPrimaryAction
-            accessibilityLabel="Agregar presupuesto"
-            disabled={budgetMinor <= 0}
-            gradientColor={categoryColor}
-            gradientTestID="category-budget-save-gradient"
-            label="Agregar"
-            mutedWhenDisabled
-            onPress={() => onSave(budgetMinor)}
-            style={styles.saveButton}
-            testID="category-budget-save-button"
+              <Text
+                numberOfLines={1}
+                testID="category-budget-subtitle"
+                tone={resetsOverrides ? 'expense' : 'secondary'}
+                variant="footnote"
+                weight="medium"
+              >
+                {isPeriodMode
+                  ? changesSchedule
+                    ? `Desde ${periodLabel} en adelante`
+                    : periodLabel
+                  : resetsOverrides
+                    ? 'Se quitarán los importes editados por periodo'
+                    : categoryName}
+              </Text>
+            </View>
+            <ModalCloseButton onPress={onClose} />
+          </View>
+
+          <CategoryBudgetScheduleFields
+            defaultAnchorOn={periodStartOn}
+            onChange={setSchedule}
+            onPickAnchor={() => setAnchorPickerVisible(true)}
+            schedule={schedule}
           />
+
+          <View
+            accessibilityLabel={`${displayAmount} ${currency} de presupuesto`}
+            accessibilityLiveRegion="polite"
+            style={styles.amountArea}
+            testID="category-budget-amount"
+          >
+            <Text
+              adjustsFontSizeToFit
+              numberOfLines={1}
+              variant="amountHero"
+              weight="medium"
+            >
+              {displayAmount}
+              {showCurrencySymbols ? ` ${currencySymbol}` : ''}
+            </Text>
+          </View>
+
+          <View style={styles.keypad} testID="category-budget-keypad">
+            {budgetKeys.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.keypadRow}>
+                {row.map((key) => (
+                  <Pressable
+                    accessibilityLabel={key === 'backspace' ? 'Borrar' : key}
+                    accessibilityRole="button"
+                    key={key}
+                    onPress={() => handleKey(key)}
+                    style={({ pressed }) => [
+                      styles.key,
+                      { height: layout.keypadKeyHeight[density] },
+                      pressed && styles.keyPressed,
+                    ]}
+                  >
+                    {key === 'backspace' ? (
+                      <Ionicons
+                        color={colors.textPrimary}
+                        name="backspace-outline"
+                        size={iconSize.lg}
+                      />
+                    ) : (
+                      <Text variant="title" weight="medium">
+                        {key}
+                      </Text>
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.actions}>
+            {(isPeriodMode ? removable : initialBudgetMinor) ? (
+              <Pressable
+                accessibilityLabel={
+                  isPeriodMode ? 'Usar importe habitual' : 'Quitar Presupuesto'
+                }
+                accessibilityRole="button"
+                onPress={onRemove}
+                style={[
+                  styles.removeButton,
+                  { minHeight: layout.actionHeight[density] },
+                ]}
+                testID="category-budget-remove-button"
+              >
+                <Text
+                  testID="category-budget-remove-label"
+                  variant="bodyStrong"
+                  weight="medium"
+                >
+                  {isPeriodMode ? 'Usar habitual' : 'Quitar Presupuesto'}
+                </Text>
+              </Pressable>
+            ) : null}
+            <ModalPrimaryAction
+              accessibilityLabel={
+                initialBudgetMinor
+                  ? 'Guardar presupuesto'
+                  : 'Agregar presupuesto'
+              }
+              disabled={budgetMinor <= 0}
+              gradientColor={categoryColor}
+              gradientTestID="category-budget-save-gradient"
+              label={initialBudgetMinor ? 'Guardar' : 'Agregar'}
+              mutedWhenDisabled
+              onPress={() => onSave(budgetMinor, schedule)}
+              style={styles.saveButton}
+              testID="category-budget-save-button"
+            />
+          </View>
         </View>
-      </View>
-    </AppModal>
+      </AppModal>
+      <TransactionDatePickerModal
+        onClose={() => setAnchorPickerVisible(false)}
+        onSelect={(anchorOn) => {
+          if (schedule.period === 'custom') {
+            setSchedule({ ...schedule, anchorOn });
+          }
+          setAnchorPickerVisible(false);
+        }}
+        selectedDate={
+          schedule.period === 'custom' ? schedule.anchorOn : todayKey
+        }
+        visible={visible && isAnchorPickerVisible}
+      />
+    </>
   );
 }
 
@@ -214,6 +311,13 @@ function createStyles(colors: ColorTokens) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
+    },
+    categoryIcon: {
+      width: layout.minTouchTarget,
+      height: layout.minTouchTarget,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.md,
     },
     headerCopy: { flex: 1, gap: spacing.xxs },
     amountArea: {

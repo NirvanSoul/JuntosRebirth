@@ -2,6 +2,7 @@ import {
   formatCurrency,
   formatExchangeRate,
 } from '@/lib/currency/formatCurrency';
+import { i18n } from '@/lib/i18n/i18n';
 
 describe('formatCurrency', () => {
   it('formatea unidades menores sin usar punto flotante como fuente', () => {
@@ -105,5 +106,22 @@ describe('formatExchangeRate', () => {
         showCurrencySymbol: false,
       }),
     ).toBe('52,35');
+  });
+});
+
+describe('formato de importes en inglés', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('es');
+  });
+
+  it('usa separadores estadounidenses cuando la app está en inglés', async () => {
+    await i18n.changeLanguage('en');
+
+    expect(formatCurrency(123456, 'USD', 'es-ES')).toBe('$\u00a01,234.56');
+    expect(formatCurrency(123456, 'EUR', 'es-ES')).toBe('1,234.56\u00a0€');
+    expect(formatCurrency(100000000, 'EUR', 'es-ES')).toBe('1,000,000\u00a0€');
+    expect(formatExchangeRate('1234.5', 'USD', 'VES', 'es-ES')).toBe(
+      '1 USD = Bs.\u00a01,234.50',
+    );
   });
 });

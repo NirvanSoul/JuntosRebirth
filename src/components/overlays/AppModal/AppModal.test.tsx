@@ -15,6 +15,8 @@ import { saveCurrencySymbolPreference } from '@/state/appPreferences/currencySym
 
 let latestOnDismiss: (() => void) | null = null;
 let latestOnChange: ((index: number) => void) | null = null;
+let latestOnAnimate: ((fromIndex: number, toIndex: number) => void) | null =
+  null;
 let mockLatestPresent = jest.fn();
 let mockLatestDismiss = jest.fn();
 let latestBackdropDisappearsOnIndex: number | undefined;
@@ -35,12 +37,14 @@ jest.mock('@gorhom/bottom-sheet', () => {
         backdropComponent,
         backgroundStyle,
         children,
+        onAnimate,
         onChange,
         onDismiss,
       }: {
         backdropComponent?: (props: object) => ReactNode;
         backgroundStyle?: object;
         children?: ReactNode;
+        onAnimate?: (fromIndex: number, toIndex: number) => void;
         onChange?: (index: number) => void;
         onDismiss?: () => void;
       },
@@ -49,6 +53,7 @@ jest.mock('@gorhom/bottom-sheet', () => {
       React.useEffect(() => {
         latestOnDismiss = onDismiss ?? null;
         latestOnChange = onChange ?? null;
+        latestOnAnimate = onAnimate ?? null;
       });
       React.useImperativeHandle(ref, () => ({
         present: mockLatestPresent,
@@ -137,6 +142,7 @@ describe('AppModal', () => {
   beforeEach(() => {
     latestOnDismiss = null;
     latestOnChange = null;
+    latestOnAnimate = null;
     mockLatestPresent = jest.fn();
     mockLatestDismiss = jest.fn();
     latestBackdropDisappearsOnIndex = undefined;
@@ -288,6 +294,39 @@ describe('AppModal', () => {
     });
 
     expect(onCloseSpy).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Contenido')).toBeNull();
+  });
+
+  it('avisa del cierre por gesto al empezar para poder reabrir aunque no llegue onDismiss', async () => {
+    const onCloseSpy = jest.fn();
+    const screen = await render(<Harness onCloseSpy={onCloseSpy} />);
+
+    // Se desliza hacia abajo y la animación se interrumpe: no hay `onDismiss`.
+    await act(async () => {
+      latestOnAnimate?.(0, -1);
+    });
+    expect(onCloseSpy).toHaveBeenCalledTimes(1);
+
+    await fireEvent.press(screen.getByTestId('reopen'));
+    expect(mockLatestPresent).toHaveBeenCalledTimes(2);
+  });
+
+  it('no repite onClose cuando el cierre por gesto termina con onDismiss', async () => {
+    const onCloseSpy = jest.fn();
+    const onDismissedSpy = jest.fn();
+    const screen = await render(
+      <Harness onCloseSpy={onCloseSpy} onDismissedSpy={onDismissedSpy} />,
+    );
+
+    await act(async () => {
+      latestOnAnimate?.(0, -1);
+    });
+    await act(async () => {
+      latestOnDismiss?.();
+    });
+
+    expect(onCloseSpy).toHaveBeenCalledTimes(1);
+    expect(onDismissedSpy).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Contenido')).toBeNull();
   });
 });

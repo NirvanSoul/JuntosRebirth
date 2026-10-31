@@ -6,7 +6,10 @@ export type HapticEvent =
   | 'categorySelect'
   | 'transactionSave'
   | 'keypadPress'
-  | 'onboardingContinue';
+  | 'onboardingContinue'
+  | 'previewActionsOpen'
+  /** Aparece una tarjeta informativa flotante: refuerza la confirmación. */
+  | 'noticeShow';
 
 function safeTrigger(action: () => Promise<void>): void {
   action().catch(() => {});
@@ -35,6 +38,14 @@ export function triggerHaptic(event: HapticEvent): void {
       return;
     case 'onboardingContinue':
       safeTrigger(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+      return;
+    case 'noticeShow':
+      safeTrigger(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+      return;
+    case 'previewActionsOpen':
+      safeTrigger(() =>
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
+      );
       return;
   }
 }

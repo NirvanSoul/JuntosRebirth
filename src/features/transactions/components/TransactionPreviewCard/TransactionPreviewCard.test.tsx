@@ -2,6 +2,7 @@ import { within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import type { Category } from '@/features/categories/types';
+import { SpaceMembershipScope } from '@/features/profile/state/SpaceMembershipContext';
 import { TransactionPreviewCard } from '@/features/transactions/components/TransactionPreviewCard/TransactionPreviewCard';
 import type { SessionTransaction } from '@/features/transactions/types';
 import { renderWithTheme } from '@/test/renderWithTheme';
@@ -98,5 +99,39 @@ describe('TransactionPreviewCard', () => {
         screen.getByTestId('transaction-direction-icon').props.style,
       ),
     ).not.toHaveProperty('backgroundColor');
+  });
+
+  it('oculta el autor de un espacio compartido cuando se pide', async () => {
+    const membership = {
+      isSharedSpace: true,
+      ownUserId: 'install-test',
+      profilesByUserId: {},
+    };
+    const shown = await renderWithTheme(
+      <SpaceMembershipScope value={membership}>
+        <TransactionPreviewCard category={category} transaction={transaction} />
+      </SpaceMembershipScope>,
+    );
+    expect(
+      shown.queryByTestId('transaction-author-avatar', {
+        includeHiddenElements: true,
+      }),
+    ).toBeTruthy();
+    shown.unmount();
+
+    const hidden = await renderWithTheme(
+      <SpaceMembershipScope value={membership}>
+        <TransactionPreviewCard
+          category={category}
+          hideAuthor
+          transaction={transaction}
+        />
+      </SpaceMembershipScope>,
+    );
+    expect(
+      hidden.queryByTestId('transaction-author-avatar', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
   });
 });

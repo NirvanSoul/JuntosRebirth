@@ -50,6 +50,12 @@ export function SpaceMembershipProvider({
   );
 }
 
+/**
+ * Reinyecta el censo en un árbol que se pinta fuera de la pantalla, como un
+ * portal en la raíz, donde el proveedor de arriba ya no llega.
+ */
+export const SpaceMembershipScope = SpaceMembershipContext.Provider;
+
 export function useSpaceMembership(): SpaceMembershipValue {
   return useContext(SpaceMembershipContext);
 }
