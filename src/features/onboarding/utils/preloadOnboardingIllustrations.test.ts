@@ -55,6 +55,13 @@ describe('preloadAppIllustrations', () => {
     expect(appIllustrations).toContain(
       require('../../../../assets/Onboarding/10_loginicon.png'),
     );
+    // Las dos variantes de tema, para que cambiar de tema no espere a disco.
+    expect(appIllustrations).toContain(
+      require('../../../../assets/Onboarding/Happy_Couple_Dark.png'),
+    );
+    expect(appIllustrations).toContain(
+      require('../../../../assets/Onboarding/Waiting_Dark.png'),
+    );
     expect(prefetchSpy).toHaveBeenCalledTimes(appIllustrations.length);
 
     prefetchSpy.mockRestore();

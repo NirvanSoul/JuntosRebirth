@@ -5,6 +5,7 @@ import { Screen } from '@/components/layout/Screen/Screen';
 import { ModalPrimaryAction } from '@/components/overlays/ModalPrimaryAction/ModalPrimaryAction';
 import { Text } from '@/components/ui/Text/Text';
 import { HomeEntrance } from '@/features/dashboard/components/HomeEntrance';
+import { partnerIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
 import {
   createJuntossInvitationGateway,
   type OutgoingInvitation,
@@ -14,6 +15,7 @@ import { useAppForeground } from '@/hooks/useAppForeground';
 import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
+import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 const ellipsisDotCounts = [1, 2, 3, 0] as const;
@@ -45,6 +47,7 @@ export function AwaitingPartnerScreen({
   space,
 }: AwaitingPartnerScreenProps) {
   const styles = useThemedStyles(createStyles);
+  const { isDark } = useTheme();
   const [invitation, setInvitation] = useState<OutgoingInvitation | null>(null);
   const [ellipsisFrame, setEllipsisFrame] = useState(0);
   const [isRefreshing, setRefreshing] = useState(false);
@@ -121,7 +124,11 @@ export function AwaitingPartnerScreen({
             <Image
               accessible={false}
               resizeMode="contain"
-              source={require('../../../../assets/Onboarding/Waiting.png')}
+              source={
+                isDark
+                  ? partnerIllustrations.waiting.dark
+                  : partnerIllustrations.waiting.light
+              }
               style={styles.waitingIllustration}
               testID="awaiting-partner-illustration"
             />

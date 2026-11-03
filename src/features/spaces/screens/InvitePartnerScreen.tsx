@@ -7,6 +7,7 @@ import { Text } from '@/components/ui/Text/Text';
 import { AuthTextField } from '@/features/auth/screens/components/AuthTextField';
 import { isValidEmail } from '@/features/auth/utils/authValidation';
 import { HomeEntrance } from '@/features/dashboard/components/HomeEntrance';
+import { partnerIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
 import {
   CreateInvitationError,
   createJuntossInvitationGateway,
@@ -44,7 +45,7 @@ export function InvitePartnerScreen({
   onCreateCoupleSpaceInvitation,
   onOpenCountrySettings,
 }: InvitePartnerScreenProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -109,7 +110,11 @@ export function InvitePartnerScreen({
             <Image
               accessible={false}
               resizeMode="contain"
-              source={require('../../../../assets/Onboarding/Happy_Couple.png')}
+              source={
+                isDark
+                  ? partnerIllustrations.happyCouple.dark
+                  : partnerIllustrations.happyCouple.light
+              }
               style={styles.coupleIllustration}
               testID="invite-partner-couple-illustration"
             />

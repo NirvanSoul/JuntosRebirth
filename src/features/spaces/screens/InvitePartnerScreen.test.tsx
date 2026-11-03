@@ -1,3 +1,4 @@
+import { partnerIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, waitFor } from '@testing-library/react-native';
 
@@ -53,6 +54,27 @@ describe('InvitePartnerScreen', () => {
     jest.clearAllMocks();
     await AsyncStorage.clear();
   });
+
+  it.each([
+    ['light', partnerIllustrations.happyCouple.light],
+    ['dark', partnerIllustrations.happyCouple.dark],
+  ] as const)(
+    'usa la ilustración de pareja del tema %s',
+    async (appearance, illustration) => {
+      const screen = await renderWithTheme(
+        <InvitePartnerScreen
+          coupleSpace={null}
+          onFinished={jest.fn()}
+          onCreateCoupleSpaceInvitation={jest.fn()}
+        />,
+        { appearance },
+      );
+
+      expect(
+        screen.getByTestId('invite-partner-couple-illustration').props.source,
+      ).toBe(illustration);
+    },
+  );
 
   it('abre directamente el formulario para enviar una invitación', async () => {
     const onCreate = jest.fn().mockResolvedValue(coupleSpace);

@@ -1,3 +1,4 @@
+import { partnerIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
 import type { ComponentProps } from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
@@ -35,6 +36,7 @@ function mockOutgoingInvitation(
 
 async function renderScreen(
   overrides: Partial<ComponentProps<typeof AwaitingPartnerScreen>> = {},
+  appearance: 'light' | 'dark' = 'light',
 ) {
   const props = {
     onCancelInvitation: jest.fn(async () => undefined),
@@ -53,7 +55,7 @@ async function renderScreen(
           insets: { top: 47, right: 0, bottom: 34, left: 0 },
         }}
       >
-        <ThemeProvider>
+        <ThemeProvider initialAppearance={appearance}>
           <AwaitingPartnerScreen {...props} />
         </ThemeProvider>
       </SafeAreaProvider>,
@@ -66,6 +68,20 @@ describe('AwaitingPartnerScreen', () => {
     jest.clearAllMocks();
     mockOutgoingInvitation(null);
   });
+
+  it.each([
+    ['light', partnerIllustrations.waiting.light],
+    ['dark', partnerIllustrations.waiting.dark],
+  ] as const)(
+    'usa la ilustración de espera del tema %s',
+    async (appearance, illustration) => {
+      const { screen } = await renderScreen({}, appearance);
+
+      expect(
+        screen.getByTestId('awaiting-partner-illustration').props.source,
+      ).toBe(illustration);
+    },
+  );
 
   it('nombra a quien fue invitado y le pide que abra su app de Juntos', async () => {
     mockOutgoingInvitation({

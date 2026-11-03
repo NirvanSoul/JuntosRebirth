@@ -9,6 +9,21 @@ import { Image } from 'react-native';
 export const nameScreenIllustration: number = require('../../../../assets/Onboarding/1_Hola.png');
 
 /**
+ * Ilustraciones de invitación a pareja con su versión para el modo oscuro.
+ * La pantalla elige la del tema activo (`useTheme().isDark`).
+ */
+export const partnerIllustrations = {
+  happyCouple: {
+    light: require('../../../../assets/Onboarding/Happy_Couple.png') as number,
+    dark: require('../../../../assets/Onboarding/Happy_Couple_Dark.png') as number,
+  },
+  waiting: {
+    light: require('../../../../assets/Onboarding/Waiting.png') as number,
+    dark: require('../../../../assets/Onboarding/Waiting_Dark.png') as number,
+  },
+};
+
+/**
  * Resto de ilustraciones principales (onboarding, acceso e invitaciones a
  * pareja), en el orden en que aparecen en el flujo. Se precargan de una en
  * una mientras el usuario escribe su nombre, así cada lámina siguiente
@@ -23,8 +38,11 @@ export const deferredIllustrations: number[] = [
   require('../../../../assets/Onboarding/8_Gastos.png'),
   require('../../../../assets/Onboarding/9_Abrazo.png'),
   require('../../../../assets/Onboarding/10_loginicon.png'),
-  require('../../../../assets/Onboarding/Happy_Couple.png'),
-  require('../../../../assets/Onboarding/Waiting.png'),
+  // Las dos variantes: el tema puede cambiar mientras la app está abierta.
+  partnerIllustrations.happyCouple.light,
+  partnerIllustrations.happyCouple.dark,
+  partnerIllustrations.waiting.light,
+  partnerIllustrations.waiting.dark,
 ];
 
 /** Todas las ilustraciones, listadas de forma centralizada. */
