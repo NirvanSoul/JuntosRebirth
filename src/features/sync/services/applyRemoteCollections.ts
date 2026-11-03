@@ -163,7 +163,7 @@ export async function applyRemoteCollections(
     if (!spaceId) continue;
     const moneyAccountId = (await linkMoneyAccount(remoteAccount.remoteId))!;
     localMoneyAccountIdByRemoteId.set(remoteAccount.remoteId, moneyAccountId);
-    await transaction.runAsync(
+    const appliedAccount = await transaction.runAsync(
       `INSERT INTO money_accounts (
          id, space_id, name, kind, icon, color_token, currency,
          opening_balance_minor, created_by, sync_status, is_archived,
@@ -188,6 +188,11 @@ export async function applyRemoteCollections(
       remoteAccount.updatedAt,
     );
 
+    // Los saldos son parte de la cuenta: con la cuenta pendiente de subir
+    // (`sync_status` distinto de `synced`) el UPSERT no se aplica y sus saldos
+    // locales, en todas las monedas, tampoco se sustituyen. Así llegan intactos
+    // a la próxima subida, igual que los presupuestos de una categoría.
+    if (appliedAccount.changes === 0) continue;
     await transaction.runAsync(
       `DELETE FROM money_account_balances WHERE money_account_id = ?`,
       moneyAccountId,
