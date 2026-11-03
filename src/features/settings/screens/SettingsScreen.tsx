@@ -11,14 +11,7 @@ import { SlidersHorizontal } from 'phosphor-react-native/src/icons/SlidersHorizo
 import { Trash } from 'phosphor-react-native/src/icons/Trash';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Alert,
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -40,10 +33,8 @@ import {
   type ToastNotice,
 } from '@/components/overlays/NoticeToast/NoticeToast';
 import { Text } from '@/components/ui/Text/Text';
-import { createJuntossAuthGateway } from '@/features/auth/gateways/juntossAuthGateway';
 import { useAuthSession } from '@/features/auth/hooks/useAuthSession';
 import { DemoUserSettingsSection } from '@/features/demo/components/DemoUserSettingsSection';
-import { discardBackedLocalSessionCache } from '@/features/auth/services/discardBackedLocalSessionCache';
 import { DataRightsScreen } from '@/features/legal/screens/DataRightsScreen';
 import { LegalDocumentScreen } from '@/features/legal/screens/LegalDocumentScreen';
 import { PermissionsScreen } from '@/features/legal/screens/PermissionsScreen';
@@ -60,6 +51,7 @@ import { ProfileHeader } from '@/features/settings/components/ProfileHeader/Prof
 import { CurrencyPreferencesModal } from '@/features/settings/components/CurrencyPreferencesModal/CurrencyPreferencesModal';
 import { CurrencySymbolsToggleRow } from '@/features/settings/components/CurrencySymbolsToggleRow/CurrencySymbolsToggleRow';
 import { useSettingsBackSwipe } from '@/features/settings/hooks/useSettingsBackSwipe';
+import { useSignOutFlow } from '@/features/settings/hooks/useSignOutFlow';
 import { useProfileCountry } from '@/features/profile/hooks/useProfileCountry';
 import type { Space } from '@/features/spaces/types';
 import { NotificationRulesModal } from '@/features/transactions/components/NotificationRulesModal/NotificationRulesModal';
@@ -128,6 +120,7 @@ export function SettingsScreen({
   const { session } = useAuthSession();
   const { demoSession } = useDemoSession();
   const resetOnboarding = useOnboardingRestart();
+  const { requestSignOut } = useSignOutFlow();
   const { t } = useTranslation();
   const { language } = useAppLanguage();
   const {
@@ -136,7 +129,6 @@ export function SettingsScreen({
     isSaving: isSavingCountry,
     saveCountry,
   } = useProfileCountry();
-  const [isSigningOut, setSigningOut] = useState(false);
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [isCountryModalVisible, setCountryModalVisible] = useState(false);
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
@@ -247,41 +239,6 @@ export function SettingsScreen({
     } else if (result.errorCode === 'country_change_blocked_by_shared_space') {
       setCountryModalVisible(false);
       setCountryChangeBlockedVisible(true);
-    }
-  };
-
-  const handleAccountRowPress = () => {
-    Alert.alert(t('settings.signOut.title'), t('settings.signOut.message'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('settings.signOut.confirm'),
-        style: 'destructive',
-        onPress: () => void handleSignOut(),
-      },
-    ]);
-  };
-
-  const handleSignOut = async (afterSignOut?: () => Promise<void>) => {
-    if (isSigningOut) return;
-    setSigningOut(true);
-    try {
-      await createJuntossAuthGateway().signOut();
-      await Promise.all([discardBackedLocalSessionCache()]).catch(
-        (error: unknown) => {
-          console.error(
-            '[Settings] No se pudo limpiar la sesión local:',
-            error,
-          );
-        },
-      );
-      await afterSignOut?.();
-    } catch {
-      Alert.alert(
-        t('settings.signOut.errorTitle'),
-        t('settings.signOut.errorMessage'),
-      );
-    } finally {
-      setSigningOut(false);
     }
   };
 
@@ -508,7 +465,12 @@ export function SettingsScreen({
             <SettingsHelpSection
               onContactDeveloper={handleContactDeveloper}
               onOpenPrivacy={() => setPrivacyModalVisible(true)}
-              onRestartOnboarding={() => void handleSignOut(resetOnboarding)}
+              onRestartOnboarding={() =>
+                void requestSignOut({
+                  afterSignOut: resetOnboarding,
+                  isConfirmed: true,
+                })
+              }
             />
 
             {demoSession ? (
@@ -523,7 +485,7 @@ export function SettingsScreen({
                   icon="log-out-outline"
                   iconBackgroundColor={categoryColors.blue}
                   label={t('settings.rows.signOut')}
-                  onPress={handleAccountRowPress}
+                  onPress={() => void requestSignOut()}
                   value={session?.user.email ?? undefined}
                 />
               </SettingsSection>

@@ -752,7 +752,11 @@ La tarjeta de perfil permite tocar la foto para elegir una imagen de la
 cámara o la galería; se recomprime en el dispositivo antes de guardarse para
 no acumular imágenes pesadas. La fila
 «Cerrar sesión» devuelve al acceso a pantalla completa y oculta todos los
-datos de la cuenta.
+datos de la cuenta. Si quedan cambios sin subir, antes ofrece subirlos; si no
+se puede, avisa de que se borrarán del dispositivo sin recuperación y solo
+cierra la sesión si la persona lo confirma. El aviso también nombra lo que
+no se guarda en la cuenta y se borrará siempre: importaciones sin terminar y
+configuraciones de recordatorios (`API.md`, «Sesión y restauración»).
 
 La fila «Recordatorios y alertas» ya no es pendiente: abre un modal con una
 regla por tipo de movimiento del espacio activo (gastos e ingresos por

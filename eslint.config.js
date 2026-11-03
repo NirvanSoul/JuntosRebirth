@@ -30,7 +30,9 @@ const frozenLineDebt = {
   'src/features/transactions/components/CreateTransactionModal/CreateTransactionModal.tsx': 942,
   'src/features/transactions/repositories/localTransactionRepository.ts': 873,
   'src/features/transactions/components/TransactionDetailModal/TransactionDetailModal.tsx': 701,
-  'src/features/settings/screens/SettingsScreen.tsx': 660,
+  // Bajado de 660 a 623 el 2026-11-02 al extraer el cierre de sesión a
+  // `features/settings/hooks/useSignOutFlow.ts`.
+  'src/features/settings/screens/SettingsScreen.tsx': 623,
   // Bajado de 627 a 576 el 2026-09-23 al extraer la selección de movimientos
   // a `useCategoryDetailTransactions.ts` y el encadenado de hojas a
   // `components/overlays/AppModal/useModalChainedAction.ts`.

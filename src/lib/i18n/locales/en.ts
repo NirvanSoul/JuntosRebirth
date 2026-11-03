@@ -99,6 +99,27 @@ export const en: TranslationResources = {
       confirm: 'Sign out',
       errorTitle: "We couldn't sign you out",
       errorMessage: 'Please try again in a few moments.',
+      pendingTitle: 'You have changes that are not uploaded',
+      pendingMessage_one:
+        "There is {{count}} change saved only on this device. Signing out removes it from here, so we'll try to upload it first.",
+      pendingMessage_other:
+        "There are {{count}} changes saved only on this device. Signing out removes them from here, so we'll try to upload them first.",
+      uploadAndSignOut: 'Upload and sign out',
+      uploadFailedTitle: "We couldn't upload your changes",
+      uploadFailedMessage_one:
+        "{{count}} change is still not uploaded. If you sign out now, it will be deleted from this device and can't be recovered. You can cancel and try again when you're online.",
+      uploadFailedMessage_other:
+        "{{count}} changes are still not uploaded. If you sign out now, they will be deleted from this device and can't be recovered. You can cancel and try again when you're online.",
+      unknownPendingMessage:
+        "We couldn't check whether there are changes left to upload. If you sign out now, any pending change will be deleted from this device and can't be recovered.",
+      discardAndSignOut: 'Sign out and delete them',
+      deviceOnlyNote:
+        "This isn't saved to your account and will also be deleted: {{items}}.",
+      deviceOnlyImports_one: '{{count}} unfinished import',
+      deviceOnlyImports_other: '{{count}} unfinished imports',
+      deviceOnlyRules_one: '{{count}} reminder setting',
+      deviceOnlyRules_other: '{{count}} reminder settings',
+      deviceOnlyJoin: ' and ',
     },
     restartOnboarding: {
       title: 'Restart onboarding',

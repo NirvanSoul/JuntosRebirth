@@ -102,6 +102,27 @@ export const es = {
       confirm: 'Cerrar sesión',
       errorTitle: 'No pudimos cerrar sesión',
       errorMessage: 'Inténtalo de nuevo en unos momentos.',
+      pendingTitle: 'Tienes cambios sin subir',
+      pendingMessage_one:
+        'Hay {{count}} cambio guardado solo en este dispositivo. Al cerrar sesión se borra de aquí, así que primero intentaremos subirlo.',
+      pendingMessage_other:
+        'Hay {{count}} cambios guardados solo en este dispositivo. Al cerrar sesión se borran de aquí, así que primero intentaremos subirlos.',
+      uploadAndSignOut: 'Subir y cerrar sesión',
+      uploadFailedTitle: 'No pudimos subir tus cambios',
+      uploadFailedMessage_one:
+        '{{count}} cambio sigue sin subir. Si cierras sesión ahora, se borrará de este dispositivo y no podrás recuperarlo. Puedes cancelar y volver a intentarlo con conexión.',
+      uploadFailedMessage_other:
+        '{{count}} cambios siguen sin subir. Si cierras sesión ahora, se borrarán de este dispositivo y no podrás recuperarlos. Puedes cancelar y volver a intentarlo con conexión.',
+      unknownPendingMessage:
+        'No pudimos comprobar si quedan cambios sin subir. Si cierras sesión ahora, cualquier cambio pendiente se borrará de este dispositivo y no podrás recuperarlo.',
+      discardAndSignOut: 'Cerrar sesión y borrarlos',
+      deviceOnlyNote:
+        'Esto no se guarda en tu cuenta y también se borrará: {{items}}.',
+      deviceOnlyImports_one: '{{count}} importación sin terminar',
+      deviceOnlyImports_other: '{{count}} importaciones sin terminar',
+      deviceOnlyRules_one: '{{count}} configuración de recordatorios',
+      deviceOnlyRules_other: '{{count}} configuraciones de recordatorios',
+      deviceOnlyJoin: ' y ',
     },
     restartOnboarding: {
       title: 'Reiniciar onboarding',
