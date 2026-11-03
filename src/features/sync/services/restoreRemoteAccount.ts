@@ -9,17 +9,21 @@ import {
   type RemoteAccountSnapshot,
 } from '@/features/sync/gateways/juntossRemoteAccountGateway';
 import {
+  getRemoteChangesCursorGeneration,
   readRemoteChangesCursor,
   type RemoteChangesCursor,
-  writeRemoteChangesCursor,
+  writeCursorUnlessCleared,
 } from '@/features/sync/repositories/localSyncCursorRepository';
 import { getLocalProfile } from '@/features/profile/repositories/localProfileRepository';
 import { preparePersonalSpaceLink } from '@/features/sync/services/preparePersonalSpaceLink';
+import { toLocalSpace } from '@/features/sync/services/remoteSpaceMapping';
 import {
   getSpacesCatalogueRevision,
   updateSpaces,
 } from '@/features/spaces/repositories/localSpaceRepository';
 import type { Space } from '@/features/spaces/types';
+import { assertLocalCacheOwnedBy } from '@/features/sync/repositories/localSyncAccountRepository';
+import { isLocalCacheIsolationError } from '@/lib/storage/localCacheIsolationError';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { fetchRemoteImportReviews } from '@/features/import/gateways/juntossImportReviewGateway';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
@@ -78,10 +82,18 @@ export async function restoreRemoteAccount(input: {
   snapshot: RemoteAccountSnapshot;
   countryCode?: string | null;
   expectedSpacesCatalogueRevision?: number;
+  /** Generación del cursor anotada antes de pedir el snapshot. */
+  expectedCursorGeneration?: number;
 }): Promise<RestoredRemoteAccount> {
   const catalogueRevision =
     input.expectedSpacesCatalogueRevision ?? getSpacesCatalogueRevision();
+  const cursorGeneration =
+    input.expectedCursorGeneration ??
+    getRemoteChangesCursorGeneration(input.userId);
   const database = await getLocalDatabase();
+  // El snapshot llegó tras una espera de red: si entretanto otra cuenta
+  // reclamó la caché, nada de esta restauración puede escribirse en ella.
+  await assertLocalCacheOwnedBy(database, input.userId);
   const personalRemoteId = input.snapshot.spaces.find(
     (space) => space.type === 'personal',
   )?.remoteId;
@@ -113,15 +125,7 @@ export async function restoreRemoteAccount(input: {
   for (const remoteSpace of input.snapshot.spaces) {
     const localId = (await linkSpace(remoteSpace.remoteId))!;
     localSpaceIdByRemoteId.set(remoteSpace.remoteId, localId);
-    remoteSpaces.push({
-      id: localId,
-      name: remoteSpace.name,
-      type: remoteSpace.type,
-      currency: remoteSpace.currency,
-      ...(remoteSpace.type === 'couple'
-        ? { isAwaitingPartner: remoteSpace.activatedAt === null }
-        : {}),
-    });
+    remoteSpaces.push(toLocalSpace(remoteSpace, localId));
   }
 
   const spaces = remoteSpaces;
@@ -133,6 +137,7 @@ export async function restoreRemoteAccount(input: {
 
   let localCategoryIdByRemoteId = new Map<string, string>();
   await database.withExclusiveTransactionAsync(async (transaction) => {
+    await assertLocalCacheOwnedBy(transaction, input.userId);
     const result = await applyRemoteCollections(transaction, {
       userId: input.userId,
       collections: input.snapshot,
@@ -156,7 +161,7 @@ export async function restoreRemoteAccount(input: {
 
   if (input.snapshot.serverTime) {
     const spaceRemoteIds = input.snapshot.spaces.map((s) => s.remoteId).sort();
-    await writeRemoteChangesCursor(database, input.userId, {
+    await writeCursorUnlessCleared(database, input.userId, cursorGeneration, {
       serverTime: input.snapshot.serverTime,
       activeFinancialContextId: input.snapshot.activeFinancialContextId,
       spaceRemoteIds,
@@ -182,10 +187,18 @@ export async function applyRemoteChanges(input: {
   changes: RemoteAccountChanges;
   cursor: RemoteChangesCursor;
   expectedSpacesCatalogueRevision?: number;
+  /** Generación del cursor anotada antes de leerlo para pedir los cambios. */
+  expectedCursorGeneration?: number;
 }): Promise<ApplyRemoteChangesResult> {
   const catalogueRevision =
     input.expectedSpacesCatalogueRevision ?? getSpacesCatalogueRevision();
+  const cursorGeneration =
+    input.expectedCursorGeneration ??
+    getRemoteChangesCursorGeneration(input.userId);
   const database = await getLocalDatabase();
+  // Igual que en la restauración completa: los cambios de una cuenta nunca
+  // se escriben en la caché que otra reclamó durante la espera de red.
+  await assertLocalCacheOwnedBy(database, input.userId);
 
   // 1. Contexto financiero distinto → requiere restauración completa
   if (
@@ -223,15 +236,7 @@ export async function applyRemoteChanges(input: {
   for (const remoteSpace of input.changes.spaces) {
     const localId = (await linkSpace(remoteSpace.remoteId))!;
     localSpaceIdByRemoteId.set(remoteSpace.remoteId, localId);
-    remoteSpaces.push({
-      id: localId,
-      name: remoteSpace.name,
-      type: remoteSpace.type,
-      currency: remoteSpace.currency,
-      ...(remoteSpace.type === 'couple'
-        ? { isAwaitingPartner: remoteSpace.activatedAt === null }
-        : {}),
-    });
+    remoteSpaces.push(toLocalSpace(remoteSpace, localId));
   }
 
   const spaces = remoteSpaces;
@@ -272,7 +277,7 @@ export async function applyRemoteChanges(input: {
     input.changes.transactions.length;
 
   if (totalDeltaRows === 0) {
-    await writeRemoteChangesCursor(database, input.userId, {
+    await writeCursorUnlessCleared(database, input.userId, cursorGeneration, {
       serverTime: input.changes.serverTime,
       activeFinancialContextId: input.changes.activeFinancialContextId,
       spaceRemoteIds: currentSpaceRemoteIds,
@@ -297,6 +302,7 @@ export async function applyRemoteChanges(input: {
     localCategoryIdByRemoteId: Map<string, string>;
   };
   await database.withExclusiveTransactionAsync(async (transaction) => {
+    await assertLocalCacheOwnedBy(transaction, input.userId);
     appliedResult = await applyRemoteCollections(transaction, {
       userId: input.userId,
       collections: input.changes,
@@ -305,7 +311,7 @@ export async function applyRemoteChanges(input: {
     });
   });
 
-  await writeRemoteChangesCursor(database, input.userId, {
+  await writeCursorUnlessCleared(database, input.userId, cursorGeneration, {
     serverTime: input.changes.serverTime,
     activeFinancialContextId: input.changes.activeFinancialContextId,
     spaceRemoteIds: currentSpaceRemoteIds,
@@ -351,6 +357,9 @@ export async function restoreRemoteAccountForCurrentSession(options?: {
     const database = await getLocalDatabase();
 
     if (requestedMode === 'delta') {
+      // Se anota antes de leer el cursor: si una subida lo borra mientras
+      // esperamos la red, este delta no lo vuelve a escribir.
+      const cursorGeneration = getRemoteChangesCursorGeneration(userId);
       const cursor = await readRemoteChangesCursor(database, userId);
       if (cursor) {
         try {
@@ -361,12 +370,17 @@ export async function restoreRemoteAccountForCurrentSession(options?: {
             changes,
             cursor,
             expectedSpacesCatalogueRevision: catalogueRevision,
+            expectedCursorGeneration: cursorGeneration,
           });
           if (!result.needsFullRestore) {
             return result;
           }
         } catch (error) {
-          if (shouldRetryDeltaWithoutFullRestore(error)) {
+          // Sin caché propia, un snapshot completo fallaría igual.
+          if (
+            isLocalCacheIsolationError(error) ||
+            shouldRetryDeltaWithoutFullRestore(error)
+          ) {
             throw error;
           }
           console.error(
@@ -379,6 +393,7 @@ export async function restoreRemoteAccountForCurrentSession(options?: {
 
     // Full restore
     const catalogueRevision = getSpacesCatalogueRevision();
+    const cursorGeneration = getRemoteChangesCursorGeneration(userId);
     const [snapshot, reviews] = await Promise.all([
       fetchRemoteAccountSnapshot(),
       fetchRemoteImportReviews(),
@@ -389,6 +404,7 @@ export async function restoreRemoteAccountForCurrentSession(options?: {
       snapshot,
       countryCode,
       expectedSpacesCatalogueRevision: catalogueRevision,
+      expectedCursorGeneration: cursorGeneration,
     });
     await restoreRemoteImportReviews({ reviews, restored });
     const receivedRows =

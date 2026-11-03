@@ -6,10 +6,13 @@ import {
   localDatabaseName,
   localDatabaseVersion,
   migrateLocalDatabase,
+  quarantineLocalDatabase,
   resetLocalDatabase,
+  retryPendingLocalDatabaseIsolation,
 } from '@/lib/storage/localDatabase';
 
 jest.mock('expo-sqlite', () => ({
+  backupDatabaseAsync: jest.fn(),
   deleteDatabaseAsync: jest.fn(),
   openDatabaseAsync: jest.fn(),
 }));
@@ -946,10 +949,29 @@ describe('getLocalDatabase', () => {
 describe('resetLocalDatabase', () => {
   const openDatabaseAsync = SQLite.openDatabaseAsync as jest.Mock;
   const deleteDatabaseAsync = SQLite.deleteDatabaseAsync as jest.Mock;
+  const backupDatabaseAsync = SQLite.backupDatabaseAsync as jest.Mock;
+
+  const createWorkingDatabase = () =>
+    ({
+      closeAsync: jest.fn(async () => undefined),
+      execAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(async () => ({
+        user_version: localDatabaseVersion,
+      })),
+      getAllAsync: jest.fn(async () => [{ name: 'display_name' }]),
+      withExclusiveTransactionAsync: jest.fn(async (task) =>
+        task({
+          execAsync: jest.fn(async () => undefined),
+          getFirstAsync: jest.fn(async () => ({ name: 'money_accounts' })),
+          getAllAsync: jest.fn(async () => [{ name: 'money_account_id' }]),
+        }),
+      ),
+    }) as unknown as SQLiteDatabase;
 
   beforeEach(async () => {
     openDatabaseAsync.mockReset();
     deleteDatabaseAsync.mockReset();
+    backupDatabaseAsync.mockReset();
     // Un test anterior puede haber dejado una conexión en caché: se
     // descarta explícitamente para que cada test de este bloque parta de
     // `databasePromise` en null.
@@ -985,20 +1007,94 @@ describe('resetLocalDatabase', () => {
     expect(openDatabaseAsync).toHaveBeenCalledTimes(2);
   });
 
-  it('registra el fallo de borrado sin propagarlo', async () => {
-    const consoleError = jest
-      .spyOn(console, 'error')
-      .mockImplementation(() => undefined);
-    deleteDatabaseAsync.mockRejectedValueOnce(new Error('no such file'));
+  it('propaga el fallo de borrado y no reabre la base hasta reintentar', async () => {
+    deleteDatabaseAsync.mockRejectedValueOnce(
+      new Error('Unable to delete the database file for juntoss.db database'),
+    );
+
+    // Un archivo que sobrevive al borrado conserva datos de la sesión
+    // anterior: nadie puede recibirlo ni asociarlo a otra cuenta.
+    await expect(resetLocalDatabase()).rejects.toMatchObject({
+      name: 'LocalCacheIsolationError',
+      reason: 'discard_failed',
+    });
+    await expect(getLocalDatabase()).rejects.toMatchObject({
+      reason: 'discard_failed',
+    });
+    expect(openDatabaseAsync).not.toHaveBeenCalled();
+
+    deleteDatabaseAsync.mockResolvedValueOnce(undefined);
+    await retryPendingLocalDatabaseIsolation();
+    expect(deleteDatabaseAsync).toHaveBeenCalledTimes(2);
+    openDatabaseAsync.mockResolvedValue(createWorkingDatabase());
+    await expect(getLocalDatabase()).resolves.toBeDefined();
+  });
+
+  it('trata una base inexistente como ya aislada', async () => {
+    deleteDatabaseAsync.mockRejectedValueOnce(
+      new Error("Database 'juntoss.db' not found"),
+    );
 
     await expect(resetLocalDatabase()).resolves.toBeUndefined();
-    // Un archivo que sobrevive al borrado deja datos de la sesión anterior:
-    // el motivo no puede quedarse en un `catch` mudo.
-    expect(consoleError).toHaveBeenCalledWith(
-      '[localDatabase] No se pudo borrar la base local',
-      expect.any(Error),
+  });
+
+  it('aparta la caché copiándola y comprobándola antes de borrar el original', async () => {
+    const order: string[] = [];
+    const source = createWorkingDatabase();
+    const copy = {
+      closeAsync: jest.fn(async () => order.push('close-copy')),
+      getFirstAsync: jest.fn(async () => ({ quick_check: 'ok' })),
+    };
+    openDatabaseAsync.mockImplementation(async (name: string) =>
+      name === localDatabaseName ? source : copy,
     );
-    consoleError.mockRestore();
+    backupDatabaseAsync.mockImplementation(async () => order.push('backup'));
+    deleteDatabaseAsync.mockImplementation(async (name: string) =>
+      order.push(`delete:${name}`),
+    );
+    await getLocalDatabase();
+
+    const name = await quarantineLocalDatabase();
+
+    expect(name).toMatch(/^juntoss-unattributed-\d+\.db$/);
+    expect(order).toEqual([
+      'backup',
+      'close-copy',
+      `delete:${localDatabaseName}`,
+    ]);
+  });
+
+  it('si la copia falla conserva el original, lo bloquea y nunca lo borra', async () => {
+    const copy = {
+      closeAsync: jest.fn(async () => undefined),
+      getFirstAsync: jest.fn(),
+    };
+    openDatabaseAsync.mockImplementation(async (name: string) =>
+      name === localDatabaseName ? createWorkingDatabase() : copy,
+    );
+    backupDatabaseAsync.mockRejectedValueOnce(new Error('disk full'));
+    await getLocalDatabase();
+
+    await expect(quarantineLocalDatabase()).rejects.toMatchObject({
+      reason: 'quarantine_failed',
+    });
+    // Solo se retira la copia incompleta.
+    expect(deleteDatabaseAsync).not.toHaveBeenCalledWith(localDatabaseName);
+    await expect(getLocalDatabase()).rejects.toMatchObject({
+      reason: 'quarantine_failed',
+    });
+    // Un cierre de sesión posterior tampoco la borra.
+    await expect(resetLocalDatabase()).rejects.toMatchObject({
+      reason: 'quarantine_failed',
+    });
+    expect(deleteDatabaseAsync).not.toHaveBeenCalledWith(localDatabaseName);
+
+    // El reintento repite el aislamiento, no un borrado.
+    copy.getFirstAsync.mockResolvedValue({ quick_check: 'ok' });
+    backupDatabaseAsync.mockResolvedValueOnce(undefined);
+    await retryPendingLocalDatabaseIsolation();
+    expect(backupDatabaseAsync).toHaveBeenCalledTimes(2);
+    expect(deleteDatabaseAsync).toHaveBeenLastCalledWith(localDatabaseName);
   });
 
   it('no abre una conexión nueva mientras la limpieza está en curso', async () => {

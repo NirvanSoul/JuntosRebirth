@@ -1,10 +1,14 @@
 import {
+  assertLocalCacheOwnedBy,
   claimLocalCacheOwnership,
+  classifyLocalCacheOwnership,
   hasLocalCacheLinksForAnotherAccount,
-  localCacheBelongsToAnotherAccount,
+  markLocalCacheAsOnboardingDraft,
   readLocalCacheOwner,
 } from '@/features/sync/repositories/localSyncAccountRepository';
+import { migrateLocalDatabase } from '@/lib/storage/localDatabaseMigrations';
 import type { LocalSqlExecutor } from '@/lib/storage/localSqlExecutor';
+import { createNodeSqliteDatabase } from '@/test/nodeSqliteDatabase';
 
 function createExecutor(
   getFirstAsync: jest.Mock,
@@ -52,44 +56,115 @@ describe('hasLocalCacheLinksForAnotherAccount', () => {
   });
 });
 
-describe('localCacheBelongsToAnotherAccount', () => {
-  it('reconoce como propia la caché que declara a esta cuenta', async () => {
-    const executor = createExecutor(jest.fn(async () => ({ user_id: 'ana' })));
+describe('classifyLocalCacheOwnership', () => {
+  let database: ReturnType<typeof createNodeSqliteDatabase>;
 
-    await expect(
-      localCacheBelongsToAnotherAccount(executor, 'ana'),
-    ).resolves.toBe(false);
+  beforeEach(async () => {
+    database = createNodeSqliteDatabase();
+    await migrateLocalDatabase(database);
   });
 
-  it('descarta la caché que declara otra cuenta', async () => {
-    const executor = createExecutor(jest.fn(async () => ({ user_id: 'beto' })));
+  afterEach(() => database.close());
 
-    await expect(
-      localCacheBelongsToAnotherAccount(executor, 'ana'),
-    ).resolves.toBe(true);
-  });
-
-  it('usa los enlaces remotos cuando no hay propietario declarado', async () => {
-    // Dispositivo anterior al marcador: los enlaces son la única prueba.
-    const executor = createExecutor(
-      jest.fn(async (statement: string) =>
-        statement.includes('remote_entity_links') ? { user_id: 'beto' } : null,
-      ),
+  const addLink = (userId: string) =>
+    database.runAsync(
+      `INSERT INTO remote_entity_links (
+         user_id, entity_type, remote_id, local_id, created_at, updated_at
+       ) VALUES (?, 'category', 'remote-1', 'cat-1', '2026-01-01', '2026-01-01')`,
+      userId,
+    );
+  const addCategory = () =>
+    database.runAsync(
+      `INSERT INTO categories (
+         id, space_id, name, icon, color_token, is_default, created_by,
+         sync_status, is_archived, created_at, updated_at
+       ) VALUES ('cat-1', 'personal', 'Casa', 'house', 'violet', 0, 'x',
+                 'local_only', 0, '2026-01-01', '2026-01-01')`,
     );
 
-    await expect(
-      localCacheBelongsToAnotherAccount(executor, 'ana'),
-    ).resolves.toBe(true);
+  it('reconoce la caché que declara a esta cuenta', async () => {
+    await claimLocalCacheOwnership(database, 'ana');
+    await expect(classifyLocalCacheOwnership(database, 'ana')).resolves.toBe(
+      'current',
+    );
   });
 
-  it('conserva una caché sin propietario ni enlaces', async () => {
-    // Puede ser trabajo sin conexión creado antes de completar una
-    // restauración: nada prueba que sea de otra cuenta y borrarlo lo perdería.
-    const executor = createExecutor(jest.fn(async () => null));
+  it('identifica la caché que declara otra cuenta', async () => {
+    await claimLocalCacheOwnership(database, 'beto');
+    await expect(classifyLocalCacheOwnership(database, 'ana')).resolves.toBe(
+      'other_account',
+    );
+  });
 
+  it('usa los enlaces remotos de otra cuenta cuando no hay propietario', async () => {
+    await addLink('beto');
+    await expect(classifyLocalCacheOwnership(database, 'ana')).resolves.toBe(
+      'other_account',
+    );
+  });
+
+  it('adopta una caché sin propietario ni datos', async () => {
+    await expect(classifyLocalCacheOwnership(database, 'ana')).resolves.toBe(
+      'empty',
+    );
+  });
+
+  it('adopta una caché con datos cuyos enlaces son solo de esta cuenta', async () => {
+    await addCategory();
+    await addLink('ana');
+    await expect(classifyLocalCacheOwnership(database, 'ana')).resolves.toBe(
+      'current',
+    );
+  });
+
+  it('no atribuye una caché con datos, sin propietario ni enlaces', async () => {
+    await addCategory();
+    await expect(classifyLocalCacheOwnership(database, 'ana')).resolves.toBe(
+      'unattributed',
+    );
+  });
+
+  it('atribuye a la primera sesión la caché marcada por el onboarding', async () => {
+    await markLocalCacheAsOnboardingDraft(database);
+    await addCategory();
+    await expect(classifyLocalCacheOwnership(database, 'ana')).resolves.toBe(
+      'current',
+    );
+
+    // Al reclamarla, la marca desaparece: no vuelve a servir de prueba.
+    await claimLocalCacheOwnership(database, 'ana');
+    await database.runAsync('DELETE FROM local_sync_account');
+    await expect(classifyLocalCacheOwnership(database, 'beto')).resolves.toBe(
+      'unattributed',
+    );
+  });
+
+  it('no marca como onboarding una caché que ya tenía datos', async () => {
+    await addCategory();
+    await markLocalCacheAsOnboardingDraft(database);
+    await expect(classifyLocalCacheOwnership(database, 'ana')).resolves.toBe(
+      'unattributed',
+    );
+  });
+});
+
+describe('assertLocalCacheOwnedBy', () => {
+  it('rechaza subir una caché sin propietario o de otra cuenta', async () => {
     await expect(
-      localCacheBelongsToAnotherAccount(executor, 'ana'),
-    ).resolves.toBe(false);
+      assertLocalCacheOwnedBy(createExecutor(jest.fn(async () => null)), 'ana'),
+    ).rejects.toMatchObject({ reason: 'owner_mismatch' });
+    await expect(
+      assertLocalCacheOwnedBy(
+        createExecutor(jest.fn(async () => ({ user_id: 'beto' }))),
+        'ana',
+      ),
+    ).rejects.toMatchObject({ reason: 'owner_mismatch' });
+    await expect(
+      assertLocalCacheOwnedBy(
+        createExecutor(jest.fn(async () => ({ user_id: 'ana' }))),
+        'ana',
+      ),
+    ).resolves.toBeUndefined();
   });
 });
 

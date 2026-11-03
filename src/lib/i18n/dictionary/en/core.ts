@@ -70,6 +70,14 @@ export const core: Record<string, string> = {
 
   // Sincronización
   Reintentar: 'Retry',
+  'Cerrar sesión': 'Sign out',
+  'No pudimos preparar tus datos': "We couldn't prepare your data",
+  'Este dispositivo guarda datos que no podemos asociar con seguridad a tu cuenta. No los mostramos ni los subimos, y no se ha borrado nada. Vuelve a intentarlo en unos momentos.':
+    "This device holds data we can't safely link to your account. We don't show or upload it, and nothing has been deleted. Try again in a few moments.",
+  'Si sigue pasando, libera espacio en el dispositivo o cierra sesión. Cerrar sesión tampoco borra nada.':
+    'If it keeps happening, free up space on your device or sign out. Signing out does not delete anything either.',
+  'No pudimos cerrar sesión. Inténtalo de nuevo en unos momentos.':
+    "We couldn't sign out. Try again in a few moments.",
   'Sin conexión. Tus cambios se guardan aquí y se subirán al reconectar.':
     "You're offline. Changes are saved here and will sync when you reconnect.",
   'Conexión recuperada.': 'Back online.',

@@ -183,7 +183,10 @@ describe('selección de espacio durante una restauración fallida', () => {
           return linksGate;
         },
       ),
-      getFirstAsync: jest.fn().mockResolvedValue(null),
+      // La caché ya pertenece a la sesión que restaura.
+      getFirstAsync: jest.fn(async (sql: string) =>
+        sql.includes('local_sync_account') ? { user_id: 'user-1' } : null,
+      ),
       runAsync: jest.fn().mockResolvedValue({ changes: 1 }),
       withExclusiveTransactionAsync: jest
         .fn()

@@ -80,14 +80,76 @@ permitir un reintento.
   espera el reintento explícito en vez de repetir la misma escritura.
 - La sincronización de un espacio usa `POST /v1/spaces/:spaceId/sync` e
   incluye siempre categorías, cuentas, recurrencias y transacciones.
+- **Conflictos (contrato de `Juntos API`, nota del 2026-11-02 en
+  `patch/APP.md`; implementado en la API sin desplegar).** La respuesta
+  puede incluir `data.conflicts: { collection, localId, remoteId, reason,
+  serverUpdatedAt }[]`, solo si alguna versión enviada no se aplicó, y cada
+  `data.transactions[]` lleva `applied`. Con `applied: false` sus valores son
+  los canónicos (o `null`), y el cliente no los guarda sobre la fila local.
+  Ante un `NEWER_VERSION` el cliente borra el cursor incremental antes de
+  marcar las filas, para que la siguiente restauración sea un snapshot
+  completo aunque un delta concurrente ya hubiera saltado la versión
+  canónica. Cada borrado incrementa una generación en memoria por cuenta; una
+  restauración la anota antes de pedir datos y no escribe su cursor si cambió,
+  así una restauración en vuelo no deshace el borrado. Tras marcar las filas
+  se borra otra vez, por si una restauración empezó entre ambos pasos.
+  - `NEWER_VERSION`: la fila se marca `synced` solo si su `updatedAt` no
+    cambió durante el envío, para que la versión canónica la sustituya; un
+    cambio posterior sigue pendiente.
+  - `NOT_IN_SPACE`: no se guardó en ninguna parte, así que la fila no se
+    marca `synced` y sigue contando como pendiente. No borra el cursor: el
+    servidor no republica nada.
+  - Una API que omite `conflicts` y `applied` (la desplegada, `origin/main`
+    b67e68e) mantiene el comportamiento anterior: toda fila enviada con
+    respuesta correcta se marca sincronizada. Converge igualmente, porque la
+    API nueva republica la versión canónica por `/v1/sync/changes`.
+- La restauración (snapshot o delta) comprueba que `local_sync_account` es
+  la cuenta que restaura, antes de escribir y de nuevo dentro de la
+  transacción exclusiva: una respuesta tardía de una sesión anterior nunca se
+  escribe en la caché que otra cuenta reclamó.
+- Al restaurar (snapshot o delta), una fila local que no está `synced` no se
+  sobrescribe y **tampoco sus hijos**: los saldos de una cuenta y los
+  presupuestos de una categoría pendientes sobreviven en todas sus monedas.
 - Al cerrar sesión, la aplicación vuelve al acceso autenticado, oculta la
-  caché local financiera y la descarta.
-- Al iniciar sesión, la caché local **se conserva salvo prueba de que pertenece
-  a otra cuenta**. `local_sync_account` guarda el propietario declarado; en los
-  dispositivos anteriores a ese marcador, un enlace de `remote_entity_links` con
-  otro `user_id` sirve de prueba. Sin ninguna de las dos, la caché se adopta:
-  puede ser trabajo sin conexión que todavía no llegó a subirse, y descartarlo
-  lo perdería para siempre.
+  caché local financiera y la descarta. Antes cuenta los cambios sin
+  confirmar por el servidor (categorías, cuentas, recurrencias, movimientos,
+  nombre y foto de perfil). Si los hay, ofrece «Subir y cerrar sesión», que
+  reutiliza la subida idempotente de cada espacio; si algo sigue sin subir (sin
+  red, rechazo del servidor) o no se pudo contar, explica que se borrará del
+  dispositivo sin recuperación y solo cierra si la persona lo confirma. Las
+  importaciones sin terminar y las configuraciones de recordatorios no tienen
+  subida: no se cuentan como pendientes, pero cada aviso de cierre (también
+  el del reinicio del onboarding) nombra cuántas se borrarán.
+- Al iniciar sesión, la caché local solo se muestra o se sube **con evidencia
+  de que es de quien entra** (`classifyLocalCacheOwnership`): el propietario
+  declarado en `local_sync_account`, enlaces de `remote_entity_links` solo de
+  esta cuenta, la marca que deja el onboarding sobre una caché vacía (sus datos
+  se asocian a la primera sesión) o una caché sin datos de cuenta.
+  - Un propietario u enlace de otra cuenta prueba que es ajena: se borra.
+  - Sin propietario ni enlaces pero con datos, no se puede atribuir: se
+    **aparta sin borrarla** a `juntoss-unattributed-<marca>.db` (copia con
+    `backupDatabaseAsync`, verificada con `PRAGMA quick_check` antes de borrar
+    el original) y el catálogo de espacios a una clave
+    `….unattributed.<marca>`. La app nunca abre ni sube esas copias; su
+    recuperación queda pendiente de una decisión de producto.
+  - Si borrar o apartar falla, el error se propaga como
+    `LocalCacheIsolationError`: `getLocalDatabase` deja de entregar la base,
+    la app muestra un estado bloqueado con «Reintentar» y el reintento repite
+    la misma limpieza (nunca convierte un aislamiento en borrado). Una base
+    inexistente cuenta como limpia. Si el fallo persiste, «Cerrar sesión»
+    cierra solo la sesión, sin borrar nada. La limpieza pendiente recuerda
+    qué cuenta la provocó: si entra otra, se descarta y la caché se vuelve a
+    clasificar (podría ser de quien entra). Mientras tanto el catálogo de
+    espacios se aparta en `….pendingDiscard` en vez de borrarse: vuelve si la
+    caché resulta ser de quien entra y se borra si la caché se borra. La que decidió quien cerró sesión
+    se repite con cualquier cuenta. Un reintento que termina una limpieza se
+    informa como `discarded` o `quarantined`, no como `kept`.
+  - Tras borrar o apartar la caché se releen espacios, monedas y perfil
+    propio antes de mostrar nada: lo leído al montar podía ser de la cuenta
+    anterior, y el snapshot puede fallar.
+  - Sin identidad no se atribuye, no se muestra y no se borra.
+  - Cada subida comprueba además que `local_sync_account` coincide con la
+    sesión que firma (`assertLocalCacheOwnedBy`).
 - Esa adopción no mezcla contextos monetarios incompatibles. Si el perfil remoto
   es VE y el espacio provisional `personal` contiene movimientos pendientes en
   una moneda distinta de USD/VES, el snapshot usa el UUID remoto como espacio

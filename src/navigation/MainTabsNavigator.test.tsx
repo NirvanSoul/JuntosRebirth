@@ -227,6 +227,7 @@ jest.mock(
 // `SettingsScreen` vive en el mismo drawer que la pantalla principal y
 // carga el avatar de perfil al montarse, también contra SQLite real.
 jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
+  announceLocalProfileReplaced: jest.fn(async () => undefined),
   getLocalProfile: jest.fn(async () => ({
     avatarUri: null,
     countryCode: mockCountryCode,

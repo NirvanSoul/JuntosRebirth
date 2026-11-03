@@ -1,7 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 
 import { initializeAuthenticatedSession } from '@/features/auth/services/sessionInitialization';
+import { announceLocalProfileReplaced } from '@/features/profile/repositories/localProfileRepository';
 import { useSessionStartup } from '@/features/sync/hooks/useSessionStartup';
+import { LocalCacheIsolationError } from '@/lib/storage/localCacheIsolationError';
 import { ApiError } from '@/services/api/client';
 
 let mockIsOffline = false;
@@ -14,6 +16,9 @@ jest.mock('@/features/auth/services/sessionInitialization', () => ({
 jest.mock('@/features/auth/services/expiredSession', () => ({
   ...jest.requireActual('@/features/auth/services/expiredSession'),
   endExpiredSession: jest.fn(async () => true),
+}));
+jest.mock('@/features/profile/repositories/localProfileRepository', () => ({
+  announceLocalProfileReplaced: jest.fn(async () => undefined),
 }));
 jest.mock(
   '@/features/transactions/repositories/localTransactionNotificationRuleRepository',
@@ -114,6 +119,62 @@ describe('useSessionStartup', () => {
       result.current.dismissSyncIssue(result.current.syncIssue!.id),
     );
     expect(result.current.syncIssue).toBeNull();
+  });
+
+  it('bloquea sin leer la caché si no se pudo aislar, y la muestra tras reintentar', async () => {
+    (initializeAuthenticatedSession as jest.Mock).mockRejectedValueOnce(
+      new LocalCacheIsolationError('discard_failed'),
+    );
+
+    const input = startupInput();
+    const { result } = await renderHook(() => useSessionStartup(input));
+
+    await waitFor(() => expect(result.current.isLocalCacheBlocked).toBe(true));
+    // Ni siquiera un instante: la caché de la cuenta anterior no se lee.
+    expect(input.reloadLocalFinance).not.toHaveBeenCalled();
+    expect(result.current.syncIssue).toBeNull();
+
+    let finishRetry: () => void = () => undefined;
+    (initializeAuthenticatedSession as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRetry = resolve;
+        }),
+    );
+    await act(async () => result.current.retryLocalCache());
+
+    // Mientras el reintento sigue, se ve la carga: ni el bloqueo ni la
+    // navegación con una caché todavía sin aislar.
+    expect(result.current.isLocalCacheBlocked).toBe(false);
+    expect(result.current.isFinanceReady).toBe(false);
+
+    await act(async () => finishRetry());
+    await waitFor(() => expect(result.current.isFinanceReady).toBe(true));
+    expect(input.reloadLocalFinance).toHaveBeenCalled();
+  });
+
+  it('tras descartar la caché de otra cuenta relee lo cargado al montar aunque falle el snapshot', async () => {
+    (initializeAuthenticatedSession as jest.Mock).mockImplementationOnce(
+      async (options: {
+        onLocalCacheReady: (preparation: 'discarded') => void;
+      }) => {
+        options.onLocalCacheReady('discarded');
+        throw new ApiError({ status: 503, code: 'UNAVAILABLE', message: 'x' });
+      },
+    );
+
+    const input = startupInput();
+    const { result } = await renderHook(() => useSessionStartup(input));
+
+    await waitFor(() => expect(result.current.isFinanceReady).toBe(true));
+    // Espacios, monedas y perfil propio se releen de la caché nueva antes de
+    // mostrar nada, aunque el snapshot no llegue.
+    expect(input.reloadSpaces).toHaveBeenCalled();
+    expect(input.reloadCurrencyPreferences).toHaveBeenCalled();
+    expect(announceLocalProfileReplaced).toHaveBeenCalled();
+    expect(input.reloadSpaces.mock.invocationCallOrder[0]).toBeLessThan(
+      input.reloadLocalFinance.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('no reinicializa si cambia la referencia de la misma cuenta', async () => {

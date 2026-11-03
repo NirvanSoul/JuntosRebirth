@@ -12,6 +12,7 @@ import { ReadyToExploreScreen } from '@/features/onboarding/screens/ReadyToExplo
 import { OnboardingLoginScreen } from '@/features/onboarding/screens/OnboardingLoginScreen';
 import { OnboardingFlowContext } from '@/features/onboarding/context/OnboardingFlowContext';
 import { preloadOnboardingIllustrations } from '@/features/onboarding/utils/preloadOnboardingIllustrations';
+import { markOnboardingLocalCache } from '@/features/onboarding/repositories/onboardingCompletionRepository';
 import {
   coolDownAuthSession,
   warmUpAuthSession,
@@ -44,6 +45,8 @@ export function OnboardingNavigator({ onComplete }: OnboardingNavigatorProps) {
 
   useEffect(() => {
     void preloadOnboardingIllustrations();
+    // Lo que el onboarding guarde se asociará a la primera sesión.
+    void markOnboardingLocalCache();
     warmUpAuthSession();
     return () => {
       coolDownAuthSession();

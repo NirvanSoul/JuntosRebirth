@@ -3,7 +3,6 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { LoadingState } from '@/components/feedback/LoadingState/LoadingState';
 import { ActiveSpaceHeader } from '@/components/navigation/ActiveSpaceHeader/ActiveSpaceHeader';
 import { getMapHeaderInset } from '@/features/map/components/MapFilterButton';
 import { QuickCreateMenu } from '@/components/overlays/QuickCreateMenu/QuickCreateMenu';
@@ -72,6 +71,7 @@ import { useSpaces } from '@/features/spaces/hooks/useSpaces';
 import { AcceptInvitationScreen } from '@/features/spaces/screens/AcceptInvitationScreen';
 import { isAwaitingPartnerSpace } from '@/features/spaces/types';
 import { useFinanceSync } from '@/features/sync/hooks/useFinanceSync';
+import { SessionStartupGate } from '@/features/sync/components/SessionStartupGate';
 import { SyncIssueToast } from '@/features/sync/components/SyncIssueToast';
 import { useSessionStartup } from '@/features/sync/hooks/useSessionStartup';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
@@ -397,15 +397,16 @@ export function MainTabsNavigator() {
     setTransactions,
     spaces,
   });
+  const sessionStartup = useSessionStartup({
+    refreshSharedCoupleData,
+    reloadCurrencyPreferences,
+    reloadLocalFinance,
+    reloadSpaces,
+    session,
+    setNotificationRules,
+  });
   const { dismissSyncIssue, isFinanceReady, retrySession, syncIssue } =
-    useSessionStartup({
-      refreshSharedCoupleData,
-      reloadCurrencyPreferences,
-      reloadLocalFinance,
-      reloadSpaces,
-      session,
-      setNotificationRules,
-    });
+    sessionStartup;
 
   const {
     clearReminder: clearDetailTransactionReminder,
@@ -1263,8 +1264,8 @@ export function MainTabsNavigator() {
   );
 
   return (
-    <LoadingState loading={!isReady || !isFinanceReady} testID="spaces-loading">
+    <SessionStartupGate isReady={isReady} startup={sessionStartup}>
       {content}
-    </LoadingState>
+    </SessionStartupGate>
   );
 }

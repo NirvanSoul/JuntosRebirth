@@ -13,7 +13,9 @@ import {
   sharedDataMaxBackoffMs,
   sharedDataRefreshIntervalMs,
 } from '@/features/sync/hooks/useSharedDataPolling';
+import { announceLocalProfileReplaced } from '@/features/profile/repositories/localProfileRepository';
 import { markStartup } from '@/lib/diagnostics/startupTrace';
+import { isLocalCacheIsolationError } from '@/lib/storage/localCacheIsolationError';
 import { listLocalNotificationRules } from '@/features/transactions/repositories/localTransactionNotificationRuleRepository';
 import type { TransactionNotificationRule } from '@/features/transactions/types';
 import { useNetworkAvailability } from '@/hooks/useNetworkAvailability';
@@ -42,6 +44,13 @@ export type SyncIssue = {
 type SessionStartupState = {
   /** Hay datos financieros que mostrar: la caché local o el snapshot ya restaurado. */
   isFinanceReady: boolean;
+  /**
+   * La caché local no se pudo atribuir o apartar de forma segura: no se
+   * muestra nada de ella y solo cabe reintentar (`LocalCacheIsolationError`).
+   */
+  isLocalCacheBlocked: boolean;
+  /** Reintenta el aislamiento mostrando la carga, nunca la navegación. */
+  retryLocalCache: () => void;
   /** Fallo de la inicialización remota pendiente de mostrar; nunca bloquea. */
   syncIssue: SyncIssue | null;
   dismissSyncIssue: (issueId: number) => void;
@@ -78,6 +87,7 @@ export function useSessionStartup(
   // refresco periódico ya no compite con el snapshot inicial.
   const [isSessionSynced, setSessionSynced] = useState(false);
   const [syncIssue, setSyncIssue] = useState<SyncIssue | null>(null);
+  const [isLocalCacheBlocked, setLocalCacheBlocked] = useState(false);
   const sessionUserId = session?.user.id ?? null;
   const nextIssueId = useRef(0);
   // El efecto de apertura registra aquí cómo relanzarse; así el reintento
@@ -91,9 +101,16 @@ export function useSessionStartup(
   const retrySession = useCallback(() => {
     shouldRetryOnReconnectRef.current = false;
     setSyncIssue(null);
+    setLocalCacheBlocked(false);
     setSessionSynced(false);
     runOpenSessionRef.current();
   }, []);
+  // Reintentar desde el estado bloqueado vuelve a la carga: la navegación no
+  // se monta hasta que la caché quede aislada, no al pulsar el botón.
+  const retryLocalCache = useCallback(() => {
+    setFinanceReady(false);
+    retrySession();
+  }, [retrySession]);
   const dismissSyncIssue = useCallback((issueId: number) => {
     setSyncIssue((current) => (current?.id === issueId ? null : current));
   }, []);
@@ -111,6 +128,8 @@ export function useSessionStartup(
         .catch(() => undefined);
 
     const openSession = async () => {
+      let isCacheIsolated = true;
+      let cacheReplaced: Promise<unknown> | null = null;
       try {
         // El usuario demo no tiene cuenta remota: su caché es todo lo que hay.
         if (sessionUserId && !isDemoSessionActive()) {
@@ -118,7 +137,24 @@ export function useSessionStartup(
             onLocalCacheReady: (preparation) => {
               // Una caché descartada era de otra cuenta: no hay nada que
               // enseñar hasta que llegue el snapshot.
-              if (preparation === 'kept' && isMounted) void showLocalFinance();
+              if (preparation === 'kept') {
+                if (isMounted) void showLocalFinance();
+                return;
+              }
+              // Espacios, perfil y monedas se leyeron al montar, antes de
+              // decidir: pueden ser los de la cuenta anterior. Se releen ya,
+              // sin esperar al snapshot, por si este falla.
+              // Cada recarga empieza en su propia promesa: un fallo, incluso
+              // síncrono, nunca escapa de este aviso ni corta la apertura.
+              cacheReplaced = Promise.allSettled(
+                [
+                  reloadSpaces,
+                  reloadCurrencyPreferences,
+                  announceLocalProfileReplaced,
+                ].map((reload: () => Promise<unknown>) =>
+                  Promise.resolve().then(() => reload()),
+                ),
+              );
             },
           });
           // La restauración del perfil puede haber sembrado las monedas del
@@ -126,12 +162,19 @@ export function useSessionStartup(
           await reloadCurrencyPreferences();
           await reloadSpaces();
         }
+      } catch (error) {
+        isCacheIsolated = !isLocalCacheIsolationError(error);
+        throw error;
       } finally {
+        // Nada se muestra hasta haber sustituido lo leído de la caché anterior.
+        if (cacheReplaced) await cacheReplaced;
         // Un 5xx de bootstrap o snapshot no invalida ni descarta la caché.
         // Mostrarla permite seguir trabajando y deja la recuperación en manos
-        // del botón explícito de reintento.
-        await reloadLocalFinance();
-        markStartup('local_finance_ready');
+        // del botón explícito de reintento. Una caché sin aislar no se lee.
+        if (isCacheIsolated) {
+          await reloadLocalFinance();
+          markStartup('local_finance_ready');
+        }
       }
       if (!isMounted) return;
       // Un fallo al cargar reglas no bloquea el acceso a las finanzas.
@@ -156,6 +199,10 @@ export function useSessionStartup(
           );
           // No cerrar la sesión nueva por una promesa tardía de la anterior.
           if (!isMounted) return;
+          if (isLocalCacheIsolationError(error)) {
+            setLocalCacheBlocked(true);
+            return;
+          }
           const kind = classifySyncFailure(error);
           if (kind === 'expired') {
             void endExpiredSession(error);
@@ -205,5 +252,12 @@ export function useSessionStartup(
       }),
   });
 
-  return { dismissSyncIssue, isFinanceReady, retrySession, syncIssue };
+  return {
+    dismissSyncIssue,
+    isFinanceReady,
+    isLocalCacheBlocked,
+    retryLocalCache,
+    retrySession,
+    syncIssue,
+  };
 }

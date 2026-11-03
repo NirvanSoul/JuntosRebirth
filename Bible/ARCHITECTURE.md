@@ -151,7 +151,11 @@ caché SQLite pertenece a quien entra y, si la conserva, avisa por
 principal pinta entonces la caché tal cual. El bootstrap, el snapshot y la
 subida de cambios pendientes siguen en segundo plano en su orden habitual, y
 al terminar el estado se vuelve a leer de SQLite. Solo cuando la caché era de
-otra cuenta se espera al snapshot. El refresco periódico (`useSharedDataPolling`) arranca
+otra cuenta, o no se podía atribuir, se espera al snapshot. Si la caché no se
+pudo borrar o apartar (`LocalCacheIsolationError`, ver `API.md` «Sesión y
+restauración»), `SessionStartupGate` no monta la navegación principal: muestra
+`LocalCacheBlockedState` con «Reintentar» (vuelve a la carga, no a la
+navegación) y «Cerrar sesión» (sin borrar nada), y nunca lee esa caché. El refresco periódico (`useSharedDataPolling`) arranca
 después de esa inicialización y espera un intervalo completo (2 s) con peticiones
 delta (`GET /v1/sync/changes`): repetir la descarga que acaba de terminar sería
 trabajo duplicado. Aplica retroceso exponencial ante fallos sucesivos (hasta 5 min)

@@ -32,7 +32,11 @@ jest.mock('@/lib/storage/localDatabase', () => ({
   getLocalDatabase: async () => {
     const database = {
       getAllAsync: async () => [],
-      getFirstAsync: async () => null,
+      // La caché ya pertenece a la sesión que restaura.
+      getFirstAsync: async (sql: string) =>
+        sql.includes('local_sync_account')
+          ? { user_id: 'verified-user' }
+          : null,
       runAsync: mockRun,
       withExclusiveTransactionAsync: async (
         callback: (tx: object) => Promise<void>,

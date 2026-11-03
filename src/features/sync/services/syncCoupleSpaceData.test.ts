@@ -18,11 +18,14 @@ jest.mock(
 describe('syncSpaceDataForCurrentSession', () => {
   const getAllAsync = jest.fn();
   const runAsync = jest.fn();
+  // Propietario declarado de la caché: la subida exige que sea quien firma.
+  const getFirstAsync = jest.fn(async () => ({ user_id: 'user-ana' }));
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(getLocalDatabase).mockResolvedValue({
       getAllAsync,
+      getFirstAsync,
       runAsync,
     } as never);
     jest.mocked(getOrCreateInstallationId).mockResolvedValue('installation-a');
@@ -201,6 +204,17 @@ describe('syncSpaceDataForCurrentSession', () => {
       'category-a',
       '2026-08-13T10:00:00.000Z',
     );
+  });
+
+  it('no firma con esta sesión una caché que declara otro propietario', async () => {
+    getFirstAsync.mockResolvedValueOnce({ user_id: 'user-bea' });
+
+    await expect(
+      syncSpaceDataForCurrentSession({ spaceId: 'personal' }),
+    ).rejects.toMatchObject({ reason: 'owner_mismatch' });
+
+    expect(getAllAsync).not.toHaveBeenCalled();
+    expect(syncCoupleSpaceRemotely).not.toHaveBeenCalled();
   });
 
   it('no llama a la API cuando no hay cambios locales del espacio', async () => {

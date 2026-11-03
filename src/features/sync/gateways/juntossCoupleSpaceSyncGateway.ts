@@ -10,6 +10,24 @@ export type CoupleSpaceSyncPayload = {
   transactions: readonly Record<string, unknown>[];
 };
 
+export type CoupleSpaceSyncCollection =
+  'categories' | 'moneyAccounts' | 'recurringSeries' | 'transactions';
+
+/**
+ * Una versión del lote que el servidor no aplicó (contrato de `Juntos API`,
+ * `SyncConflict`). `NEWER_VERSION`: ya guardaba una con `updatedAt` posterior
+ * y la vuelve a publicar por `/v1/sync/changes`. `NOT_IN_SPACE`: el id remoto
+ * pertenece a otro espacio y no se guardó nada. Solo aparece si hay alguno;
+ * una API anterior omite el campo.
+ */
+export type CoupleSpaceSyncConflict = {
+  collection: CoupleSpaceSyncCollection;
+  localId: string;
+  remoteId: string;
+  reason: 'NEWER_VERSION' | 'NOT_IN_SPACE';
+  serverUpdatedAt: string | null;
+};
+
 export type CoupleSpaceSyncResult = {
   categoryCount: number;
   moneyAccountCount: number;
@@ -18,10 +36,16 @@ export type CoupleSpaceSyncResult = {
   transactions?: readonly {
     localId: string;
     remoteId: string;
-    updatedAt: string;
+    /**
+     * `false`: el servidor descartó esta versión y los demás campos son los
+     * canónicos (o `null`), nunca los enviados. Una API anterior lo omite.
+     */
+    applied?: boolean;
+    updatedAt: string | null;
     accountingAmountMinorUsd?: number | null;
     exchangeSnapshot: TransactionExchangeSnapshot | null;
   }[];
+  conflicts?: readonly CoupleSpaceSyncConflict[];
 };
 
 /**

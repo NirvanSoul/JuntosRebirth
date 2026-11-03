@@ -1,8 +1,14 @@
 import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
 import { getLocalDatabase } from '@/lib/storage/localDatabase';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
-import { syncCoupleSpaceRemotely } from '@/features/sync/gateways/juntossCoupleSpaceSyncGateway';
+import {
+  type CoupleSpaceSyncCollection,
+  type CoupleSpaceSyncConflict,
+  syncCoupleSpaceRemotely,
+} from '@/features/sync/gateways/juntossCoupleSpaceSyncGateway';
+import { clearRemoteChangesCursor } from '@/features/sync/repositories/localSyncCursorRepository';
 import { findRemoteIdForLocalEntity } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
+import { assertLocalCacheOwnedBy } from '@/features/sync/repositories/localSyncAccountRepository';
 import {
   flattenBudgetSchedule,
   parseBudgetHistory,
@@ -125,6 +131,8 @@ async function syncSpaceData(input: {
   if (!userId) return emptySyncResult();
 
   const database = await getLocalDatabase();
+  // Nunca se firman con esta sesión filas de una caché que no es suya.
+  await assertLocalCacheOwnedBy(database, userId);
   const installationId = await getOrCreateInstallationId(database);
   const remoteSpaceId =
     (await findRemoteIdForLocalEntity({
@@ -263,7 +271,28 @@ async function syncSpaceData(input: {
     transactions: transactions.map(serializeRow),
   });
 
+  const rejected = rejectedLocalIds(remoteResult.conflicts);
+  const hasNewerVersion = [...rejected.values()].includes('NEWER_VERSION');
+  if (hasNewerVersion) {
+    // El servidor conservó otra versión. Su versión canónica llega por
+    // `/v1/sync/changes`, pero una restauración incremental que corriera
+    // mientras la fila seguía pendiente ya habría avanzado el cursor sin
+    // aplicarla: sin cursor, la próxima restauración es un snapshot completo.
+    // Se borra antes de marcar para que un cierre a medias nunca deje filas
+    // obsoletas como sincronizadas con el cursor intacto. `NOT_IN_SPACE` no
+    // lo borra: el servidor no republica nada y la fila sigue pendiente, así
+    // que cada sondeo forzaría un snapshot completo sin ganar nada.
+    await clearRemoteChangesCursor(database, userId);
+  }
+
   for (const syncedTransaction of remoteResult.transactions ?? []) {
+    // Una versión descartada no trae valores que guardar sobre la local.
+    if (
+      syncedTransaction.applied === false ||
+      rejected.has(conflictKey('transactions', syncedTransaction.localId))
+    ) {
+      continue;
+    }
     await database.runAsync(
       `UPDATE transactions
           SET accounting_amount_minor_usd = ?, exchange_snapshot_json = ?
@@ -277,12 +306,28 @@ async function syncSpaceData(input: {
     );
   }
 
+  // Una versión `NEWER_VERSION` sin cambios desde el envío se marca
+  // sincronizada para que la canónica la sustituya; si cambió durante el
+  // envío, `markRowsSynced` la deja pendiente. Una `NOT_IN_SPACE` no se
+  // guardó en ninguna parte: sigue pendiente y no se presenta como subida.
+  const keep = (collection: CoupleSpaceSyncCollection) => (row: SyncRow) =>
+    rejected.get(conflictKey(collection, row.id)) !== 'NOT_IN_SPACE';
   await Promise.all([
-    markRowsSynced('categories', categories),
-    markRowsSynced('money_accounts', moneyAccounts),
-    markRowsSynced('recurring_transaction_series', recurringSeries),
-    markRowsSynced('transactions', transactions),
+    markRowsSynced('categories', categories.filter(keep('categories'))),
+    markRowsSynced(
+      'money_accounts',
+      moneyAccounts.filter(keep('moneyAccounts')),
+    ),
+    markRowsSynced(
+      'recurring_transaction_series',
+      recurringSeries.filter(keep('recurringSeries')),
+    ),
+    markRowsSynced('transactions', transactions.filter(keep('transactions'))),
   ]);
+  // Una restauración que empezó entre el primer borrado y el marcado pudo
+  // saltarse la versión canónica (la fila aún estaba pendiente) sin ver
+  // cambiar la generación: se borra otra vez para que no escriba su cursor.
+  if (hasNewerVersion) await clearRemoteChangesCursor(database, userId);
 
   return {
     categoryCount: categories.length,
@@ -290,6 +335,27 @@ async function syncSpaceData(input: {
     recurringSeriesCount: recurringSeries.length,
     transactionCount: transactions.length,
   };
+}
+
+const conflictKey = (collection: CoupleSpaceSyncCollection, localId: string) =>
+  `${collection}:${localId}`;
+
+/** Motivo de cada versión descartada, por colección e id local. */
+function rejectedLocalIds(
+  conflicts: readonly CoupleSpaceSyncConflict[] | undefined,
+) {
+  const rejected = new Map<string, CoupleSpaceSyncConflict['reason']>();
+  // Una respuesta con otra forma no se interpreta: se ignora como una API
+  // que no informa de conflictos.
+  if (!Array.isArray(conflicts)) return rejected;
+  for (const conflict of conflicts) {
+    if (typeof conflict?.localId !== 'string') continue;
+    rejected.set(
+      conflictKey(conflict.collection, conflict.localId),
+      conflict.reason,
+    );
+  }
+  return rejected;
 }
 
 /**

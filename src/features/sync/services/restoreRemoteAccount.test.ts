@@ -30,6 +30,16 @@ jest.mock('@/lib/storage/localDatabase', () => ({
   getLocalDatabase: jest.fn(),
 }));
 
+// La comprobación del propietario tiene sus propias pruebas con SQLite real
+// (`restoreRemoteAccount.ownership.test.ts`); aquí no interfiere con los
+// dobles que cuentan cada acceso a la base.
+jest.mock('@/features/sync/repositories/localSyncAccountRepository', () => ({
+  ...jest.requireActual(
+    '@/features/sync/repositories/localSyncAccountRepository',
+  ),
+  assertLocalCacheOwnedBy: jest.fn(async () => undefined),
+}));
+
 jest.mock('@/features/spaces/repositories/localSpaceRepository', () => ({
   getSpacesCatalogueRevision: jest.fn(() => 0),
   loadSpaces: jest.fn(),
@@ -44,11 +54,27 @@ jest.mock('@/features/sync/gateways/juntossRemoteAccountGateway', () => ({
   fetchRemoteAccountSnapshot: jest.fn(),
   fetchRemoteAccountChanges: jest.fn(),
 }));
-jest.mock('@/features/sync/repositories/localSyncCursorRepository', () => ({
-  readRemoteChangesCursor: jest.fn(),
-  writeRemoteChangesCursor: jest.fn(),
-  clearRemoteChangesCursor: jest.fn(),
-}));
+jest.mock('@/features/sync/repositories/localSyncCursorRepository', () => {
+  const writeRemoteChangesCursor = jest.fn();
+  return {
+    getRemoteChangesCursorGeneration: jest.fn(() => 0),
+    readRemoteChangesCursor: jest.fn(),
+    writeRemoteChangesCursor,
+    // Igual que el real: delega con la generación como opción.
+    writeCursorUnlessCleared: jest.fn(
+      (
+        executor: unknown,
+        userId: string,
+        expectedGeneration: number,
+        cursor: unknown,
+      ) =>
+        writeRemoteChangesCursor(executor, userId, cursor, {
+          expectedGeneration,
+        }),
+    ),
+    clearRemoteChangesCursor: jest.fn(),
+  };
+});
 jest.mock('@/features/import/gateways/juntossImportReviewGateway', () => ({
   fetchRemoteImportReviews: jest.fn(),
 }));
@@ -937,11 +963,16 @@ describe('restoreRemoteAccount (delta sync y cursor)', () => {
       },
     });
 
-    expect(mockWriteCursor).toHaveBeenCalledWith(database, 'test-user-id', {
-      serverTime: '2026-09-11T12:00:00.000Z',
-      activeFinancialContextId: 'ctx-1',
-      spaceRemoteIds: ['space-a', 'space-b'],
-    });
+    expect(mockWriteCursor).toHaveBeenCalledWith(
+      database,
+      'test-user-id',
+      {
+        serverTime: '2026-09-11T12:00:00.000Z',
+        activeFinancialContextId: 'ctx-1',
+        spaceRemoteIds: ['space-a', 'space-b'],
+      },
+      { expectedGeneration: 0 },
+    );
   });
 
   it('delta sin cursor realiza un restore full', async () => {
@@ -1097,6 +1128,7 @@ describe('restoreRemoteAccount (delta sync y cursor)', () => {
       database,
       'test-user-id',
       expect.objectContaining({ serverTime: '2026-09-11T12:00:00.000Z' }),
+      { expectedGeneration: 0 },
     );
   });
 

@@ -84,6 +84,16 @@ async function publishLocalProfile(): Promise<LocalProfile> {
 }
 
 /**
+ * La caché de otra cuenta se borró o se apartó: avisa a toda la interfaz
+ * aunque el perfil nuevo coincida con el último publicado, porque lo que cada
+ * hook leyó al montarse puede ser el de la cuenta anterior.
+ */
+export async function announceLocalProfileReplaced(): Promise<LocalProfile> {
+  lastPublishedProfile = null;
+  return publishLocalProfile();
+}
+
+/**
  * Guarda la foto recién elegida y la deja marcada como pendiente de subir.
  *
  * El estado se escribe en la misma sentencia que el archivo, no después: si la
