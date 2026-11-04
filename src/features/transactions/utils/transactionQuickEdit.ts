@@ -12,7 +12,7 @@ import type {
  */
 export function applyTransactionQuickEdit(
   transaction: SessionTransaction,
-  change: TransactionQuickEdit,
+  change: Exclude<TransactionQuickEdit, { field: 'time' }>,
 ): CreateTransactionDraft {
   const draft: CreateTransactionDraft = {
     spaceId: transaction.spaceId,

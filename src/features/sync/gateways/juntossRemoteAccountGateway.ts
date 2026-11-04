@@ -14,6 +14,8 @@ import {
 } from '@/features/categories/types';
 import type { TransactionExchangeSnapshot } from '@/features/transactions/types';
 import { apiClient } from '@/services/api/juntossApiClient';
+import { readRemoteExchangeSnapshot } from '@/features/sync/gateways/remoteExchangeSnapshot';
+import { readRemoteOccurredTime } from '@/features/sync/gateways/remoteOccurredTime';
 
 export type RemoteAccountSpace = {
   remoteId: string;
@@ -96,6 +98,8 @@ export type RemoteAccountTransaction = {
   currency: string;
   title: string;
   occurredOn: string;
+  /** `undefined`: la API no trae la clave y se conserva la hora local. */
+  occurredTime?: string | null;
   note: string | null;
   recurrence: string;
   recurrenceGroupId: string | null;
@@ -175,54 +179,6 @@ function currency(value: unknown, context: string): CurrencyCode {
     );
   }
   return value;
-}
-
-function exchangeSnapshot(value: unknown): TransactionExchangeSnapshot | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== 'object')
-    throw new Error('[sync] Snapshot de tasa inválido');
-  const snapshot = value as Record<string, unknown>;
-  if (
-    snapshot.countryCode !== 'VE' ||
-    (snapshot.createdWithCurrency !== 'USD' &&
-      snapshot.createdWithCurrency !== 'VES') ||
-    typeof snapshot.rates !== 'object' ||
-    snapshot.rates === null
-  ) {
-    throw new Error('[sync] Snapshot de tasa inválido');
-  }
-  const rates: TransactionExchangeSnapshot['rates'] = {};
-  for (const source of ['BCV', 'EURO', 'CUSTOM'] as const) {
-    const raw = (snapshot.rates as Record<string, unknown>)[source];
-    if (raw === undefined) continue;
-    if (typeof raw !== 'object' || raw === null)
-      throw new Error('[sync] Tasa histórica inválida');
-    const rate = raw as Record<string, unknown>;
-    if (
-      typeof rate.baseCurrency !== 'string' ||
-      typeof rate.quoteCurrency !== 'string' ||
-      typeof rate.rate !== 'string' ||
-      (rate.convertedCurrency !== undefined &&
-        (typeof rate.convertedCurrency !== 'string' ||
-          !isCurrencyCode(rate.convertedCurrency)))
-    )
-      throw new Error('[sync] Tasa histórica inválida');
-    rates[source] = {
-      baseCurrency: rate.baseCurrency,
-      quoteCurrency: rate.quoteCurrency,
-      rate: rate.rate,
-      convertedAmountMinor: minorAmount(rate.convertedAmountMinor),
-      ...(rate.convertedCurrency === undefined
-        ? {}
-        : { convertedCurrency: rate.convertedCurrency }),
-      observedAt: optionalString(rate.observedAt),
-    };
-  }
-  return {
-    countryCode: 'VE',
-    createdWithCurrency: snapshot.createdWithCurrency,
-    rates,
-  };
 }
 
 type RawCollections = {
@@ -357,6 +313,7 @@ function parseCollections(raw: RawCollections) {
         currency: text(transaction.currency),
         title: text(transaction.title),
         occurredOn: text(transaction.occurredOn),
+        occurredTime: readRemoteOccurredTime(transaction),
         note: optionalString(transaction.note),
         recurrence: text(transaction.recurrence) || 'once',
         recurrenceGroupId: optionalString(transaction.recurrenceGroupId),
@@ -373,7 +330,9 @@ function parseCollections(raw: RawCollections) {
         accountingAmountMinorUsd: optionalMinorAmount(
           transaction.accountingAmountMinorUsd,
         ),
-        exchangeSnapshot: exchangeSnapshot(transaction.exchangeSnapshot),
+        exchangeSnapshot: readRemoteExchangeSnapshot(
+          transaction.exchangeSnapshot,
+        ),
       }),
     ),
   };

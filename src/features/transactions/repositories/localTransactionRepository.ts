@@ -15,6 +15,7 @@ import {
   assertTransaction,
   resolveLocalAuthorId,
 } from '@/features/transactions/repositories/localTransactionGuards';
+import { withStoredOccurredTimes } from '@/features/transactions/repositories/localTransactionTimeRepository';
 import {
   automaticRecurrences,
   mapTransaction,
@@ -96,16 +97,17 @@ async function insertTransaction(
   recurrenceGroupId: string | null,
   recurrenceSeriesId: string | null,
   now: string,
+  occurredTime: string | null = null,
 ): Promise<void> {
   await database.runAsync(
     `INSERT INTO transactions (
        id, space_id, category_id, money_account_id, created_by, type,
        amount_minor, currency,
-       title, occurred_on, recurrence, recurrence_group_id,
+       title, occurred_on, occurred_time, recurrence, recurrence_group_id,
        recurrence_series_id,
        source_transaction_id, sync_status, is_archived, created_at, updated_at,
        archived_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only', 0, ?, ?, NULL)`,
     id,
     input.spaceId,
     input.categoryId,
@@ -116,6 +118,7 @@ async function insertTransaction(
     input.currency,
     input.title,
     occurredOn,
+    occurredTime,
     input.recurrence,
     recurrenceGroupId,
     recurrenceSeriesId,
@@ -134,7 +137,8 @@ export async function listLocalTransactions(): Promise<SessionTransaction[]> {
             transactions.created_by,
             transactions.type, transactions.amount_minor,
             transactions.currency, transactions.title,
-            transactions.occurred_on, transactions.recurrence,
+            transactions.occurred_on, transactions.occurred_time,
+            transactions.recurrence,
             transactions.recurrence_group_id,
             transactions.recurrence_series_id, transactions.updated_at,
             transactions.source_transaction_id, transactions.note,
@@ -229,6 +233,7 @@ export async function createLocalTransaction(
     }
 
     for (const [index, occurredOn] of occurrenceDates.entries()) {
+      // Solo la ocurrencia que registró la persona tiene hora.
       await insertTransaction(
         transaction,
         input,
@@ -238,6 +243,7 @@ export async function createLocalTransaction(
         recurrenceGroupId,
         seriesId,
         now,
+        index === 0 ? (input.occurredTime ?? null) : null,
       );
     }
   });
@@ -253,6 +259,9 @@ export async function createLocalTransaction(
     currency: input.currency,
     title: input.title,
     occurredOn,
+    ...(index === 0 && input.occurredTime
+      ? { occurredTime: input.occurredTime }
+      : {}),
     recurrence: input.recurrence,
     nextOccurrenceOn,
     recurrenceGroupId: recurrenceGroupId ?? undefined,
@@ -302,6 +311,7 @@ export async function createLocalTransactions(
         null,
         null,
         now,
+        input.occurredTime ?? null,
       );
     }
   });
@@ -317,13 +327,22 @@ export async function createLocalTransactions(
     currency: input.currency,
     title: input.title,
     occurredOn: input.occurredOn,
+    ...(input.occurredTime ? { occurredTime: input.occurredTime } : {}),
     recurrence: 'once',
     sourceTransactionId: input.sourceTransactionId,
     updatedAt: now,
   }));
 }
 
+/** La hora no se edita aquí: se conserva en SQLite y se relee al devolver. */
 export async function updateLocalTransaction(
+  id: string,
+  draft: CreateTransactionDraft,
+): Promise<SessionTransaction[]> {
+  return withStoredOccurredTimes(await updateLocalTransactionFields(id, draft));
+}
+
+async function updateLocalTransactionFields(
   id: string,
   draft: CreateTransactionDraft,
 ): Promise<SessionTransaction[]> {
@@ -338,7 +357,7 @@ export async function updateLocalTransaction(
       projectedIdentity,
       draft.spaceId,
     );
-    return updateLocalTransaction(materializedId, draft);
+    return updateLocalTransactionFields(materializedId, draft);
   }
 
   const now = new Date().toISOString();
@@ -673,6 +692,7 @@ export async function updateLocalTransaction(
               transactions.type,
               transactions.amount_minor, transactions.currency,
               transactions.title, transactions.occurred_on,
+              transactions.occurred_time,
               transactions.recurrence, transactions.recurrence_group_id,
               transactions.recurrence_series_id, transactions.updated_at,
               transactions.source_transaction_id,

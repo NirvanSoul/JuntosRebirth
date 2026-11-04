@@ -137,4 +137,34 @@ describe('transactionRecurrence', () => {
       seriesId: 'salary-series',
     });
   });
+
+  it('no copia la hora de la ocurrencia registrada a las proyectadas', () => {
+    const transaction: SessionTransaction = {
+      id: 'rent-source',
+      createdBy: 'install-test',
+      spaceId: 'personal',
+      categoryId: 'home',
+      type: 'expense',
+      amountMinor: 80_000,
+      currency: 'EUR',
+      title: 'Alquiler',
+      occurredOn: '2026-08-05',
+      occurredTime: '09:15',
+      recurrence: 'monthly',
+      nextOccurrenceOn: '2026-09-05',
+      recurrenceSeriesId: 'rent-series',
+      recurrenceStartsOn: '2026-08-05',
+      updatedAt: '2026-08-05T12:00:00.000Z',
+    };
+
+    const [nextOccurrence, registered] = projectRecurringTransactions({
+      transactions: [transaction],
+      startOn: '2026-08-01',
+      endOn: '2026-09-30',
+    });
+
+    expect(nextOccurrence!.occurredOn).toBe('2026-09-05');
+    expect(nextOccurrence).not.toHaveProperty('occurredTime');
+    expect(registered!.occurredTime).toBe('09:15');
+  });
 });

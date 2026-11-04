@@ -30,6 +30,10 @@ jest.mock('@/features/transactions/services/notificationRuleService', () => ({
 jest.mock('@/lib/date/localDate', () => ({
   getLocalTodayKey: () => '2026-09-22',
 }));
+jest.mock('@/lib/date/timeOfDay', () => ({
+  resolveRegistrationTimeOfDay: (occurredOn: string) =>
+    occurredOn === '2026-09-22' ? '14:35' : undefined,
+}));
 
 const mockedCreateOne = jest.mocked(createLocalTransaction);
 const mockedCreateMany = jest.mocked(createLocalTransactions);
@@ -97,7 +101,7 @@ async function setup(
     onChangesPublished: jest.fn(),
     onError: jest.fn(),
     onTransactionSaved: jest.fn(),
-    onTransactionsCreated: jest.fn(),
+    onTransactionsSaved: jest.fn(),
     setTransactions: jest.fn(),
   };
   const { result } = await renderHook(() =>
@@ -118,6 +122,18 @@ describe('useTransactionSubmit', () => {
   beforeEach(() => jest.clearAllMocks());
 
   describe('submitTransaction', () => {
+    it('no adivina la hora de un movimiento de otro día', async () => {
+      mockedCreateOne.mockResolvedValueOnce([
+        sessionTransaction({ id: 'tx-yesterday' }),
+      ]);
+      const { result } = await setup();
+      const yesterday = { ...draft, occurredOn: '2026-09-21' };
+
+      await act(() => result.current.submitTransaction(yesterday));
+
+      expect(mockedCreateOne).toHaveBeenCalledWith(yesterday);
+    });
+
     it('crea el movimiento, publica y cierra el formulario', async () => {
       const created = [sessionTransaction({ id: 'tx-1' })];
       mockedCreateOne.mockResolvedValueOnce(created);
@@ -125,7 +141,11 @@ describe('useTransactionSubmit', () => {
 
       await act(() => result.current.submitTransaction(draft));
 
-      expect(mockedCreateOne).toHaveBeenCalledWith(draft);
+      // Registrado hoy: guarda la hora actual sin que la persona la elija.
+      expect(mockedCreateOne).toHaveBeenCalledWith({
+        ...draft,
+        occurredTime: '14:35',
+      });
       const update = callbacks.setTransactions.mock.calls[0]![0];
       expect(update([sessionTransaction({ id: 'old' })])).toEqual([
         created[0],
@@ -134,9 +154,10 @@ describe('useTransactionSubmit', () => {
       expect(reconcileNotificationRules).toHaveBeenCalled();
       expect(callbacks.onChangesPublished).toHaveBeenCalledTimes(1);
       expect(callbacks.onTransactionSaved).toHaveBeenCalledWith('created');
-      expect(callbacks.onTransactionsCreated).toHaveBeenCalledWith(
+      expect(callbacks.onTransactionsSaved).toHaveBeenCalledWith(
         created,
         foodCategory,
+        'created',
       );
       expect(callbacks.onError).not.toHaveBeenCalled();
     });
@@ -183,6 +204,11 @@ describe('useTransactionSubmit', () => {
       expect(applyTransactionUpdate).toHaveBeenCalledWith('tx-1', draft);
       expect(mockedCreateOne).not.toHaveBeenCalled();
       expect(callbacks.onTransactionSaved).toHaveBeenCalledWith('updated');
+      expect(callbacks.onTransactionsSaved).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: 'tx-1' })],
+        expect.objectContaining({ id: draft.categoryId }),
+        'updated',
+      );
     });
   });
 
@@ -232,6 +258,7 @@ describe('useTransactionSubmit', () => {
           categoryId: 'exchange',
           moneyAccountId: 'bank',
           occurredOn: '2026-09-22',
+          occurredTime: '14:35',
           recurrence: 'once',
         },
         {
@@ -243,18 +270,20 @@ describe('useTransactionSubmit', () => {
           categoryId: 'exchange',
           moneyAccountId: undefined,
           occurredOn: '2026-09-22',
+          occurredTime: '14:35',
           recurrence: 'once',
         },
       ]);
       expect(callbacks.setTransactions).toHaveBeenCalledTimes(1);
       expect(callbacks.onChangesPublished).toHaveBeenCalledTimes(1);
       expect(callbacks.onTransactionSaved).not.toHaveBeenCalled();
-      expect(callbacks.onTransactionsCreated).toHaveBeenCalledWith(
+      expect(callbacks.onTransactionsSaved).toHaveBeenCalledWith(
         [
           expect.objectContaining({ id: 'ves' }),
           expect.objectContaining({ id: 'usd' }),
         ],
         exchangeCategory,
+        'created',
       );
     });
 

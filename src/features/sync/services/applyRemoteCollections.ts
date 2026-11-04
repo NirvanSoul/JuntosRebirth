@@ -342,17 +342,20 @@ export async function applyRemoteCollections(
       `INSERT INTO transactions (
          id, space_id, category_id, money_account_id, created_by, type,
          amount_minor, currency,
-         title, occurred_on, recurrence, recurrence_group_id,
+         title, occurred_on, occurred_time, recurrence, recurrence_group_id,
          recurrence_series_id, source_transaction_id, note, sync_status,
            accounting_amount_minor_usd, exchange_snapshot_json,
          is_archived, created_at, updated_at, archived_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                  'synced', ?, ?, ?, ?, ?, ?)
        ON CONFLICT (id) DO UPDATE SET
          category_id = excluded.category_id,
          money_account_id = excluded.money_account_id, type = excluded.type,
          amount_minor = excluded.amount_minor, currency = excluded.currency,
          title = excluded.title, occurred_on = excluded.occurred_on,
+         -- Una respuesta sin la clave (API anterior) conserva la hora local.
+         occurred_time = CASE WHEN ? = 1
+           THEN excluded.occurred_time ELSE transactions.occurred_time END,
          recurrence = excluded.recurrence,
          recurrence_group_id = excluded.recurrence_group_id,
          recurrence_series_id = excluded.recurrence_series_id,
@@ -372,6 +375,7 @@ export async function applyRemoteCollections(
       remoteTransaction.currency,
       remoteTransaction.title,
       remoteTransaction.occurredOn,
+      remoteTransaction.occurredTime ?? null,
       remoteTransaction.recurrence,
       remoteTransaction.recurrenceGroupId,
       remoteTransaction.recurrenceSeriesRemoteId,
@@ -385,6 +389,9 @@ export async function applyRemoteCollections(
       remoteTransaction.createdAt,
       remoteTransaction.updatedAt,
       remoteTransaction.archivedAt,
+      // Va al final: es el único parámetro de la cláusula DO UPDATE, que
+      // sigue a VALUES en el texto de la sentencia.
+      remoteTransaction.occurredTime === undefined ? 0 : 1,
     );
   }
 

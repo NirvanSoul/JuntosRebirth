@@ -370,6 +370,8 @@ describe('migrateLocalDatabase', () => {
         .fn()
         .mockResolvedValueOnce([{ name: 'money_account_id' }])
         .mockResolvedValueOnce([])
+        // Columnas de `transactions` que repara la migración 36.
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]),
     } as unknown as SQLiteDatabase;
 

@@ -3,14 +3,17 @@ import type { TransactionType } from '@/features/transactions/types';
 import { isValidLocalDate } from '@/features/transactions/utils/transactionRecurrence';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { formatCurrency } from '@/lib/currency/formatCurrency';
+import {
+  formatTimeOfDay,
+  isValidTimeOfDay,
+  timeOfDayToDate,
+} from '@/lib/date/timeOfDay';
 
 /** Tope de recordatorios que se pueden programar para un mismo día. */
 export const maxTransactionReminderTimesPerDay = 6;
 
-const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
 export function isValidReminderTime(time: string): boolean {
-  return timePattern.test(time);
+  return isValidTimeOfDay(time);
 }
 
 /** Ordena y elimina horas repetidas, sin alterar su formato `HH:mm`. */
@@ -32,20 +35,7 @@ export function buildReminderDateTime(
   return new Date(year!, month! - 1, day!, hour!, minute!, 0, 0);
 }
 
-/** Formatea la hora de un `Date` como `HH:mm` en hora local. */
-export function formatTimeOfDay(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(
-    date.getMinutes(),
-  ).padStart(2, '0')}`;
-}
-
-/** Convierte una hora `HH:mm` en un `Date` de hoy, para inicializar un selector nativo. */
-export function timeOfDayToDate(time: string): Date {
-  const [hour, minute] = time.split(':').map(Number);
-  const date = new Date();
-  date.setHours(hour ?? 0, minute ?? 0, 0, 0);
-  return date;
-}
+export { formatTimeOfDay, timeOfDayToDate };
 
 /**
  * Variables disponibles para interpolar en una plantilla de notificación de

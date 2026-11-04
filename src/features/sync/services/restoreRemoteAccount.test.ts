@@ -293,6 +293,8 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
       'VES',
       'Sueldo',
       '2026-08-16',
+      // La API legacy no trae la hora: se inserta sin ella…
+      null,
       'once',
       null,
       null,
@@ -307,6 +309,8 @@ describe('restoreRemoteAccount (disciplina transaccional estructural)', () => {
       '2026-08-16T12:00:00.000Z',
       '2026-08-16T12:00:00.000Z',
       null,
+      // …y una fila existente conserva la suya.
+      0,
     );
 
     const transactionInsert = (txHandle.runAsync as jest.Mock).mock.calls.find(

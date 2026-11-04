@@ -19,6 +19,7 @@ import {
   createLocalTransactions,
   type CreateLocalTransactionInput,
 } from '@/features/transactions/repositories/localTransactionRepository';
+import type { TransactionSaveMode } from '@/features/transactions/hooks/useMovementNotice';
 import { reconcileNotificationRules } from '@/features/transactions/services/notificationRuleService';
 import type {
   CreateTransactionDraft,
@@ -27,6 +28,7 @@ import type {
 } from '@/features/transactions/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { getLocalTodayKey } from '@/lib/date/localDate';
+import { resolveRegistrationTimeOfDay } from '@/lib/date/timeOfDay';
 
 type UseTransactionSubmitInput = {
   activeSpaceId: string;
@@ -47,11 +49,12 @@ type UseTransactionSubmitInput = {
   onChangesPublished: () => void;
   onError: () => void;
   /** Cierra el formulario y limpia la selección tras guardar. */
-  onTransactionSaved: (mode: 'created' | 'updated') => void;
-  /** Confirma a la persona los movimientos nuevos y su categoría. */
-  onTransactionsCreated: (
-    created: readonly SessionTransaction[],
+  onTransactionSaved: (mode: TransactionSaveMode) => void;
+  /** Confirma a la persona lo guardado (altas o edición) y su categoría. */
+  onTransactionsSaved: (
+    saved: readonly SessionTransaction[],
     category: Category,
+    mode: TransactionSaveMode,
   ) => void;
   setTransactions: (
     update: (current: SessionTransaction[]) => SessionTransaction[],
@@ -82,7 +85,7 @@ export function useTransactionSubmit({
   onChangesPublished,
   onError,
   onTransactionSaved,
-  onTransactionsCreated,
+  onTransactionsSaved,
   setTransactions,
 }: UseTransactionSubmitInput) {
   const ensureAccountCurrency = useCallback(
@@ -120,9 +123,9 @@ export function useTransactionSubmit({
         transactions: nextTransactions,
       }).catch(() => undefined);
       onChangesPublished();
-      onTransactionsCreated(created, category);
+      onTransactionsSaved(created, category, 'created');
     },
-    [categories, onChangesPublished, onTransactionsCreated, setTransactions],
+    [categories, onChangesPublished, onTransactionsSaved, setTransactions],
   );
 
   const submitTransaction = useCallback(
@@ -159,12 +162,22 @@ export function useTransactionSubmit({
           editingTransactionId,
           safeDraft,
         );
-        if (updated) onTransactionSaved('updated');
+        if (updated) {
+          onTransactionSaved('updated');
+          onTransactionsSaved([updated], targetCategory, 'updated');
+        }
         return;
       }
 
       try {
-        commitCreated(await createLocalTransaction(safeDraft), targetCategory);
+        const occurredTime = resolveRegistrationTimeOfDay(safeDraft.occurredOn);
+        commitCreated(
+          await createLocalTransaction({
+            ...safeDraft,
+            ...(occurredTime ? { occurredTime } : {}),
+          }),
+          targetCategory,
+        );
         onTransactionSaved('created');
       } catch (error) {
         console.error(
@@ -183,6 +196,7 @@ export function useTransactionSubmit({
       ensureAccountCurrency,
       onError,
       onTransactionSaved,
+      onTransactionsSaved,
     ],
   );
 
@@ -233,6 +247,7 @@ export function useTransactionSubmit({
 
         const category = await resolveCurrencyExchangeCategory();
         const occurredOn = getLocalTodayKey();
+        const occurredTime = resolveRegistrationTimeOfDay(occurredOn);
         const toInput = (
           leg: CurrencyExchangeLeg,
           type: TransactionType,
@@ -245,6 +260,7 @@ export function useTransactionSubmit({
           categoryId: category.id,
           moneyAccountId: leg.moneyAccountId,
           occurredOn,
+          ...(occurredTime ? { occurredTime } : {}),
           recurrence: 'once',
         });
 

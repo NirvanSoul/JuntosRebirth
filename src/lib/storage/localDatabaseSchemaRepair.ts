@@ -72,12 +72,14 @@ export async function ensureLocalProfileDisplayNameSyncStatusColumn(
 }
 
 /**
+ * Añade a `transactions` las columnas posteriores al esquema base que falten.
  * Repara una instalación que ya llegó a la versión 29, pero cuya build
- * intermedia marcó la versión antes de añadir las columnas de tasas. Sin esta
+ * intermedia marcó la versión antes de añadir las columnas de tasas: sin esta
  * comprobación la restauración remota falla al recibir un movimiento creado
- * con el modo Venezuela.
+ * con el modo Venezuela. Es también la migración 36 (`occurred_time`, la hora
+ * local `HH:mm` del movimiento; los existentes quedan sin hora).
  */
-export async function ensureTransactionExchangeRateColumns(
+export async function ensureTransactionAddedColumns(
   database: SQLite.SQLiteDatabase,
 ): Promise<void> {
   const columns = await database.getAllAsync<{ name: string }>(
@@ -97,6 +99,11 @@ export async function ensureTransactionExchangeRateColumns(
   if (!names.has('accounting_amount_minor_usd')) {
     await database.execAsync(
       'ALTER TABLE transactions ADD COLUMN accounting_amount_minor_usd INTEGER',
+    );
+  }
+  if (!names.has('occurred_time')) {
+    await database.execAsync(
+      'ALTER TABLE transactions ADD COLUMN occurred_time TEXT',
     );
   }
 }

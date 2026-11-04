@@ -14,7 +14,7 @@ import {
   ensureLocalProfileCountryCodeColumn,
   ensureLocalProfileDisplayNameColumn,
   ensureLocalProfileDisplayNameSyncStatusColumn,
-  ensureTransactionExchangeRateColumns,
+  ensureTransactionAddedColumns,
 } from '@/lib/storage/localDatabaseSchemaRepair';
 
 /**
@@ -23,7 +23,7 @@ import {
  * versión, de modo que la escalera es acumulativa y ningún bloque se
  * reejecuta.
  */
-export const localDatabaseVersion = 35;
+export const localDatabaseVersion = 36;
 
 export async function migrateLocalDatabase(
   database: SQLite.SQLiteDatabase,
@@ -56,7 +56,7 @@ export async function migrateLocalDatabase(
     await ensureLocalProfileDisplayNameColumn(database);
     await ensureLocalProfileDisplayNameSyncStatusColumn(database);
     await ensureLocalProfileCountryCodeColumn(database);
-    await ensureTransactionExchangeRateColumns(database);
+    await ensureTransactionAddedColumns(database);
     return;
   }
 
@@ -433,6 +433,8 @@ export async function migrateLocalDatabase(
     await applyRetiredCategoryColorMigration(transaction, currentVersion);
 
     await applyCategoryBudgetMigrations(transaction, currentVersion);
+
+    await ensureTransactionAddedColumns(transaction); // v36: occurred_time
 
     await transaction.execAsync(
       `PRAGMA user_version = ${localDatabaseVersion}`,

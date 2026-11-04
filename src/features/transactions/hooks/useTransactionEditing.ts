@@ -5,6 +5,7 @@ import {
   listLocalTransactions,
   updateLocalTransaction,
 } from '@/features/transactions/repositories/localTransactionRepository';
+import { updateLocalTransactionOccurredTime } from '@/features/transactions/repositories/localTransactionTimeRepository';
 import type {
   CreateTransactionDraft,
   SessionTransaction,
@@ -36,6 +37,10 @@ type UseTransactionEditingInput = {
  * proyectadas, recordatorios y autoría se resuelven en `updateLocalTransaction`
  * (`DATABASE.md` §8), y un UPDATE por campo desde el detalle habría creado una
  * segunda regla que se desincroniza con la primera.
+ *
+ * La hora es la excepción: `updateLocalTransaction` no la escribe, no afecta a
+ * series ni recordatorios, y el detalle no la ofrece en ocurrencias
+ * proyectadas, así que se guarda con un UPDATE de su única columna.
  */
 export function useTransactionEditing({
   categories,
@@ -113,6 +118,31 @@ export function useTransactionEditing({
       );
       if (!transaction) return;
 
+      if (change.field === 'time') {
+        if (parseProjectedTransactionId(transactionId)) return;
+        try {
+          const updatedAt = await updateLocalTransactionOccurredTime(
+            transaction.id,
+            transaction.spaceId,
+            change.occurredTime,
+          );
+          setTransactions((current) =>
+            current.map((entry) => {
+              if (entry.id !== transaction.id) return entry;
+              const { occurredTime: _previousTime, ...rest } = entry;
+              return change.occurredTime === null
+                ? { ...rest, updatedAt }
+                : { ...rest, occurredTime: change.occurredTime, updatedAt };
+            }),
+          );
+          onChangesPublished();
+        } catch (error) {
+          console.error('[useTransactionEditing] occurredTime', error);
+          onError();
+        }
+        return;
+      }
+
       const updated = await applyTransactionUpdate(
         transactionId,
         applyTransactionQuickEdit(transaction, change),
@@ -121,7 +151,14 @@ export function useTransactionEditing({
         setDetailTransactionId(updated.id);
       }
     },
-    [applyTransactionUpdate, setDetailTransactionId, spaceTransactions],
+    [
+      applyTransactionUpdate,
+      onChangesPublished,
+      onError,
+      setDetailTransactionId,
+      setTransactions,
+      spaceTransactions,
+    ],
   );
 
   return { applyTransactionUpdate, quickEditTransaction };

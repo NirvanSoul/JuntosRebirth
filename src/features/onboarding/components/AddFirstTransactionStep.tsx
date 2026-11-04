@@ -30,6 +30,7 @@ import type {
 import { defaultCurrencyCode } from '@/lib/currency/currencyCatalog';
 import type { CreateActionType } from '@/navigation/createActions';
 import { useCurrencyPreferences } from '@/state/appPreferences/useCurrencyPreferences';
+import { resolveRegistrationTimeOfDay } from '@/lib/date/timeOfDay';
 
 type AddFirstTransactionStepProps = {
   currentStep: number;
@@ -149,7 +150,11 @@ export function AddFirstTransactionStep({
 
     setError(null);
     try {
-      await createLocalTransaction(draft);
+      const occurredTime = resolveRegistrationTimeOfDay(draft.occurredOn);
+      await createLocalTransaction({
+        ...draft,
+        ...(occurredTime ? { occurredTime } : {}),
+      });
       setModalVisible(false);
       onSaved();
     } catch {

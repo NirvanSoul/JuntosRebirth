@@ -10,15 +10,21 @@ export type ExchangeSnapshotRate = {
   quoteCurrency: string;
   rate: string;
   convertedAmountMinor: number;
-  /** Moneda exacta de `convertedAmountMinor`; evita inferir la dirección. */
-  convertedCurrency?: CurrencyCode;
+  /**
+   * Moneda exacta de `convertedAmountMinor`; evita inferir la dirección. Solo
+   * la fila USDT de un movimiento en VES convierte a `USDT`, que no es una
+   * moneda de la app.
+   */
+  convertedCurrency?: CurrencyCode | 'USDT';
   observedAt: string | null;
 };
 
 export type TransactionExchangeSnapshot = {
   countryCode: 'VE';
   createdWithCurrency: 'USD' | 'VES';
-  rates: Partial<Record<'BCV' | 'EURO' | 'CUSTOM', ExchangeSnapshotRate>>;
+  rates: Partial<
+    Record<'BCV' | 'EURO' | 'CUSTOM' | 'USDT', ExchangeSnapshotRate>
+  >;
 };
 
 /** Selector que debe abrir el formulario al llegar desde el detalle. */
@@ -43,7 +49,9 @@ export type TransactionQuickEdit =
       field: 'recurrence';
       customOccurrenceDates?: readonly string[];
       recurrence: TransactionRecurrence;
-    };
+    }
+  /** `null` quita la hora. Es el único cambio que no pasa por el borrador. */
+  | { field: 'time'; occurredTime: string | null };
 
 export type CreateTransactionDraft = {
   spaceId: string;
@@ -59,6 +67,12 @@ export type CreateTransactionDraft = {
    */
   moneyAccountId?: string;
   occurredOn: string;
+  /**
+   * Hora de reloj local `HH:mm` en la que ocurrió, sin zona horaria, igual que
+   * `occurredOn` es una fecha local. Ausente significa «sin hora». Es
+   * informativa: no cambia el orden ni la agrupación por día.
+   */
+  occurredTime?: string;
   recurrence: TransactionRecurrence;
   customOccurrenceDates?: readonly string[];
 };

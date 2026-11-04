@@ -6,6 +6,7 @@ import type { CreateTransactionDraft } from '@/features/transactions/types';
 import { isValidLocalDate } from '@/features/transactions/utils/transactionRecurrence';
 import { isCurrencyCode } from '@/lib/currency/currencyCatalog';
 import { getOrCreateInstallationId } from '@/lib/storage/localIdentity';
+import { isValidTimeOfDay } from '@/lib/date/timeOfDay';
 
 /**
  * Identidad que se graba en `created_by` al crear una fila en este dispositivo.
@@ -30,6 +31,8 @@ export function assertTransaction(input: CreateTransactionDraft): void {
     !Number.isSafeInteger(input.amountMinor) ||
     input.amountMinor <= 0 ||
     !isValidLocalDate(input.occurredOn) ||
+    (input.occurredTime !== undefined &&
+      !isValidTimeOfDay(input.occurredTime)) ||
     !recurrences.has(input.recurrence) ||
     !isCurrencyCode(input.currency)
   ) {

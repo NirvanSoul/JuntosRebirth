@@ -196,10 +196,15 @@ export function projectRecurringTransactions({
     }
   }
 
-  for (const [seriesId, template] of templatesBySeries) {
-    if (!template.nextOccurrenceOn || template.nextOccurrenceOn > endOn) {
+  for (const [seriesId, latestOccurrence] of templatesBySeries) {
+    if (
+      !latestOccurrence.nextOccurrenceOn ||
+      latestOccurrence.nextOccurrenceOn > endOn
+    ) {
       continue;
     }
+    // La hora es de la ocurrencia que se registró, no de las que vendrán.
+    const { occurredTime: _occurrenceTime, ...template } = latestOccurrence;
 
     const frequency = template.recurrence as AutomaticTransactionRecurrence;
     const startsOn = template.recurrenceStartsOn ?? template.occurredOn;
@@ -210,7 +215,7 @@ export function projectRecurringTransactions({
       occurrenceIndex,
     );
 
-    while (occurrenceDate < template.nextOccurrenceOn) {
+    while (occurrenceDate < latestOccurrence.nextOccurrenceOn) {
       occurrenceIndex += 1;
       occurrenceDate = getRecurrenceOccurrenceDate(
         startsOn,

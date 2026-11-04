@@ -7,6 +7,7 @@ import {
   syncCoupleSpaceRemotely,
 } from '@/features/sync/gateways/juntossCoupleSpaceSyncGateway';
 import { clearRemoteChangesCursor } from '@/features/sync/repositories/localSyncCursorRepository';
+import { sendWithOccurredTimeSupport } from '@/features/sync/services/occurredTimeUploadSupport';
 import { findRemoteIdForLocalEntity } from '@/features/sync/repositories/localRemoteEntityLinkRepository';
 import { assertLocalCacheOwnedBy } from '@/features/sync/repositories/localSyncAccountRepository';
 import {
@@ -229,7 +230,8 @@ async function syncSpaceData(input: {
                 ),
                 'Movimiento'
               ) AS title,
-              occurred_on AS "occurredOn", note, recurrence,
+              occurred_on AS "occurredOn",
+              occurred_time AS "occurredTime", note, recurrence,
               recurrence_group_id AS "recurrenceGroupId",
               recurrence_series_id AS "recurrenceSeriesId",
               source_transaction_id AS "sourceTransactionId",
@@ -250,26 +252,30 @@ async function syncSpaceData(input: {
     return emptySyncResult();
   }
 
-  const remoteResult = await syncCoupleSpaceRemotely({
-    installationId,
-    spaceId: remoteSpaceId,
-    // Cada categoría viaja con todos sus presupuestos por moneda: el
-    // servidor los reescribe enteros, así que quitar uno aquí lo quita allí.
-    categories: categories.map((row) => ({
-      ...serializeRow(row),
-      budgets: buildCategoryBudgets(row.id, categoryBudgets),
-    })),
-    // Cada cuenta viaja con sus monedas: el RPC las reescribe enteras, así
-    // que una divisa retirada aquí desaparece también en el otro dispositivo.
-    moneyAccounts: moneyAccounts.map((row) => ({
-      ...serializeRow(row),
-      balances: moneyAccountBalances
-        .filter((balance) => balance.money_account_id === row.id)
-        .map(({ money_account_id: _accountId, ...balance }) => balance),
-    })),
-    recurringSeries: recurringSeries.map(serializeRow),
-    transactions: transactions.map(serializeRow),
-  });
+  const remoteResult = await sendWithOccurredTimeSupport(
+    transactions.map(serializeRow),
+    (serializedTransactions) =>
+      syncCoupleSpaceRemotely({
+        installationId,
+        spaceId: remoteSpaceId,
+        // Cada categoría viaja con todos sus presupuestos por moneda: el
+        // servidor los reescribe enteros, así que quitar uno aquí lo quita allí.
+        categories: categories.map((row) => ({
+          ...serializeRow(row),
+          budgets: buildCategoryBudgets(row.id, categoryBudgets),
+        })),
+        // Cada cuenta viaja con sus monedas: el RPC las reescribe enteras, así
+        // que una divisa retirada aquí desaparece también en el otro dispositivo.
+        moneyAccounts: moneyAccounts.map((row) => ({
+          ...serializeRow(row),
+          balances: moneyAccountBalances
+            .filter((balance) => balance.money_account_id === row.id)
+            .map(({ money_account_id: _accountId, ...balance }) => balance),
+        })),
+        recurringSeries: recurringSeries.map(serializeRow),
+        transactions: serializedTransactions,
+      }),
+  );
 
   const rejected = rejectedLocalIds(remoteResult.conflicts);
   const hasNewerVersion = [...rejected.values()].includes('NEWER_VERSION');

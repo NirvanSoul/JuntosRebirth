@@ -43,7 +43,11 @@ describe('localTransactionRepository', () => {
     lastInsertRowId: 0,
   }));
   const getFirstAsync = jest.fn();
-  const getAllAsync = jest.fn();
+  // Por defecto ninguna fila: `updateLocalTransaction` relee la hora guardada
+  // de los movimientos que devuelve.
+  const getAllAsync = jest.fn(
+    async (..._args: unknown[]): Promise<unknown[]> => [],
+  );
   const withExclusiveTransactionAsync = jest.fn(
     async (task: (transaction: SQLiteDatabase) => Promise<void>) =>
       task(database),
@@ -104,6 +108,7 @@ describe('localTransactionRepository', () => {
       'EUR',
       'Compra',
       '2026-08-01',
+      null,
       'once',
       null,
       null,
@@ -911,6 +916,7 @@ describe('localTransactionRepository', () => {
         'EUR',
         'Compra',
         '2026-08-01',
+        null,
         'once',
         null,
         null,
@@ -1115,6 +1121,7 @@ describe('localTransactionRepository', () => {
         'EUR',
         'Compra',
         '2026-08-01',
+        null,
         'once',
         null,
         null,

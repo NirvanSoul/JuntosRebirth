@@ -31,6 +31,7 @@ jest.mock(
 // expo-localization devuelve en-US y los textos esperados están en español.
 jest.mock('expo-localization', () => ({
   getLocales: jest.fn(() => [{ languageCode: 'es', languageTag: 'es-ES' }]),
+  getCalendars: jest.fn(() => [{ uses24hourClock: true }]),
 }));
 
 jest.mock('@react-native-async-storage/async-storage', () =>

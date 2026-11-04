@@ -4,6 +4,7 @@ import type {
   TransactionType,
 } from '@/features/transactions/types';
 import { isCurrencyCode } from '@/lib/currency/currencyCatalog';
+import { isValidTimeOfDay } from '@/lib/date/timeOfDay';
 
 export type TransactionRow = {
   id: string;
@@ -16,6 +17,7 @@ export type TransactionRow = {
   currency: string;
   title: string;
   occurred_on: string;
+  occurred_time: string | null;
   recurrence: string;
   next_occurrence_on: string | null;
   recurrence_group_id: string | null;
@@ -86,6 +88,11 @@ export function mapTransaction(row: TransactionRow): SessionTransaction {
     currency: row.currency,
     title: row.title,
     occurredOn: row.occurred_on,
+    // Una hora corrupta se trata como «sin hora»: es informativa y no
+    // justifica descartar el movimiento entero.
+    ...(isValidTimeOfDay(row.occurred_time)
+      ? { occurredTime: row.occurred_time }
+      : {}),
     recurrence: row.recurrence as TransactionRecurrence,
     nextOccurrenceOn: row.next_occurrence_on ?? undefined,
     recurrenceGroupId: row.recurrence_group_id ?? undefined,
