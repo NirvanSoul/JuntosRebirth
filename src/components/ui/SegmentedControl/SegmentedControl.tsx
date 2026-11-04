@@ -24,6 +24,8 @@ import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
 type SegmentedControlOption<Value extends string> = {
+  /** Se muestra apagada y no se puede elegir, sin desplazar a las demás. */
+  disabled?: boolean;
   icon?: keyof typeof Ionicons.glyphMap;
   iconRotation?: string;
   iconTestID?: string;
@@ -110,7 +112,8 @@ export function SegmentedControl<Value extends string>({
           <Pressable
             accessibilityLabel={option.label}
             accessibilityRole="tab"
-            accessibilityState={{ selected }}
+            accessibilityState={{ disabled: option.disabled, selected }}
+            disabled={option.disabled}
             hitSlop={{ bottom: spacing.sm, top: spacing.sm }}
             key={option.value}
             onPress={() => onChange(option.value)}
@@ -142,7 +145,13 @@ export function SegmentedControl<Value extends string>({
             ) : null}
             <Text
               align="center"
-              tone={selected ? selectedTextTone : unselectedTextTone}
+              tone={
+                option.disabled
+                  ? 'muted'
+                  : selected
+                    ? selectedTextTone
+                    : unselectedTextTone
+              }
               variant="label"
             >
               {option.label}

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { StyleSheet, View } from 'react-native';
 
@@ -10,6 +11,11 @@ import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymb
 type VenezuelaDisplayModeSelectorProps = {
   hideLabel?: boolean;
   indicatorColor?: string;
+  /**
+   * `false` cuando no hay tasa USDT con la que valorar (la fuente P2P cayó):
+   * la opción sigue visible pero apagada, para que el control no salte.
+   */
+  isUsdtAvailable?: boolean;
   selectedTextTone?: TextTone;
   mode: VenezuelaDisplayMode;
   onChange: (mode: VenezuelaDisplayMode) => void;
@@ -21,6 +27,7 @@ type VenezuelaDisplayModeSelectorProps = {
 export function VenezuelaDisplayModeSelector({
   hideLabel = false,
   indicatorColor,
+  isUsdtAvailable = true,
   selectedTextTone,
   mode,
   onChange,
@@ -28,6 +35,12 @@ export function VenezuelaDisplayModeSelector({
   testID,
 }: VenezuelaDisplayModeSelectorProps) {
   const { showCurrencySymbols } = useCurrencySymbolPreference();
+  const isUsdtLost = mode === 'VES_USDT' && !isUsdtAvailable;
+
+  useEffect(() => {
+    if (isUsdtLost) onChange('USD');
+  }, [isUsdtLost, onChange]);
+
   return (
     <View style={[styles.container, style]} testID={testID}>
       {!hideLabel ? (
@@ -48,11 +61,12 @@ export function VenezuelaDisplayModeSelector({
             label: showCurrencySymbols ? '€ BCV' : 'Euro BCV',
             value: 'EUR',
           },
+          { disabled: !isUsdtAvailable, label: 'USDT', value: 'VES_USDT' },
         ]}
         selectedTextTone={
           selectedTextTone ?? (indicatorColor ? 'onBrand' : 'primary')
         }
-        selectedValue={mode}
+        selectedValue={isUsdtLost ? 'USD' : mode}
         testID={testID ? `${testID}-control` : undefined}
       />
     </View>

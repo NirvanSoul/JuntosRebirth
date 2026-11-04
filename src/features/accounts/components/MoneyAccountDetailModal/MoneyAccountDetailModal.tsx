@@ -17,12 +17,9 @@ import { MoneyAccountIcon } from '@/features/accounts/components/MoneyAccountIco
 import { getMoneyAccountKindLabel } from '@/features/accounts/constants/moneyAccountKindDefinitions';
 import type { MoneyAccount } from '@/features/accounts/types';
 import { summarizeMoneyAccounts } from '@/features/accounts/utils/moneyAccountSummary';
-import {
-  computeCombinedAccountBalance,
-  extractRatesFromTransactions,
-} from '@/features/accounts/utils/moneyAccountValuation';
+import { computeCombinedAccountBalance } from '@/features/accounts/utils/moneyAccountValuation';
 import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
-import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
+import { useValuationRates } from '@/features/exchangeRates/hooks/useValuationRates';
 import { useHistoricalTransactionValuation } from '@/features/exchangeRates/hooks/useHistoricalTransactionValuation';
 import { summarizeHistoricalTransactions } from '@/features/exchangeRates/utils/transactionSnapshot';
 import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
@@ -130,36 +127,19 @@ export function MoneyAccountDetailModal({
         : null,
     [hasHistoricalValuation, selectedCurrencyTransactions],
   );
-
-  const exchangeRatesState = useExchangeRates({
-    enabled: visible && canDisplayVenezuelaRates,
-  });
-  const apiRates =
-    exchangeRatesState.status === 'success' ||
-    exchangeRatesState.status === 'stale'
-      ? exchangeRatesState.rates.rates
-      : null;
-
-  const snapshotRates = useMemo(
+  const usdtSummary = useMemo(
     () =>
-      extractRatesFromTransactions(
-        selectedCurrencyTransactions.length > 0
-          ? selectedCurrencyTransactions
-          : transactions,
-      ),
-    [selectedCurrencyTransactions, transactions],
+      hasHistoricalValuation
+        ? summarizeHistoricalTransactions(selectedCurrencyTransactions, 'USDT')
+        : null,
+    [hasHistoricalValuation, selectedCurrencyTransactions],
   );
 
-  const effectiveRates = useMemo(
-    () => ({
-      bcvRate: apiRates?.BCV?.rate
-        ? Number(apiRates.BCV.rate)
-        : snapshotRates.bcvRate,
-      eurRate: apiRates?.EURO?.rate
-        ? Number(apiRates.EURO.rate)
-        : snapshotRates.eurRate,
-    }),
-    [apiRates, snapshotRates],
+  const effectiveRates = useValuationRates(
+    selectedCurrencyTransactions.length > 0
+      ? selectedCurrencyTransactions
+      : transactions,
+    visible && canDisplayVenezuelaRates,
   );
 
   if (!account || !summary || !selectedBalance) return null;
@@ -171,6 +151,7 @@ export function MoneyAccountDetailModal({
         eurSummary,
         mode: valuationMode,
         rates: effectiveRates,
+        usdtSummary,
       })
     : {
         balanceMinor: selectedBalance.balanceMinor,
@@ -264,6 +245,7 @@ export function MoneyAccountDetailModal({
             <VenezuelaDisplayModeSelector
               hideLabel
               indicatorColor={accountColor}
+              isUsdtAvailable={effectiveRates.usdtRate !== null}
               mode={valuationMode}
               onChange={setValuationMode}
               style={styles.valuationSelector}

@@ -84,7 +84,7 @@ describe('getVenezuelaDisplayValue', () => {
     ).toBeNull();
   });
 
-  it('no adivina la moneda de snapshots antiguos sin convertedCurrency', () => {
+  it('sin convertedCurrency no adivina su importe: usa el USD por la tasa congelada', () => {
     expect(
       getVenezuelaDisplayValue({
         amountMinor: 1_000,
@@ -93,12 +93,40 @@ describe('getVenezuelaDisplayValue', () => {
           ...snapshot,
           rates: {
             ...snapshot.rates,
-            BCV: { ...snapshot.rates.BCV, convertedCurrency: undefined },
+            BCV: {
+              ...snapshot.rates.BCV,
+              convertedAmountMinor: 1,
+              convertedCurrency: undefined,
+            },
           },
         },
         mode: 'VES_BCV',
       }),
-    ).toBeNull();
+    ).toMatchObject({ amountMinor: 50_000, currency: 'VES' });
+  });
+
+  it('lee la tasa EUR en bolívares aunque el servidor la congele en euros', () => {
+    expect(
+      getVenezuelaDisplayValue({
+        amountMinor: 500,
+        currency: 'USD',
+        exchangeSnapshot: {
+          countryCode: 'VE',
+          createdWithCurrency: 'USD',
+          rates: {
+            EURO: {
+              baseCurrency: 'EUR',
+              quoteCurrency: 'VES',
+              rate: '999.7691920000',
+              convertedAmountMinor: 447,
+              convertedCurrency: 'EUR',
+              observedAt: '2026-11-04T04:00:00.000Z',
+            },
+          },
+        },
+        mode: 'EUR',
+      }),
+    ).toMatchObject({ amountMinor: 499_885, currency: 'VES', source: 'EURO' });
   });
 
   it('describe la tasa histórica solo con números cuando se ocultan los símbolos', () => {

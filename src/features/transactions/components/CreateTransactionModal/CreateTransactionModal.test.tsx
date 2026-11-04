@@ -1755,6 +1755,11 @@ describe('CreateTransactionModal', () => {
         conversions: {
           BCV: { amountMinor: 20_000, currency: 'USD', rate: '50.0000000000' },
           EURO: { amountMinor: 16_667, currency: 'USD', rate: '60.0000000000' },
+          USDT: {
+            amountMinor: 18_182,
+            currency: 'USDT',
+            rate: '55.0000000000',
+          },
         },
         ratesUpdatedAt: '2026-09-01T04:00:00.000Z',
       });
@@ -1775,12 +1780,17 @@ describe('CreateTransactionModal', () => {
       await fireEvent.press(screen.getByTestId('transaction-currency-button'));
       await fireEvent.press(screen.getByLabelText('5'));
 
+      // Las tres tasas, una al lado de otra: importe y, debajo, su nombre.
       expect(
         await screen.findByTestId('transaction-exchange-preview-badge'),
-      ).toHaveTextContent('≈ $ 200 · $ BCV');
+      ).toHaveTextContent(/^≈\s\$\s200\$\sBCV$/);
       expect(
         screen.getByTestId('transaction-exchange-preview-euro-badge'),
-      ).toHaveTextContent('≈ $ 166,67 · € BCV');
+      ).toHaveTextContent(/^≈\s\$\s166,67€\sBCV$/);
+      // Desde Bs el USDT llega en USDT y se lee como dólares.
+      expect(
+        screen.getByTestId('transaction-exchange-preview-usdt-badge'),
+      ).toHaveTextContent(/^≈\s\$\s181,82USDT$/);
       expect(previewExchangeRate).toHaveBeenCalledWith(
         expect.objectContaining({ fromCurrency: 'VES' }),
       );

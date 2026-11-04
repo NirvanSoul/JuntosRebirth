@@ -62,7 +62,36 @@ describe('moneyAccountValuation', () => {
       expect(extractRatesFromTransactions(transactions)).toEqual({
         bcvRate: 50.25,
         eurRate: 60.1,
+        usdtRate: null,
       });
+    });
+  });
+
+  describe('modo USDT', () => {
+    it('valora una cuenta USD en Bs con el resumen USDT congelado o la tasa actual', () => {
+      const usdtRates = { bcvRate: 50, eurRate: 60, usdtRate: 55 };
+
+      expect(
+        computeEffectiveAccountBalance({
+          balance: balanceUSD,
+          mode: 'VES_USDT',
+          rates: usdtRates,
+        }).balanceMinor,
+      ).toBe(Math.round(balanceUSD.balanceMinor * 55));
+      expect(
+        computeEffectiveAccountBalance({
+          balance: balanceUSD,
+          mode: 'VES_USDT',
+          rates: usdtRates,
+          usdtSummary: {
+            currency: 'VES',
+            expenseMinor: 1,
+            incomeMinor: 2,
+            convertedTransactionCount: 1,
+            missingTransactionCount: 0,
+          },
+        }),
+      ).toMatchObject({ currency: 'VES', expenseMinor: 1, incomeMinor: 2 });
     });
   });
 

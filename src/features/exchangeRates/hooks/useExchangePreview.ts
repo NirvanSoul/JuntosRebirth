@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import { useEffect, useRef, useState } from 'react';
 
 import { previewExchangeRate } from '@/features/exchangeRates/gateways/juntossExchangeRateGateway';
@@ -31,9 +32,15 @@ export type ExchangePreviewState =
 export function useExchangePreview({
   amountMinor,
   fromCurrency,
+  occurredOn,
 }: {
   amountMinor: number;
   fromCurrency: VenezuelaCurrencyCode;
+  /**
+   * Fecha del movimiento. Una fecha pasada pide las tasas de ese día, las que
+   * el servidor congelará al guardar; sin ella se usan las de hoy.
+   */
+  occurredOn?: string;
 }): ExchangePreviewState {
   const [state, setState] = useState<ExchangePreviewState>({
     status: 'idle',
@@ -56,6 +63,7 @@ export function useExchangePreview({
       void previewExchangeRate({
         amountMinor,
         fromCurrency,
+        occurredOn,
       })
         .then((preview) => {
           if (requestId.current !== currentRequestId) return;
@@ -71,7 +79,7 @@ export function useExchangePreview({
         })
         .catch((error: unknown) => {
           if (requestId.current !== currentRequestId) return;
-          console.error(
+          reportBackgroundFailure(
             '[exchangeRates] No se pudo obtener el preview de conversión',
             error,
           );
@@ -80,7 +88,7 @@ export function useExchangePreview({
     }, debounceMs);
 
     return () => clearTimeout(timeoutId);
-  }, [amountMinor, fromCurrency]);
+  }, [amountMinor, fromCurrency, occurredOn]);
 
   return state;
 }

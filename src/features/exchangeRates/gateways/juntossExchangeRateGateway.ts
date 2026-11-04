@@ -1,7 +1,9 @@
 import type {
   CurrentExchangeRate,
   CurrentExchangeRates,
+  CurrentUsdtExchangeRate,
   ExchangeRateConversion,
+  UsdtRateConversion,
   ExchangeRatePreview,
   VenezuelaCurrencyCode,
   VenezuelaExchangeRateSource,
@@ -10,7 +12,9 @@ import {
   getDemoCurrentExchangeRates,
   getDemoExchangePreview,
 } from '@/features/demo/utils/demoVenezuelaRates';
+import { clearVenezuelaRateHistoryCache } from '@/features/exchangeRates/gateways/juntossVenezuelaRateHistoryGateway';
 import { getLocalTodayKey } from '@/lib/date/localDate';
+import { ApiError } from '@/services/api/client';
 import { apiClient } from '@/services/api/juntossApiClient';
 import { loadDemoSession } from '@/state/demoSession/demoSessionStore';
 
@@ -55,7 +59,7 @@ type RawExchangeRatePreview = {
   conversions: Record<
     VenezuelaExchangeRateSource,
     { amount: string; currency: string; rate: string }
-  >;
+  > & { USDT?: unknown };
   ratesUpdatedAt: string;
 };
 
@@ -79,6 +83,58 @@ function mapCurrentRate(
     observedAt: raw.observedAt,
     fetchedAt: raw.fetchedAt,
   } as CurrentExchangeRate;
+}
+
+/**
+ * La fuente USDT es independiente de BCV y EURO: una respuesta sin ella, con
+ * `null` o malformada deja la tasa USDT en `null` y nunca tumba las otras dos.
+ */
+function mapUsdtRate(raw: unknown): CurrentUsdtExchangeRate | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const rate = raw as Record<string, unknown>;
+  if (
+    rate.source !== 'USDT' ||
+    rate.baseCurrency !== 'USDT' ||
+    rate.quoteCurrency !== 'VES' ||
+    typeof rate.rate !== 'string' ||
+    !(Number(rate.rate) > 0) ||
+    typeof rate.observedAt !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    source: 'USDT',
+    baseCurrency: 'USDT',
+    quoteCurrency: 'VES',
+    rate: rate.rate,
+    dailyAverage:
+      typeof rate.dailyAverage === 'string' ? rate.dailyAverage : null,
+    observedAt: rate.observedAt,
+    fetchedAt: typeof rate.fetchedAt === 'string' ? rate.fetchedAt : '',
+    stale: rate.stale === true,
+  };
+}
+
+/** Igual que la tasa vigente: un USDT ausente o roto es `null`, nunca un error. */
+function mapUsdtConversion(raw: unknown): UsdtRateConversion | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const conversion = raw as Record<string, unknown>;
+  if (
+    (conversion.currency !== 'VES' && conversion.currency !== 'USDT') ||
+    typeof conversion.amount !== 'string' ||
+    typeof conversion.rate !== 'string'
+  ) {
+    return null;
+  }
+  try {
+    return {
+      amountMinor: decimalStringToAmountMinor(conversion.amount, 'USDT'),
+      currency: conversion.currency,
+      rate: conversion.rate,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function mapConversion(
@@ -121,6 +177,8 @@ export function peekCurrentExchangeRates(): CurrentExchangeRates | null {
 export function clearCurrentExchangeRatesCache(): void {
   cachedCurrentRates = null;
   currentRatesRequest = null;
+  clearVenezuelaRateHistoryCache();
+  serverAcceptsPreviewDate = true;
 }
 
 export async function getCurrentExchangeRates(): Promise<CurrentExchangeRates> {
@@ -148,7 +206,9 @@ export async function getCurrentExchangeRates(): Promise<CurrentExchangeRates> {
 async function fetchCurrentExchangeRates(): Promise<CurrentExchangeRates> {
   const response = await apiClient.get<{
     data: {
-      rates: Record<VenezuelaExchangeRateSource, RawCurrentExchangeRate>;
+      rates: Record<VenezuelaExchangeRateSource, RawCurrentExchangeRate> & {
+        USDT?: unknown;
+      };
       ratesUpdatedAt: string;
       stale: boolean;
     };
@@ -159,18 +219,39 @@ async function fetchCurrentExchangeRates(): Promise<CurrentExchangeRates> {
     rates: {
       BCV: mapCurrentRate(raw.rates.BCV, 'BCV'),
       EURO: mapCurrentRate(raw.rates.EURO, 'EURO'),
+      USDT: mapUsdtRate(raw.rates.USDT),
     },
     ratesUpdatedAt: raw.ratesUpdatedAt,
     stale: raw.stale,
   };
 }
 
+/** `false` tras ver que el servidor no admite `occurredOn` en el preview. */
+let serverAcceptsPreviewDate = true;
+
+async function postPreview(
+  body: Record<string, string>,
+): Promise<RawExchangeRatePreview> {
+  const response = await apiClient.post<{ data: RawExchangeRatePreview }>(
+    '/v1/exchange/preview',
+    body,
+  );
+  return response.data;
+}
+
 export async function previewExchangeRate({
   amountMinor,
   fromCurrency,
+  occurredOn,
 }: {
   amountMinor: number;
   fromCurrency: VenezuelaCurrencyCode;
+  /**
+   * Fecha local del movimiento. Con una fecha pasada el servidor usa las
+   * tasas de ese día, las mismas que congelará al guardar; sin ella, las de
+   * hoy.
+   */
+  occurredOn?: string;
 }): Promise<ExchangeRatePreview> {
   if (await loadDemoSession()) {
     return getDemoExchangePreview({
@@ -179,15 +260,26 @@ export async function previewExchangeRate({
       today: getLocalTodayKey(),
     });
   }
-  const response = await apiClient.post<{ data: RawExchangeRatePreview }>(
-    '/v1/exchange/preview',
-    {
-      amount: amountMinorToDecimalString(amountMinor),
-      countryCode: 'VE',
-      currency: fromCurrency,
-    },
-  );
-  const raw = response.data;
+  const body = {
+    amount: amountMinorToDecimalString(amountMinor),
+    countryCode: 'VE',
+    currency: fromCurrency,
+  };
+  // Hoy es el valor por defecto del servidor: solo se envía una fecha pasada
+  // (o futura), y así el preview de hoy no cambia.
+  const sendsDate =
+    serverAcceptsPreviewDate &&
+    occurredOn !== undefined &&
+    occurredOn !== getLocalTodayKey();
+  const raw = sendsDate
+    ? await postPreview({ ...body, occurredOn }).catch((error: unknown) => {
+        // Un servidor anterior rechaza la clave desconocida con 400: se
+        // reintenta con las tasas de hoy y no se vuelve a enviar la fecha.
+        if (!(error instanceof ApiError) || error.status !== 400) throw error;
+        serverAcceptsPreviewDate = false;
+        return postPreview(body);
+      })
+    : await postPreview(body);
   const bcvCurrency = fromCurrency === 'USD' ? 'VES' : 'USD';
 
   return {
@@ -196,6 +288,7 @@ export async function previewExchangeRate({
       // Ambas referencias devuelven la misma moneda de salida. EURO significa
       // «dólar a tasa EUR/BCV», no una conversión a euros europeos.
       EURO: mapConversion(raw.conversions.EURO, 'EURO', bcvCurrency),
+      USDT: mapUsdtConversion(raw.conversions.USDT),
     },
     ratesUpdatedAt: raw.ratesUpdatedAt,
   };

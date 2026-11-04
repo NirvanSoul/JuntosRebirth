@@ -40,18 +40,35 @@ pero produce también el valor contable USD necesario para balances y agregados.
 Por tanto, el usuario puede registrar `Bs. 5.000`, sin que eso cree un segundo
 saldo VES en su cuenta.
 
-La interfaz ofrece tres **modos de visualización**, que no son tres monedas
-activas ni tres balances distintos:
+La interfaz ofrece cuatro **modos de visualización**, que no son cuatro monedas
+activas ni cuatro balances distintos:
 
-| Modo      | Qué se muestra           | Fuente                                                              |
-| --------- | ------------------------ | ------------------------------------------------------------------- |
-| `USD`     | Valor principal/contable | USD original o USD normalizado al guardar                           |
-| `VES_BCV` | Equivalente en bolívares | Snapshot BCV del movimiento; tasa actual solo para un saldo actual  |
-| `EUR`     | Equivalente USD a tasa EUR/BCV | Snapshot EURO del movimiento; tasa actual solo para un saldo actual |
+| Modo       | Qué se muestra           | Fuente                                                              |
+| ---------- | ------------------------ | ------------------------------------------------------------------- |
+| `USD`      | Valor principal/contable | USD original o USD normalizado al guardar                           |
+| `VES_BCV`  | Equivalente en bolívares | Snapshot BCV del movimiento; tasa actual solo para un saldo actual  |
+| `EUR`      | Equivalente USD a tasa EUR/BCV | Snapshot EURO del movimiento; tasa actual solo para un saldo actual |
+| `VES_USDT` | Equivalente en bolívares a precio P2P | Snapshot USDT del movimiento; tasa actual solo para un saldo actual |
 
 `EUR` identifica la referencia oficial EUR/VES del BCV aplicada a un importe
 en USD; no representa una conversión a euros europeos. El modal muestra esa
 referencia como "Tasa EUR" para que nunca se confunda con una moneda de salida.
+
+`VES_USDT` sigue la misma regla: 1 $ vale la tasa USDT (promedio P2P de
+Binance y Bybit) en bolívares, y la salida siempre es Bs. Solo cambian el
+monto y lo seguido que se actualiza la tasa (varias veces al día).
+
+Los modos `EUR` y `VES_USDT` de un movimiento se leen como su valor en USD por
+la tasa congelada en su snapshot. El servidor congela la fila EURO en euros, no
+en Bs, así que su `convertedAmountMinor` nunca se muestra tal cual. Un
+movimiento sin fila USDT (el servidor aún no la congela) pide en su detalle la
+tasa USDT que regía su fecha y hora (`GET /v1/exchange/rates/at`), nunca la de
+hoy. Si ese día no hay dato, muestra su importe original con «Sin tasa USDT».
+El preview del formulario muestra las tres equivalencias ($ BCV, € BCV y USDT)
+en una fila. Es solo una
+referencia: `accountingAmountMinorUsd`, saldos y presupuestos siguen en BCV.
+Sin tasa USDT vigente, la opción queda visible pero apagada, y si estaba
+elegida el selector vuelve a USD.
 
 ## 0.2 Regla de cuentas y balances VE
 
@@ -79,7 +96,7 @@ En balances, ingresos, gastos, detalle de categoría, detalle de cuenta y
 detalle de movimiento se usa un segundo control reutilizable:
 
 ```text
-Ver en:  USD | Bs. BCV | EUR
+Ver en:  USD | Bs. BCV | EUR | USDT
 ```
 
 No se llama `RateSourceSelector` en esta experiencia, porque BCV/EURO no son

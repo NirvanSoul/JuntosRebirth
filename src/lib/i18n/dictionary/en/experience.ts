@@ -66,6 +66,7 @@ export const experience: Record<string, string> = {
   '{{count}} movimientos no tienen esta conversión guardada.':
     '{{count}} transactions do not have this conversion saved.',
   '· conversión no actualizada hoy': '· conversion not updated today',
+  'Conversión no actualizada hoy': 'Conversion not updated today',
   Anuncio: 'Ad',
   'Tasa usada': 'Rate used',
   'No pudimos actualizar la conversión.': "We couldn't update the conversion.",

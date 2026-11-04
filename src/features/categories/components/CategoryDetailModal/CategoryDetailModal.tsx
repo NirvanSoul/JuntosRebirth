@@ -22,9 +22,8 @@ import {
   TransactionFiltersModal,
   type TransactionFilters,
 } from '@/features/activity/components/TransactionFiltersModal';
-import { extractRatesFromTransactions } from '@/features/accounts/utils/moneyAccountValuation';
 import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
-import { useExchangeRates } from '@/features/exchangeRates/hooks/useExchangeRates';
+import { useValuationRates } from '@/features/exchangeRates/hooks/useValuationRates';
 import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import { createStyles } from '@/features/categories/components/CategoryDetailModal/CategoryDetailModal.styles';
 import { CategoryBudgetModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetModal';
@@ -47,8 +46,8 @@ import { summarizeCategories } from '@/features/categories/utils/categorySummary
 import {
   applyCategoryBudgetChange,
   type CategoryBudgetChange,
-  getBudgetSchedule,
   getCategoryBudget,
+  getCategoryBudgetEdit,
   withCategoryBudget,
 } from '@/features/categories/utils/categoryBudgetPeriod';
 import { CategoryBudgetHistoryModal } from '@/features/categories/components/CategoryDetailModal/CategoryBudgetHistoryModal';
@@ -175,29 +174,10 @@ export function CategoryDetailModal({
         : undefined,
     [authorFilteredTransactions, category, selectedCurrency],
   );
-  const exchangeRatesState = useExchangeRates({
-    enabled: visible && showRates,
-  });
-  const apiRates =
-    exchangeRatesState.status === 'success' ||
-    exchangeRatesState.status === 'stale'
-      ? exchangeRatesState.rates.rates
-      : null;
-
-  const fallbackRates = useMemo(
-    () =>
-      extractRatesFromTransactions(
-        categoryTransactions.length > 0 ? categoryTransactions : transactions,
-      ),
-    [categoryTransactions, transactions],
+  const rates = useValuationRates(
+    categoryTransactions.length > 0 ? categoryTransactions : transactions,
+    visible && showRates,
   );
-
-  const bcvRate = apiRates?.BCV?.rate
-    ? Number(apiRates.BCV.rate)
-    : fallbackRates.bcvRate;
-  const eurRate = apiRates?.EURO?.rate
-    ? Number(apiRates.EURO.rate)
-    : fallbackRates.eurRate;
 
   // Se reinicia al abrir u otra categoría, no por identidad: cada
   // sincronización trae objetos nuevos y borraba el filtro elegido.
@@ -229,8 +209,7 @@ export function CategoryDetailModal({
   if (!category || !summary) return null;
 
   const metrics = computeCategoryMetrics({
-    bcvRate,
-    eurRate,
+    ...rates,
     mode: valuationMode,
     selectedCurrency,
     transactions: periodCategoryTransactions,
@@ -253,6 +232,11 @@ export function CategoryDetailModal({
       ),
       selectedCurrency,
     );
+  const budgetReferenceDate = getBudgetReferenceDate(filters.date);
+  const { toChange: toBudgetChange, ...budgetEdit } = getCategoryBudgetEdit(
+    budget,
+    budgetReferenceDate,
+  );
   return (
     <>
       <AppModal
@@ -356,6 +340,7 @@ export function CategoryDetailModal({
               <VenezuelaDisplayModeSelector
                 hideLabel
                 indicatorColor={categoryColors[category.colorToken]}
+                isUsdtAvailable={rates.usdtRate !== null}
                 mode={valuationMode}
                 onChange={setValuationMode}
                 style={styles.valuationSelector}
@@ -416,7 +401,7 @@ export function CategoryDetailModal({
                 category={category}
                 currency={selectedCurrency}
                 onPress={() => setBudgetHistoryVisible(true)}
-                referenceDate={getBudgetReferenceDate(filters.date)}
+                referenceDate={budgetReferenceDate}
                 transactions={transactions}
               />
             ) : null}
@@ -535,18 +520,14 @@ export function CategoryDetailModal({
         categoryIcon={category.icon}
         categoryName={category.name}
         currency={selectedCurrency}
-        hasPeriodOverrides={Boolean(
-          budget?.budgetOverrides?.length || budget?.budgetHistory?.length,
-        )}
-        initialBudgetMinor={budget?.budgetMinor}
-        initialSchedule={budget ? getBudgetSchedule(budget) : undefined}
+        {...budgetEdit}
         onClose={() => setBudgetModalVisible(false)}
         onRemove={() => {
           saveBudget({ kind: 'remove' });
           setBudgetModalVisible(false);
         }}
         onSave={(amountMinor, schedule) => {
-          saveBudget({ kind: 'base', amountMinor, schedule });
+          saveBudget(toBudgetChange(amountMinor, schedule));
           setBudgetModalVisible(false);
         }}
         visible={isBudgetModalVisible}

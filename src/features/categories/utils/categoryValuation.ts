@@ -1,4 +1,8 @@
-import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
+import {
+  getCurrentBolivarRate,
+  type VenezuelaBolivarRates,
+  type VenezuelaDisplayMode,
+} from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import type { SessionTransaction } from '@/features/transactions/types';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
@@ -14,10 +18,9 @@ export function computeCategoryMetrics({
   mode,
   selectedCurrency,
   transactions,
+  usdtRate,
   venezuelaCurrencyMode,
-}: {
-  bcvRate: number | null;
-  eurRate: number | null;
+}: VenezuelaBolivarRates & {
   mode: VenezuelaDisplayMode;
   selectedCurrency: CurrencyCode;
   transactions: readonly SessionTransaction[];
@@ -56,22 +59,11 @@ export function computeCategoryMetrics({
       };
     }
 
-    if (mode === 'VES_BCV') {
-      const activeBcvRate = bcvRate && bcvRate > 0 ? bcvRate : 1;
-      return {
-        currency: 'VES',
-        expenseMinor: Math.round(totalUsdExpense * activeBcvRate),
-        incomeMinor: Math.round(totalUsdIncome * activeBcvRate),
-      };
-    }
-
-    // mode === 'EUR'
-    const activeEurRate =
-      eurRate && eurRate > 0 ? eurRate : bcvRate && bcvRate > 0 ? bcvRate : 1;
+    const rate = getCurrentBolivarRate(mode, { bcvRate, eurRate, usdtRate });
     return {
       currency: 'VES',
-      expenseMinor: Math.round(totalUsdExpense * activeEurRate),
-      incomeMinor: Math.round(totalUsdIncome * activeEurRate),
+      expenseMinor: Math.round(totalUsdExpense * rate),
+      incomeMinor: Math.round(totalUsdIncome * rate),
     };
   }
 

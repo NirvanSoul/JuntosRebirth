@@ -1,9 +1,7 @@
+import { getFrozenBolivarAmount } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import type { SessionTransaction } from '@/features/transactions/types';
 import type { ExchangeRateSource } from '@/lib/currency/exchangeRateSource';
-import {
-  isCurrencyCode,
-  type CurrencyCode,
-} from '@/lib/currency/currencyCatalog';
+import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 
 const exchangeRateSourceOrder: readonly ExchangeRateSource[] = [
   'BCV',
@@ -58,25 +56,20 @@ export function summarizeHistoricalTransactions(
   let missingTransactionCount = 0;
 
   for (const transaction of transactions) {
-    const rate = getSnapshotRate(transaction, source);
-    if (!rate || !isCurrencyCode(rate.quoteCurrency)) {
+    // Siempre en Bs: la fila EURO se congela en euros y no puede sumarse tal
+    // cual como si fueran bolívares.
+    const frozen = getFrozenBolivarAmount(transaction, source);
+    if (!frozen) {
       missingTransactionCount += 1;
       continue;
     }
 
-    // Una pantalla solo agrupa una moneda de origen. Aun así, no mezclamos
-    // destinos si un snapshot corrupto o futuro cambiara esa garantía.
-    if (currency && currency !== rate.quoteCurrency) {
-      missingTransactionCount += 1;
-      continue;
-    }
-
-    currency = rate.quoteCurrency;
+    currency = 'VES';
     convertedTransactionCount += 1;
     if (transaction.type === 'income') {
-      incomeMinor += rate.convertedAmountMinor;
+      incomeMinor += frozen.amountMinor;
     } else {
-      expenseMinor += rate.convertedAmountMinor;
+      expenseMinor += frozen.amountMinor;
     }
   }
 

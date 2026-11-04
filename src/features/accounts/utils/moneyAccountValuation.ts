@@ -14,6 +14,7 @@ export type EffectiveAccountBalance = {
 export type ExchangeRatePair = {
   bcvRate: number | null;
   eurRate: number | null;
+  usdtRate?: number | null;
 };
 
 export function extractRatesFromTransactions(
@@ -21,6 +22,7 @@ export function extractRatesFromTransactions(
 ): ExchangeRatePair {
   let bcvRate: number | null = null;
   let eurRate: number | null = null;
+  let usdtRate: number | null = null;
 
   for (const transaction of transactions) {
     const rates = transaction.exchangeSnapshot?.rates;
@@ -31,10 +33,13 @@ export function extractRatesFromTransactions(
     if (eurRate === null && rates.EURO?.rate && Number(rates.EURO.rate) > 0) {
       eurRate = Number(rates.EURO.rate);
     }
-    if (bcvRate !== null && eurRate !== null) break;
+    if (usdtRate === null && Number(rates.USDT?.rate) > 0) {
+      usdtRate = Number(rates.USDT!.rate);
+    }
+    if (bcvRate !== null && eurRate !== null && usdtRate !== null) break;
   }
 
-  return { bcvRate, eurRate };
+  return { bcvRate, eurRate, usdtRate };
 }
 
 export function computeEffectiveAccountBalance({
@@ -43,15 +48,18 @@ export function computeEffectiveAccountBalance({
   eurSummary,
   mode,
   rates,
+  usdtSummary,
 }: {
   balance: MoneyAccountCurrencyBalance;
   bcvSummary?: HistoricalTransactionSummary | null;
   eurSummary?: HistoricalTransactionSummary | null;
   mode: VenezuelaDisplayMode;
   rates?: ExchangeRatePair;
+  usdtSummary?: HistoricalTransactionSummary | null;
 }): EffectiveAccountBalance {
   const bcv = rates?.bcvRate && rates.bcvRate > 0 ? rates.bcvRate : null;
   const eur = rates?.eurRate && rates.eurRate > 0 ? rates.eurRate : null;
+  const usdt = rates?.usdtRate && rates.usdtRate > 0 ? rates.usdtRate : null;
 
   if (mode === 'USD') {
     if (balance.currency === 'USD') {
@@ -107,14 +115,17 @@ export function computeEffectiveAccountBalance({
     };
   }
 
-  // mode === 'EUR' (referencia EUR/VES del BCV)
+  // mode === 'EUR' (referencia EUR/VES del BCV) o 'VES_USDT' (1 USDT en Bs):
+  // ambos valoran en bolívares con su propia tasa.
+  const modeRate = mode === 'EUR' ? eur : usdt;
+  const modeSummary = mode === 'EUR' ? eurSummary : usdtSummary;
   if (balance.currency === 'USD') {
-    const conversionRate = eur ?? bcv ?? 1;
+    const conversionRate = modeRate ?? bcv ?? 1;
     const expenseMinor =
-      eurSummary?.expenseMinor ??
+      modeSummary?.expenseMinor ??
       Math.round(balance.expenseMinor * conversionRate);
     const incomeMinor =
-      eurSummary?.incomeMinor ??
+      modeSummary?.incomeMinor ??
       Math.round(balance.incomeMinor * conversionRate);
     const balanceMinor = Math.round(balance.balanceMinor * conversionRate);
 
@@ -127,7 +138,7 @@ export function computeEffectiveAccountBalance({
   }
 
   // balance.currency === 'VES'
-  const factor = bcv && eur ? eur / bcv : 1;
+  const factor = bcv && modeRate ? modeRate / bcv : 1;
   return {
     balanceMinor: Math.round(balance.balanceMinor * factor),
     currency: 'VES',
@@ -142,12 +153,14 @@ export function computeCombinedAccountBalance({
   eurSummary,
   mode,
   rates,
+  usdtSummary,
 }: {
   balances: readonly MoneyAccountCurrencyBalance[];
   bcvSummary?: HistoricalTransactionSummary | null;
   eurSummary?: HistoricalTransactionSummary | null;
   mode: VenezuelaDisplayMode;
   rates?: ExchangeRatePair;
+  usdtSummary?: HistoricalTransactionSummary | null;
 }): EffectiveAccountBalance {
   if (balances.length === 0) {
     return {
@@ -170,6 +183,7 @@ export function computeCombinedAccountBalance({
       eurSummary,
       mode,
       rates,
+      usdtSummary,
     });
     totalBalanceMinor += eff.balanceMinor;
     totalIncomeMinor += eff.incomeMinor;

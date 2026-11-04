@@ -13,18 +13,15 @@ import { Text } from '@/components/ui/Text/Text';
 import { TransactionFilterButton } from '@/components/ui/TransactionFilterButton/TransactionFilterButton';
 import { TransactionAuthorFiltersModal } from '@/features/activity/components/TransactionAuthorFiltersModal';
 import type { TransactionAuthorFilter } from '@/features/activity/components/TransactionFiltersModal';
+import { ActivityMovementList } from '@/features/activity/components/ActivityMonthSections';
 import { useTransactionAuthorFilter } from '@/features/activity/hooks/useTransactionAuthorFilter';
+import { groupActivityMonths } from '@/features/activity/utils/activityTimeline';
 import type { Category } from '@/features/categories/types';
-import {
-  OlderPeriodSections,
-  useOlderPeriodSections,
-} from '@/features/dashboard/components/TransactionPeriodModal/OlderPeriodSections';
 import { PeriodEmptyState } from '@/features/dashboard/components/TransactionPeriodModal/PeriodEmptyState';
 import { PeriodCurrencyButton } from '@/features/dashboard/components/TransactionPeriodModal/PeriodCurrencyButton';
 import { PeriodCurrencyPickerModal } from '@/features/dashboard/components/TransactionPeriodModal/PeriodCurrencyPickerModal';
 import { PeriodTotalAmount } from '@/features/dashboard/components/TransactionPeriodModal/PeriodTotalAmount';
 import { usePeriodCarryOver } from '@/features/dashboard/components/TransactionPeriodModal/usePeriodCarryOver';
-import { usePeriodRates } from '@/features/dashboard/components/TransactionPeriodModal/usePeriodRates';
 import {
   getComparisonPeriodLabel,
   getPreviousDateFilter,
@@ -37,10 +34,10 @@ import {
   summarizePeriodTotalMinor,
 } from '@/features/dashboard/utils/periodValuation';
 import { VenezuelaDisplayModeSelector } from '@/features/exchangeRates/components/VenezuelaDisplayModeSelector';
+import { useValuationRates } from '@/features/exchangeRates/hooks/useValuationRates';
 import type { VenezuelaDisplayMode } from '@/features/exchangeRates/utils/venezuelaDisplayMode';
 import { useCurrencyCapabilities } from '@/features/profile/hooks/useCurrencyCapabilities';
 import { PeriodComparisonIndicator } from '@/features/transactions/components/PeriodComparisonIndicator/PeriodComparisonIndicator';
-import { TransactionPreviewList } from '@/features/transactions/components/TransactionPreviewList/TransactionPreviewList';
 import type {
   SessionTransaction,
   TransactionType,
@@ -132,7 +129,7 @@ export function TransactionPeriodModal({
     modalBottomInset + layout.actionHeight[density] + spacing.xl;
   const isBalance = type === 'balance';
 
-  const { bcvRate, eurRate } = usePeriodRates(
+  const rates = useValuationRates(
     transactions,
     visible && venezuelaCurrencyMode,
   );
@@ -172,13 +169,12 @@ export function TransactionPeriodModal({
   const periodValuation = useMemo(
     () =>
       computePeriodValuation({
-        bcvRate,
-        eurRate,
+        ...rates,
         mode: valuationMode,
         transactions: filteredTransactions,
         type,
       }),
-    [bcvRate, eurRate, filteredTransactions, type, valuationMode],
+    [filteredTransactions, rates, type, valuationMode],
   );
 
   // «Todos» no tiene periodo anterior: sin movimientos previos la
@@ -192,7 +188,7 @@ export function TransactionPeriodModal({
   const comparisonLabel = getComparisonPeriodLabel(dateFilter);
 
   const valuation = venezuelaCurrencyMode
-    ? { bcvRate, eurRate, mode: valuationMode }
+    ? { ...rates, mode: valuationMode }
     : null;
   const summarizeTotal = (
     periodTransactions: readonly SessionTransaction[],
@@ -235,11 +231,14 @@ export function TransactionPeriodModal({
     ? filteredTransactions
     : currencyTransactions;
 
-  const olderPeriods = useOlderPeriodSections({
-    currency: venezuelaCurrencyMode ? null : effectiveCurrency,
-    dateFilter,
-    transactions: typeTransactions,
-  });
+  // Solo «Desde el inicio» mezcla meses: entonces van agrupados y plegables.
+  const monthSections = useMemo(
+    () => ({
+      sections:
+        dateFilter === 'all' ? groupActivityMonths(displayedTransactions) : [],
+    }),
+    [dateFilter, displayedTransactions],
+  );
   const openTransactionDetail = (transactionId: string) =>
     runAction(() => onOpenTransactionDetail?.(transactionId));
 
@@ -300,9 +299,8 @@ export function TransactionPeriodModal({
             <ModalCloseButton onPress={onClose} />
           </View>
 
-          {/* Fijo arriba: al bajar a periodos anteriores muestra el que se ve. */}
           <CategoryDetailPeriodFilter
-            filter={olderPeriods.visibleFilter ?? dateFilter}
+            filter={dateFilter}
             onChange={setDateFilter}
             testID={`${type}-period-selector`}
           />
@@ -312,7 +310,6 @@ export function TransactionPeriodModal({
               styles.scrollContent,
               { paddingBottom: floatingActionClearance },
             ]}
-            {...olderPeriods.scrollProps}
             showsVerticalScrollIndicator={false}
             testID={`${type}-period-scroll-view`}
           >
@@ -320,6 +317,7 @@ export function TransactionPeriodModal({
               <VenezuelaDisplayModeSelector
                 hideLabel
                 indicatorColor={accentColor}
+                isUsdtAvailable={rates.usdtRate !== null}
                 mode={valuationMode}
                 onChange={setValuationMode}
                 style={styles.valuationSelector}
@@ -369,9 +367,10 @@ export function TransactionPeriodModal({
 
             <View style={styles.results}>
               {displayedTransactions.length > 0 ? (
-                <TransactionPreviewList
+                <ActivityMovementList
                   categories={categories}
                   groupingTransactions={transactions}
+                  months={monthSections}
                   onOpenTransactionDetail={openTransactionDetail}
                   progressive
                   testID={`${type}-period-transaction-list`}
@@ -381,15 +380,6 @@ export function TransactionPeriodModal({
                 <PeriodEmptyState accentColor={accentColor} type={type} />
               )}
             </View>
-
-            <OlderPeriodSections
-              categories={categories}
-              groupingTransactions={transactions}
-              onOpenTransactionDetail={openTransactionDetail}
-              onSectionLayout={olderPeriods.onSectionLayout}
-              sections={olderPeriods.sections}
-              testID={`${type}-period-older-section`}
-            />
           </BottomSheetScrollView>
 
           <ModalPrimaryAction

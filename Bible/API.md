@@ -80,6 +80,14 @@ permitir un reintento.
   espera el reintento explícito en vez de repetir la misma escritura.
 - La sincronización de un espacio usa `POST /v1/spaces/:spaceId/sync` e
   incluye siempre categorías, cuentas, recurrencias y transacciones.
+- **Hora del movimiento (`occurredTime`).** Cada transacción viaja con
+  `occurredTime`: hora de reloj local `HH:mm` (24 h, sin zona) o `null`, igual
+  que `occurredOn` es una fecha local. La subida la envía siempre, también como
+  `null` para quitarla. En la bajada (snapshot y delta) una clave **ausente** no
+  es `null`: la fila local conserva su hora, para que una API anterior no la
+  borre; un valor malformado se trata igual. Es informativa: no cambia el orden
+  ni la agrupación por día. Cambiarla puede volver a congelar el
+  `exchangeSnapshot`, que el cliente reemplaza al recibir la respuesta.
 - **Conflictos (contrato de `Juntos API`, nota del 2026-11-02 en
   `patch/APP.md`; implementado en la API sin desplegar).** La respuesta
   puede incluir `data.conflicts: { collection, localId, remoteId, reason,
@@ -267,10 +275,23 @@ Las tasas públicas de Venezuela viven bajo `/v1/exchange`:
   La app reutiliza la última respuesta durante 5 minutos y comparte la
   petición en curso, de modo que las hojas que muestran tasas abren con ellas
   sin estado de carga (las tasas ficticias del usuario demo no se cachean).
-- `POST /v1/exchange/preview` recibe `{ countryCode: 'VE', amount, currency }`.
-  `amount` es un string decimal en unidades mayores y `currency` es `USD` o
-  `VES`; devuelve conversiones BCV y Euro. La frontera entre ese contrato y
-  los enteros en unidades menores se concentra en
+  También devuelve `USDT` (USDT/VES, promedio P2P de Binance y Bybit) con
+  `dailyAverage` y su propio `stale` (más de 2 h sin observación). Puede ser
+  `null`, o faltar en una API anterior; una fila malformada también se lee
+  como `null`. Nunca impide leer BCV ni EURO: el modo USDT queda visible pero
+  apagado. La caché de 5 minutos cubre el refresco de una tasa que cambia
+  durante el día (el servidor la actualiza cada 30 minutos).
+- `POST /v1/exchange/preview` recibe `{ countryCode: 'VE', amount, currency,
+  occurredOn? }`. `amount` es un string decimal en unidades mayores y
+  `currency` es `USD` o `VES`; devuelve conversiones BCV y Euro. `occurredOn`
+  solo se envía cuando la fecha elegida en el formulario no es hoy, para que el
+  preview use las tasas de ese día, las que el servidor congelará al guardar.
+  También devuelve `USDT` (en Bs desde USD; en USDT desde VES, que la app lee
+  como dólares), o `null`. `GET /v1/exchange/rates/at?date=&time=` da la tasa
+  USDT de una fecha y hora pasadas; el detalle la usa cuando el movimiento no
+  trae fila USDT congelada, y la recuerda para toda la sesión (la de hoy, 5
+  minutos). La frontera entre ese contrato y los enteros en unidades menores
+  se concentra en
   `features/exchangeRates/gateways/juntossExchangeRateGateway.ts`.
 
 Las tasas personalizadas requieren sesión y usan
@@ -279,7 +300,11 @@ Las tasas personalizadas requieren sesión y usan
 cliente. Para movimientos de usuarios de Venezuela en USD o VES, el servidor
 congela las tasas aplicables y responde `exchangeSnapshot` por movimiento.
 `GET /v1/sync/snapshot` también devuelve ese snapshot. El cliente persiste y
-lee esos valores históricos; no los recalcula con la tasa vigente.
+lee esos valores históricos; no los recalcula con la tasa vigente. El snapshot
+puede traer una fila `USDT`: en un movimiento USD convierte a `VES`, y en uno
+VES a `USDT`, que no es una moneda de la app y solo se admite en esa fila. Una
+fila USDT rota se descarta sin rechazar el movimiento, y las claves
+desconocidas se ignoran.
 
 ## Límites de integración
 

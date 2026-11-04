@@ -262,9 +262,8 @@ export function CreateTransactionModal({
   const currencySymbolPosition = getCurrencySymbolPosition(currency);
   const currencyPluralName = getCurrencyPluralName(currency);
   /**
-   * Sección 7 del plan de Venezuela: conversión en vivo bajo el importe,
-   * solo para quien tiene la capacidad activa y está escribiendo en USD o
-   * VES — el resto de monedas y de usuarios no llaman a este endpoint.
+   * Conversión en vivo bajo el importe (plan VE §7) con las tasas de la fecha
+   * elegida; solo con la capacidad activa y en USD o VES.
    */
   const isVenezuelaCurrency = currency === 'USD' || currency === 'VES';
   const shouldUseVenezuelaCurrencySelector =
@@ -274,6 +273,7 @@ export function CreateTransactionModal({
   const exchangePreview = useExchangePreview({
     amountMinor: shouldPreviewExchange ? resolvedAmountMinor : 0,
     fromCurrency: (currency === 'USD' ? 'USD' : 'VES') as VenezuelaCurrencyCode,
+    occurredOn,
   });
   const selectedCategoryColor = selectedCategory
     ? categoryColors[selectedCategory.colorToken]
