@@ -232,7 +232,7 @@ function MetricBadge({
                 <ComparisonAmount
                   amount={changeAmount}
                   comparison={comparison}
-                  testID={`${testIDPrefix}-${icon}-comparison-arrow`}
+                  testID={`${testIDPrefix}-${icon}-comparison-amount`}
                   variant={amountVariant}
                 />
               </Animated.View>

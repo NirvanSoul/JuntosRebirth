@@ -1,3 +1,5 @@
+import { isNetworkFailure } from '@/lib/diagnostics/backgroundFailure';
+
 type ApiErrorBody = {
   error?: {
     code?: unknown;
@@ -119,19 +121,7 @@ function joinUrl(baseUrl: string, path: string): string {
 }
 
 function throwRequestFailure(error: unknown, path: string): never {
-  const nativeError =
-    error && typeof error === 'object'
-      ? (error as { message?: unknown; name?: unknown })
-      : undefined;
-  if (
-    !(error instanceof ApiError) &&
-    nativeError?.name !== 'SyntaxError' &&
-    (nativeError?.name === 'AbortError' ||
-      (typeof nativeError?.message === 'string' &&
-        /network request failed|network connection was lost|fetch failed|failed to fetch|load failed|networkerror/i.test(
-          nativeError.message,
-        )))
-  ) {
+  if (!(error instanceof ApiError) && isNetworkFailure(error)) {
     throw new ApiError({
       status: 0,
       code: 'NETWORK_ERROR',

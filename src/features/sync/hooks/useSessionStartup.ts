@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -193,7 +194,7 @@ export function useSessionStartup(
           setSessionSynced(true);
         })
         .catch((error: unknown) => {
-          console.error(
+          reportBackgroundFailure(
             '[MainTabsNavigator] Error al sincronizar sesión:',
             error,
           );

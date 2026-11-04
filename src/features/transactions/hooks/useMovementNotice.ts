@@ -18,6 +18,8 @@ export type MovementNotice = ToastNotice & {
 
 export type AnnounceMovement = (notice: Omit<MovementNotice, 'id'>) => void;
 
+export type TransactionSaveMode = 'created' | 'updated';
+
 export type DeletedItem = 'transaction' | 'category' | 'moneyAccount';
 
 const deletedItemMessages: Record<DeletedItem, string> = {
@@ -27,8 +29,8 @@ const deletedItemMessages: Record<DeletedItem, string> = {
 };
 
 /**
- * Tarjeta flotante única para confirmar movimientos creados, copiados o
- * eliminados (también categorías y cuentas eliminadas, y cuentas creadas): un
+ * Tarjeta flotante única para confirmar movimientos creados, editados, copiados
+ * o eliminados (también categorías y cuentas eliminadas, y cuentas creadas): un
  * aviso nuevo sustituye al anterior en lugar de apilarse. Tocar la de un
  * movimiento creado abre su detalle con `openTransactionDetail`.
  */
@@ -53,11 +55,18 @@ export function useMovementNotice(
     setNotice((current) => (current?.id === noticeId ? null : current));
   }, []);
 
-  const announceCreated = useCallback(
+  /** Confirma lo guardado desde el formulario: altas o una edición. */
+  const announceSaved = useCallback(
     (
-      created: readonly SessionTransaction[],
+      saved: readonly SessionTransaction[],
       category: Pick<Category, 'colorToken' | 'icon'>,
-    ) => announce(createdMovementNotice(created, category, openDetail)),
+      mode: TransactionSaveMode = 'created',
+    ) =>
+      announce(
+        mode === 'updated'
+          ? updatedMovementNotice(category)
+          : createdMovementNotice(saved, category, openDetail),
+      ),
     [announce, openDetail],
   );
 
@@ -84,11 +93,23 @@ export function useMovementNotice(
 
   return {
     announce,
-    announceCreated,
     announceCreatedMoneyAccount,
     announceDeleted,
+    announceSaved,
     dismissNotice,
     notice,
+  };
+}
+
+/** Confirmación de un movimiento editado, con el icono de su categoría. */
+export function updatedMovementNotice(
+  category: Pick<Category, 'colorToken' | 'icon'>,
+): Omit<MovementNotice, 'id'> {
+  return {
+    category,
+    message: 'Movimiento editado',
+    placement: 'bottom',
+    tone: 'success',
   };
 }
 

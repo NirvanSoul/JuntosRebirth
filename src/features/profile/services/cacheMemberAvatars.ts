@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import { Directory, File, Paths } from 'expo-file-system';
 
 import { buildAvatarCacheFileName } from '@/features/profile/services/avatarImage';
@@ -74,10 +75,11 @@ export async function cacheMemberAvatars(spaceId: string): Promise<void> {
         destination.uri,
       );
     } catch (error) {
-      console.error('[avatar] no se pudo cachear la foto de un miembro', {
-        userId: profile.userId,
+      reportBackgroundFailure(
+        '[avatar] no se pudo cachear la foto de un miembro',
         error,
-      });
+        { userId: profile.userId },
+      );
     }
   }
 

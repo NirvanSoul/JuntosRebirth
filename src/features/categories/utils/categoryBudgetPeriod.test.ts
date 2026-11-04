@@ -310,3 +310,41 @@ describe('withCategoryBudget', () => {
     ).toEqual({ budgetMinor: 3000, budgetSchedule: { period: 'week' } });
   });
 });
+
+describe('cambio de importe desde un mes', () => {
+  const month = { period: 'month' } as const;
+  const from = (
+    budget: CategoryBudget,
+    startsOn: string,
+    amountMinor: number,
+  ) =>
+    applyChange(budget, {
+      kind: 'from',
+      startsOn,
+      amountMinor,
+      schedule: month,
+    });
+  const at = (budget: CategoryBudget, monthIndex: number) =>
+    resolveBudgetAmount(budget, new Date(2026, monthIndex, 15, 12));
+
+  it('cambia ese mes y los siguientes, nunca los anteriores', () => {
+    // 300 € en octubre, 100 € desde noviembre y 175 € desde diciembre.
+    const october = { budgetMinor: 30_000 };
+    const november = from(october, '2026-11-01', 10_000);
+    const december = from(november, '2026-12-01', 17_500);
+    expect([at(december, 9), at(december, 10), at(december, 11)]).toEqual([
+      30_000, 10_000, 17_500,
+    ]);
+    // Volver a cambiar noviembre no toca octubre ni diciembre en adelante.
+    const edited = from(november, '2026-11-01', 12_000);
+    expect([at(edited, 9), at(edited, 10), at(edited, 11)]).toEqual([
+      30_000, 12_000, 12_000,
+    ]);
+  });
+
+  it('une el tramo con el anterior si recupera su importe', () => {
+    const november = from({ budgetMinor: 30_000 }, '2026-11-01', 10_000);
+    const reverted = from(november, '2026-11-01', 30_000);
+    expect(reverted).toEqual({ budgetMinor: 30_000 });
+  });
+});

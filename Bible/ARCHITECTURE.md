@@ -945,6 +945,11 @@ Prioridades:
 - Normalizar errores.
 - No mostrar mensajes técnicos crudos.
 - No registrar importes, títulos, tokens o información sensible.
+- Las tareas de fondo (sincronización, censo, perfil, avatar, tasas) registran
+  sus fallos con `reportBackgroundFailure`
+  (`src/lib/diagnostics/backgroundFailure.ts`): un fallo por falta de red
+  (`isNetworkFailure`) no se registra, porque es lo esperado y el aviso
+  "Sin conexión" de `SyncIssueToast` ya informa a la persona.
 - La autorización real vive en la API.
 - El espacio activo visual no sustituye la autorización del servidor.
 - Ningún secreto entra en el bundle.

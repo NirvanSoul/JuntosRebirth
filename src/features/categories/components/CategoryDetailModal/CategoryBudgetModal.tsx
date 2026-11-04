@@ -38,6 +38,8 @@ import { useThemedStyles } from '@/theme/useThemedStyles';
 import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 
 type CategoryBudgetModalProps = {
+  /** Periodo desde el que se aplica el cambio (p. ej. «Noviembre 2026»). */
+  appliesFromLabel?: string;
   categoryColor: string;
   categoryIcon: CategoryIconName;
   categoryName: string;
@@ -71,6 +73,7 @@ const budgetKeys = [
 const budgetAmountHeight = 64;
 
 export function CategoryBudgetModal({
+  appliesFromLabel,
   categoryColor,
   categoryIcon,
   categoryName,
@@ -183,7 +186,9 @@ export function CategoryBudgetModal({
                     : periodLabel
                   : resetsOverrides
                     ? 'Se quitarán los importes editados por periodo'
-                    : categoryName}
+                    : appliesFromLabel
+                      ? `Desde ${appliesFromLabel} en adelante`
+                      : categoryName}
               </Text>
             </View>
             <ModalCloseButton onPress={onClose} />

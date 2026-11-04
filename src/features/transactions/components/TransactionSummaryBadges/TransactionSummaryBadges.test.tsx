@@ -51,12 +51,13 @@ describe('TransactionSummaryBadges', () => {
     expect(getByTestId('badges-income-badge')).toContainElement(
       getByTestId('badges-income-comparison'),
     );
-    expect(getByText('3\u00a0€ más')).toBeTruthy();
-    expect(getByTestId('badges-expense-comparison-arrow')).toBeTruthy();
+    expect(getByTestId('badges-expense-comparison-amount')).toHaveTextContent(
+      '+3\u00a0€',
+    );
     expect(getByTestId('badges-expense-badge').props.accessibilityLabel).toBe(
       'Gastos del mes: 8\u00a0€, 3\u00a0€ más que el periodo anterior',
     );
-    expect(getByText('1\u00a0€ menos')).toBeTruthy();
+    expect(getByText('\u22121\u00a0€')).toBeTruthy();
   });
 
   it('muestra la comparación de balance solo cuando se pasa balanceMinor', async () => {

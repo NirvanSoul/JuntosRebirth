@@ -49,6 +49,11 @@ type AppModalProps = PropsWithChildren<{
    * vista previa dentro de la hoja, que se pinta en un portal sin ese contexto.
    */
   previewActions?: boolean;
+  /**
+   * `false` deja los arrastres del contenido a sus hijos (p. ej. la rueda del
+   * selector nativo de hora); la hoja se sigue cerrando desde el tirador.
+   */
+  enableContentPanningGesture?: boolean;
   stackBehavior?: 'push' | 'switch' | 'replace';
   testID?: string;
 }>;
@@ -86,6 +91,7 @@ export function AppModal({
   hideHandle = false,
   containsScrollable = false,
   previewActions = false,
+  enableContentPanningGesture = true,
   stackBehavior = 'replace',
   testID,
 }: AppModalProps) {
@@ -285,6 +291,7 @@ export function AppModal({
         backgroundVariant === 'modal' && themedStyles.modalBackground,
       ]}
       containerComponent={ModalLayer}
+      enableContentPanningGesture={enableContentPanningGesture}
       enableDynamicSizing={!hasFixedHeight}
       enablePanDownToClose
       handleComponent={hideHandle ? null : undefined}

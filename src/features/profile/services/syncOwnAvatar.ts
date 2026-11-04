@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { isDemoSessionActive } from '@/state/demoSession/demoSessionStore';
 import {
@@ -48,7 +49,10 @@ export async function syncOwnAvatar(): Promise<boolean> {
     await saveOwnRemoteAvatar(localPath, avatar);
     return true;
   } catch (error) {
-    console.error('[avatar] no se pudo subir la foto de perfil', { error });
+    reportBackgroundFailure(
+      '[avatar] no se pudo subir la foto de perfil',
+      error,
+    );
     await markAvatarUploadResult(localPath, 'failed', null);
     return false;
   }
@@ -97,7 +101,10 @@ export async function restoreOwnAvatar(remote: {
     });
     return true;
   } catch (error) {
-    console.error('[avatar] no se pudo recuperar la foto de perfil', { error });
+    reportBackgroundFailure(
+      '[avatar] no se pudo recuperar la foto de perfil',
+      error,
+    );
     return false;
   }
 }

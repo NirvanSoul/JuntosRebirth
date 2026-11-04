@@ -64,6 +64,24 @@ describe('useMovementNotice', () => {
     expect(result.current.notice?.message).toBe('Cuenta eliminada');
   });
 
+  it('confirma el movimiento editado con el icono de su categoría', async () => {
+    const { result } = await renderHook(() => useMovementNotice(jest.fn()));
+
+    await act(() =>
+      result.current.announceSaved(
+        [movement('expense')],
+        { colorToken: 'blue', icon: 'car' },
+        'updated',
+      ),
+    );
+    expect(result.current.notice).toMatchObject({
+      category: { colorToken: 'blue', icon: 'car' },
+      message: 'Movimiento editado',
+      placement: 'bottom',
+      tone: 'success',
+    });
+  });
+
   it('confirma la cuenta creada con su nombre, icono y color', async () => {
     const { result } = await renderHook(() => useMovementNotice(jest.fn()));
 

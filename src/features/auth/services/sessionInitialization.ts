@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import {
   type LocalCachePreparation,
   prepareLocalCacheForSession,
@@ -110,7 +111,7 @@ async function performSessionInitialization(
       // El servidor pudo aceptar el lote y perderse solo la respuesta.
       needsFinalRestore = true;
       firstSpaceSyncFailure ??= { error: spaceSyncError };
-      console.error(
+      reportBackgroundFailure(
         `[sessionInitialization] Error sincronizando espacio ${space.id}:`,
         spaceSyncError,
       );

@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import {
   getPendingLocalDisplayName,
@@ -34,7 +35,7 @@ export async function syncOwnDisplayName(
     await markDisplayNameSyncResult(trimmed, 'synced');
     return true;
   } catch (error) {
-    console.error('[profiles] no se pudo publicar el nombre', { error });
+    reportBackgroundFailure('[profiles] no se pudo publicar el nombre', error);
     await markDisplayNameSyncResult(trimmed, 'failed');
     return false;
   }

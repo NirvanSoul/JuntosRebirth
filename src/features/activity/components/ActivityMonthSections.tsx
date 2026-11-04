@@ -79,18 +79,23 @@ type ActivityMovementListProps = Omit<
   ComponentProps<typeof TransactionPreviewList>,
   'limit'
 > & {
-  limit: number;
-  months: ReturnType<typeof useActivityMonthSections>;
+  /** Sin límite se muestran todas las filas (modales de periodo). */
+  limit?: number;
+  months: {
+    onSectionLayout?: (key: string, top: number) => void;
+    sections: readonly ActivityMonthSection[];
+  };
 };
 
 /**
  * Lista de movimientos de Actividad. Con «Desde el inicio» va por meses, cada
  * uno con su subtítulo, y el límite de filas se reparte entre ellos en orden.
  * Pulsar el subtítulo pliega o despliega el mes, como las secciones de
- * Actividad; un mes plegado no gasta filas del límite.
+ * Actividad; un mes plegado no gasta filas del límite. También la usan los
+ * modales de ingresos, gastos y balance de Inicio con «Desde el inicio».
  */
 export function ActivityMovementList({
-  limit,
+  limit = Number.POSITIVE_INFINITY,
   months,
   testID,
   ...listProps
@@ -100,7 +105,11 @@ export function ActivityMovementList({
   );
   if (months.sections.length === 0) {
     return (
-      <TransactionPreviewList {...listProps} limit={limit} testID={testID} />
+      <TransactionPreviewList
+        {...listProps}
+        limit={Number.isFinite(limit) ? limit : undefined}
+        testID={testID}
+      />
     );
   }
 
@@ -130,7 +139,7 @@ export function ActivityMovementList({
             key={section.key}
             layout={getActivityLayoutTransition()}
             onLayout={({ nativeEvent }) =>
-              months.onSectionLayout(section.key, nativeEvent.layout.y)
+              months.onSectionLayout?.(section.key, nativeEvent.layout.y)
             }
             testID={`activity-month-${section.key}`}
           >
@@ -154,7 +163,7 @@ export function ActivityMovementList({
             <AnimatedDisclosureContent expanded={expanded}>
               <TransactionPreviewList
                 {...listProps}
-                limit={sectionLimit}
+                limit={Number.isFinite(sectionLimit) ? sectionLimit : undefined}
                 transactions={section.transactions}
               />
             </AnimatedDisclosureContent>

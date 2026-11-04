@@ -70,6 +70,10 @@ export function PeriodComparisonIndicator({
     <View style={styles.container} testID={testID}>
       <Ionicons color={iconColor} name={iconName} size={iconSize.xs} />
       <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
+        numberOfLines={1}
+        style={styles.amount}
         tone={textTone}
         variant={compact ? 'overline' : 'caption'}
         weight="semibold"
@@ -93,5 +97,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xxs,
+    // Cede ancho antes que la etiqueta y reduce el importe si no cabe, para
+    // que nunca se salga del badge.
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  amount: {
+    flexShrink: 1,
+    // `overline` trae tracking abierto para etiquetas; en cifras lo cerramos
+    // como en los importes de los badges para ganar espacio sin encoger.
+    letterSpacing: -0.2,
   },
 });

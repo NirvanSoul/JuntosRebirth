@@ -355,9 +355,9 @@ export function MainTabsNavigator() {
     });
   const {
     announce: announceMovement,
-    announceCreated: announceCreatedMovement,
     announceCreatedMoneyAccount,
     announceDeleted,
+    announceSaved: announceSavedMovement,
     dismissNotice: handleDismissMovementNotice,
     notice: movementNotice,
   } = useMovementNotice(openTransactionDetail);
@@ -642,7 +642,7 @@ export function MainTabsNavigator() {
         setSelectedCategoryId(null);
         setSelectedMoneyAccountId(null);
       },
-      onTransactionsCreated: announceCreatedMovement,
+      onTransactionsSaved: announceSavedMovement,
       setTransactions,
     });
   // Estos hooks no pasan por React Compiler (sus `try/catch` lo impiden):

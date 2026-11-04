@@ -1,4 +1,4 @@
-import { fireEvent, within } from '@testing-library/react-native';
+import { fireEvent } from '@testing-library/react-native';
 import {
   type MeasureInWindowOnSuccessCallback,
   StyleSheet,
@@ -120,48 +120,48 @@ describe('TransactionPeriodModal', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('sigue bajando hacia los periodos anteriores sin cambiar el selector', async () => {
-    const history = [
-      ...transactions,
-      transaction('expense-march', 'expense', 300, '2026-03-05'),
-    ];
-    const { getAllByTestId, getByTestId, queryByText } = await renderWithTheme(
+  it('muestra solo los movimientos del periodo elegido, sin meses anteriores', async () => {
+    const { getByText, queryByTestId, queryByText } = await renderWithTheme(
       <TransactionPeriodModal
         categories={[]}
         onAdd={jest.fn()}
         onClose={jest.fn()}
-        transactions={history}
+        transactions={transactions}
         type="expense"
         visible
       />,
     );
 
-    // Bajo julio siguen los movimientos de junio, sin título propio.
-    const [june] = getAllByTestId('expense-period-older-section');
-    expect(within(june!).getByText('expense-june')).toBeTruthy();
-    expect(queryByText('Junio 2026')).toBeNull();
-    expect(queryByText('expense-march')).toBeNull();
+    expect(getByText('expense-july')).toBeTruthy();
+    expect(queryByText('expense-june')).toBeNull();
+    expect(queryByTestId('activity-month-toggle-2026-07')).toBeNull();
+  });
 
-    // Al bajar, el selector fijo de arriba pasa al mes que se ve y, cerca del
-    // final, se añade el siguiente con movimientos saltando los vacíos.
-    const selector = getByTestId('expense-period-selector');
-    const scrollView = getByTestId('expense-period-scroll-view');
-    await fireEvent(scrollView, 'layout', {
-      nativeEvent: { layout: { height: 600 } },
-    });
-    await fireEvent(june!, 'layout', { nativeEvent: { layout: { y: 400 } } });
-    expect(within(selector).getByText('Julio 2026')).toBeTruthy();
-    await fireEvent.scroll(scrollView, {
-      nativeEvent: {
-        contentOffset: { y: 300 },
-        contentSize: { height: 1000, width: 390 },
-        layoutMeasurement: { height: 600, width: 390 },
-      },
-    });
+  it('agrupa «Desde el inicio» por meses plegables', async () => {
+    const { getByRole, getByTestId, getByText, queryByText } =
+      await renderWithTheme(
+        <TransactionPeriodModal
+          categories={[]}
+          onAdd={jest.fn()}
+          onClose={jest.fn()}
+          transactions={transactions}
+          type="expense"
+          visible
+        />,
+      );
 
-    expect(within(selector).getByText('Junio 2026')).toBeTruthy();
-    expect(getAllByTestId('expense-period-older-section')).toHaveLength(2);
-    expect(queryByText('expense-march')).toBeTruthy();
+    await fireEvent.press(getByRole('button', { name: 'Julio 2026' }));
+    await fireEvent.press(getByRole('radio', { name: 'Periodo: Todos' }));
+
+    expect(getByTestId('activity-month-toggle-2026-07')).toBeTruthy();
+    expect(getByText('Junio 2026')).toBeTruthy();
+    expect(getByText('expense-june')).toBeTruthy();
+
+    await fireEvent.press(getByTestId('activity-month-toggle-2026-06'));
+    expect(
+      getByTestId('activity-month-toggle-2026-06').props.accessibilityState,
+    ).toMatchObject({ expanded: false });
+    expect(queryByText('expense-july')).toBeTruthy();
   });
 
   it('abre las acciones de un movimiento con una pulsación larga', async () => {

@@ -335,6 +335,17 @@ export function applyCategoryBudgetChange(
         schedule: previous.schedule,
       });
     }
+    // Si el tramo anterior ya tenía este importe y periodicidad, es el mismo
+    // tramo: se une con el nuevo en lugar de partirlo sin motivo.
+    const last = history.at(-1);
+    if (
+      last &&
+      last.endsOn === dayBefore &&
+      last.amountMinor === change.amountMinor &&
+      isSameBudgetSchedule(last.schedule, change.schedule)
+    ) {
+      history.pop();
+    }
     const overrides = (budget.budgetOverrides ?? []).filter(
       (override) => override.periodStartOn < change.startsOn,
     );
@@ -342,7 +353,7 @@ export function applyCategoryBudgetChange(
       budgetMinor: change.amountMinor,
       ...schedule(change.schedule),
       ...(overrides.length > 0 ? { budgetOverrides: overrides } : {}),
-      budgetHistory: history,
+      ...(history.length > 0 ? { budgetHistory: history } : {}),
     };
   }
 
@@ -367,6 +378,36 @@ export function applyCategoryBudgetChange(
         );
   const { budgetOverrides: _previous, ...rest } = budget;
   return overrides.length > 0 ? { ...rest, budgetOverrides: overrides } : rest;
+}
+
+/**
+ * Editar el presupuesto desde el periodo que contiene `date`: ese periodo y
+ * los siguientes toman el nuevo importe; los anteriores conservan el suyo.
+ * Sin presupuesto previo, el nuevo vale para todo.
+ */
+export function getCategoryBudgetEdit(
+  budget: CategoryBudget | undefined,
+  date: Date,
+) {
+  return {
+    appliesFromLabel: budget
+      ? formatCategoryBudgetPeriod(budget, date)
+      : undefined,
+    initialBudgetMinor: budget ? resolveBudgetAmount(budget, date) : undefined,
+    initialSchedule: budget ? getBudgetScheduleAt(budget, date) : undefined,
+    toChange: (
+      amountMinor: number,
+      schedule: BudgetSchedule,
+    ): CategoryBudgetChange =>
+      budget
+        ? {
+            kind: 'from',
+            amountMinor,
+            schedule,
+            startsOn: getCategoryBudgetStartKey(budget, date),
+          }
+        : { kind: 'base', amountMinor, schedule },
+  };
 }
 
 export function getCategoryBudget(

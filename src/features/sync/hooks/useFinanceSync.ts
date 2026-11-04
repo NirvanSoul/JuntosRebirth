@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import { useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
@@ -110,7 +111,10 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
           // roto no debe dejar sin publicar cambios independientes.
           failures.push(error);
           if (!propagateFailure) {
-            console.error('[sync] Subida de espacio compartido falló:', error);
+            reportBackgroundFailure(
+              '[sync] Subida de espacio compartido falló:',
+              error,
+            );
           }
         }
       }
@@ -126,7 +130,7 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
       try {
         await restoreOwnProfile();
       } catch (error) {
-        console.error(
+        reportBackgroundFailure(
           '[profiles] Restauración del perfil propio falló:',
           error,
         );
@@ -141,7 +145,10 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
         try {
           await syncSpaceMemberProfiles(space.id);
         } catch (error) {
-          console.error('[profiles] Sincronización del censo falló:', error);
+          reportBackgroundFailure(
+            '[profiles] Sincronización del censo falló:',
+            error,
+          );
         }
       }
     },
@@ -164,7 +171,7 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
           } catch (error) {
             uploadFailures.push(error);
             if (!options?.propagateFailure) {
-              console.error(
+              reportBackgroundFailure(
                 '[sync] Subida de espacio compartido falló:',
                 error,
               );
@@ -195,7 +202,7 @@ export function useFinanceSync(input: FinanceSyncInput): FinanceSyncController {
         if (options?.propagateFailure) throw error;
         // Las acciones explícitas de interfaz conservan el diagnóstico actual
         // y siguen mostrando la caché local.
-        console.error('[sync] Restauración remota falló:', error);
+        reportBackgroundFailure('[sync] Restauración remota falló:', error);
       }
       const now = Date.now();
       const isPolling = options?.mode === 'delta';

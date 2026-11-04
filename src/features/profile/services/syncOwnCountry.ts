@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import { apiClient } from '@/services/api/juntossApiClient';
 import { bootstrapRemoteAccount } from '@/features/sync/services/bootstrapRemoteAccount';
@@ -35,7 +36,7 @@ export async function syncOwnCountry(
     return true;
   } catch (error) {
     if (throwOnFailure) throw error;
-    console.error('[profiles] no se pudo publicar el país', { error });
+    reportBackgroundFailure('[profiles] no se pudo publicar el país', error);
     return false;
   }
 }

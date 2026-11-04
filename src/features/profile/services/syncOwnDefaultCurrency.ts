@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
 import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { apiClient } from '@/services/api/juntossApiClient';
@@ -31,9 +32,10 @@ export async function syncOwnDefaultCurrency(
     await apiClient.patch('/v1/me/profile', { defaultCurrency: currency });
     return true;
   } catch (error) {
-    console.error('[profiles] no se pudo publicar la moneda principal', {
+    reportBackgroundFailure(
+      '[profiles] no se pudo publicar la moneda principal',
       error,
-    });
+    );
     return false;
   }
 }

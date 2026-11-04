@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import { useEffect, useState } from 'react';
 
 import {
@@ -45,7 +46,10 @@ export function useExchangeRates(options?: {
         if (isMounted) setState(toLoadedState(rates));
       })
       .catch((error: unknown) => {
-        console.error('[exchangeRates] No se pudo leer la tasa vigente', error);
+        reportBackgroundFailure(
+          '[exchangeRates] No se pudo leer la tasa vigente',
+          error,
+        );
         if (isMounted) setState({ status: 'error' });
       });
 

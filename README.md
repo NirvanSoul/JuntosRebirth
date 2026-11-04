@@ -39,13 +39,13 @@ El script usa el túnel WebSocket disponible desde Expo SDK 57 porque el transpo
 
 La development build incorpora `expo-dev-client` y los módulos nativos del proyecto. Es necesaria para validar cambios nativos; Expo Go continúa siendo útil para comprobaciones rápidas de JavaScript.
 
-Conecta el iPhone por USB, actívale el modo de desarrollo y asegúrate de que Xcode pueda firmar `com.juntoss.app` con tu equipo. Después ejecuta:
+Conecta el iPhone por USB, actívale el modo de desarrollo y asegúrate de que Xcode pueda firmar `com.aoraestudio.juntos` con tu equipo. Después ejecuta:
 
 ```sh
 npm run ios:device
 ```
 
-El comando genera `ios/` mediante Expo CNG cuando hace falta, instala los pods, compila, instala la app en el dispositivo y arranca Metro. Para abrir el proyecto directamente en Xcode tras esa generación, abre `ios/juntoss.xcworkspace`, selecciona el iPhone y pulsa Run. En otra terminal, inicia el servidor para la development build:
+El comando genera `ios/` mediante Expo CNG cuando hace falta, instala los pods, compila, instala la app en el dispositivo y arranca Metro. Para abrir el proyecto directamente en Xcode tras esa generación, abre `ios/Juntos.xcworkspace`, selecciona el iPhone y pulsa Run. En otra terminal, inicia el servidor para la development build:
 
 ```sh
 npm run start:dev-client

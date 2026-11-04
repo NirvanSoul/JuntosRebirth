@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { CaretDown } from 'phosphor-react-native/src/icons/CaretDown';
 import { CaretUp } from 'phosphor-react-native/src/icons/CaretUp';
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -22,7 +22,6 @@ import type { CurrencyCode } from '@/lib/currency/currencyCatalog';
 import { useCurrencySymbolPreference } from '@/state/appPreferences/CurrencySymbolPreferenceProvider';
 import { iconSize } from '@/theme/layout';
 import { motion } from '@/theme/motion';
-import { spacing } from '@/theme/spacing';
 import type { TextVariant } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 
@@ -30,7 +29,7 @@ const comparisonHoldDuration =
   motion.summaryComparisonDisplayDuration -
   motion.summaryComparisonTransitionDuration * 2;
 
-/** Importe de la diferencia, sin signo: la flecha ya indica la dirección. */
+/** Importe de la diferencia, sin signo: el signo lo añade el formateo. */
 export function useComparisonAmount(
   comparison: PeriodComparisonResult | undefined,
   currency: CurrencyCode,
@@ -41,13 +40,13 @@ export function useComparisonAmount(
     : '';
 }
 
-/** «30,00 € menos»: la diferencia exacta, sin depender de un porcentaje. */
+/** «−30,00 €»: la diferencia exacta con su signo, sin depender de un porcentaje. */
 export function formatComparisonAmount(
   comparison: PeriodComparisonResult,
   amount: string,
 ): string {
   if (comparison.direction === 'flat') return 'Sin cambios';
-  return `${amount} ${comparison.direction === 'up' ? 'más' : 'menos'}`;
+  return `${comparison.direction === 'up' ? '+' : '\u2212'}${amount}`;
 }
 
 export function describeComparison(
@@ -61,10 +60,7 @@ export function describeComparison(
   return `${amount} ${comparison.direction === 'up' ? 'más' : 'menos'} que el periodo anterior`;
 }
 
-/**
- * Diferencia con una flecha fija a su izquierda: la dirección se entiende sin
- * depender de la animación del icono, que solo la refuerza.
- */
+/** Diferencia con signo «+» o «−»: ocupa menos que una flecha y un texto. */
 export function ComparisonAmount({
   amount,
   comparison,
@@ -76,35 +72,17 @@ export function ComparisonAmount({
   testID?: string;
   variant: TextVariant;
 }) {
-  const { colors } = useTheme();
-  const Caret =
-    comparison.direction === 'up'
-      ? CaretUp
-      : comparison.direction === 'down'
-        ? CaretDown
-        : null;
-
   return (
-    <View style={styles.percent}>
-      {Caret ? (
-        <Caret
-          color={colors.textPrimary}
-          size={iconSize.xs}
-          testID={testID}
-          weight="bold"
-        />
-      ) : null}
-      <Text
-        adjustsFontSizeToFit
-        minimumFontScale={0.72}
-        numberOfLines={1}
-        style={styles.amount}
-        variant={variant}
-        weight="semibold"
-      >
-        {formatComparisonAmount(comparison, amount)}
-      </Text>
-    </View>
+    <Text
+      adjustsFontSizeToFit
+      minimumFontScale={0.72}
+      numberOfLines={1}
+      testID={testID}
+      variant={variant}
+      weight="semibold"
+    >
+      {formatComparisonAmount(comparison, amount)}
+    </Text>
   );
 }
 
@@ -211,14 +189,6 @@ export function ComparisonTriangles({
 }
 
 const styles = StyleSheet.create({
-  percent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-  },
-  amount: {
-    flexShrink: 1,
-  },
   triangle: {
     position: 'absolute',
   },

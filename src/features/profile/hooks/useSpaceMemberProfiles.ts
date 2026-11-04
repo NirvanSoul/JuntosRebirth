@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import { useCallback, useEffect, useState } from 'react';
 
 import { getAuthenticatedUserId } from '@/features/legal/services/authenticatedUser';
@@ -127,10 +128,11 @@ export function useSpaceMemberProfiles(space: Space): SpaceMembership {
         if (isMounted)
           setMembership((current) => keepIfUnchanged(current, synced));
       } catch (error) {
-        console.error('[profiles] no se pudo refrescar el censo', {
-          spaceId,
+        reportBackgroundFailure(
+          '[profiles] no se pudo refrescar el censo',
           error,
-        });
+          { spaceId },
+        );
       }
     })();
 

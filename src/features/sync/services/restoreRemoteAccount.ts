@@ -1,3 +1,4 @@
+import { reportBackgroundFailure } from '@/lib/diagnostics/backgroundFailure';
 import {
   applyRemoteCollections,
   createLinkResolver,
@@ -383,7 +384,7 @@ export async function restoreRemoteAccountForCurrentSession(options?: {
           ) {
             throw error;
           }
-          console.error(
+          reportBackgroundFailure(
             '[sync] Delta falló, recurriendo a full restore:',
             error,
           );
