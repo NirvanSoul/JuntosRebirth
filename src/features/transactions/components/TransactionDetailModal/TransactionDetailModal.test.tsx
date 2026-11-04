@@ -655,6 +655,49 @@ describe('TransactionDetailModal', () => {
     expect(onSaveNote).toHaveBeenCalledWith('lunch', null);
   });
 
+  it('muestra la hora debajo de la fecha y la guarda como cambio puntual', async () => {
+    const onQuickEdit = jest.fn();
+    const timedTransaction = { ...transaction, occurredTime: '14:35' };
+    const screen = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <TransactionDetailModal
+            category={category}
+            onClose={jest.fn()}
+            onCopy={jest.fn(() => true)}
+            onDelete={jest.fn()}
+            onEdit={jest.fn()}
+            onQuickEdit={onQuickEdit}
+            onRemoveReminder={jest.fn(() => true)}
+            onSaveNote={jest.fn()}
+            onSaveReminder={jest.fn(() => true)}
+            reminder={null}
+            shareTargets={[]}
+            transaction={timedTransaction}
+            transactions={[timedTransaction]}
+            visible
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+    const timeRow = screen.getByTestId('transaction-detail-time-row');
+    expect(within(timeRow).getByText('Hora')).toBeTruthy();
+    expect(within(timeRow).getByText('14:35')).toBeTruthy();
+
+    await fireEvent.press(timeRow);
+    await fireEvent.press(screen.getByTestId('transaction-time-remove'));
+    expect(onQuickEdit).toHaveBeenCalledWith('lunch', {
+      field: 'time',
+      occurredTime: null,
+    });
+  });
+
   it('permite eliminar una ocurrencia proyectada sin ofrecer acciones que requieren materializarla', async () => {
     const projectedId = createProjectedTransactionId(
       'monthly-series',
@@ -690,6 +733,8 @@ describe('TransactionDetailModal', () => {
     );
 
     expect(screen.queryByTestId('transaction-detail-note')).toBeNull();
+    // La hora es de la ocurrencia registrada, no de las que vendrán.
+    expect(screen.queryByTestId('transaction-detail-time-row')).toBeNull();
     await fireEvent.press(
       screen.getByRole('button', { name: 'Eliminar movimiento' }),
     );
@@ -931,6 +976,69 @@ describe('TransactionDetailModal', () => {
       ).toBe('Bs. 600');
       expect(screen.getByText(/1 € BCV = Bs\.?\s*60/i)).toBeTruthy();
       expect(screen.getByText(/5 sept 2026/i)).toBeTruthy();
+
+      // Sin tasa USDT congelada no se inventa un valor: se conserva el
+      // importe original y se dice que falta.
+      await fireEvent.press(
+        screen.getByTestId(
+          'transaction-detail-display-mode-selector-control-VES_USDT',
+        ),
+      );
+      expect(
+        screen.getByTestId('transaction-detail-rate-badge').props.children,
+      ).toMatch(/^\$\s10$/);
+      expect(screen.getByText('Sin tasa USDT')).toBeTruthy();
+    });
+
+    it('lee en USDT los bolívares congelados al precio P2P', async () => {
+      jest.mocked(useCurrencyCapabilities).mockReturnValue({
+        accountingCurrency: 'USD',
+        allowedTransactionInputCurrencies: ['USD', 'VES'],
+        allowsMultipleAccountCurrencies: false,
+        countryCode: 'VE',
+        venezuelaCurrencyMode: true,
+        customExchangeRate: true,
+        multiRateMovementDisplay: true,
+      });
+      const usdtTransaction: SessionTransaction = {
+        ...transaction,
+        amountMinor: 1_000,
+        currency: 'USD',
+        exchangeSnapshot: {
+          countryCode: 'VE',
+          createdWithCurrency: 'USD',
+          rates: {
+            BCV: {
+              baseCurrency: 'USD',
+              quoteCurrency: 'VES',
+              rate: '50',
+              convertedAmountMinor: 50_000,
+              convertedCurrency: 'VES',
+              observedAt: '2026-09-05T04:00:00.000Z',
+            },
+            USDT: {
+              baseCurrency: 'USDT',
+              quoteCurrency: 'VES',
+              rate: '55',
+              convertedAmountMinor: 55_000,
+              convertedCurrency: 'VES',
+              observedAt: '2026-09-05T15:05:00.000Z',
+            },
+          },
+        },
+      };
+
+      const screen = await renderDetail({ transaction: usdtTransaction });
+      await fireEvent.press(
+        screen.getByTestId(
+          'transaction-detail-display-mode-selector-control-VES_USDT',
+        ),
+      );
+
+      expect(
+        screen.getByTestId('transaction-detail-rate-badge').props.children,
+      ).toMatch(/^Bs\.\s550$/);
+      expect(screen.getByText(/1 USDT = Bs\.?\s*55/i)).toBeTruthy();
     });
   });
 });

@@ -215,3 +215,68 @@ describe('AppCalendar vertical', () => {
     ]);
   });
 });
+
+describe('AppCalendar por meses con límites', () => {
+  const renderLimited = (onPressHeader?: () => void) =>
+    render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, right: 0, bottom: 34, left: 0 },
+        }}
+      >
+        <ThemeProvider initialAppearance="light">
+          <AppCalendar
+            currentDate="2026-01-20"
+            maxDate="2026-02-10"
+            minDate="2026-01-19"
+            onPressHeader={onPressHeader}
+            onSelectDate={jest.fn()}
+            testID="limited"
+          />
+        </ThemeProvider>
+      </SafeAreaProvider>,
+    );
+
+  it('no retrocede antes del primer mes ni avanza después del último', async () => {
+    const screen = await renderLimited();
+
+    await fireEvent.press(
+      screen.getByTestId('limited.header.leftArrow', {
+        includeHiddenElements: true,
+      }),
+    );
+    expect(
+      screen.getByText(/enero 2026/i, { includeHiddenElements: true }),
+    ).toBeTruthy();
+
+    await fireEvent.press(
+      screen.getByTestId('limited.header.rightArrow', {
+        includeHiddenElements: true,
+      }),
+    );
+    expect(
+      screen.getByText(/febrero 2026/i, { includeHiddenElements: true }),
+    ).toBeTruthy();
+    await fireEvent.press(
+      screen.getByTestId('limited.header.rightArrow', {
+        includeHiddenElements: true,
+      }),
+    );
+    expect(
+      screen.getByText(/febrero 2026/i, { includeHiddenElements: true }),
+    ).toBeTruthy();
+  });
+
+  it('hace pulsable el mes y año de la cabecera', async () => {
+    const onPressHeader = jest.fn();
+    const screen = await renderLimited(onPressHeader);
+
+    await fireEvent.press(
+      screen.getByTestId('limited.monthButton', {
+        includeHiddenElements: true,
+      }),
+    );
+    expect(onPressHeader).toHaveBeenCalled();
+  });
+});

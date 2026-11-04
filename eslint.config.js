@@ -41,7 +41,9 @@ const frozenLineDebt = {
   // Bajado de 573 a 555 el 2026-10-24 al extraer los filtros a
   // `features/activity/hooks/useActivityFilters.ts`.
   'src/features/activity/screens/ActivityScreen.tsx': 555,
-  'src/components/ui/AppCalendar/AppCalendar.tsx': 565,
+  // Bajado de 565 a 481 el 2026-11-04 al extraer el tema de
+  // react-native-calendars a `components/ui/AppCalendar/appCalendarTheme.ts`.
+  'src/components/ui/AppCalendar/AppCalendar.tsx': 481,
   'src/features/import/repositories/localImportBatchRepository.ts': 556,
   // `localDatabase.ts` salió de esta lista el 2026-08-17: al extraer el esquema
   // fundacional y la escalera de migraciones bajó de 536 a 62 líneas y ya

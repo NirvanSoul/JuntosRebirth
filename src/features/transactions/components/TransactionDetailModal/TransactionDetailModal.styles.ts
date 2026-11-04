@@ -69,9 +69,26 @@ export function createStyles(colors: ColorTokens, shadows: ThemeShadows) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      gap: spacing.sm,
       width: '100%',
       marginTop: spacing.xs,
     },
+    rateText: { flexShrink: 1 },
+    /** Fecha de la tasa: un botón blanco dentro de la tarjeta del importe. */
+    rateDateBadge: {
+      ...shadows.subtle,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: radii.round,
+      borderWidth: 1,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+    },
+    /** Leído con las tasas de otro día que no es el del movimiento. */
+    rateDateBadgeChanged: { borderColor: colors.cta },
     directionIcon: {
       width: iconSize.lg,
       height: iconSize.lg,

@@ -63,6 +63,46 @@ export function MonthNavigatorLabel({ label }: { label: string }) {
   );
 }
 
+/**
+ * Etiqueta pulsable del navegador: mismo fondo que las flechas, porque sin él
+ * nada indica que el periodo también se puede pulsar.
+ */
+export function MonthNavigatorLabelButton({
+  accessibilityHint,
+  expanded,
+  label,
+  onPress,
+  style,
+  testID,
+}: {
+  accessibilityHint?: string;
+  expanded?: boolean;
+  label: string;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+  testID?: string;
+}) {
+  const themedStyles = useThemedStyles(createThemedStyles);
+
+  return (
+    <Pressable
+      accessibilityHint={accessibilityHint}
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        themedStyles.labelButton,
+        style,
+        pressed && styles.pressed,
+      ]}
+      testID={testID}
+    >
+      <MonthNavigatorLabel label={label} />
+    </Pressable>
+  );
+}
+
 export function MonthNavigator({
   label,
   labelAccessibilityHint,
@@ -77,8 +117,6 @@ export function MonthNavigator({
   style,
   testID,
 }: MonthNavigatorProps) {
-  const themedStyles = useThemedStyles(createThemedStyles);
-
   return (
     <View style={[styles.navigator, style]} testID={testID}>
       <Pressable
@@ -92,22 +130,13 @@ export function MonthNavigator({
         <MonthNavigatorArrow direction="left" disabled={previousDisabled} />
       </Pressable>
       {onLabelPress ? (
-        <Pressable
+        <MonthNavigatorLabelButton
           accessibilityHint={labelAccessibilityHint}
-          accessibilityLabel={label}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: labelExpanded }}
+          expanded={labelExpanded}
+          label={label}
           onPress={onLabelPress}
-          // Mismo fondo que las flechas: sin él, nada indica que el periodo
-          // también se puede pulsar.
-          style={({ pressed }) => [
-            styles.label,
-            themedStyles.labelButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <MonthNavigatorLabel label={label} />
-        </Pressable>
+          style={styles.label}
+        />
       ) : (
         <View style={styles.label}>
           <MonthNavigatorLabel label={label} />

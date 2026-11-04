@@ -35,6 +35,7 @@ import {
 } from '@/features/transactions/components/TransactionDetailModal/transactionDetailPresentation';
 import { TransactionDetailAmount } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailAmount';
 import { TransactionDetailSecondaryActions } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailSecondaryActions';
+import { TransactionDetailTimeRow } from '@/features/transactions/components/TransactionDetailModal/TransactionDetailTimeRow';
 import {
   TransactionDetailQuickEditors,
   type TransactionQuickEditField,
@@ -323,6 +324,14 @@ export function TransactionDetailModal({
             ) : null}
 
             <TransactionDetailAmount
+              accentColor={
+                category ? categoryColors[category.colorToken] : undefined
+              }
+              accentTextTone={
+                category
+                  ? getCategoryContentContrast(category.colorToken).tone
+                  : undefined
+              }
               mode={canDisplayVenezuelaRates ? valuationMode : undefined}
               onPress={() => onEdit(transaction.id)}
               transaction={transaction}
@@ -469,6 +478,21 @@ export function TransactionDetailModal({
                 />
               </Pressable>
               <View style={styles.divider} />
+              {!isProjected ? (
+                <>
+                  <TransactionDetailTimeRow
+                    occurredTime={transaction.occurredTime}
+                    onChange={(occurredTime) =>
+                      onQuickEdit?.(transaction.id, {
+                        field: 'time',
+                        occurredTime,
+                      })
+                    }
+                    transactionId={transaction.id}
+                  />
+                  <View style={styles.divider} />
+                </>
+              ) : null}
               <Pressable
                 accessibilityLabel={`Cambiar recurrencia: ${transactionRecurrenceLabels[transaction.recurrence]}`}
                 accessibilityRole="button"

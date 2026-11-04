@@ -400,15 +400,10 @@ periodo seleccionado. La acción `Añadir ingreso` en verde o `Añadir gasto` en
 rojo flota sobre el listado, anclada al pie del modal, para que nunca se pierda
 por mucho que se baje.
 
-Al terminar los movimientos del periodo elegido, el listado sigue hacia atrás
-con los del periodo anterior, sin título propio, y al acercarse al final se
-añade el siguiente. Se saltan los periodos sin movimientos y se detiene en el
-primero registrado. El selector de periodo queda fijo arriba y, al bajar, pasa
-al periodo que se está viendo (por ejemplo, de `Octubre 2026` a
-`Septiembre 2026`); usar sus flechas u opciones desde ahí elige ese periodo y
-vuelve el listado arriba. Así se revisan meses anteriores sin subir a cambiar
-el selector; la tarjeta de total sigue refiriéndose solo al periodo elegido.
-Con `Todos` no hay periodos anteriores.
+El listado muestra solo los movimientos del periodo elegido. Con `Todos`
+(«Desde el inicio») se agrupan por mes, cada grupo con su subtítulo de mes y
+año («Octubre 2026») que se pulsa para plegarlo o desplegarlo, igual que en
+Actividad; con cualquier otro periodo no hay subtítulos ni grupos.
 
 Los movimientos de estos modales admiten la misma pulsación larga que en
 Inicio y Actividad: abre sus acciones (editar, copiar, eliminar) y eliminar o
@@ -1099,6 +1094,25 @@ guardar o cerrar se vuelve al movimiento que se estaba mirando, ya actualizado,
 y el formulario completo no llega a aparecer. La categoría ya no navega a su
 detalle desde aquí. Solo se ofrecen cuentas en la misma moneda del movimiento,
 porque el importe no cambia al entrar en un saldo.
+
+Debajo de la fecha, la fila «Hora» es el único lugar donde se ve y se edita la
+hora del movimiento; ningún formulario, lista, filtro ni reporte la muestra. Se
+presenta en el formato 12/24 h del sistema y, sin hora, ofrece «Agregar hora»
+en vez de un «00:00». Abre el selector nativo del sistema, que permite también
+«Quitar hora». Un movimiento registrado con fecha de hoy guarda la hora actual
+sin que la persona la elija; uno con otra fecha, las repeticiones que genera
+una recurrencia y los importados quedan sin hora. Las repeticiones futuras
+proyectadas no muestran la fila.
+
+En Venezuela, la fecha de la tasa bajo el importe es un botón blanco. Abre un
+calendario, desde el primer día con tasa USDT guardada (19 de enero de 2026)
+hasta hoy, sin flechas ni deslizamiento fuera de ese rango, para ver cuánto
+habría valido el importe en otro día con las tasas de ese día. Por defecto es
+la fecha del movimiento; «Hoy» aplica la tasa de hoy. Pulsar el mes y año del
+calendario muestra los doce meses como botones para saltar a uno. Una fecha
+distinta de la del movimiento tiñe de morado solo el botón; el importe nunca
+cambia de color. La elección no se guarda: vuelve a la fecha del movimiento
+al abrir otro.
 
 Cambiar la recurrencia de un movimiento afecta a lo que viene después, no a lo
 que ya pasó: las repeticiones posteriores a su fecha se sustituyen por la nueva

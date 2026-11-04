@@ -23,7 +23,9 @@ import type { CalendarProps, DateData } from 'react-native-calendars';
 import {
   MonthNavigatorArrow,
   MonthNavigatorLabel,
+  MonthNavigatorLabelButton,
 } from '@/components/ui/MonthNavigator/MonthNavigator';
+import { createCalendarTheme } from '@/components/ui/AppCalendar/appCalendarTheme';
 import '@/components/ui/AppCalendar/calendarLocale';
 import { Text } from '@/components/ui/Text/Text';
 import {
@@ -37,7 +39,6 @@ import { layout } from '@/theme/layout';
 import { radii } from '@/theme/radii';
 import { spacing } from '@/theme/spacing';
 import type { ColorTokens } from '@/theme/types';
-import { typography } from '@/theme/typography';
 import { useTheme } from '@/theme/useTheme';
 import { useThemedStyles } from '@/theme/useThemedStyles';
 
@@ -48,11 +49,16 @@ type AppCalendarProps = {
   currentDate: string;
   footer?: ReactElement | null;
   markedDates?: MarkedDates;
+  /** Últimos y primeros días elegibles (`YYYY-MM-DD`); fuera quedan apagados. */
+  maxDate?: string;
+  minDate?: string;
   mode?: 'month' | 'scroll';
   onFocusedMonthChange?: (month: string, date?: string) => void;
+  onPressHeader?: () => void; // Mes y año pulsables (solo en modo mes).
   onSelectDate: (date: string) => void;
   rangeEndDate?: string;
   selectedDate?: string;
+  selectedColor?: string; // Fondo del día elegido; por defecto, el CTA.
   testID: string;
 };
 
@@ -60,14 +66,6 @@ export type AppCalendarHandle = {
   scrollToDate: (date: string) => void;
 };
 
-type CalendarTheme = NonNullable<ComponentProps<typeof Calendar>['theme']> & {
-  'stylesheet.calendar.header': Record<string, object>;
-  'stylesheet.calendar-list.main': Record<string, object>;
-  'stylesheet.calendar.main': Record<string, object>;
-  'stylesheet.day.basic': Record<string, object>;
-};
-
-const calendarDaySize = 40;
 const calendarFutureRange = 12;
 const scrollCalendarDayHeight = 52;
 const scrollCalendarNumberSize = 32;
@@ -202,113 +200,21 @@ function ScrollWeekdayRow({ testID }: { testID: string }) {
   );
 }
 
-function createCalendarTheme(colors: ColorTokens): CalendarTheme {
-  return {
-    arrowColor: colors.textPrimary,
-    calendarBackground: colors.surface,
-    dayTextColor: colors.textPrimary,
-    monthTextColor: colors.textPrimary,
-    selectedDayBackgroundColor: colors.cta,
-    selectedDayTextColor: colors.onBrand,
-    textDayFontFamily: typography.body.fontFamily,
-    textDayFontSize: typography.body.fontSize,
-    textDayHeaderFontFamily: typography.footnote.fontFamily,
-    textDayHeaderFontSize: typography.footnote.fontSize,
-    textDisabledColor: colors.textMuted,
-    textMonthFontFamily: typography.bodyStrong.fontFamily,
-    textMonthFontSize: typography.bodyStrong.fontSize,
-    textSectionTitleColor: colors.textSecondary,
-    todayTextColor: colors.cta,
-    'stylesheet.calendar.header': {
-      header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: spacing.none,
-        paddingHorizontal: spacing.none,
-      },
-      monthText: {
-        color: colors.textPrimary,
-        fontFamily: typography.bodyStrong.fontFamily,
-        fontSize: typography.bodyStrong.fontSize,
-        marginVertical: spacing.xs,
-      },
-      week: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginTop: spacing.xl,
-      },
-      dayHeader: {
-        width: spacing.xxl,
-        color: colors.textSecondary,
-        fontFamily: typography.footnote.fontFamily,
-        fontSize: typography.footnote.fontSize,
-        includeFontPadding: false,
-        letterSpacing: typography.footnote.letterSpacing,
-        lineHeight: typography.footnote.lineHeight,
-        marginBottom: spacing.lg,
-        textAlign: 'center',
-      },
-    },
-    'stylesheet.calendar.main': {
-      container: {
-        paddingLeft: spacing.none,
-        paddingRight: spacing.none,
-        backgroundColor: colors.surface,
-      },
-      week: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginVertical: spacing.sm,
-      },
-    },
-    'stylesheet.calendar-list.main': {
-      flatListContainer: { flex: 1 },
-    },
-    'stylesheet.day.basic': {
-      base: {
-        width: calendarDaySize,
-        height: calendarDaySize,
-        alignItems: 'center',
-        justifyContent: 'center',
-      },
-      today: {
-        borderColor: colors.cta,
-        borderRadius: radii.sm,
-        borderWidth: 1,
-      },
-      selected: {
-        backgroundColor: colors.cta,
-        borderRadius: radii.sm,
-      },
-      text: {
-        color: colors.textPrimary,
-        fontFamily: typography.body.fontFamily,
-        fontSize: typography.body.fontSize,
-        includeFontPadding: false,
-        lineHeight: calendarDaySize,
-        marginTop: spacing.none,
-        textAlign: 'center',
-        textAlignVertical: 'center',
-      },
-      todayText: { color: colors.cta },
-      selectedText: { color: colors.onBrand },
-      disabledText: { color: colors.textMuted },
-    },
-  };
-}
-
 export const AppCalendar = memo(
   forwardRef<AppCalendarHandle, AppCalendarProps>(function AppCalendar(
     {
       currentDate,
       footer,
       markedDates = {},
+      maxDate,
+      minDate,
       mode = 'month',
       onFocusedMonthChange,
+      onPressHeader,
       onSelectDate,
       rangeEndDate,
       selectedDate,
+      selectedColor,
       testID,
     },
     ref,
@@ -317,6 +223,8 @@ export const AppCalendar = memo(
     const themedStyles = useThemedStyles(createThemedStyles);
     const calendarTheme = useMemo(() => createCalendarTheme(colors), [colors]);
     const [scrollAnchorDate] = useState(currentDate);
+    /** Mes visible en modo mes, `YYYY-MM`, para apagar flechas en los límites. */
+    const [shownMonth, setShownMonth] = useState(currentDate.slice(0, 7));
     const futureScrollRange = getCalendarFutureMonthRange(
       scrollAnchorDate,
       rangeEndDate ?? scrollAnchorDate,
@@ -346,12 +254,12 @@ export const AppCalendar = memo(
               [selectedDate]: {
                 ...markedDates[selectedDate],
                 selected: true,
-                selectedColor: colors.cta,
+                selectedColor: selectedColor ?? colors.cta,
                 selectedTextColor: colors.onBrand,
               },
             }
           : markedDates,
-      [colors, markedDates, selectedDate],
+      [colors, markedDates, selectedColor, selectedDate],
     );
 
     useImperativeHandle(
@@ -383,7 +291,8 @@ export const AppCalendar = memo(
         hideExtraDays: mode !== 'scroll',
         markedDates: dates,
         markingType: 'multi-dot' as const,
-        minDate: minimumCalendarDate,
+        maxDate,
+        minDate: minDate ?? minimumCalendarDate,
         monthFormat: 'MMMM yyyy',
         onDayPress: handleDayPress,
         testID,
@@ -394,6 +303,8 @@ export const AppCalendar = memo(
         currentDate,
         dates,
         handleDayPress,
+        maxDate,
+        minDate,
         mode,
         scrollAnchorDate,
         testID,
@@ -471,16 +382,39 @@ export const AppCalendar = memo(
       );
     }
 
+    // Con límites, ni las flechas ni el deslizamiento salen del rango: la
+    // librería solo apaga los días, no la navegación.
+    const isAtMinMonth = Boolean(minDate && shownMonth <= minDate.slice(0, 7));
+    const isAtMaxMonth = Boolean(maxDate && shownMonth >= maxDate.slice(0, 7));
     return (
       <Calendar
         {...commonProps}
         enableSwipeMonths
+        onPressArrowLeft={(subtractMonth) => !isAtMinMonth && subtractMonth()}
+        onPressArrowRight={(addMonth) => !isAtMaxMonth && addMonth()}
         renderArrow={(direction) => (
-          <MonthNavigatorArrow direction={direction} />
+          <MonthNavigatorArrow
+            direction={direction}
+            disabled={direction === 'left' ? isAtMinMonth : isAtMaxMonth}
+          />
         )}
-        renderHeader={(month) => (
-          <MonthNavigatorLabel label={month?.toString('MMMM yyyy') ?? ''} />
-        )}
+        onMonthChange={({ dateString }) => {
+          setShownMonth(dateString.slice(0, 7));
+          onFocusedMonthChangeRef.current?.(dateString.slice(0, 7));
+        }}
+        renderHeader={(month) => {
+          const label = month?.toString('MMMM yyyy') ?? '';
+          return onPressHeader ? (
+            <MonthNavigatorLabelButton
+              label={label}
+              onPress={onPressHeader}
+              style={styles.headerButton}
+              testID={`${testID}.monthButton`}
+            />
+          ) : (
+            <MonthNavigatorLabel label={label} />
+          );
+        }}
         style={styles.calendar}
       />
     );
@@ -488,6 +422,7 @@ export const AppCalendar = memo(
 );
 
 const styles = StyleSheet.create({
+  headerButton: { flex: 1 },
   calendar: {
     borderRadius: radii.md,
     marginTop: spacing.lg,
