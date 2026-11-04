@@ -45,6 +45,28 @@ const successRates = {
   },
 };
 
+function withUsdtRate({ stale }: { stale: boolean }) {
+  return {
+    ...successRates,
+    rates: {
+      ...successRates.rates,
+      rates: {
+        ...successRates.rates.rates,
+        USDT: {
+          source: 'USDT' as const,
+          baseCurrency: 'USDT' as const,
+          quoteCurrency: 'VES' as const,
+          rate: '62.0000000000',
+          dailyAverage: '61.5000000000',
+          observedAt: '2026-09-22T19:00:00.000Z',
+          fetchedAt: '2026-09-22T19:05:00.000Z',
+          stale,
+        },
+      },
+    },
+  };
+}
+
 const accounts = summarizeMoneyAccounts(
   [
     {
@@ -260,6 +282,38 @@ describe('CurrencyExchangeModal', () => {
 
     expect(amountOf(screen, 'give')).toBe('500');
     expect(screen.getByLabelText('Bolívares por dólar: 50')).toBeTruthy();
+  });
+
+  it('sin tasa USDT del backend no la ofrece', async () => {
+    const { screen } = await renderModal();
+
+    expect(screen.queryByText('USDT')).toBeNull();
+  });
+
+  it('con tasa USDT la ofrece en el selector y recalcula con ella', async () => {
+    mockedUseExchangeRates.mockReturnValue(withUsdtRate({ stale: false }));
+    const { screen } = await renderModal();
+
+    await fireEvent.press(
+      screen.getByLabelText('Recibes dólares, sin importe'),
+    );
+    await typeKeys(screen, '10');
+    await fireEvent.press(screen.getByText('USDT'));
+
+    expect(amountOf(screen, 'give')).toBe('620');
+    expect(screen.getByLabelText('Bolívares por dólar: 62')).toBeTruthy();
+    expect(screen.queryByTestId('currency-exchange-rate-notice')).toBeNull();
+  });
+
+  it('avisa cuando la tasa USDT tiene más de dos horas', async () => {
+    mockedUseExchangeRates.mockReturnValue(withUsdtRate({ stale: true }));
+    const { screen } = await renderModal();
+
+    await fireEvent.press(screen.getByText('USDT'));
+
+    expect(
+      screen.getByTestId('currency-exchange-rate-notice'),
+    ).toHaveTextContent('Tasa USDT de hace más de dos horas.');
   });
 
   it('sin tasa del backend solo deja la personalizada, editable con el teclado', async () => {

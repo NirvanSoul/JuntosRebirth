@@ -16,6 +16,13 @@ import { useDepsChanged } from '@/hooks/useDepsChanged';
 import type { ExchangeRateSource } from '@/lib/currency/exchangeRateSource';
 
 const allRateSources: readonly ExchangeRateSource[] = ['BCV', 'EURO', 'CUSTOM'];
+/** Con la tasa P2P disponible, se ofrece junto a las del BCV. */
+const ratesWithUsdtSources: readonly ExchangeRateSource[] = [
+  'BCV',
+  'EURO',
+  'USDT',
+  'CUSTOM',
+];
 const customOnlySources: readonly ExchangeRateSource[] = ['CUSTOM'];
 
 /**
@@ -57,10 +64,15 @@ export function useCurrencyExchangeForm({ visible }: { visible: boolean }) {
   }
 
   const rate = resolveExchangeRate(state, officialRates);
+  const usdtRate = officialRates?.USDT ?? null;
 
   return {
     availableSources:
-      ratesState.status === 'error' ? customOnlySources : allRateSources,
+      ratesState.status === 'error'
+        ? customOnlySources
+        : usdtRate
+          ? ratesWithUsdtSources
+          : allRateSources,
     canSubmit: canSubmitCurrencyExchange(state, officialRates),
     dispatch,
     /** Valor del recuadro de tasa: el escrito a mano o el vigente de la fuente. */
@@ -71,7 +83,11 @@ export function useCurrencyExchangeForm({ visible }: { visible: boolean }) {
           ? ''
           : formatExchangeRateInput(rate),
     /** Solo se explica lo excepcional: cargando, sin tasa o tasa no fresca. */
-    rateNotice: describeRateNotice(state, ratesState.status),
+    rateNotice: describeRateNotice(
+      state,
+      ratesState.status,
+      usdtRate?.stale ?? false,
+    ),
     ratesStatus: ratesState.status,
     state,
     submission: deriveCurrencyExchangeSubmission(state),
@@ -81,6 +97,7 @@ export function useCurrencyExchangeForm({ visible }: { visible: boolean }) {
 function describeRateNotice(
   state: CurrencyExchangeFormState,
   status: ReturnType<typeof useExchangeRates>['status'],
+  isUsdtStale: boolean,
 ): string {
   if (state.rateSource === 'CUSTOM') {
     return status === 'error'
@@ -88,6 +105,10 @@ function describeRateNotice(
       : '';
   }
   if (status === 'loading') return 'Cargando la tasa de hoy…';
+  // La P2P cambia durante el día: se avisa si la última lectura es vieja.
+  if (state.rateSource === 'USDT') {
+    return isUsdtStale ? 'Tasa USDT de hace más de dos horas.' : '';
+  }
   if (status === 'stale') return 'Tasa no actualizada hoy.';
 
   return '';
