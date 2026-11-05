@@ -1,15 +1,15 @@
 {
   "expo": {
     "name": "Juntos",
-    "slug": "juntoss",
+    "slug": "juntos",
     "scheme": "juntoss",
-    "version": "0.1.0",
+    "version": "0.0.4",
     "icon": "./assets/icons/App Icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.aoraestudio.juntoss",
+      "bundleIdentifier": "com.aoraestudio.juntos",
       "infoPlist": {
         "CFBundleDevelopmentRegion": "es",
         "CFBundleLocalizations": ["es"],
@@ -64,7 +64,7 @@
     },
     "android": {
       "package": "com.juntosapp.finance",
-      "versionCode": 2,
+      "versionCode": 4,
       "predictiveBackGestureEnabled": true
     },
     "assetBundlePatterns": ["**/*"],
