@@ -20,6 +20,12 @@ type RequestOptions = {
   binary?: { bytes: Uint8Array; contentType: string };
   headers?: HeadersInit;
   isPublic?: boolean;
+  /**
+   * Rechazos que el llamador ya sabe tratar (p. ej. reenviar sin un campo
+   * que un servidor anterior no admite). Se lanzan igual, pero sin el log de
+   * error: en desarrollo ese log abre LogBox en rojo aunque todo haya ido bien.
+   */
+  isExpectedFailure?: (error: ApiError) => boolean;
   method?: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
 };
 
@@ -152,6 +158,7 @@ export function createApiClient({
       binary,
       body,
       headers: suppliedHeaders,
+      isExpectedFailure,
       isPublic = false,
       method = 'GET',
     } = options;
@@ -208,6 +215,7 @@ export function createApiClient({
       // El mensaje de `ApiError` es deliberadamente apto para UI. El detalle
       // operativo se conserva únicamente en el log, sin incluir el body ni la
       // cookie de la petición.
+      if (isExpectedFailure?.(error)) throw error;
       console.error('[api] Request failed', {
         status: error.status,
         code: error.code,
@@ -259,8 +267,11 @@ export function createApiClient({
     },
     patch: <T>(path: string, body: unknown) =>
       request<T>(path, { body, method: 'PATCH' }),
-    post: <T>(path: string, body: unknown) =>
-      request<T>(path, { body, method: 'POST' }),
+    post: <T>(
+      path: string,
+      body: unknown,
+      options?: Pick<RequestOptions, 'isExpectedFailure'>,
+    ) => request<T>(path, { ...options, body, method: 'POST' }),
     put: <T>(path: string, body: unknown) =>
       request<T>(path, { body, method: 'PUT' }),
     /** `PUT` con cuerpo binario: hoy solo la subida del avatar. */

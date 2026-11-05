@@ -1,4 +1,5 @@
 import { apiClient } from '@/services/api/juntossApiClient';
+import { isOccurredTimeRejection } from '@/features/sync/services/occurredTimeUploadSupport';
 import type { TransactionExchangeSnapshot } from '@/features/transactions/types';
 
 export type CoupleSpaceSyncPayload = {
@@ -62,6 +63,8 @@ export async function syncCoupleSpaceRemotely(
   const response = await apiClient.post<{ data: CoupleSpaceSyncResult }>(
     `/v1/spaces/${spaceId}/sync`,
     batch,
+    // Lo reintenta `sendWithOccurredTimeSupport` sin la hora: no es un fallo.
+    { isExpectedFailure: isOccurredTimeRejection },
   );
   return response.data;
 }

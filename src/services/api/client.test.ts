@@ -103,6 +103,40 @@ describe('apiClient', () => {
     log.mockRestore();
   });
 
+  it('no registra un rechazo que el llamador declara esperado', async () => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const client = createApiClient({
+      baseUrl: 'https://api.example.test',
+      fetchImpl: jest.fn().mockResolvedValue(
+        createResponse(
+          {
+            error: {
+              code: 'INVALID_SYNC_PAYLOAD',
+              details: {
+                path: ['transactions', 0, 'occurredTime'],
+                reason: 'FIELD_NOT_ALLOWED',
+              },
+            },
+          },
+          400,
+        ),
+      ),
+      getCookie: async () => '',
+    });
+
+    await expect(
+      client.post(
+        '/v1/spaces/s/sync',
+        {},
+        { isExpectedFailure: (error) => error.code === 'INVALID_SYNC_PAYLOAD' },
+      ),
+    ).rejects.toEqual(
+      expect.objectContaining({ code: 'INVALID_SYNC_PAYLOAD', status: 400 }),
+    );
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
   it('sube bytes con su propio Content-Type y sin serializarlos', async () => {
     const fetchImpl = jest
       .fn()
