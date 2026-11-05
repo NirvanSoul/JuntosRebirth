@@ -41,6 +41,7 @@ export const transactions: Record<string, string> = {
   'Quitar hora': 'Remove time',
   Único: 'One-time',
   Personalizada: 'Custom',
+  Libre: 'Custom',
   'Elige la cuenta': 'Choose the account',
   'Sin cuenta': 'No account',
   'Guardar cuenta': 'Save account',

@@ -189,7 +189,7 @@ describe('CurrencyExchangeModal', () => {
 
     expect(screen.getByLabelText('Bolívares por dólar: 50')).toBeTruthy();
     expect(
-      screen.getByLabelText('Personalizada').props.accessibilityState,
+      screen.getByLabelText('Libre').props.accessibilityState,
     ).toMatchObject({ selected: true });
     expect(amountOf(screen, 'give')).toBe('400');
     expect(amountOf(screen, 'receive')).toBe('8');

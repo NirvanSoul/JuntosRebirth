@@ -259,6 +259,39 @@ export function CurrencyExchangeModal({
       >
         <View style={styles.container}>
           <View style={styles.header}>
+            <View style={styles.rateRow}>
+              <Text variant="label" weight="medium">
+                1 USD =
+              </Text>
+              <Pressable
+                accessibilityHint="Escribe la tasa con el teclado"
+                accessibilityLabel={
+                  form.rateInputValue
+                    ? `Bolívares por dólar: ${form.rateInputValue}`
+                    : 'Bolívares por dólar'
+                }
+                accessibilityRole="button"
+                accessibilityState={{ selected: target === 'RATE' }}
+                hitSlop={iconSize.xs}
+                onPress={() => selectTarget('RATE')}
+                style={[
+                  styles.rateValue,
+                  target === 'RATE' && styles.rateValueActive,
+                ]}
+                testID="currency-exchange-rate-value"
+              >
+                <Text
+                  tone={form.rateInputValue ? 'primary' : 'muted'}
+                  variant="label"
+                  weight="semibold"
+                >
+                  {form.rateInputValue || '0'}
+                </Text>
+              </Pressable>
+              <Text variant="label" weight="medium">
+                Bs
+              </Text>
+            </View>
             <ModalCloseButton
               onPress={onClose}
               testID="currency-exchange-close-button"
@@ -305,39 +338,6 @@ export function CurrencyExchangeModal({
               selectedSource={state.rateSource}
               testID="currency-exchange-rate-source"
             />
-            <View style={styles.rateRow}>
-              <Text variant="label" weight="medium">
-                1 USD =
-              </Text>
-              <Pressable
-                accessibilityHint="Escribe la tasa con el teclado"
-                accessibilityLabel={
-                  form.rateInputValue
-                    ? `Bolívares por dólar: ${form.rateInputValue}`
-                    : 'Bolívares por dólar'
-                }
-                accessibilityRole="button"
-                accessibilityState={{ selected: target === 'RATE' }}
-                hitSlop={iconSize.xs}
-                onPress={() => selectTarget('RATE')}
-                style={[
-                  styles.rateValue,
-                  target === 'RATE' && styles.rateValueActive,
-                ]}
-                testID="currency-exchange-rate-value"
-              >
-                <Text
-                  tone={form.rateInputValue ? 'primary' : 'muted'}
-                  variant="label"
-                  weight="semibold"
-                >
-                  {form.rateInputValue || '0'}
-                </Text>
-              </Pressable>
-              <Text variant="label" weight="medium">
-                Bs
-              </Text>
-            </View>
             {form.rateNotice ? (
               <Text
                 accessibilityLiveRegion="polite"

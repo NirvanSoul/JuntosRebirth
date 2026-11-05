@@ -24,7 +24,12 @@ export function createStyles(
       justifyContent: 'space-between',
       gap: layout.controlGap[density],
     },
-    header: { flexDirection: 'row', justifyContent: 'flex-end' },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
     blocks: { gap: spacing.xs },
     block: { gap: spacing.xxs },
     amountRow: {
@@ -84,14 +89,15 @@ export function createStyles(
       borderRadius: radii.round,
       backgroundColor: colors.surface,
     },
+    /** Separado de los importes para que el selector de cuatro fuentes respire. */
     rateSection: {
-      gap: spacing.xs,
+      gap: spacing.sm,
+      marginTop: spacing.lg,
     },
     rateRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
-      paddingTop: spacing.sm,
     },
     rateValue: {
       ...shadows.subtle,

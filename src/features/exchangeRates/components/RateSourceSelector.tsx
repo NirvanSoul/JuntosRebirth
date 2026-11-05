@@ -46,7 +46,10 @@ export function RateSourceSelector({
                 ? showCurrencySymbols
                   ? '€ BCV'
                   : 'Euro BCV'
-                : getExchangeRateSourceLabel(source),
+                : source === 'CUSTOM'
+                  ? // Cabe en el segmento junto a otras tres fuentes.
+                    'Libre'
+                  : getExchangeRateSourceLabel(source),
           value: source,
         }))}
         selectedValue={selectedSource}
